@@ -1,0 +1,24 @@
+extend-exclude = ["test"]
+exclude = ["**/gui.py"]
+line-length = 180
+indent-width = 4
+target-version = "py313"
+
+[lint]
+
+#select = ["F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "CPY", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TC", "INT", "ARG", "PTH", "TD", "FIX", "ERA", "PD", "PGH", "PL", "C", "R", "TRY", "FLY", "NPY", "FAST", "AIR", "PERF", "FURB", "DOC", "RUF"]
+
+select = ["F", "E", "W", "C90", "I", "N", "UP", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "CPY", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TC", "INT", "ARG", "PTH", "TD", "FIX", "ERA", "PD", "PGH", "PL", "C", "R", "TRY", "FLY", "NPY", "FAST", "AIR", "PERF", "FURB", "DOC", "RUF"]
+
+ignore = ["W191","PLR0913","E731","T201","BLE001","ERA001","C901","B006","TD003","FIX002"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.pylint]
+max-branches = 15
+
+[format]
+quote-style = "double"
+indent-style = "tab"
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

@@ -1,7 +1,0 @@
---enable-plugin=tk-inter
-
-nuitka --standalone --mingw64 --plugin-enable=upx --upx-binary="E:\zybqw\upx\upx.exe" --show-progress --show-memory --remove-output --windows-icon-from-ico=luo.ico --windows-company-name="猫鱼a" --windows-product-name="Aumiao" --windows-file-version="1.12.5" --windows-file-description="A CodeMao Community Tool" --output-dir=out Aumiao.py
-
-
-nuitka --standalone --mingw64 --plugin-enable=upx --upx-binary="E:\zybqw\upx\upx.exe" --show-progress --show-memory --remove-output --windows-company-name="猫鱼a" --windows-product-name="Aumiao" --windows-file-version="1.12.5" --windows-file-description="A CodeMao Community Tool" --output-dir=out test.py
-

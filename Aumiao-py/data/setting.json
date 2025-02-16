@@ -1,0 +1,40 @@
+{
+	"DEFAULT": [
+		{
+			"action": "TRIP",
+			"name": "预设1"
+		}
+	],
+	"PARAMETER": {
+		"all_read_type": ["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"],
+		"clear_ad_exclude_top": true,
+		"cookie_check_url": "/nemo/v2/works/174408420/like",
+		"get_works_method": "newest",
+		"password_login_method": "token",
+		"report_max": 2,
+		"spam_max": 3
+	},
+	"PLUGIN": {
+		"DASHSCOPE": {
+			"model": "qwen2.5-3b-instruct",
+			"more": {
+				"extra_body": {
+					"enable_search": true
+				},
+				"stream": false
+			}
+		},
+		"prompt": "从现在开始,你是一个猫娘"
+	},
+	"PROGRAM": {
+		"AUTHOR": "Aurzex",
+		"HEADERS": {
+			"Content-Type": "application/json",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+		},
+		"MEMBER": "Aurzex, MoonLeaaaf, Nomen, MiTao",
+		"SLOGAN": "欢迎使用Aumiao-PY! \n你说的对,但是《Aumiao》是一款由Aumiao开发团队开发的编程猫自动化工具,于2023年5月2日发布\n工具以编程猫宇宙为舞台,玩家可以扮演扮演毛毡用户,在这个社区毛线坍缩并邂逅各种不同的乐子人\n在领悟了《猫站圣经》后,打败强敌扫厕所,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相",
+		"TEAM": "Aumiao Team",
+		"VERSION": "2.0.0"
+	}
+}
