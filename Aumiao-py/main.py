@@ -131,8 +131,6 @@ def main() -> None:
 			check_account_status()
 		elif choice == "8":
 			break
-		elif choice == "9":
-			client.Motion().del_students()  # noqa: F405
 		else:
 			print("无效的选择, 请重新输入")
 

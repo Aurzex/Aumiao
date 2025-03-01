@@ -990,20 +990,6 @@ class Motion(ClassUnion):
 					reporter_id=int(self.data.ACCOUNT_DATA.id),
 				)
 
-	def del_students(self) -> None:
-		stu = self.edu_obtain.get_students(limit=None)
-		count = 0
-		for i in stu:
-			_id: int = i["id"]
-			_name: str = i["username"]
-			if not self.edu_motion.remove_student(stu_id=_id):
-				print("删除失败")
-				print(f"学生账户{_name}")
-			count += 1
-			if count >= 100:
-				count = 0
-				print("已删除100个")
-
 
 # "POST_COMMENT",
 # "POST_COMMENT_DELETE_FEEDBACK",
