@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, TypedDict, cast
 
 import requests
+from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
 
@@ -83,9 +84,10 @@ class CodeMaoClient:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
 				# print("=" * 82)
 				# print(f"Request {method} {url} {response.status_code}")
-				# if "Authorization" in response.request.headers:
-				# 	print(response.request.headers["Authorization"])
-				# print(response.json() if len(response.text) <= 100 else response.text[:100] + "...")
+				# # if "Authorization" in response.request.headers:
+				# # 	print(response.request.headers["Authorization"])
+				# with contextlib.suppress(Exception):
+				# 	print(response.json() if len(response.text) <= 100 else response.text[:100] + "...")
 				response.raise_for_status()
 
 			except HTTPError as err:
@@ -176,8 +178,9 @@ class CodeMaoClient:
 					return
 
 	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu"]) -> None:
-		self.headers["Cookie"] = ""
+		self.headers["Cookie"] = f"authorization={token}"
 		self.headers["Authorization"] = token
+		# print(f"\n切换到账户{identity}")
 		match identity:
 			case "average":
 				self.token.average = token
@@ -281,3 +284,30 @@ class CodeMaoClient:
 			return f"请求错误: {e}"
 		except Exception as e:
 			return f"上传出错: {e!s}"
+
+	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
+		"""仅操作headers中的Cookie,不涉及session cookies"""
+		# 清除旧Cookie
+		if "Cookie" in self.headers:
+			del self.headers["Cookie"]
+
+		# 转换所有类型为Cookie字符串
+		def _to_cookie_str(cookie: RequestsCookieJar | dict | str) -> str:
+			if isinstance(cookie, RequestsCookieJar):
+				return "; ".join(f"{cookie.name}={cookie.value}" for cookie in cookie)
+			if isinstance(cookie, dict):
+				return "; ".join(f"{k}={v}" for k, v in cookie.items())
+			if isinstance(cookie, str):
+				# 过滤非法字符
+				return ";".join(part.strip() for part in cookie.split(";") if "=" in part and len(part.split("=")) == DICT_ITEM)
+			msg = f"不支持的Cookie类型: {type(cookie).__name__}"
+			raise TypeError(msg)
+
+		try:
+			cookie_str = _to_cookie_str(cookies)
+			if cookie_str:
+				self.headers["Cookie"] = cookie_str
+		except Exception as e:
+			print(f"Cookie更新失败: {e!s}")
+			msg = "无效的Cookie格式"
+			raise ValueError(msg) from e

@@ -714,7 +714,7 @@ class Motion(ClassUnion):
 
 			while True:
 				print("-" * 50)
-				choice = input("选择操作: D:删除, S:禁言7天, P:通过, C:查看, F:检查违规, J:跳过").upper()
+				choice = input("选择操作: D:删除, S:禁言7天, P:通过, C:查看, F:检查违规, J:跳过  ").upper()
 				handler = getattr(self.whale_motion, cfg["handle_method"])
 				if choice == "J":
 					break
@@ -802,7 +802,7 @@ class Motion(ClassUnion):
 				report_source="shop" if report_type == "comment" else "forum",
 			)
 
-	def _auto_report_comments(self, user_comments: list, source_id: int, report_source: str) -> None:
+	def _auto_report_comments(self, user_comments: list, source_id: int, report_source: str) -> None:  # noqa: PLR0915
 		"""自动举报违规评论的优化方法"""
 		analyze_comments = self._analyze_comments(user_comments, source_id)
 		choice = input("是否自动举报违规评论? (Y/N) ").upper()
@@ -854,7 +854,8 @@ class Motion(ClassUnion):
 								print(f"切换到账号 {current_account[0]}")
 								sleep(5)
 								# self.acquire.switch_account("", identity="edu")
-								self.community_login.login_token(identity=current_account[0], password=current_account[1], status="edu")
+								self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+								sleep(5)
 								# self.acquire.switch_account(token=self.acquire.token.edu, identity="edu")
 								# print("*" * 85)
 								# print(f"token={self.acquire.token.edu}")
@@ -874,7 +875,8 @@ class Motion(ClassUnion):
 								text=comment_id,
 								candidates=user_comments,
 							)
-
+							# self.acquire.switch_account(self.acquire.token.edu, identity="edu")
+							# self.community_motion.sign_nature()
 							if self.report_work(
 								source=cast(Literal["forum", "work", "shop"], report_source),
 								target_id=int(comment_id),
@@ -955,6 +957,7 @@ class Motion(ClassUnion):
 		source_id: int,
 		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
 		parent_id: int | None = None,
+		description: str = "",
 		*,
 		is_reply: bool = False,
 	) -> bool:
@@ -972,7 +975,7 @@ class Motion(ClassUnion):
 				return self.work_motion.report_comment_work(work_id=target_id, comment_id=source_id, reason=reason_content)
 			case "forum":
 				_source = "COMMENT" if is_reply else "REPLY"
-				return self.forum_motion.report_reply_or_comment(comment_id=target_id, reason_id=reason_id, description=reason_content, source=_source, return_data=False)
+				return self.forum_motion.report_reply_or_comment(comment_id=target_id, reason_id=reason_id, description=description, source=_source, return_data=False)
 			case "shop":
 				if is_reply:
 					parent_id = cast(int, parent_id)
@@ -982,12 +985,14 @@ class Motion(ClassUnion):
 						reason_id=reason_id,
 						reporter_id=int(self.data.ACCOUNT_DATA.id),
 						comment_parent_id=parent_id,
+						description=description,
 					)
 				return self.shop_motion.report_comment(
 					comment_id=target_id,
 					reason_content=reason_content,
 					reason_id=reason_id,
 					reporter_id=int(self.data.ACCOUNT_DATA.id),
+					description=description,
 				)
 
 
