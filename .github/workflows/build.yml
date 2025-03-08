@@ -1,4 +1,4 @@
-name: Nightly Build with Nuitka
+name: Build and Package with Nuitka
 
 on:
   push:
@@ -9,145 +9,131 @@ on:
       - "LICENSE"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13"
-  UPX_VERSION: "v4.2.4"
-  BUILD_DIR: "build"
-  TZ: "Asia/Shanghai"
-  VENV_DIR: ".venv"
+  PYTHON_VERSION: "3.12"  # 降级到稳定版本
+  UPX_VERSION: "4.2.4"
+  BUILD_TYPE: Release
 
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
 
     steps:
-      # ========== 基础配置 ==========
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          architecture: x64
-          #cache: "uv"
-          
-      # ========== 缓存优化配置 ==========
-      - name: Cache dependencies
+          architecture: "x64"
+          cache: "pip"
+          check-latest: true
+
+      - name: Cache virtual environment
         uses: actions/cache@v4
-        id: dep-cache
         with:
           path: |
-            ${{ env.VENV_DIR }}
+            .venv
             ~/.cache/pip
             ~/.cache/uv
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/requirements.txt') }}
+          key: venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-deps-
+            venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
 
-      # ========== 依赖安装优化 ==========
-      - name: Install UV
+      - name: Set Up UV
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
 
       - name: Install Dependencies
         run: |
-          python -m venv ${{ env.VENV_DIR }}
-          .\${{ env.VENV_DIR }}\Scripts\activate
+          python -m venv .venv
+          . .venv/Scripts/activate
           uv pip install -r ./Aumiao-py/src/project/requirements.txt
-        if: steps.dep-cache.outputs.cache-hit != 'true'
-
-
-      - name: Get Build Metadata
-        id: version
-        run: |
-          $buildDate = (Get-Date).ToString("yyyyMMdd-HHmm")
-          echo "BUILD_DATE=$buildDate" >> $env:GITHUB_OUTPUT
-          echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
-      # ========== Nuitka 构建优化 ==========
-      - name: Build with Nuitka
+      - name: Get Version Info
+        id: version
+        run: |
+          echo "BUILD_DATE=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
+          echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build Executable with Nuitka
         uses: Nuitka/Nuitka-Action@main
-        continue-on-error: true
         with:
-          nuitka-version: "latest"  # 使用最新版本
+          nuitka-version: main  # 使用main分支
           script-name: ./Aumiao-py/main.py
           mode: standalone
-          company-name: "Aumiao Team"
-          product-name: "Aumiao"
-          file-version: "2.0.0"
-          product-version: "2.0.0"
-          file-description: "Build: ${{ steps.version.outputs.BUILD_DATE }} (${{ steps.version.outputs.GIT_SHA }})"
-          copyright: "Copyright © 2025 喵鱼a. All rights reserved."
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
-          output-dir: ${{ env.BUILD_DIR }}
-          jobs: 4
+          output-dir: build
+          remove-output: true
           lto: "yes"
+          jobs: 4
           follow-imports: true
           assume-yes-for-downloads: true
-          remove-output: true
 
-      # ========== UPX 压缩 ==========
-      - name: Setup UPX
-        uses: crazy-max/ghaction-upx@v2
+      - name: Cache UPX
+        id: cache-upx
+        uses: actions/cache@v4
         with:
-          version: ${{ env.UPX_VERSION }}
+          path: upx.exe
+          key: upx-${{ env.UPX_VERSION }}-win64
 
-      - name: Compress Binaries
+      - name: Download and Install UPX
+        if: steps.cache-upx.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile "upx.zip"
+          Expand-Archive -Path "upx.zip" -DestinationPath "upx_tmp"
+          Move-Item -Path "upx_tmp/upx-${{ env.UPX_VERSION }}-win64/upx.exe" -Destination "upx.exe"
+          Remove-Item -Recurse -Force upx_tmp, upx.zip
+        shell: pwsh
         continue-on-error: true
+
+      - name: Copy Additional Files
         run: |
-          $retryCount = 0
-          Get-ChildItem "${{ env.BUILD_DIR }}" -Recurse -Include *.exe, *.dll | ForEach-Object {
-            while ($retryCount -lt 2) {
-              try {
-                upx --best --lzma $_.FullName
-                break
-              } catch {
-                $retryCount++
-                Start-Sleep -Seconds 5
-              }
-            }
+          New-Item -Path "build/main.dist/.log" -ItemType Directory -Force
+          Copy-Item "./Aumiao-py/README.txt" -Destination "build/main.dist/"
+          Copy-Item "./Aumiao-py/DISCLAIMER.txt" -Destination "build/main.dist/"
+          Copy-Item "./Aumiao-py/data" -Destination "build/main.dist/" -Recurse
+        shell: pwsh
+
+      - name: Compress with UPX
+        run: |
+          $exePath = "build/main.dist/main.exe"
+          ./upx.exe --best --lzma $exePath
+          Get-ChildItem "build/main.dist/*.dll" | ForEach-Object {
+            ./upx.exe --best --lzma $_.FullName
           }
+        shell: pwsh
 
-      # ========== 文件处理 ==========
-      - name: Prepare Distribution
+      - name: Package Build
         run: |
-          $distDir = "${{ env.BUILD_DIR }}/main.dist"
-          New-Item "$distDir/.log" -ItemType Directory -Force | Out-Null
-          
-          # 使用哈希表管理文件列表
-          $filesToCopy = @{
-            Docs = @("./Aumiao-py/README.txt", "./Aumiao-py/DISCLAIMER.txt")
-            Data = @("./Aumiao-py/data")
-          }
+          7z a -tzip "build/Aumiao-${{ steps.version.outputs.GIT_SHA }}-win64.zip" "build/main.dist/*"
+        shell: pwsh
 
-          $filesToCopy.Docs | Copy-Item -Destination $distDir -Force
-          $filesToCopy.Data | Copy-Item -Destination $distDir -Recurse -Force
-
-      # ========== 打包与上传 ==========
-      - name: Create Artifact
-        run: |
-          $timestamp = "${{ steps.version.outputs.BUILD_DATE }}"
-          $zipName = "Aumiao-${timestamp}-${{ steps.version.outputs.GIT_SHA }}-win64.zip"
-          7z a -tzip "${{ env.BUILD_DIR }}/$zipName" "${{ env.BUILD_DIR }}/main.dist/*" -mx9
-
-      - name: Upload Artifact
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "Aumiao_${{ steps.version.outputs.BUILD_DATE }}_${{ steps.version.outputs.GIT_SHA }}"
-          path: ${{ env.BUILD_DIR }}/Aumiao-*.zip
-          retention-days: 7
+          name: Aumiao-${{ steps.version.outputs.GIT_SHA }}-win64
+          path: build/Aumiao-*-win64.zip
+          retention-days: 5
 
-      - name: Archive Logs
+      - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BuildLogs_${{ steps.version.outputs.BUILD_DATE }}
-          path: ${{ env.BUILD_DIR }}/**/*.log
+          name: build-logs-${{ steps.version.outputs.GIT_SHA }}
+          path: |
+            build/main.dist/*.yml
+          retention-days: 5
