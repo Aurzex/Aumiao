@@ -14,7 +14,7 @@ from requests.exceptions import HTTPError, RequestException, Timeout
 from . import data, file, tool
 from .decorator import singleton
 
-LOG_DIR: Path = Path.cwd() / "log"
+LOG_DIR: Path = Path.cwd() / ".log"
 LOG_FILE_PATH: Path = LOG_DIR / f"{int(time.time())}.txt"
 DICT_ITEM = 2
 

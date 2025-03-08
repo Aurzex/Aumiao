@@ -113,8 +113,8 @@ jobs:
 
       - name: Copy Additional Files
         run: |
-          # 创建 log 文件夹
-          New-Item -Path "build/main.dist/log" -ItemType Directory -Force
+          # 创建 .log 文件夹
+          New-Item -Path "build/main.dist/.log" -ItemType Directory -Force
 
           # 复制 README 和 DISCLAIMER
           Copy-Item "./Aumiao-py/README.txt" -Destination "build/main.dist/"
