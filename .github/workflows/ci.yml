@@ -23,7 +23,7 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           version: "latest"
-          args: "format --write --output-format=github ./Aumiao-py/src"
+          args: "format --output-format=github ./Aumiao-py/src"
 
   spell-check:
     name: "Spell Check"

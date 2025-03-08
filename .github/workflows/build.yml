@@ -16,7 +16,8 @@ env:
   UPX_VERSION: "4.2.4"
   BUILD_DIR: "build"
   TZ: "Asia/Shanghai"
-
+  VENV_DIR: ".venv"
+  
 jobs:
   build:
     runs-on: windows-latest
@@ -34,8 +35,22 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-          cache: "uv"
+          #cache: "uv"
+          
+      # ========== 缓存优化配置 ==========
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        id: dep-cache
+        with:
+          path: |
+            ${{ env.VENV_DIR }}
+            ~/.cache/pip
+            ~/.cache/uv
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
 
+      # ========== 依赖安装优化 ==========
       - name: Install UV
         uses: astral-sh/setup-uv@v5
         with:
@@ -43,9 +58,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          python -m venv .venv
-          .\.venv\Scripts\activate
+          python -m venv ${{ env.VENV_DIR }}
+          .\${{ env.VENV_DIR }}\Scripts\activate
           uv pip install -r ./Aumiao-py/src/project/requirements.txt
+        if: steps.dep-cache.outputs.cache-hit != 'true'
+
 
       - name: Get Build Metadata
         id: version
