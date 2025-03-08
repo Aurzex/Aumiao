@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
-from typing import Any, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import Any, Generic, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from . import decorator
 
@@ -203,7 +203,7 @@ def save_json_file(path: Path, data: object) -> None:
 # --------------------------
 # 统一管理器基类
 # --------------------------
-class BaseManager[T]:
+class BaseManager(Generic[T]):  # noqa: UP046
 	_data: T
 	_file_path: Path
 
