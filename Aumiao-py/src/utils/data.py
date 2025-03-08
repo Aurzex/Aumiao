@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
-from typing import Any, Generic, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import Any, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from . import decorator
 
@@ -124,8 +124,7 @@ class CodeMaoSetting:
 # --------------------------
 # 增强型转换工具
 # --------------------------
-def dict_to_dataclass(cls: type[T], data: Mapping[str, Any]) -> T:
-	"""安全类型转换字典到数据类,支持嵌套结构和泛型"""
+def dict_to_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:
 	if not (is_dataclass(cls) and isinstance(cls, type)):
 		msg = f"{cls.__name__} must be a dataclass type"
 		raise ValueError(msg)
@@ -143,13 +142,13 @@ def dict_to_dataclass(cls: type[T], data: Mapping[str, Any]) -> T:
 
 		# 处理嵌套数据类(添加类型断言)
 		if is_dataclass(field_type):
-			kwargs[field_name] = dict_to_dataclass(cast(type, field_type), value)
+			kwargs[field_name] = dict_to_dataclass(cast("type", field_type), value)
 		# 处理泛型容器(添加类型断言)
 		elif origin_type is list and type_args:
 			item_type = type_args[0]
 			if is_dataclass(item_type):
 				kwargs[field_name] = [
-					dict_to_dataclass(cast(type, item_type), item)  # 类型断言
+					dict_to_dataclass(cast("type", item_type), item)  # 类型断言
 					for item in value
 				]
 			else:
@@ -169,8 +168,7 @@ def dict_to_dataclass(cls: type[T], data: Mapping[str, Any]) -> T:
 # --------------------------
 # 增强型文件操作
 # --------------------------
-def load_json_file(path: Path, data_class: type[T]) -> T:
-	"""安全加载JSON文件,增强错误处理"""
+def load_json_file[T](path: Path, data_class: type[T]) -> T:
 	try:
 		if not path.exists():
 			return data_class()
@@ -187,7 +185,6 @@ def load_json_file(path: Path, data_class: type[T]) -> T:
 
 
 def save_json_file(path: Path, data: object) -> None:
-	"""原子化写入JSON文件,防止数据损坏"""
 	if not is_dataclass(data) or isinstance(data, type):
 		msg = "Only dataclass instances can be saved"
 		raise ValueError(msg)
@@ -206,7 +203,7 @@ def save_json_file(path: Path, data: object) -> None:
 # --------------------------
 # 统一管理器基类
 # --------------------------
-class BaseManager(Generic[T]):
+class BaseManager[T]:
 	_data: T
 	_file_path: Path
 
@@ -220,7 +217,6 @@ class BaseManager(Generic[T]):
 		return self._data
 
 	def update(self, new_data: dict[str, Any]) -> None:
-		"""类型安全的深度更新"""
 		for key, value in new_data.items():
 			if not hasattr(self._data, key):
 				continue
@@ -236,7 +232,7 @@ class BaseManager(Generic[T]):
 					raise TypeError(msg)
 
 				# 使用 cast 来确保类型检查器知道 current 是一个数据类实例
-				current = cast(DataclassInstance, current)
+				current = cast("DataclassInstance", current)
 
 				# 创建一个新的字典,只包含数据类字段中存在的键
 				valid_fields = {f.name for f in fields(current)}

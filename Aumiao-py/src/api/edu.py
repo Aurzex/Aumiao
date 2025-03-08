@@ -224,7 +224,6 @@ class Obtain:
 
 	# 获取所有班级
 	def get_classes(self, method: Literal["detail", "simple"] = "simple", limit: int | None = 20) -> dict | Generator:
-		"""获取班级信息"""
 		if method == "simple":
 			# 发送GET请求获取简单班级信息
 			classes = self.acquire.send_request(
@@ -509,7 +508,7 @@ class Obtain:
 			limit=limit,
 		)
 
-	## 获取官方课程包主题
+	# 获取官方课程包主题
 	def get_official_package_topic(self) -> dict:
 		time_stamp = community.Obtain().get_timestamp()["data"]
 		params = {"TIME": time_stamp, "pacakgeEntryType": 0, "topicType": "all"}

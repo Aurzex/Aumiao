@@ -68,8 +68,7 @@ class Login:
 		self,
 		cookies: str,
 		status: Literal["judgement", "average", "edu"] = "average",
-	) -> None | bool:
-		"""通过cookie登录"""
+	) -> bool | None:
 		try:
 			# 将cookie字符串转换为字典
 			cookie = dict([item.split("=", 1) for item in cookies.split("; ")])
@@ -116,11 +115,11 @@ class Login:
 		# token_ca = {"authorization": token, "__ca_uid_key__": str(uuid_ca)}
 		# 无上面这两句会缺少__ca_uid_key__
 		token_ca = {"authorization": token}
-		cookie_str = self.tool_process.convert_cookie_to_str(token_ca)  #  将cookie转换为字符串
-		headers = {**self.acquire.headers, "cookie": cookie_str}  #  添加cookie到headers中
-		response = self.acquire.send_request(method="GET", endpoint="/web/users/details", headers=headers)  #  发送请求获取用户详情
-		_auth = response.cookies.get_dict()  #  获取cookie
-		return {**token_ca, **_auth}  #  返回完整cookie
+		cookie_str = self.tool_process.convert_cookie_to_str(token_ca)  # 将cookie转换为字符串
+		headers = {**self.acquire.headers, "cookie": cookie_str}  # 添加cookie到headers中
+		response = self.acquire.send_request(method="GET", endpoint="/web/users/details", headers=headers)  # 发送请求获取用户详情
+		auth = response.cookies.get_dict()  # 获取cookie
+		return {**token_ca, **auth}  # 返回完整cookie
 
 	# 退出登录
 	def logout(self, method: Literal["web", "app"]) -> bool:
@@ -293,7 +292,7 @@ class Obtain:
 	# 获取推荐头图
 	def get_banner_web(
 		self,
-		types: (None | Literal["FLOAT_BANNER", "OFFICIAL", "CODE_TV", "WOKE_SHOP", "MATERIAL_NORMAL"]) = None,
+		types: (Literal["FLOAT_BANNER", "OFFICIAL", "CODE_TV", "WOKE_SHOP", "MATERIAL_NORMAL"] | None) = None,
 	) -> dict:
 		# 所有:不设置type,首页:OFFICIAL, 工作室页:WORK_SHOP
 		# 素材页:MATERIAL_NORMAL, 右下角浮动区域:FLOAT_BANNER, 编程TV:CODE_TV

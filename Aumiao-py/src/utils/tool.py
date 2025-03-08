@@ -42,15 +42,6 @@ class CodeMaoProcess:
 		reserve: list[str] | None = None,
 		exclude: list[str] | None = None,
 	) -> dict | list[dict] | Generator[dict]:
-		"""
-		处理输入数据,根据 `reserve` 或 `exclude` 进行键筛选
-
-		:param data: 输入数据(字典/列表/生成器)
-		:param reserve: 保留的键列表
-		:param exclude: 排除的键列表
-		:return: 筛选后的数据(保持原数据结构或生成器)
-		:raises ValueError: 参数冲突或数据类型错误
-		"""
 		if reserve and exclude:
 			msg = "请仅提供 'reserve' 或 'exclude' 中的一个参数"
 			raise ValueError(msg)
@@ -134,7 +125,7 @@ class CodeMaoRoutine:
 			if hasattr(data, "__dict__"):
 				return vars(data)
 			if is_dataclass(data):
-				return asdict(cast(Any, data))
+				return asdict(cast("Any", data))
 			msg = f"Unsupported data type: {type(data)}"
 			raise TypeError(msg)
 

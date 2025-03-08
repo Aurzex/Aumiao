@@ -21,9 +21,9 @@ DICT_ITEM = 2
 
 @dataclass
 class Token:
-	average = ""
-	edu = ""
-	judgement = ""
+	average: str = ""
+	edu: str = ""
+	judgement: str = ""
 
 
 class HTTPSTATUS(Enum):
@@ -75,7 +75,6 @@ class CodeMaoClient:
 		*,
 		log: bool = True,
 	) -> requests.Response:
-		"""增强型请求方法,支持重试机制和更安全的超时处理"""
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
 		# self._session.headers.clear()
@@ -92,7 +91,7 @@ class CodeMaoClient:
 
 			except HTTPError as err:
 				print(f"HTTP Error {type(err).__name__} - {err}")
-				if err.response.status_code in (429, 503):
+				if err.response.status_code in {429, 503}:
 					time.sleep(2**attempt * backoff_factor)
 					continue
 				break
@@ -113,7 +112,7 @@ class CodeMaoClient:
 				# self.update_cookies(response.cookies)
 				return response
 
-		return cast(requests.Response, None)
+		return cast("requests.Response", None)
 
 	def fetch_data(
 		self,
@@ -130,7 +129,6 @@ class CodeMaoClient:
 			Literal["limit", "offset", "page", "current_page", "page_size"],
 		] = {},
 	) -> Generator[dict]:
-		"""分页获取数据生成器版本"""
 		# 设置默认分页参数
 		args.setdefault("amount", "limit")
 		args.setdefault("remove", "offset")
@@ -146,7 +144,7 @@ class CodeMaoClient:
 
 		initial_json = initial_response.json()
 		first_page_data: list = self.tool_process.get_nested_value(initial_json, data_key)  # type: ignore  # noqa: PGH003
-		total_items = int(cast(str, self.tool_process.get_nested_value(initial_json, total_key)))
+		total_items = int(cast("str", self.tool_process.get_nested_value(initial_json, total_key)))
 
 		items_per_page = params.get(args["amount"], initial_json.get(args["res_amount_key"], 0))
 
@@ -232,7 +230,6 @@ class CodeMaoClient:
 
 	@staticmethod
 	def _get_default_pagination_config(method: str) -> PaginationConfig:
-		"""获取分页参数默认配置"""
 		return {
 			"amount_key": "limit" if method == "GET" else "page_size",
 			"offset_key": "offset" if method == "GET" else "current_page",
@@ -240,14 +237,8 @@ class CodeMaoClient:
 			"response_offset_key": "offset",
 		}
 
-	def stream_upload(self, file_path: Path, upload_path: str = "aumiao", chunk_size: int = 8192) -> str:
-		"""
-		简单的流式上传实现
-		:param file_path: 文件路径
-		:param upload_path: 上传目标路径,默认为 "aumiao"
-		:param chunk_size: 每次读取的文件块大小,默认为 8192 字节
-		:return: 返回文件的 URL 和消息
-		"""
+	@staticmethod
+	def stream_upload(file_path: Path, upload_path: str = "aumiao", chunk_size: int = 8192) -> str:
 		try:
 			# 打开文件并定义生成器
 			with file_path.open("rb") as f:
@@ -286,7 +277,6 @@ class CodeMaoClient:
 			return f"上传出错: {e!s}"
 
 	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
-		"""仅操作headers中的Cookie,不涉及session cookies"""
 		# 清除旧Cookie
 		if "Cookie" in self.headers:
 			del self.headers["Cookie"]

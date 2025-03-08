@@ -17,13 +17,13 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           version: "latest"
-          args: "check --fix --output-format=github ./Aumiao-py/src"
+          args: "check --fix --preview --output-format=github ./Aumiao-py/src/**/*.py"
 
       - name: Run Ruff Formatter
         uses: astral-sh/ruff-action@v3
         with:
           version: "latest"
-          args: "format -- --output-format=github ./Aumiao-py/src"
+          args: "format ./Aumiao-py/src/**/*.py"
 
   spell-check:
     name: "Spell Check"
