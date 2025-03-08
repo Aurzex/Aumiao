@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.12"  # 降级到稳定版本
+  PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
 
@@ -72,16 +72,23 @@ jobs:
       - name: Build Executable with Nuitka
         uses: Nuitka/Nuitka-Action@main
         with:
-          nuitka-version: main  # 使用main分支
-          script-name: ./Aumiao-py/main.py
-          mode: standalone
-          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
-          output-dir: build
-          remove-output: true
-          lto: "yes"
-          jobs: 4
-          follow-imports: true
           assume-yes-for-downloads: true
+          company-name: "Aumiao Team"
+          copyright: "Copyright © 2025 喵鱼a. All rights reserved."
+          file-description: "Build: ${{ steps.version.outputs.BUILD_DATE }} (${{ steps.version.outputs.GIT_SHA }})"
+          file-version: "2.0.0"
+          follow-imports: true
+          jobs: ${{ runner.os == 'Windows' && 4 || 2 }}
+          lto: "yes"
+          mode: standalone
+          nuitka-version: main
+          output-dir: build
+          product-name: "Aumiao"
+          product-version: "2.0.0"
+          remove-output: true
+          script-name: ./Aumiao-py/main.py
+          windows-console-mode: force
+          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
       - name: Cache UPX
         id: cache-upx
@@ -135,5 +142,5 @@ jobs:
         with:
           name: build-logs-${{ steps.version.outputs.GIT_SHA }}
           path: |
-            build/main.dist/*.yml
+            build/**/*.xml
           retention-days: 5
