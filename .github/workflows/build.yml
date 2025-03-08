@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-          cache: "uv+pip"
+          cache: "uv"
 
       - name: Install UV
         uses: astral-sh/setup-uv@v5
