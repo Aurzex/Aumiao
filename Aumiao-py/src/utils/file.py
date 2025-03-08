@@ -8,7 +8,8 @@ from .decorator import singleton
 @singleton
 class CodeMaoFile:
 	# 检查文件
-	def check_file(self, path: Path) -> bool:
+	@staticmethod
+	def check_file(path: Path) -> bool:
 		# 尝试打开文件
 		try:
 			with Path.open(path):
@@ -18,7 +19,8 @@ class CodeMaoFile:
 			print(err)
 			return False
 
-	def validate_json(self, json_string: str | bytes) -> str | Literal[False]:
+	@staticmethod
+	def validate_json(json_string: str | bytes) -> str | Literal[False]:
 		# 尝试解析JSON字符串
 		try:
 			return json.loads(json_string)
@@ -44,8 +46,8 @@ class CodeMaoFile:
 			raise ValueError(msg)
 
 	# 将文本写入到指定文件
+	@staticmethod
 	def file_write(
-		self,
 		path: Path,
 		content: str | dict | list[str],
 		method: str = "w",

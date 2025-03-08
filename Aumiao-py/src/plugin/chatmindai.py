@@ -20,7 +20,8 @@ class Login:
 		return response.json()
 
 	# 更新token函数,接收token,更新全局变量HEADERS中的Authorization字段
-	def update_token(self, token: str) -> None:
+	@staticmethod
+	def update_token(token: str) -> None:
 		global HEADERS  # noqa: PLW0602
 		HEADERS["Authorization"] = f"Bearer {token}"
 

@@ -6,14 +6,14 @@ from typing import Any
 
 
 def singleton(cls):  # noqa: ANN001, ANN201
-	_instance = {}
+	instance = {}
 
 	def _singleton(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
 		# 如果cls不在_instance中,则创建cls的实例,并将其添加到_instance中
-		if cls not in _instance:
-			_instance[cls] = cls(*args, **kwargs)
+		if cls not in instance:
+			instance[cls] = cls(*args, **kwargs)
 		# 返回_instance中cls的实例
-		return _instance[cls]
+		return instance[cls]
 
 	# 返回_singleton函数
 	return _singleton
@@ -53,8 +53,6 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 
 
 def skip_on_error(func):  # noqa: ANN001, ANN201
-	"""捕获异常并跳过当前循环"""
-
 	@wraps(func)
 	def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
 		try:

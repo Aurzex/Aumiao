@@ -14,30 +14,29 @@ T = TypeVar("T")
 @singleton
 class CodeMaoProcess:
 	@overload
+	@staticmethod
 	def filter_data(
-		self,
 		data: dict,
 		reserve: list[str] | None = None,
 		exclude: list[str] | None = None,
 	) -> dict: ...
 
 	@overload
+	@staticmethod
 	def filter_data(
-		self,
 		data: list[dict],
 		reserve: list[str] | None = None,
 		exclude: list[str] | None = None,
 	) -> list[dict]: ...
 	@overload
+	@staticmethod
 	def filter_data(
-		self,
 		data: Generator[dict],
 		reserve: list[str] | None = None,
 		exclude: list[str] | None = None,
 	) -> Generator[dict]: ...
-
+	@staticmethod
 	def filter_data(
-		self,
 		data: dict | list[dict] | Generator[dict],
 		reserve: list[str] | None = None,
 		exclude: list[str] | None = None,
@@ -47,7 +46,6 @@ class CodeMaoProcess:
 			raise ValueError(msg)
 
 		def filter_item(item: dict) -> dict:
-			"""键过滤核心逻辑"""
 			if reserve:
 				return {k: v for k, v in item.items() if k in reserve}
 			if exclude:
@@ -78,7 +76,8 @@ class CodeMaoProcess:
 	def format_timestamp(timestamp: int) -> str:
 		return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
-	def get_nested_value(self, data: Nested_dict, path: str | None) -> object:
+	@staticmethod
+	def get_nested_value(data: Nested_dict, path: str | None) -> object:
 		if not path:
 			return data
 		value = data
@@ -145,7 +144,8 @@ class CodeMaoRoutine:
 			after = after_dict.get(field, 0)
 			print(f"{label}: {after - before:+} (当前: {after}, 初始: {before})")
 
-	def find_prefix_suffix(self, text: str | int, candidates: list[str]) -> tuple[int | None, int | None]:
+	@staticmethod
+	def find_prefix_suffix(text: str | int, candidates: list[str]) -> tuple[int | None, int | None]:
 		target = str(text)
 		for item in candidates:
 			if isinstance(item, str) and target in item:
@@ -156,7 +156,8 @@ class CodeMaoRoutine:
 					continue
 		return (None, None)
 
-	def merge_user_data(self, data_list: list[dict]) -> dict:
+	@staticmethod
+	def merge_user_data(data_list: list[dict]) -> dict:
 		merged = {}
 		counter = {}
 		for item in filter(None, data_list):
