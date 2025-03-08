@@ -13,11 +13,11 @@ on:
 
 env:
   PYTHON_VERSION: "3.13"
-  UPX_VERSION: "4.2.4"
+  UPX_VERSION: "v4.2.4"
   BUILD_DIR: "build"
   TZ: "Asia/Shanghai"
   VENV_DIR: ".venv"
-  
+
 jobs:
   build:
     runs-on: windows-latest
