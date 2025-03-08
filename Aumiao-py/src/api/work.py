@@ -365,7 +365,7 @@ class Motion:
 		name: str,
 		work_type: int | None = None,
 		*,
-		is_check_name: Literal[True, False] = False,
+		is_check_name: bool = False,
 	) -> bool:
 		response = self.acquire.send_request(
 			endpoint=f"/tiger/work/works/{work_id}/rename",
@@ -746,13 +746,13 @@ class Obtain:
 	# 获取积木/角色背包列表
 	def get_block_character_package(self, types: Literal["block", "character"], limit: int = 16, offset: int = 0) -> dict:
 		if types == "block":
-			_type = 1
+			type_ = 1
 		elif types == "character":
-			_type = 0
+			type_ = 0
 		# type 1 角色背包 0 积木背包
 		# limit 获取积木默认16个,角色默认20个
 		params = {
-			"type": _type,
+			"type": type_,
 			"limit": limit,
 			"offset": offset,
 		}

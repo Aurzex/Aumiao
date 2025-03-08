@@ -123,7 +123,6 @@ class NovelMotion:
 		self.acquire = acquire.CodeMaoClient()
 
 	def collect_novel(self, novel_id: int, method: select) -> dict:
-		"""发送请求,收藏小说"""
 		response = self.acquire.send_request(
 			endpoint=f"/web/fanfic/collect/{novel_id}",
 			method=method,
@@ -131,7 +130,6 @@ class NovelMotion:
 		return response.json()
 
 	def comment_novel(self, comment: str, novel_id: int, *, return_data: bool = False) -> bool | dict:
-		"""发送请求,评论小说"""
 		response = self.acquire.send_request(
 			endpoint=f"/api/fanfic/comments/{novel_id}",
 			method="POST",
@@ -143,7 +141,6 @@ class NovelMotion:
 		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
 
 	def like_comment(self, method: select, comment_id: int, *, return_data: bool = False) -> bool | dict:
-		"""点赞小说评论"""
 		# 发送请求,点赞小说评论
 		response = self.acquire.send_request(
 			endpoint=f"/api/fanfic/comments/praise/{comment_id}",
@@ -153,7 +150,6 @@ class NovelMotion:
 		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
 
 	def delete_comment(self, comment_id: int, *, return_data: bool = False) -> bool | dict:
-		"""发送请求,删除小说评论"""
 		response = self.acquire.send_request(
 			endpoint=f"/api/fanfic/comments/{comment_id}",
 			method="DELETE",

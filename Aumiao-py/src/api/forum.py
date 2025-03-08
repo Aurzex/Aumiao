@@ -286,8 +286,8 @@ class Motion:
 		method: Literal["board", "work_shop"],
 		title: str,
 		content: str,
-		board_id: None | Literal[17, 2, 10, 5, 3, 6, 27, 11, 26, 13, 7, 4, 28] = None,
-		work_shop_id: None | int = None,
+		board_id: Literal[17, 2, 10, 5, 3, 6, 27, 11, 26, 13, 7, 4, 28] | None = None,
+		work_shop_id: int | None = None,
 		*,
 		return_data: bool = False,
 	) -> dict | bool:

@@ -15,7 +15,6 @@ class Dashscope:
 		self.HEADERS = HEADERS
 
 	def set_key(self, api_key: str) -> None:
-		"""设置 API key 以进行授权。"""
 		if not api_key:
 			msg = "API key cannot be empty."
 			raise ValueError(msg)
@@ -27,7 +26,6 @@ class Dashscope:
 		message: str,
 		more: dict[str, bool] | None = None,
 	) -> dict:
-		"""与模型进行聊天的函数。"""
 		# 设置默认值
 		final_mes = [
 			# {

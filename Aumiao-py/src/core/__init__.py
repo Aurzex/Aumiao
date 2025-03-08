@@ -14,7 +14,6 @@ __loaded_modules: dict[str, ModuleType] = {}
 
 
 def __getattr__(name: str) -> ModuleType:
-	"""实现动态延迟加载"""
 	if name in __all__:
 		if name not in __loaded_modules:
 			# 动态导入模块 (实际运行时加载)
@@ -27,5 +26,4 @@ def __getattr__(name: str) -> ModuleType:
 
 
 def __dir__() -> list[str]:
-	"""增强 IDE 自动补全支持"""
 	return sorted(__all__)

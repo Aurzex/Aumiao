@@ -37,13 +37,13 @@ class Obtain:
 		],
 	) -> dict:  # 不要问我limit默认值为啥是14,因为api默认获取14个
 		if isinstance(sort, list):
-			_sort = ",".join(sort)
+			sort_ = ",".join(sort)
 		params = {
 			"level": level,
 			"works_limit": works_limit,
 			"limit": limit,
 			"offset": offset,
-			"sort": _sort,
+			"sort": sort_,
 		}
 		response = self.acquire.send_request(
 			endpoint="/web/work-shops/search",
@@ -70,17 +70,17 @@ class Obtain:
 		works_limit: int = 4,
 		sort: list[str] | str = ["-ordinal,-updated_at"],
 	) -> dict:
-		_levels: str = ""
-		_sort: str = ""
+		levels_: str = ""
+		sort_: str = ""
 		if isinstance(levels, list):
-			_levels = ",".join(map(str, levels))
+			levels_ = ",".join(map(str, levels))
 		if isinstance(sort, list):
-			_sort = ",".join(sort)
+			sort_ = ",".join(sort)
 		params = {
-			"levels": _levels,
+			"levels": levels_,
 			"max_number": max_number,
 			"works_limit": works_limit,
-			"sort": _sort,
+			"sort": sort_,
 		}
 		response = self.acquire.send_request(endpoint="/web/shops", method="GET", params=params)
 		return response.json()

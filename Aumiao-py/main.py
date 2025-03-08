@@ -7,18 +7,18 @@ def login() -> None:
 		identity = input("请输入用户名: ")
 		password = input("请输入密码: ")
 		community.Login().login_token(identity=identity, password=password)  # noqa: F405
-		_data = user.Obtain().get_data_details()  # noqa: F405
+		data_ = user.Obtain().get_data_details()  # noqa: F405
 		account_data_manager = data.DataManager()  # noqa: F405
 		account_data_manager.update(
 			{
 				"ACCOUNT_DATA": {
 					"identity": identity,
 					"password": "******",  # 不建议存储密码
-					"id": _data["id"],
-					"nickname": _data["nickname"],
-					"create_time": _data["create_time"],
-					"description": _data["description"],
-					"author_level": _data["author_level"],
+					"id": data_["id"],
+					"nickname": data_["nickname"],
+					"create_time": data_["create_time"],
+					"description": data_["description"],
+					"author_level": data_["author_level"],
 				},
 			},
 		)
@@ -32,7 +32,7 @@ def clear_comments() -> None:
 		source = input("请输入来源类型 (work/post): ")
 		action_type = input("请输入操作类型 (ads/duplicates/blacklist): ")
 		# 判断输入是否有效
-		if source not in ["work", "post"] or action_type not in ["ads", "duplicates", "blacklist"]:
+		if source not in {"work", "post"} or action_type not in {"ads", "duplicates", "blacklist"}:
 			print("无效的输入")
 			return
 		# 调用Motion类的clear_comments方法,清除评论
@@ -46,7 +46,7 @@ def clear_red_point() -> None:
 	try:
 		method = input("请输入方法 (nemo/web): ")
 		# 判断输入是否有效
-		if method not in ["nemo", "web"]:
+		if method not in {"nemo", "web"}:
 			print("无效的输入")
 			return
 		# 调用Motion类的clear_red_point方法,传入方法参数

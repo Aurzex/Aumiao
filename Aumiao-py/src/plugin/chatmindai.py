@@ -70,7 +70,7 @@ class Explore:
 		searchValue: str = "",  # noqa: N803
 	) -> dict:
 		# 如果originpage不为空,则使用originpage,否则使用category
-		originpage = originpage if originpage != "" else category
+		originpage = originpage or category
 		# 构造请求数据
 		data = {
 			"pageIndex": page,

@@ -16,9 +16,10 @@ preview = true
 
 [lint.pylint]
 max-branches = 15
-max-positional-args = 10
+max-positional-args = 15
 max-public-methods = 50
-max-nested-blocks = 10
+max-nested-blocks = 15
+
 [format]
 quote-style = "double"
 indent-style = "tab"
