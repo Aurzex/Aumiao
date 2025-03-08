@@ -1,4 +1,4 @@
-name: Enhanced Build Pipeline
+name: Nightly Build with Nuitka
 
 on:
   push:
@@ -20,10 +20,10 @@ env:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
-      # ========== 保留的核心配置 ==========
+      # ========== 基础配置 ==========
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
@@ -35,15 +35,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
           cache: "uv+pip"
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            .venv
-            ~/.cache/pip
-            ~/.cache/uv
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/requirements.txt') }}
 
       - name: Install UV
         uses: astral-sh/setup-uv@v5
@@ -69,47 +60,37 @@ jobs:
         uses: Nuitka/Nuitka-Action@main
         continue-on-error: true
         with:
-          nuitka-version: "2.0.0"  # 固定指定版本
+          nuitka-version: "latest"  # 使用最新版本
           script-name: ./Aumiao-py/main.py
           mode: standalone
           company-name: "Aumiao Team"
-          product-name: "Aumiao" 
+          product-name: "Aumiao"
           file-version: "2.0.0"
           product-version: "2.0.0"
           file-description: "Build: ${{ steps.version.outputs.BUILD_DATE }} (${{ steps.version.outputs.GIT_SHA }})"
           copyright: "Copyright © 2025 喵鱼a. All rights reserved."
-          windows-console-mode: force
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
-          remove-output: true
+          output-dir: ${{ env.BUILD_DIR }}
+          jobs: 4
           lto: "yes"
           follow-imports: true
           assume-yes-for-downloads: true
-          output-dir: build
+          remove-output: true
 
-      # ========== UPX 处理优化 ==========
-      - name: Smart UPX Cache
-        uses: actions/cache@v4
-        id: upx-cache
+      # ========== UPX 压缩 ==========
+      - name: Setup UPX
+        uses: crazy-max/ghaction-upx@v2
         with:
-          path: upx.exe
-          key: upx-${{ env.UPX_VERSION }}-win64
-
-      - name: Fetch UPX
-        if: steps.upx-cache.outputs.cache-hit != 'true'
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
-          Expand-Archive upx.zip -DestinationPath .
-          Get-ChildItem -Recurse -Filter upx.exe | Move-Item -Destination upx.exe
+          version: ${{ env.UPX_VERSION }}
 
       - name: Compress Binaries
-        continue-on-error: true  # 允许压缩失败
+        continue-on-error: true
         run: |
           $retryCount = 0
           Get-ChildItem "${{ env.BUILD_DIR }}" -Recurse -Include *.exe, *.dll | ForEach-Object {
             while ($retryCount -lt 2) {
               try {
-                ./upx.exe --best --lzma $_.FullName
+                upx --best --lzma $_.FullName
                 break
               } catch {
                 $retryCount++
@@ -118,7 +99,7 @@ jobs:
             }
           }
 
-      # ========== 文件处理优化 ==========
+      # ========== 文件处理 ==========
       - name: Prepare Distribution
         run: |
           $distDir = "${{ env.BUILD_DIR }}/main.dist"
@@ -133,7 +114,7 @@ jobs:
           $filesToCopy.Docs | Copy-Item -Destination $distDir -Force
           $filesToCopy.Data | Copy-Item -Destination $distDir -Recurse -Force
 
-      # ========== 增强的打包逻辑 ==========
+      # ========== 打包与上传 ==========
       - name: Create Artifact
         run: |
           $timestamp = "${{ steps.version.outputs.BUILD_DATE }}"
