@@ -1,1 +1,14 @@
-/.idea
+**.exe
+**.ipynb
+**.pdb
+*.VSCodeCounter/
+*.idea/
+*.log/
+*.venv/
+*.vscode/
+*__pycache__/
+*data/
+*dist/
+*media/
+*test.py
+*test/
