@@ -34,7 +34,6 @@ jobs:
       - name: Setup Beijing Timezone
         shell: bash
         run: |
-          # 设置东八区时区
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_ENV
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
@@ -112,7 +111,7 @@ jobs:
 
       - name: Optimize Binaries
         shell: pwsh
-        continue-on-error: true # 关键修改：忽略UPX错误
+        continue-on-error: true
         run: |
           if (-not (Test-Path "./upx.exe")) {
               $ProgressPreference = 'SilentlyContinue'
@@ -122,7 +121,6 @@ jobs:
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
 
-          # 强制继续执行后续命令
           $ErrorActionPreference = 'Continue'
           ./upx.exe --best --lzma ./build/main.dist/main.exe 2>&1 | Out-Null
           Get-ChildItem ./build/main.dist/*.dll | ForEach-Object {
@@ -131,9 +129,6 @@ jobs:
 
       - name: Package Artifacts
         shell: pwsh
-        continue-on-error: true
-
-      - name: Package Build
         run: |
           $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha.zip"
           7z a -tzip "./build/$packageName" ./build/main.dist/*
@@ -154,4 +149,5 @@ jobs:
             build/**/*.log
             build/**/*.json
             **/nuitka-*.log
+            **/nuitka-*.xml
           retention-days: 14
