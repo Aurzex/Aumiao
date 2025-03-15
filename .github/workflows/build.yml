@@ -130,7 +130,7 @@ jobs:
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
           $ErrorActionPreference = 'Continue'
-          ./upx.exe --best --lzma ./build/main.dist/main.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log"
+          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log"
           Get-ChildItem ./build/main.dist/*.dll | ForEach-Object {
               ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
           }
