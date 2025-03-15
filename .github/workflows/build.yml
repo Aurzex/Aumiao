@@ -88,7 +88,6 @@ jobs:
           copyright: "Copyright © 2025 喵鱼a. All rights reserved."
           file-version: "2.0.0"
           follow-imports: true
-          include-package: requests
           jobs: 4
           lto: "yes"
           mode: standalone
