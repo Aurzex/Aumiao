@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.13"  # 保留 Python 3.13
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
 
@@ -57,19 +57,29 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
 
-      - name: Install System Tools
+      - name: Install 7-Zip
         shell: pwsh
         run: |
-          winget install 7zip.7zip
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
+          Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
+          $sevenZipPath = "C:\Program Files\7-Zip"
+          if (Test-Path $sevenZipPath) {
+              "$sevenZipPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              $env:PATH += ";$sevenZipPath"
+          } else {
+              Write-Error "7-Zip installation failed!"
+              exit 1
+          }
 
       - name: Setup Python Environment
         shell: pwsh
         run: |
           python -m venv .venv
           .\.venv\Scripts\activate
-          pip install -U pip uv
-          uv pip install --system -r ./Aumiao-py/src/project/requirements.txt
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install -r ./Aumiao-py/src/project/requirements.txt
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
@@ -88,20 +98,19 @@ jobs:
           script-name: ./Aumiao-py/main.py
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
           windows-console-mode: force
+          show-progress: true  # 保留进度显示
 
       - name: Prepare Distribution
         shell: pwsh
         run: |
           $distDir = "build/main.dist"
           New-Item -Path "$distDir/.logs" -ItemType Directory -Force
-
           $essentialFiles = @(
               "./Aumiao-py/README.txt",
               "./Aumiao-py/DISCLAIMER.txt",
               "./Aumiao-py/data"
           )
           Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
-
           $versionInfo = @{
               Version   = "2.0.0"
               BuildDate = "${{ env.BUILD_DATE }}"
@@ -120,18 +129,18 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
-
           $ErrorActionPreference = 'Continue'
-          ./upx.exe --best --lzma ./build/main.dist/main.exe 2>&1 | Out-Null
+          ./upx.exe --best --lzma ./build/main.dist/main.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log"
           Get-ChildItem ./build/main.dist/*.dll | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Out-Null
+              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
           }
 
       - name: Package Artifacts
         shell: pwsh
         run: |
           $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha.zip"
-          7z a -tzip "./build/$packageName" ./build/main.dist/*
+          $distDir = Resolve-Path "./build/main.dist"
+          7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
@@ -150,4 +159,5 @@ jobs:
             build/**/*.json
             **/nuitka-*.log
             **/nuitka-*.xml
+          if-no-files-found: ignore
           retention-days: 14
