@@ -77,7 +77,7 @@ jobs:
           .\.venv\Scripts\activate
           python -m pip install --upgrade pip
           pip install uv
-          uv pip install -r ./Aumiao-py/src/project/requirements.txt
+          uv pip install --system -r ./Aumiao-py/src/project/requirements.txt
           pip list
 
       - name: Build with Nuitka
