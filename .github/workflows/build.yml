@@ -3,20 +3,26 @@ name: Build and Package with Nuitka
 on:
   push:
     branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "Aumiao-py/src/**/*.py"
     paths-ignore:
-      - "**.md"
-      - ".gitignore"
-      - "LICENSE"
+      - "**/*.md"
+      - "**/.gitignore"
+      - "**/LICENSE"
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "Aumiao-py/src/**/*.py"
     paths-ignore:
-      - "**.md"
-      - ".gitignore"
-      - "LICENSE"
+      - "**/*.md"
+      - "**/.gitignore"
+      - "**/LICENSE"
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13"  # 保留 Python 3.13
+  PYTHON_VERSION: "3.13" # 保留 Python 3.13
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
 
@@ -80,6 +86,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install uv
           uv pip install -r ./Aumiao-py/src/project/requirements.txt
+          pip list
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
@@ -89,16 +96,18 @@ jobs:
           copyright: "Copyright © 2025 喵鱼a. All rights reserved."
           file-version: "2.0.0"
           follow-imports: true
+          include-package: requests
           jobs: 4
           lto: "yes"
           mode: standalone
           output-dir: build
+          output-filename: aumiao
           product-name: "Aumiao"
           product-version: "2.0.0"
           script-name: ./Aumiao-py/main.py
-          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
+          show-progress: true # 保留进度显示
           windows-console-mode: force
-          show-progress: true  # 保留进度显示
+          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
       - name: Prepare Distribution
         shell: pwsh
