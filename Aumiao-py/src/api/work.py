@@ -391,7 +391,6 @@ class Obtain:
 			params=params,
 			total_key="page_total",
 			limit=limit,
-			args={},
 		)
 
 	# 获取作品信息
@@ -598,7 +597,7 @@ class Obtain:
 			total_key="data.total",
 			data_key="data.items",
 			pagination_method="page",
-			args={"amount": "current_page", "remove": "page_size"},
+			config={"amount_key": "page_size", "offset_key": "current_page"},
 			limit=limit,
 		)
 

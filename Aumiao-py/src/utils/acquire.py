@@ -32,8 +32,9 @@ class HTTPSTATUS(Enum):
 	NO_CONTENT = 204
 
 
-# 类型定义增强
 class PaginationConfig(TypedDict, total=False):
+	"""分页配置参数类型定义"""
+
 	amount_key: Literal["limit", "page_size", "current_page"]
 	offset_key: Literal["offset", "page", "current_page"]
 	response_amount_key: Literal["limit", "page_size"]
@@ -114,65 +115,107 @@ class CodeMaoClient:
 
 		return cast("requests.Response", None)
 
-	def fetch_data(
+	def fetch_data(  # noqa: PLR0914
 		self,
 		endpoint: str,
 		params: dict,
 		payload: dict | None = None,
 		limit: int | None = None,
-		fetch_method: FetchMethod = "GET",
+		fetch_method: Literal["GET", "POST"] = "GET",
 		total_key: str = "total",
 		data_key: str = "items",
 		pagination_method: Literal["offset", "page"] = "offset",
-		args: dict[
-			Literal["amount", "remove", "res_amount_key", "res_remove_key"],
-			Literal["limit", "offset", "page", "current_page", "page_size"],
-		] = {},
+		config: PaginationConfig | None = None,
 	) -> Generator[dict]:
-		# 设置默认分页参数
-		args.setdefault("amount", "limit")
-		args.setdefault("remove", "offset")
-		args.setdefault("res_amount_key", "limit")
-		args.setdefault("res_remove_key", "offset")
-		# 初始化计数器
+		"""获取分页API数据
+
+		Args:
+			endpoint: API端点地址
+			params: 基础请求参数
+			payload: POST请求负载
+			limit: 最大返回条目数
+			fetch_method: 请求方法 (GET/POST)
+			total_key: 总条目数键名
+			data_key: 数据列表键名
+			pagination_method: 分页方式 (offset/page)
+			config: 分页参数配置
+
+		Yields:
+			数据条目
+
+		Raises:
+			ValueError: 无效分页配置或参数错误
+		"""
+		# 合并分页配置参数
+		config_: PaginationConfig = {
+			"amount_key": "limit",
+			"offset_key": "offset",
+			"response_amount_key": "limit",
+			"response_offset_key": "offset",
+			**(config or {}),
+		}
+
+		# 参数副本避免污染原始参数
+		base_params = params.copy()
 		yielded_count = 0
 
-		# 第一次请求
-		initial_response = self.send_request(endpoint, fetch_method, params, payload)
+		# 处理初始请求
+		initial_response = self.send_request(endpoint, fetch_method, base_params, payload)
 		if not initial_response:
 			return
 
-		initial_json = initial_response.json()
-		first_page_data: list = self.tool_process.get_nested_value(initial_json, data_key)  # type: ignore  # noqa: PGH003
-		total_items = int(cast("str", self.tool_process.get_nested_value(initial_json, total_key)))
+		initial_data = initial_response.json()
+		first_page = cast("list[dict]", self.tool_process.get_nested_value(initial_data, data_key))
+		total_items = int(cast("int", self.tool_process.get_nested_value(initial_data, total_key)))
 
-		items_per_page = params.get(args["amount"], initial_json.get(args["res_amount_key"], 0))
+		# 安全获取分页参数配置
+		amount_key = config_.get("amount_key", "limit")
+		page_size_key = config_.get("response_amount_key", "limit")
+		offset_param_key = config_.get("offset_key", "offset")
 
-		# 处理第一页数据
-		for item in first_page_data:
+		# 计算每页数量
+		items_per_page = base_params.get(
+			amount_key,
+			initial_data.get(page_size_key, 0),
+		)
+		if items_per_page <= 0:
+			msg = f"无效的每页数量: {items_per_page}"
+			raise ValueError(msg)
+
+		# 处理首屏数据
+		for item in first_page:
 			yield item
 			yielded_count += 1
 			if limit and yielded_count >= limit:
 				return
 
-		# 计算总请求次数(从第二页开始)
+		# 计算总页数
 		total_pages = (total_items + items_per_page - 1) // items_per_page
-		for page in range(1, total_pages):
-			# 更新分页参数
-			if pagination_method == "offset":
-				params[args["remove"]] = page * items_per_page
-			elif pagination_method == "page":
-				params[args["remove"]] = page + 1
 
-			response = self.send_request(endpoint, fetch_method, params, payload=payload)
-			if not response:
+		# 分页请求循环
+		for current_page in range(1, total_pages):
+			page_params = base_params.copy()
+
+			# 设置分页参数
+			if pagination_method == "offset":
+				page_params[offset_param_key] = current_page * items_per_page
+			elif pagination_method == "page":
+				page_params[offset_param_key] = current_page + 1  # 页码通常从1开始
+			else:
+				msg = f"不支持的分页方式: {pagination_method}"
+				raise ValueError(msg)
+
+			# 发送分页请求
+			page_response = self.send_request(endpoint, fetch_method, page_params, payload)
+			if not page_response:
 				continue
 
-			page_data: list = self.tool_process.get_nested_value(response.json(), data_key)  # type: ignore  # noqa: PGH003
+			# 处理分页数据
+			page_data = cast("list[dict]", self.tool_process.get_nested_value(page_response.json(), data_key))
 			for item in page_data:
 				yield item
 				yielded_count += 1
-				if limit and yielded_count >= limit:  # 达到限制立即停止
+				if limit and yielded_count >= limit:
 					return
 
 	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu"]) -> None:

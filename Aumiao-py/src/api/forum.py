@@ -42,7 +42,7 @@ class Obtain:
 			params=params,
 			total_key="total",
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -59,7 +59,7 @@ class Obtain:
 			params=params,
 			limit=limit,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 		)
 
 	# 获取我的帖子或回复的帖子
@@ -69,7 +69,7 @@ class Obtain:
 			endpoint=f"/web/forums/posts/mine/{method}",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -134,7 +134,7 @@ class Obtain:
 			pagination_method="page",
 			params=params,
 			limit=limit,
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 		)
 
 

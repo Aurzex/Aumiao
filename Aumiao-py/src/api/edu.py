@@ -192,7 +192,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/system/message/list",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -204,7 +204,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/invite/teacher/messages",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -242,7 +242,7 @@ class Obtain:
 				endpoint=url,
 				params=params,
 				pagination_method="page",
-				args={"remove": "page", "res_amount_key": "limit"},
+				config={"offset_key": "page", "response_amount_key": "limit"},
 				limit=limit,
 			)
 		else:
@@ -257,7 +257,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/student/remove/record",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -272,7 +272,7 @@ class Obtain:
 			payload=data,
 			fetch_method="POST",
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -416,7 +416,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/student/works",
 			params=params,
 			pagination_method="page",
-			args={"remove": "page", "res_amount_key": "limit"},
+			config={"offset_key": "page", "response_amount_key": "limit"},
 			limit=limit,
 		)
 
@@ -431,7 +431,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/works",
 			params=params,
 			pagination_method="page",
-			args={"remove": "page", "res_amount_key": "limit"},
+			config={"offset_key": "page", "response_amount_key": "limit"},
 			limit=limit,
 		)
 
@@ -445,7 +445,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/self/works",
 			params=params,
 			pagination_method="page",
-			args={"remove": "page", "res_amount_key": "limit"},
+			config={"offset_key": "page", "response_amount_key": "limit"},
 			limit=limit,
 		)
 
@@ -470,7 +470,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/teaching/record/list",
 			params=params,
 			pagination_method="page",
-			args={"remove": "page", "amount": "limit"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -504,7 +504,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/lesson/offical/packages",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
@@ -538,7 +538,7 @@ class Obtain:
 			endpoint="https://eduzone.codemao.cn/edu/zone/lesson/offical/packages",
 			params=params,
 			pagination_method="page",
-			args={"amount": "limit", "remove": "page"},
+			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
 		)
 
