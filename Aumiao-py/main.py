@@ -44,10 +44,10 @@ def login() -> None:
 				},
 			},
 		)
-		print(f"{COLOR_SUCCESS}✅ 登录成功！欢迎 {data_['nickname']}{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}登录成功！欢迎 {data_['nickname']}{COLOR_RESET}")
 
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 登录失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}登录失败: {e}{COLOR_RESET}")
 
 
 def clear_comments() -> None:
@@ -58,14 +58,14 @@ def clear_comments() -> None:
 		action_type = input(f"{COLOR_PROMPT}↳ 请输入操作类型 (ads/duplicates/blacklist): {COLOR_RESET}").lower()
 
 		if source not in {"work", "post"} or action_type not in {"ads", "duplicates", "blacklist"}:
-			print(f"{COLOR_ERROR}⚠ 无效的输入，请检查选项是否正确{COLOR_RESET}")
+			print(f"{COLOR_ERROR}无效的输入，请检查选项是否正确{COLOR_RESET}")
 			return
 
 		client.Motion().clear_comments(source=source, action_type=action_type)  # type: ignore  # noqa: F405, PGH003
-		print(f"{COLOR_SUCCESS}✅ 已成功清除 {source} 的 {action_type} 评论{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}已成功清除 {source} 的 {action_type} 评论{COLOR_RESET}")
 
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 清除评论失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}清除评论失败: {e}{COLOR_RESET}")
 
 
 def clear_red_point() -> None:
@@ -75,14 +75,14 @@ def clear_red_point() -> None:
 		method = input(f"{COLOR_PROMPT}↳ 请输入方法 (nemo/web): {COLOR_RESET}").lower()
 
 		if method not in {"nemo", "web"}:
-			print(f"{COLOR_ERROR}⚠ 无效的输入，请使用 nemo 或 web 方法{COLOR_RESET}")
+			print(f"{COLOR_ERROR}无效的输入，请使用 nemo 或 web 方法{COLOR_RESET}")
 			return
 
 		client.Motion().clear_red_point(method=method)  # type: ignore  # noqa: F405, PGH003
-		print(f"{COLOR_SUCCESS}✅ 已成功清除 {method} 红点提醒{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}已成功清除 {method} 红点提醒{COLOR_RESET}")
 
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 清除红点失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}清除红点失败: {e}{COLOR_RESET}")
 
 
 def reply_work() -> None:
@@ -90,9 +90,9 @@ def reply_work() -> None:
 	try:
 		print_header("自动回复")
 		client.Motion().reply_work()  # noqa: F405
-		print(f"{COLOR_SUCCESS}✅ 已成功执行自动回复{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}已成功执行自动回复{COLOR_RESET}")
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 自动回复失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}自动回复失败: {e}{COLOR_RESET}")
 
 
 def handle_report() -> None:
@@ -104,10 +104,10 @@ def handle_report() -> None:
 
 		admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
 		client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
-		print(f"{COLOR_SUCCESS}✅ 已成功处理举报{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}已成功处理举报{COLOR_RESET}")
 
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 处理举报失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}处理举报失败: {e}{COLOR_RESET}")
 
 
 def check_account_status() -> None:
@@ -115,9 +115,9 @@ def check_account_status() -> None:
 	try:
 		print_header("账户状态查询")
 		status = client.Motion().get_account_status()  # noqa: F405
-		print(f"{COLOR_STATUS}🔄 当前账户状态: {status}{COLOR_RESET}")
+		print(f"{COLOR_STATUS}当前账户状态: {status}{COLOR_RESET}")
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 获取账户状态失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}获取账户状态失败: {e}{COLOR_RESET}")
 
 
 def logout() -> None:
@@ -127,14 +127,14 @@ def logout() -> None:
 		method = input(f"{COLOR_PROMPT}↳ 请输入方法 (web): {COLOR_RESET}").lower()
 
 		if method != "web":
-			print(f"{COLOR_ERROR}⚠ 无效的输入，目前仅支持 web 登出方式{COLOR_RESET}")
+			print(f"{COLOR_ERROR}无效的输入，目前仅支持 web 登出方式{COLOR_RESET}")
 			return
 
 		community.Login().logout(method=method)  # noqa: F405
-		print(f"{COLOR_SUCCESS}✅ 已成功登出账户{COLOR_RESET}")
+		print(f"{COLOR_SUCCESS}已成功登出账户{COLOR_RESET}")
 
 	except Exception as e:
-		print(f"{COLOR_ERROR}❌ 登出失败: {e}{COLOR_RESET}")
+		print(f"{COLOR_ERROR}登出失败: {e}{COLOR_RESET}")
 
 
 def main() -> None:
@@ -168,10 +168,10 @@ def main() -> None:
 		elif choice == "7":
 			check_account_status()
 		elif choice == "8":
-			print(f"\n{COLOR_SUCCESS}👋 感谢使用，再见！{COLOR_RESET}")
+			print(f"\n{COLOR_SUCCESS}感谢使用，再见！{COLOR_RESET}")
 			break
 		else:
-			print(f"{COLOR_ERROR}⚠ 无效的输入，请重新选择{COLOR_RESET}")
+			print(f"{COLOR_ERROR}无效的输入，请重新选择{COLOR_RESET}")
 
 		input(f"\n{COLOR_PROMPT}⏎ 按回车键继续...{COLOR_RESET}")
 
