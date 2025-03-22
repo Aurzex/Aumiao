@@ -1,19 +1,41 @@
 from src import *  # noqa: F403
 
+# 颜色代码定义
+COLOR_PROMPT = "\033[1;34m"  # 蓝色加粗-输入提示
+COLOR_SUCCESS = "\033[1;32m"  # 绿色加粗-成功提示
+COLOR_ERROR = "\033[1;31m"  # 红色加粗-错误提示
+COLOR_MENU_TITLE = "\033[1;36m"  # 青色加粗-菜单标题
+COLOR_MENU_ITEM = "\033[1;35m"  # 紫色加粗-菜单项
+COLOR_STATUS = "\033[1;33m"  # 黄色加粗-状态信息
+COLOR_RESET = "\033[0m"  # 重置样式
+
+# 装饰线符号
+SEPARATOR = f"{COLOR_PROMPT}══════════════════════════════════════════════════════════{COLOR_RESET}"
+
+
+def print_header(text: str) -> None:
+	"""打印带装饰的标题"""
+	print(f"\n{SEPARATOR}")
+	print(f"{COLOR_MENU_TITLE}{text:^60}{COLOR_RESET}")
+	print(f"{SEPARATOR}\n")
+
 
 def login() -> None:
 	"""尝试登录并获取数据"""
 	try:
-		identity = input("请输入用户名: ")
-		password = input("请输入密码: ")
+		print_header("用户登录")
+		identity = input(f"{COLOR_PROMPT}↳ 请输入用户名: {COLOR_RESET}")
+		password = input(f"{COLOR_PROMPT}↳ 请输入密码: {COLOR_RESET}")
+
 		community.Login().login_token(identity=identity, password=password)  # noqa: F405
 		data_ = user.Obtain().get_data_details()  # noqa: F405
+
 		account_data_manager = data.DataManager()  # noqa: F405
 		account_data_manager.update(
 			{
 				"ACCOUNT_DATA": {
 					"identity": identity,
-					"password": "******",  # 不建议存储密码
+					"password": "******",
 					"id": data_["id"],
 					"nickname": data_["nickname"],
 					"create_time": data_["create_time"],
@@ -22,98 +44,114 @@ def login() -> None:
 				},
 			},
 		)
+		print(f"{COLOR_SUCCESS}✅ 登录成功！欢迎 {data_['nickname']}{COLOR_RESET}")
+
 	except Exception as e:
-		print(f"登录失败: {e}")
+		print(f"{COLOR_ERROR}❌ 登录失败: {e}{COLOR_RESET}")
 
 
 def clear_comments() -> None:
 	"""尝试执行清除评论的操作"""
 	try:
-		source = input("请输入来源类型 (work/post): ")
-		action_type = input("请输入操作类型 (ads/duplicates/blacklist): ")
-		# 判断输入是否有效
+		print_header("清除评论")
+		source = input(f"{COLOR_PROMPT}↳ 请输入来源类型 (work/post): {COLOR_RESET}").lower()
+		action_type = input(f"{COLOR_PROMPT}↳ 请输入操作类型 (ads/duplicates/blacklist): {COLOR_RESET}").lower()
+
 		if source not in {"work", "post"} or action_type not in {"ads", "duplicates", "blacklist"}:
-			print("无效的输入")
+			print(f"{COLOR_ERROR}⚠ 无效的输入，请检查选项是否正确{COLOR_RESET}")
 			return
-		# 调用Motion类的clear_comments方法,清除评论
+
 		client.Motion().clear_comments(source=source, action_type=action_type)  # type: ignore  # noqa: F405, PGH003
+		print(f"{COLOR_SUCCESS}✅ 已成功清除 {source} 的 {action_type} 评论{COLOR_RESET}")
+
 	except Exception as e:
-		print(f"清除评论失败: {e}")
+		print(f"{COLOR_ERROR}❌ 清除评论失败: {e}{COLOR_RESET}")
 
 
 def clear_red_point() -> None:
 	"""尝试执行清除红点操作"""
 	try:
-		method = input("请输入方法 (nemo/web): ")
-		# 判断输入是否有效
+		print_header("清除红点提醒")
+		method = input(f"{COLOR_PROMPT}↳ 请输入方法 (nemo/web): {COLOR_RESET}").lower()
+
 		if method not in {"nemo", "web"}:
-			print("无效的输入")
+			print(f"{COLOR_ERROR}⚠ 无效的输入，请使用 nemo 或 web 方法{COLOR_RESET}")
 			return
-		# 调用Motion类的clear_red_point方法,传入方法参数
+
 		client.Motion().clear_red_point(method=method)  # type: ignore  # noqa: F405, PGH003
+		print(f"{COLOR_SUCCESS}✅ 已成功清除 {method} 红点提醒{COLOR_RESET}")
+
 	except Exception as e:
-		# 如果出现异常,则输出清除邮箱红点失败的信息
-		print(f"清除邮箱红点失败: {e}")
+		print(f"{COLOR_ERROR}❌ 清除红点失败: {e}{COLOR_RESET}")
 
 
 def reply_work() -> None:
 	"""尝试执行自动回复操作"""
 	try:
+		print_header("自动回复")
 		client.Motion().reply_work()  # noqa: F405
+		print(f"{COLOR_SUCCESS}✅ 已成功执行自动回复{COLOR_RESET}")
 	except Exception as e:
-		print(f"自动回复失败: {e}")
+		print(f"{COLOR_ERROR}❌ 自动回复失败: {e}{COLOR_RESET}")
 
 
 def handle_report() -> None:
 	"""尝试执行处理举报操作"""
 	try:
-		token = input("请输入 Authorization: ")
+		print_header("处理举报")
+		token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
 		whale.Routine().set_token(token=token)  # noqa: F405
-		admin_id = int(input("请输入管理员ID: "))
+
+		admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
 		client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
+		print(f"{COLOR_SUCCESS}✅ 已成功处理举报{COLOR_RESET}")
+
 	except Exception as e:
-		print(f"处理举报失败: {e}")
+		print(f"{COLOR_ERROR}❌ 处理举报失败: {e}{COLOR_RESET}")
 
 
 def check_account_status() -> None:
 	"""尝试查看账户状态"""
 	try:
+		print_header("账户状态查询")
 		status = client.Motion().get_account_status()  # noqa: F405
-		print(f"账户状态: {status}")
+		print(f"{COLOR_STATUS}🔄 当前账户状态: {status}{COLOR_RESET}")
 	except Exception as e:
-		print(f"获取账户状态失败: {e}")
+		print(f"{COLOR_ERROR}❌ 获取账户状态失败: {e}{COLOR_RESET}")
 
 
 def logout() -> None:
 	"""尝试执行登出操作"""
 	try:
-		method = input("请输入方法 (web): ")
+		print_header("账户登出")
+		method = input(f"{COLOR_PROMPT}↳ 请输入方法 (web): {COLOR_RESET}").lower()
+
 		if method != "web":
-			print("无效的输入")
+			print(f"{COLOR_ERROR}⚠ 无效的输入，目前仅支持 web 登出方式{COLOR_RESET}")
 			return
-		# 调用community.Login().logout()方法,传入method参数
+
 		community.Login().logout(method=method)  # noqa: F405
-	# 捕获异常,并输出错误信息
+		print(f"{COLOR_SUCCESS}✅ 已成功登出账户{COLOR_RESET}")
+
 	except Exception as e:
-		print(f"登出失败: {e}")
+		print(f"{COLOR_ERROR}❌ 登出失败: {e}{COLOR_RESET}")
 
 
 def main() -> None:
 	"""主函数"""
 	client.Index().index()  # noqa: F405
 	while True:
-		print("\n请选择操作:")
-		print("1. 登录")
+		print_header("主菜单")
+		print(f"{COLOR_MENU_ITEM}1. 用户登录")
 		print("2. 清除评论")
-		print("3. 清除邮箱红点")
+		print("3. 清除红点提醒")
 		print("4. 自动回复")
-		print("5. 登出")
+		print("5. 账户登出")
 		print("6. 处理举报")
-		print("7. 查看账户状态")
-		print("8. 退出")
+		print("7. 状态查询")
+		print(f"8. 退出系统{COLOR_RESET}")
 
-		choice = input("请输入选择 (1-8): ")
-		print("*" * 50)
+		choice = input(f"\n{COLOR_PROMPT}↳ 请输入操作编号 (1-8): {COLOR_RESET}")
 
 		if choice == "1":
 			login()
@@ -130,11 +168,14 @@ def main() -> None:
 		elif choice == "7":
 			check_account_status()
 		elif choice == "8":
+			print(f"\n{COLOR_SUCCESS}👋 感谢使用，再见！{COLOR_RESET}")
 			break
 		else:
-			print("无效的选择, 请重新输入")
+			print(f"{COLOR_ERROR}⚠ 无效的输入，请重新选择{COLOR_RESET}")
+
+		input(f"\n{COLOR_PROMPT}⏎ 按回车键继续...{COLOR_RESET}")
 
 
 if __name__ == "__main__":
 	main()
-	input("按任意键退出")
+	input(f"\n{COLOR_PROMPT}⏎ 按回车键退出程序{COLOR_RESET}")

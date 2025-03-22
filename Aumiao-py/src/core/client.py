@@ -114,25 +114,35 @@ class Tool(ClassUnion):
 class Index(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
+		# 颜色配置
+		self.COLOR_SLOGAN = "\033[1;36m"  # 青色加粗
+		self.COLOR_VERSION = "\033[1;32m"  # 绿色加粗
+		self.COLOR_TITLE = "\033[1;34m"  # 蓝色加粗
+		self.COLOR_LINK = "\033[4;35m"  # 紫色下划线
+		self.COLOR_DATA = "\033[1;33m"  # 黄色加粗
+		self.COLOR_RESET = "\033[0m"
 
-	# 打印slogan
 	def index(self) -> None:
+		"""打印引导界面"""
 		# 打印slogan
-		print(self.setting.PROGRAM.SLOGAN)
+		print(f"\n{self.COLOR_SLOGAN}{self.setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
 		# 打印版本号
-		print(f"版本号: {self.setting.PROGRAM.VERSION}")
+		print(f"{self.COLOR_VERSION}版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
+
 		# 打印公告标题
-		print("*" * 22 + " 公告 " + "*" * 22)
-		# 打印编程猫社区行为守则链接
-		print("编程猫社区行为守则 https://shequ.codemao.cn/community/1619098")
-		# 打印2025编程猫拜年祭活动链接
-		print("2025编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855")
+		title = f"{'*' * 22} 公告 {'*' * 22}"
+		print(f"\n{self.COLOR_TITLE}{title}{self.COLOR_RESET}")
+		# 打印链接
+		print(f"{self.COLOR_LINK}编程猫社区行为守则 https://shequ.codemao.cn/community/1619098{self.COLOR_RESET}")
+		print(f"{self.COLOR_LINK}2025编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855{self.COLOR_RESET}")
+
 		# 打印数据标题
-		print("*" * 22 + " 数据 " + "*" * 22)
-		# 调用Tool类的message_report方法,传入用户id
+		data_title = f"{'*' * 22} 数据 {'*' * 22}"
+		print(f"\n{self.COLOR_DATA}{data_title}{self.COLOR_RESET}")
+		# 调用数据报告
 		Tool().message_report(user_id=self.data.ACCOUNT_DATA.id)
-		# 打印分隔线
-		print("*" * 50)
+		# 分隔线
+		print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
 
 
 @decorator.singleton
