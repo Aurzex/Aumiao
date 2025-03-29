@@ -116,7 +116,7 @@ export class EnvCred extends Cred {
             state.password = await fall.password("密码:");
         }
 
-        this.app.Logger.debug(`login with username: ${state.username}`);
+        this.app.Logger.debug(`login with username: [*****]`);
 
         fall.step(this.app.UI.color.gray(""), 1);
 

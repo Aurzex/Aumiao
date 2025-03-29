@@ -106,7 +106,7 @@ export class Logger {
 
             let msg = message;
             envData.forEach((data, i) => {
-                if (data) msg = msg.replace(data, `${trackedData[i]}: [*****]`);
+                if (data) msg = msg.replace(new RegExp(data, 'g'), `${trackedData[i]}: [*****]`);
             });
 
             console.debug(this.generate({ level: this.Levels.DEBUG, message: msg }));
@@ -124,7 +124,7 @@ export class Logger {
 
             let msg = message;
             envData.forEach((data, i) => {
-                if (data) msg = msg.replace(data, `${trackedData[i]}: [*****]`);
+                if (data) msg = msg.replace(new RegExp(data, 'g'), `${trackedData[i]}: [*****]`);
             });
 
             console.log(
