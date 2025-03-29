@@ -52,6 +52,8 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set HEAD_REF environment variable
+        run: echo "HEAD_REF=${{ github.head_ref }}" >> $GITHUB_ENV
 
       - name: Detect Modifications
         id: changes
@@ -65,4 +67,4 @@ jobs:
           git config --global user.email "bot@aumiao-py"
           git add -A
           git commit -m "style: Automated code quality fixes"
-          git push origin HEAD:${{ github.head_ref }}
+          git push origin HEAD:$HEAD_REF
