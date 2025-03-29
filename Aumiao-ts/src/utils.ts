@@ -100,7 +100,17 @@ export class Logger {
         try {
             if (typeof message !== "string") message = JSON.stringify(message);
         } catch { /* empty */ }
-        if (this.app.config.debug) console.debug(this.generate({ level: this.Levels.DEBUG, message }));
+        if (this.app.config.debug) {
+            const trackedData = ["USERNAME", "PASSWORD", "CODEMAO_DB_FILE"];
+            const envData = trackedData.map((key) => process.env[key]);
+
+            let msg = message;
+            envData.forEach((data, i) => {
+                if (data) msg = msg.replace(data, `${trackedData[i]}: [*****]`);
+            });
+
+            console.debug(this.generate({ level: this.Levels.DEBUG, message: msg }));
+        }
         return this;
     }
 
