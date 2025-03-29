@@ -1,4 +1,15 @@
+import sys
+
 from src import *  # noqa: F403
+
+
+def enable_vt_mode() -> None:
+	if sys.platform == "win32":
+		from ctypes import windll  # noqa: PLC0415
+
+		kernel32 = windll.kernel32
+		kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+
 
 # 颜色代码定义
 COLOR_PROMPT = "\033[1;34m"  # 蓝色加粗-输入提示
@@ -139,6 +150,7 @@ def logout() -> None:
 
 def main() -> None:
 	"""主函数"""
+	enable_vt_mode()
 	client.Index().index()  # noqa: F405
 	while True:
 		print_header("主菜单")
