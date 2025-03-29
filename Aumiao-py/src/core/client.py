@@ -2,7 +2,7 @@ from collections import defaultdict
 from collections.abc import Generator
 from enum import Enum
 from json import loads
-from random import choice
+from random import choice, randint
 from time import sleep
 from typing import Any, Literal, TypedDict, cast, overload
 
@@ -915,9 +915,12 @@ class Motion(ClassUnion):
 		self.whale_routine.set_token(self.acquire.token.judgement)
 
 	def _switch_edu_account(self, limit: int | None) -> Generator:
-		"""返回所有学生账密列表(优化版本)"""
-		students = self.edu_obtain.get_students(limit=limit)
-		for student in students:
+		"""使用pop随机抽取学生账密"""
+		students = list(self.edu_obtain.get_students(limit=limit))
+
+		while students:
+			# 随机选择一个索引并pop
+			student = students.pop(randint(0, len(students) - 1))  # noqa: S311
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
 		# return [(student["username"], self.edu_motion.reset_password(student["id"])["password"]) for student in students]
