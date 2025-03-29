@@ -43,7 +43,7 @@ jobs:
 
   apply-fixes:
     name: "Apply Fixes"
-    needs: [ code-styling, spell-check ]
+    needs: [code-styling, spell-check]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -52,8 +52,12 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Set HEAD_REF environment variable
+      #   run: echo "HEAD_REF=${{ github.head_ref }}" >> $GITHUB_ENV
       - name: Set HEAD_REF environment variable
-        run: echo "HEAD_REF=${{ github.head_ref }}" >> $GITHUB_ENV
+        run: echo "HEAD_REF=${HEAD_REF}" >> $GITHUB_ENV
+        env:
+          HEAD_REF: ${{ github.head_ref }}
 
       - name: Detect Modifications
         id: changes
