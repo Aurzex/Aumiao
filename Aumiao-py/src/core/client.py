@@ -856,7 +856,8 @@ class Motion(ClassUnion):
 
 								# 获取新账号并登录
 								# current_account = all_accounts[current_account_idx]
-								print(f"切换到账号 {current_account[0]}")
+								# print(f"切换到账号 {current_account[0]}")
+								print("已经切换账号")
 								sleep(5)
 								# self.acquire.switch_account("", identity="edu")
 								self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
