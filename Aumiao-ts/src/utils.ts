@@ -4,6 +4,7 @@ import * as path from "path";
 import { pathToFileURL } from 'url';
 import fs from "fs/promises";
 import { createObjectCsvWriter } from "csv-writer";
+import _ from "lodash";
 
 type LogLevel = "INFO" | "ERROR" | "DEBUG" | "WARN" | "LOG" | "VERBOSE" | "UNKNOWN";
 type LogLevelConfig = {
@@ -106,7 +107,10 @@ export class Logger {
 
             let msg = message;
             envData.forEach((data, i) => {
-                if (data) msg = msg.replace(new RegExp(data, 'g'), `${trackedData[i]}: [*****]`);
+                if (data) {
+                    const safeData = _.escapeRegExp(data);
+                    msg = msg.replace(new RegExp(safeData, 'g'), `${trackedData[i]}: [*****]`);
+                }
             });
 
             console.debug(this.generate({ level: this.Levels.DEBUG, message: msg }));
@@ -124,7 +128,10 @@ export class Logger {
 
             let msg = message;
             envData.forEach((data, i) => {
-                if (data) msg = msg.replace(new RegExp(data, 'g'), `${trackedData[i]}: [*****]`);
+                if (data) {
+                    const safeData = _.escapeRegExp(data);
+                    msg = msg.replace(new RegExp(safeData, 'g'), `${trackedData[i]}: [*****]`);
+                }
             });
 
             console.log(
