@@ -11,15 +11,23 @@ def enable_vt_mode() -> None:
 		kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 
 
-# 颜色代码定义
-COLOR_PROMPT = "\033[1;34m"  # 蓝色加粗-输入提示
-COLOR_SUCCESS = "\033[1;32m"  # 绿色加粗-成功提示
-COLOR_ERROR = "\033[1;31m"  # 红色加粗-错误提示
-COLOR_MENU_TITLE = "\033[1;36m"  # 青色加粗-菜单标题
-COLOR_MENU_ITEM = "\033[1;35m"  # 紫色加粗-菜单项
-COLOR_STATUS = "\033[1;33m"  # 黄色加粗-状态信息
+# # 颜色代码定义
+# COLOR_PROMPT = "\033[1;34m"  # 蓝色加粗-输入提示
+# COLOR_SUCCESS = "\033[1;32m"  # 绿色加粗-成功提示
+# COLOR_ERROR = "\033[1;31m"  # 红色加粗-错误提示
+# COLOR_MENU_TITLE = "\033[1;36m"  # 青色加粗-菜单标题
+# COLOR_MENU_ITEM = "\033[1;35m"  # 紫色加粗-菜单项
+# COLOR_STATUS = "\033[1;33m"  # 黄色加粗-状态信息
+# COLOR_RESET = "\033[0m"  # 重置样式
+# 颜色代码定义(淡雅风格)
+COLOR_PROMPT = "\033[38;5;75m"  # 淡蓝色 - 输入提示(类似晴空)
+COLOR_SUCCESS = "\033[38;5;114m"  # 淡绿色 - 成功提示(类似新芽)
+COLOR_ERROR = "\033[38;5;203m"  # 浅红色 - 错误提示(类似珊瑚红)
+COLOR_MENU_TITLE = "\033[38;5;80m"  # 青绿色 - 菜单标题(类似湖水)
+COLOR_MENU_ITEM = "\033[38;5;183m"  # 薰衣草紫 - 菜单项
+COLOR_STATUS = "\033[38;5;228m"  # 浅黄色 - 状态信息(类似月光)
+COLOR_COMMENT = "\033[38;5;245m"  # 中灰色 - 辅助说明
 COLOR_RESET = "\033[0m"  # 重置样式
-
 # 装饰线符号
 SEPARATOR = f"{COLOR_PROMPT}══════════════════════════════════════════════════════════{COLOR_RESET}"
 
