@@ -1,7 +1,8 @@
 import sys  # noqa: I001
 import ctypes
 import numpy as np
-import PyQt5.sip
+from numpy.typing import NDArray
+import PyQt6.sip
 
 from PyQt5.QtWidgets import *  # noqa: F403
 from PyQt5.QtGui import *  # noqa: F403
@@ -10,27 +11,27 @@ from src import *  # noqa: F403
 
 from scipy.ndimage import convolve
 
-# # 高斯核（5x5）
-# gaussian_kernel = np.array([
-# 	[0.003, 0.013, 0.022, 0.013, 0.003],
-# 	[0.013, 0.059, 0.097, 0.059, 0.013],
-# 	[0.022, 0.097, 0.159, 0.097, 0.022],
-# 	[0.013, 0.059, 0.097, 0.059, 0.013],
-# 	[0.003, 0.013, 0.022, 0.013, 0.003]
-# ])
+# 高斯核（5x5）
+gaussian_kernel : NDArray = np.array([
+	[0.003, 0.013, 0.022, 0.013, 0.003],
+	[0.013, 0.059, 0.097, 0.059, 0.013],
+	[0.022, 0.097, 0.159, 0.097, 0.022],
+	[0.013, 0.059, 0.097, 0.059, 0.013],
+	[0.003, 0.013, 0.022, 0.013, 0.003]
+])
 
-def apply_gaussian_blur(image: QImage):
-	# 将 QImage 转换为 NumPy 数组
-	width = image.width()
-	height = image.height()
-	image_data = image.convertToFormat(QImage.Format_RGBA8888)
-	buffer = image_data.bits().asstring(image_data.byteCount())
-	# buffer = image.bits().asstring(image.byteCount())
-	# buffer : PyQt5.sip.voidptr = image_data.constBits() # type: ignore
-	# buffer.setsize(height * width * 4)
-	img_array = np.frombuffer(buffer, dtype=np.uint8).reshape(image.height(), image.width(), 4)
-	# img_array = np.frombuffer(buffer, dtype=np.uint8).reshape((height, width, 4)) # type: ignore
-	
+
+def apply_gaussian_blur(image: QImage) -> QImage:
+	"""高斯模糊"""
+	# 创建一个可写的 QImage 副本
+	result_image = image.copy()
+	# 转换为 RGBA 格式并获取数据
+	rgba_image = result_image.convertToFormat(QImage.Format_RGBA8888)
+	ptr = rgba_image.bits()
+	ptr.setsize(rgba_image.byteCount())
+	img_array = np.frombuffer(ptr, np.uint8).reshape(rgba_image.height(), rgba_image.width(), 4).copy()
+	# 此时 img_array 是一个可写的独立副本
+
 	# 分离颜色通道
 	red = img_array[:, :, 0]
 	green = img_array[:, :, 1]
@@ -49,11 +50,11 @@ def apply_gaussian_blur(image: QImage):
 	img_array[:, :, 1] = blurred_green
 	img_array[:, :, 2] = blurred_blue
 
-	# 创建新的 QImage
-	result_image = QImage(img_array.data, width, height, width * 4, QImage.Format_RGBA8888)
-	return result_image
+	# 创建一个新的 QImage 并返回
+	return QImage(img_array.data, rgba_image.width(), rgba_image.height(), QImage.Format_RGBA8888).copy()
 
-def apply_gaussian_blur_manual(image: QImage):
+def apply_gaussian_blur_manual(image: QImage) -> QImage:
+	"""手动实现高斯模糊"""
 	width = image.width()
 	height = image.height()
 	new_image = QImage(width, height, QImage.Format_RGBA8888)
@@ -89,9 +90,12 @@ def apply_gaussian_blur_manual(image: QImage):
 class MainWindow(QMainWindow):  # noqa: F405
 	def update(self) -> None:
 		"""更新"""
+		# self.paintBackground()
+		...
+	
+	def paintEvent(self, event):
+		"""重写绘制事件"""
 		self.paintBackground()
-
-
 
 	
 	def __init__(self : QWidget, parent=None) -> None:
@@ -164,69 +168,12 @@ class MainWindow(QMainWindow):  # noqa: F405
 		# 应用高斯模糊
 		image = self.background_image.toImage()
 
-		for x in range(image.width()):
-			for y in range(image.height()):
-				total_red = 0
-				total_green = 0
-				total_blue = 0
-				count = 0
-				for i in range(-1, 2):
-					for j in range(-1, 2):
-						if 0 <= x + i < image.width() and 0 <= y + j < image.height():
-							color = image.pixelColor(x + i, y + j)
-							total_red += color.red()
-							total_green += color.green()
-							total_blue += color.blue()
-							count += 1
-				avg_red = total_red // count
-				avg_green = total_green // count
-				avg_blue = total_blue // count
-				image.setPixelColor(x, y, QColor(avg_red, avg_green, avg_blue))
-
-		self.background_image.convertFromImage(image)
+		self.background_image.convertFromImage(apply_gaussian_blur(image))
 
 		# 绘制模糊后的图像
 		painter.drawPixmap(0, 0, self.background_image)
 
 
-		
-
-
-	def enable_gaussian_blur(self, hwnd):
-		# 创建 Direct2D 高斯模糊效果
-		d2d_factory = ctypes.windll.d2d1.D2D1CreateFactory(
-			ctypes.c_uint(0),  # D2D1_FACTORY_TYPE_SINGLE_THREADED
-			ctypes.c_void_p()  # CLSID_D2D1Factory
-		)
-
-		d2d_context = ctypes.windll.d2d1.D2D1CreateDeviceContext(
-			ctypes.c_void_p(),  # ID2D1Device
-			ctypes.c_void_p()  # ID2D1DeviceContext
-		)
-
-		gaussian_blur_effect = ctypes.windll.d2d1.D2D1CreateEffect(
-			ctypes.c_void_p(),  # ID2D1EffectFactory
-			ctypes.c_void_p()  # CLSID_D2D1GaussianBlur
-		)
-
-		# 设置高斯模糊参数
-		ctypes.windll.d2d1.ID2D1Effect_SetValue(
-			gaussian_blur_effect,
-			ctypes.c_int(0),  # D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION
-			ctypes.c_float(3.0)  # 标准差
-		)
-
-		# 应用高斯模糊效果
-		ctypes.windll.d2d1.ID2D1DeviceContext_SetEffect(
-			d2d_context,
-			gaussian_blur_effect,
-			ctypes.c_void_p()  # ID2D1Image
-		)
-
-		# 释放资源
-		ctypes.windll.d2d1.ID2D1Effect_Release(gaussian_blur_effect)
-		ctypes.windll.d2d1.ID2D1DeviceContext_Release(d2d_context)
-		ctypes.windll.d2d1.ID2D1Factory_Release(d2d_factory)
 
 	def set_button_disabled(self, is_disabled: bool) -> None:
 		"""设置按钮是否可用"""

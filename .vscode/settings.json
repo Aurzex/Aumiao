@@ -1,5 +1,10 @@
 {
     "Codegeex.RepoIndex": true,
     "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.autoImportCompletions": false
+    "python.analysis.autoImportCompletions": false,
+    "Codegeex.GenerationPreference": "line by line",
+    "cSpell.words": [
+        "Aumiao",
+        "siui"
+    ]
 }
