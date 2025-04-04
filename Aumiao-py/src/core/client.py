@@ -323,7 +323,7 @@ class Motion(ClassUnion):
 		params = {
 			"ads": self.data.USER_DATA.ads,
 			"blacklist": self.data.USER_DATA.black_room,
-			"spam_max": self.setting.PARAMETER.spam_max,
+			"spam_max": self.setting.PARAMETER.spam_del_max,
 		}
 
 		# 主处理逻辑
@@ -671,7 +671,7 @@ class Motion(ClassUnion):
 	# 查看账户状态
 	def get_account_status(self) -> str:
 		status = self.user_obtain.get_data_details()
-		return f"禁言状态{status['voice_forbidden']},签订友好条约{status['has_signed']}"
+		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
 	# 处理举报
 	# 需要风纪权限
@@ -848,7 +848,7 @@ class Motion(ClassUnion):
 					while not success and retries < max_retries:
 						try:
 							# 当达到最大举报次数或需要切换账号时
-							if report_count >= self.setting.PARAMETER.report_max or success_count == 0:
+							if report_count >= self.setting.PARAMETER.report_work_max or success_count == 0:
 								try:
 									current_account = next(all_accounts)
 								except StopIteration:
@@ -956,7 +956,7 @@ class Motion(ClassUnion):
 					print(f"广告回复: {reply['content']}")
 		# (user_id,content):[item_id.comment_id1:reply/comment,item_id.comment_id2:reply/comment]
 		for (user_id, content), entry in content_map.items():
-			if len(entry) >= self.setting.PARAMETER.spam_max:
+			if len(entry) >= self.setting.PARAMETER.spam_del_max:
 				print(f"发现刷屏评论: {content}")
 				print(f"此用户已经刷屏,共发布{len(entry)}次")
 				yield {(user_id, content): entry}

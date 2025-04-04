@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
-from typing import Any, Generic, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import Any, Generic, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from . import decorator
 
@@ -52,20 +52,12 @@ class CodeMaoData:
 
 
 @dataclass
-class DefaultAction:
-	action: str = ""
-	name: str = ""
-
-
-@dataclass
 class Parameter:
-	all_read_type: list[str] = field(default_factory=list)
-	clear_ad_exclude_top: bool = False
+	all_read_type: list[Literal["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"]] = field(default_factory=list)
 	cookie_check_url: str = ""
-	get_works_method: str = ""
+	report_work_max: int = 0
 	password_login_method: str = ""
-	spam_max: int = 0
-	report_max: int = 0
+	spam_del_max: int = 0
 
 
 @dataclass
@@ -115,7 +107,6 @@ class CodeMaoCache:
 
 @dataclass
 class CodeMaoSetting:
-	DEFAULT: list[DefaultAction] = field(default_factory=list)
 	PARAMETER: Parameter = field(default_factory=Parameter)
 	PLUGIN: Plugin = field(default_factory=Plugin)
 	PROGRAM: Program = field(default_factory=Program)
