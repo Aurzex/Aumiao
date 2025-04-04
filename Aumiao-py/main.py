@@ -11,14 +11,6 @@ def enable_vt_mode() -> None:
 		kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 
 
-# # 颜色代码定义
-# COLOR_PROMPT = "\033[1;34m"  # 蓝色加粗-输入提示
-# COLOR_SUCCESS = "\033[1;32m"  # 绿色加粗-成功提示
-# COLOR_ERROR = "\033[1;31m"  # 红色加粗-错误提示
-# COLOR_MENU_TITLE = "\033[1;36m"  # 青色加粗-菜单标题
-# COLOR_MENU_ITEM = "\033[1;35m"  # 紫色加粗-菜单项
-# COLOR_STATUS = "\033[1;33m"  # 黄色加粗-状态信息
-# COLOR_RESET = "\033[0m"  # 重置样式
 # 颜色代码定义(淡雅风格)
 COLOR_PROMPT = "\033[38;5;75m"  # 淡蓝色 - 输入提示(类似晴空)
 COLOR_SUCCESS = "\033[38;5;114m"  # 淡绿色 - 成功提示(类似新芽)
