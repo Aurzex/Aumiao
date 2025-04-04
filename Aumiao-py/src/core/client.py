@@ -115,12 +115,12 @@ class Index(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 		# 颜色配置
-		self.COLOR_SLOGAN = "\033[1;36m"  # 青色加粗
-		self.COLOR_VERSION = "\033[1;32m"  # 绿色加粗
-		self.COLOR_TITLE = "\033[1;34m"  # 蓝色加粗
-		self.COLOR_LINK = "\033[4;35m"  # 紫色下划线
-		self.COLOR_DATA = "\033[1;33m"  # 黄色加粗
-		self.COLOR_RESET = "\033[0m"
+		self.COLOR_SLOGAN = "\033[38;5;80m"  # 湖水青-标语
+		self.COLOR_VERSION = "\033[38;5;114m"  # 新芽绿-版本号
+		self.COLOR_TITLE = "\033[38;5;75m"  # 晴空蓝-标题
+		self.COLOR_LINK = "\033[4;38;5;183m"  # 薰衣草紫带下划线-链接
+		self.COLOR_DATA = "\033[38;5;228m"  # 月光黄-数据
+		self.COLOR_RESET = "\033[0m"  # 样式重置
 
 	def index(self) -> None:
 		"""打印引导界面"""
@@ -129,6 +129,10 @@ class Index(ClassUnion):
 		# 打印版本号
 		print(f"{self.COLOR_VERSION}版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
 
+		title = f"{'*' * 22} 一言 {'*' * 22}"
+		print(f"\n{self.COLOR_TITLE}{title}{self.COLOR_RESET}")
+		lyric: str = self.acquire.send_request(endpoint="https://lty.vc/lyric", method="GET").text
+		print(f"{self.COLOR_SLOGAN}{lyric}{self.COLOR_RESET}")
 		# 打印公告标题
 		title = f"{'*' * 22} 公告 {'*' * 22}"
 		print(f"\n{self.COLOR_TITLE}{title}{self.COLOR_RESET}")
