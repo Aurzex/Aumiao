@@ -279,24 +279,24 @@ class ExampleWidgets(SiPage):
             self.refactor_progress_button = SiProgressPushButton(self)
             self.refactor_progress_button.setText("Downloading")
             self.refactor_progress_button.setSvgIcon(SiGlobal.siui.iconpack.get("ic_fluent_arrow_download_filled"))
-            self.refactor_progress_button.setToolTip("Click me to set a random progress value.")
+            self.refactor_progress_button.setToolTip("单击我以设置随机进度值")
             self.refactor_progress_button.clicked.connect(lambda: self.refactor_progress_button.setProgress(random.random() * 1.3))
             self.refactor_progress_button.adjustSize()
 
             self.refactor_long_press_button = SiLongPressButtonRefactor(self)
-            self.refactor_long_press_button.setText("Delete Files")
-            self.refactor_long_press_button.setToolTip("Hold me to confirm.<br><strong>Your files will be lost forever!</strong>")
+            self.refactor_long_press_button.setText("删除文件")
+            self.refactor_long_press_button.setToolTip("请按住我确认<br><strong>您的文件将永远丢失！</strong>")
             self.refactor_long_press_button.setSvgIcon(SiGlobal.siui.iconpack.get("ic_fluent_delete_filled"))
-            self.refactor_long_press_button.longPressed.connect(lambda: self.refactor_long_press_button.setToolTip("Deleted!"))
+            self.refactor_long_press_button.longPressed.connect(lambda: self.refactor_long_press_button.setToolTip("删除！"))
             self.refactor_long_press_button.adjustSize()
 
             self.refactor_flat_button = SiFlatButton(self)
-            self.refactor_flat_button.setText("Flat Button")
+            self.refactor_flat_button.setText("平面按钮")
             self.refactor_flat_button.setSvgIcon(SiGlobal.siui.iconpack.get("ic_fluent_wrench_settings_filled"))
             self.refactor_flat_button.adjustSize()
 
             self.refactor_toggle_button = SiToggleButtonRefactor(self)
-            self.refactor_toggle_button.setText("Auto Save")
+            self.refactor_toggle_button.setText("自动保存")
             self.refactor_toggle_button.setSvgIcon(SiGlobal.siui.iconpack.get("ic_fluent_save_filled"))
             self.refactor_toggle_button.adjustSize()
 
@@ -366,7 +366,7 @@ class ExampleWidgets(SiPage):
             radio_button_container.setSpacing(6)
 
             self.refactor_radio_button = SiRadioButtonRefactor(self)
-            self.refactor_radio_button.setText("I want to go sleep now")
+            self.refactor_radio_button.setText("我现在想睡觉")
             self.refactor_radio_button.adjustSize()
             self.refactor_radio_button.setChecked(True)
 
@@ -383,7 +383,7 @@ class ExampleWidgets(SiPage):
             self.refactor_radio_button4.adjustSize()
 
             self.refactor_radio_button5 = SiRadioButtonRefactor(self)
-            self.refactor_radio_button5.setText("nihao")
+            self.refactor_radio_button5.setText("你好")
             self.refactor_radio_button5.adjustSize()
 
             radio_button_container.addWidget(self.refactor_radio_button)
@@ -407,7 +407,7 @@ class ExampleWidgets(SiPage):
 
             self.refactor_radio_button = SiRadioButtonWithDescription(self)
             self.refactor_radio_button.setText("Hello World")
-            self.refactor_radio_button.setDescription("This is the description of Item1, which is very long.")
+            self.refactor_radio_button.setDescription("这是 Item1 的描述，很长")
             self.refactor_radio_button.setDescriptionWidth(180)
             self.refactor_radio_button.adjustSize()
             self.refactor_radio_button.setChecked(True)

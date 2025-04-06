@@ -53,7 +53,7 @@ class About(SiPage):
             self.button_to_repo = SiSimpleButton(self)
             self.button_to_repo.resize(32, 32)
             self.button_to_repo.attachment().load(SiGlobal.siui.iconpack.get("ic_fluent_open_regular"))
-            self.button_to_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/ChinaIceF/PyQt-SiliconUI")))
+            self.button_to_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/ChinaIceF/PyQt-SiliconUI"))) # type: ignore
 
             self.option_card_repo = SiOptionCardLinear(self)
             self.option_card_repo.setTitle("开源仓库", "在 GitHub 上查看 Silicon UI 的项目主页")
