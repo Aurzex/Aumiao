@@ -17,6 +17,7 @@ from siui.core import SiColor
 from siui.core import SiGlobal
 from siui.core import Si
 
+# TODO: 优化图标库，提升加载速度
 
 def get_on_button_clicked_func(button):
     def on_button_clicked():

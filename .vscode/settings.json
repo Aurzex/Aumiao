@@ -1,10 +1,13 @@
 {
     "Codegeex.RepoIndex": true,
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.autoImportCompletions": false,
-    "Codegeex.GenerationPreference": "line by line",
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true,
+    "Codegeex.GenerationPreference": "line by line", // 设置 Codegeex 的代码生成偏好为逐行生成
     "cSpell.words": [
         "Aumiao",
+        "Aurzex",
+        "iconpack",
+        "numpy",
         "siui"
     ]
 }

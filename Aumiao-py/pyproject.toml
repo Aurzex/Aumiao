@@ -3,9 +3,9 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Aumiao"  # 替换为你的项目名称
+name = "Aumiao"
 email = "aumiao@aurzex.top"
-version = "2.0.0"    # 替换为你的项目版本
+version = "2.0.0"
 authors = [
     {name = "Aumiao Team", email = "aumiao@aurzex.top"},
     {name = "DontLoveBy", email = "laya200900@outlook.com"},
@@ -25,7 +25,7 @@ description = "Aumiao 是一款针对于编程猫社区的爬虫(划掉)
 readme = ["README.md", "Aumiao-py/readme.txt", "Aumiao-ts/README.md"]
 requires-python = ">=3.12"
 dependencies = [
-    # "numpy",
+    "numpy",
     "PyQt5",
     "siui"
 ]
@@ -45,4 +45,4 @@ dependencies = [
 [tool.setuptools.packages.find]
 # 你可以在这里指定setuptools查找包的方式
 # where = ["src"]  # 假设你的包在src目录下
-exclude = ["log*"]  # 排除日志目录
+exclude = ["log*", "__pycache__", "data"]  # 排除日志目录

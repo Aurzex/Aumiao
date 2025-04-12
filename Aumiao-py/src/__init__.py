@@ -32,7 +32,7 @@ _module_paths = {
 	"shop": ".api.shop", #  商店模块
 	"user": ".api.user", #  用户模块
 	"whale": ".api.whale", #  Whale模块
-	"work": ".api.work", #  工作模块
+	"work": ".api.work", #  作品模块
 }
 
 __all__ = list(_module_paths.keys())# | __all__

@@ -17,7 +17,15 @@ from siui.components.widgets import (
     SiSimpleButton,
     SiSwitch,
 )
-from siui.core import GlobalFont, Si, SiColor, SiGlobal, SiQuickEffect, GlobalFontSize
+from siui.components.button import SiPushButtonRefactor
+from siui.core import (
+    GlobalFont, 
+    Si, SiColor, 
+    SiGlobal, 
+    SiQuickEffect, 
+    GlobalFontSize
+)
+
 from siui.gui import SiFont
 
 from .components.themed_option_card import ThemedOptionCardPlane
@@ -48,28 +56,32 @@ class ExampleHomepage(SiPage):
             """.format(SiGlobal.siui.colors["INTERFACE_BG_B"],
                        SiColor.trans(SiGlobal.siui.colors["INTERFACE_BG_B"], 0))
         )
+        
+        # 创建顶部栏
+        # self.setupTopBar()
 
         # 创建大标题和副标题
         self.title = SiLabel(self.head_area)
-        self.title.setGeometry(64, 0, 500, 128)
+        self.title.setGeometry(64, 0, 400, 128)
         self.title.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.title.setText("Aumiao")
         self.title.setStyleSheet("color: {}".format(SiGlobal.siui.colors["TEXT_A"]))
         self.title.setFont(SiFont.tokenized(GlobalFont.XL_MEDIUM))
 
         self.subtitle = SiLabel(self.head_area)
-        self.subtitle.setGeometry(64, 72, 500, 48)
+        self.subtitle.setGeometry(64, 96, 900, 128)
         self.subtitle.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         self.subtitle.setText("Aumiao 是一款针对于编程猫社区的爬虫(划掉)\n"
                               "自动化工具，旨在帮助用户更好地管理和维护编程猫社区\n"
-                              "于 2023 年 5 月 2 日发布，工具以编程猫宇宙为舞台，玩家可以扮演毛毡用户在这个答辩 💩 社区毛线 🧶 坍缩并邂逅各种不同的乐子人 😋。在领悟了《猫站圣经》后，打败强敌扫厕所 😡，在维护编程猫核邪铀删的局面的同时，逐步揭开编程猫社区的真相"
+                              "于 2023 年 5 月 2 日发布，工具以编程猫宇宙为舞台，玩家可以扮演毛毡用户在这个答辩 💩 社区毛线 🧶 坍缩并邂逅各种不同的乐子人 😋。\n"
+                              "在领悟了《猫站圣经》后，打败强敌扫厕所 😡，在维护编程猫核邪铀删的局面的同时，逐步揭开编程猫社区的真相"
                               )
         self.subtitle.setStyleSheet("color: {}".format(SiColor.trans(SiGlobal.siui.colors["TEXT_A"], 0.9)))
         self.subtitle.setFont(SiFont.tokenized(GlobalFont.S_MEDIUM))
 
         # 创建一个水平容器
         self.container_for_cards = SiDenseHContainer(self.head_area)
-        self.container_for_cards.move(0, 130)
+        self.container_for_cards.move(0, 250)
         self.container_for_cards.setFixedHeight(310)
         self.container_for_cards.setAlignment(Qt.AlignCenter)
         self.container_for_cards.setSpacing(32)
@@ -77,7 +89,7 @@ class ExampleHomepage(SiPage):
         # 添加卡片
         self.option_card_project = ThemedOptionCardPlane(self)
         self.option_card_project.setTitle("Aumiao 在 GitHub 上的仓库")
-        self.option_card_project.setFixedSize(218, 250)
+        self.option_card_project.setFixedSize(260, 250)
         self.option_card_project.setThemeColor("#855198")
         self.option_card_project.setDescription(
             "查看 GitHub 上的 Aumiao 存储库以获取最新版本、报告错误、提供建议等")  # noqa: E501
@@ -130,6 +142,22 @@ class ExampleHomepage(SiPage):
         # 添加到页面
         self.setAttachment(self.scroll_container)
 
+    # 顶部工具栏
+    def setupTopBar(self):
+        # 创建一个水平容器
+        self.container_for_toys = SiDenseHContainer(self.head_area)
+        self.container_for_toys.move(0, 0)
+        self.container_for_toys.setFixedHeight(50)
+        self.container_for_toys.setAlignment(Qt.AlignCenter)
+        self.container_for_toys.setSpacing(32)
+        
+        # 添加登录按钮
+        self.login_pushbutton = SiPushButtonRefactor(self)
+        self.login_pushbutton.setText("Login")
+        self.login_pushbutton.setSvgIcon(SiGlobal.siui.iconpack.get("ic_fluent_person_passkey_regular"))
+        self.login_pushbutton.adjustSize()
+        self.container_for_toys.addWidget(self.login_pushbutton)
+    
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = event.size().width()
