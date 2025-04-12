@@ -6,7 +6,14 @@ SiLineEditWithItemName
 )
 from siui.core import SiColor, SiGlobal
 from siui.templates.application.components.dialog.modal import SiModalDialog
+# from src import *
+# from src.api import (
+#     community,
+#     user,
+# )
+# from src.utils import data
 
+from PyQt5.QtWidgets import QMessageBox
 
 class LoginDialog(SiModalDialog):
     def __init__(self, *args, **kwargs):
@@ -18,7 +25,7 @@ class LoginDialog(SiModalDialog):
                                                         self.getColor(SiColor.SVG_NORMAL),
                                                         self.getColor(SiColor.INTERFACE_BG_B),
                                                         0.05))
-                         )
+        )
 
         label = SiLabel(self)
         label.setStyleSheet(f"color: {self.getColor(SiColor.TEXT_E)}")
@@ -29,18 +36,26 @@ class LoginDialog(SiModalDialog):
         self.contentContainer().addWidget(label)
         
         # 添加输入框
-        self.demo_named_line_edit_1 = SiLineEditWithItemName(self)
-        self.demo_named_line_edit_1.setName("编程猫账号")
-        self.demo_named_line_edit_1.lineEdit().setText("")
-        self.demo_named_line_edit_1.resize(512, 32)
-        self.contentContainer().addWidget(self.demo_named_line_edit_1)
+        self.userAccountLineEdit = SiLineEditWithItemName(self)
+        self.userAccountLineEdit.setName("编程猫账号")
+        self.userAccountLineEdit.lineEdit().setText("")
+        self.userAccountLineEdit.resize(512, 32)
+        self.contentContainer().addWidget(self.userAccountLineEdit)
         
-        
+        # 添加密码框
+        self.userPasswordLineEdit = SiLineEditWithItemName(self)
+        self.userPasswordLineEdit.setName("密码")
+        self.userPasswordLineEdit.lineEdit().setText("")
+        self.userPasswordLineEdit.resize(512, 32)
+        # self.userPasswordLineEdit.lineEdit().setEchoMode(SiLineEditWithItemName.Password)
+        self.contentContainer().addWidget(self.userPasswordLineEdit)
+
+        # 添加按钮
         loginButton : SiPushButton = SiPushButton(self)
         loginButton.setFixedHeight(32)
         loginButton.attachment().setText("登录")
         loginButton.colorGroup().assign(SiColor.BUTTON_PANEL, self.getColor(SiColor.INTERFACE_BG_D))
-        loginButton.clicked.connect(SiGlobal.siui.windows["MAIN_WINDOW"].layerModalDialog().closeLayer)
+        loginButton.clicked.connect(self.login)
 
         returnButton : SiPushButton = SiPushButton(self)
         returnButton.setFixedHeight(32)
@@ -68,3 +83,30 @@ class LoginDialog(SiModalDialog):
         SiGlobal.siui.windows["TOOL_TIP"].setNowInsideOf(None)
         SiGlobal.siui.windows["TOOL_TIP"].hide_()
         super().deleteLater()
+
+    def login(self) -> None:
+        """登录"""
+        # identity : str = self.userAccountLineEdit.lineEdit().text()
+        # password = self.userPasswordLineEdit.lineEdit().text()
+        # if identity and password:
+        #     try:
+        #         community.Login().login_token(identity=identity, password=password)  # noqa: F405
+        #         _data = user.Obtain().get_data_details()  # noqa: F405
+        #         account_data_manager = data.DataManager()  # noqa: F405
+        #         account_data_manager.update({
+        #             "ACCOUNT_DATA": {
+        #                 "identity": identity,
+        #                 "password": "******",
+        #                 "id": _data["id"],
+        #                 "nickname": _data["nickname"],
+        #                 "create_time": _data["create_time"],
+        #                 "description": _data["description"],
+        #                 "author_level": _data["author_level"],
+        #             },
+        #         },)
+        #         QMessageBox.information(self, "成功", "登录成功")  # noqa: F405
+        #         self.isLogin = True
+        #         self.set_button_disabled(self.isLogin)
+        #     except Exception as e:
+        #         QMessageBox.critical(self, "错误", f"登录失败: {e}")  # noqa: F405
+        SiGlobal.siui.windows["MAIN_WINDOW"].layerModalDialog().closeLayer()

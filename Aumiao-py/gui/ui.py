@@ -66,6 +66,8 @@ class MySiliconApp(SiliconApplication):
         )
         
         self.container_for_tools.addWidget(self.login_pushbutton)
+        # self.(self.container_for_tools)
+
 
         self.layerMain().addPage(ExampleHomepage(self),
                                  icon=SiGlobal.siui.iconpack.get("ic_fluent_home_filled"),

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 # 类型检查时显式导入 (仅供 IDE 识别)
 if TYPE_CHECKING:
-	from . import acquire, data, decorator, file, tool  # noqa: TC004
+	from . import acquire, data, decorator, file, tool
 
 # 修改后的 __all__ 列表,确保包含你需要的模块
 __all__ = ["acquire", "data", "decorator", "file", "tool"]
