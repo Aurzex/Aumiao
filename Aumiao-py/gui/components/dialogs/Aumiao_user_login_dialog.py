@@ -62,9 +62,9 @@ class LoginDialog(SiModalDialog):
 
     def deleteLater(self):
         # print("你好")
-        self.button3.hold_thread.safe_to_stop = True
-        self.button3.hold_thread.wait()
-        self.button3.deleteLater()
+        # self.button3.hold_thread.safe_to_stop = True
+        # self.button3.hold_thread.wait()
+        # self.button3.deleteLater()
         SiGlobal.siui.windows["TOOL_TIP"].setNowInsideOf(None)
         SiGlobal.siui.windows["TOOL_TIP"].hide_()
         super().deleteLater()
