@@ -1,0 +1,24 @@
+{
+    "INFO": {},
+    "ACCOUNT_DATA": {
+        "author_level": 3,
+        "create_time": 1617996269,
+        "description": "优化，我的一生之敌～",
+        "id": "18152839",
+        "identity": "13790059182",
+        "nickname": "蓝要起飞",
+        "password": "******"
+    },
+    "USER_DATA": {
+        "ads": [],
+        "answers": [],
+        "black_room": {
+            "post": [],
+            "user": [],
+            "work": []
+        },
+        "comments": [],
+        "emojis": [],
+        "replies": []
+    }
+}

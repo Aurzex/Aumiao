@@ -1,9 +1,0 @@
-{
-  "name": "aumiao-js",
-  "description": "A Node.js version of Aumiao.",
-  "author": "MoonLeeeaf",
-  "dependencies": {
-    "request": "^2.88.2"
-  },
-  "type": "commonjs"
-}

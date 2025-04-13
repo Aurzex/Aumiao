@@ -1,0 +1,173 @@
+name: Build and Package with Nuitka
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.13"
+  UPX_VERSION: "4.2.4"
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: "x64"
+          cache: "pip"
+          check-latest: true
+
+      - name: Cache virtual environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            \~/.cache/pip
+            \~/.cache/uv
+          key: venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
+      - name: Set Up UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/requirements*.txt
+            **/pyproject.toml
+
+      - name: Install Dependencies
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\activate
+          uv pip install --system -r ./Aumiao-py/src/project/requirements.txt
+        shell: pwsh
+
+      - name: Get Version Info
+        id: version
+        run: |
+          echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build Executable with Nuitka
+        uses: Nuitka/Nuitka-Action@main
+        continue-on-error: true
+        with:
+          nuitka-version: main
+          script-name: ./Aumiao-py/main.py
+          mode: standalone
+          company-name: "Aumiao Team"
+          product-name: "Aumiao"
+          file-version: "2.0.0"
+          product-version: "2.0.0"
+          file-description: "Build: ${{ steps.version.outputs.BUILD_DATE }} (${{ steps.version.outputs.GIT_SHA }})"
+          copyright: "Copyright © 2025 喵鱼a. All rights reserved."
+          windows-console-mode: force
+          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
+          remove-output: true
+          lto: "yes"
+          jobs: ${{ runner.os == 'Windows' && 4 || 2 }}
+          follow-imports: true
+          assume-yes-for-downloads: true
+          output-dir: build
+
+      - name: Cache UPX
+        id: cache-upx
+        uses: actions/cache@v4
+        with:
+          path: upx.exe
+          key: upx-${{ env.UPX_VERSION }}-win64
+
+      - name: Download and Install UPX
+        if: steps.cache-upx.outputs.cache-hit != 'true'
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile "upx.zip"
+          Expand-Archive -Path "upx.zip" -DestinationPath "upx"
+          Move-Item -Path "upx\upx-${{ env.UPX_VERSION }}-win64\upx.exe" -Destination "upx.exe"
+        shell: pwsh
+
+      - name: Copy Additional Files
+        run: |
+          # 创建 log 文件夹
+          New-Item -Path "build/main.dist/log" -ItemType Directory -Force
+
+          # 复制 README 和 DISCLAIMER
+          Copy-Item "./Aumiao-py/README.txt" -Destination "build/main.dist/"
+          Copy-Item "./Aumiao-py/DISCLAIMER.txt" -Destination "build/main.dist/"
+
+          # 复制 data 目录及其内容
+          Copy-Item "./Aumiao-py/data" -Destination "build/main.dist/" -Recurse
+
+          # 显示复制后的文件结构(用于调试)
+          Write-Host "Final directory structure:"
+          Get-ChildItem -Path "build/main.dist" -Recurse
+        shell: pwsh
+
+      - name: Compress with UPX
+        run: |
+          Write-Host "Compressing executables with UPX..."
+          $exePath = "./build/main.dist/main.exe"
+          if (Test-Path $exePath) {
+            ./upx.exe --best --lzma "$exePath"
+          } else {
+            Write-Error "Main executable not found!"
+            exit 1
+          }
+          Get-ChildItem "./build/main.dist/*.dll" | ForEach-Object {
+            Write-Host "Compressing $($_.Name)..."
+            ./upx.exe --best --lzma $_.FullName
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Package Build
+        run: |
+          cd build/main.dist
+          7z a -tzip "../Aumiao-${{ steps.version.outputs.GIT_SHA }}-win64.zip" *
+        shell: pwsh
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aumiao-${{ steps.version.outputs.GIT_SHA }}-win64
+          path: build/Aumiao-${{ steps.version.outputs.GIT_SHA }}-win64.zip
+          if-no-files-found: error
+          retention-days: 5
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ steps.version.outputs.GIT_SHA }}
+          path: |
+            build/**/*.log
+            build/**/*.yml
+            **.yml
+          if-no-files-found: ignore
+          retention-days: 5
+#编译后将./Aumiao-py/中的README.txt和DISCLAIMER.txt与data目录以及里面的文件也一并放入,并添加log文件夹

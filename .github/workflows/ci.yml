@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  pull_request_target:
+
+jobs:
+  lint-format:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Ruff linter
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: check --fix
+          changed-files: true
+
+      - name: Run Ruff formatter
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: format
+          changed-files: true
+
+  typos:
+    name: Code Spell Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check spelling
+        uses: crate-ci/typos@master
+        with:
+          files: .
+          config: ./Aumiao-py/typos.toml
+
+  commit-changes:
+    name: Commit Changes
+    needs: [lint-format, typos] # 添加依赖,确保在其他检查完成后运行
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: success() # 只在之前的任务成功时运行
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "no_changes=true" >> $GITHUB_ENV
+          else
+            echo "no_changes=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit files
+        if: env.no_changes == 'false'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "style: auto format and lint fixes"
+
+      - name: Push changes
+        if: env.no_changes == 'false'
+        uses: ad-m/github-push-action@master
+        with:
+          branch: ${{ github.head_ref }}
