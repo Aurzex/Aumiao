@@ -865,7 +865,7 @@ class Motion(ClassUnion):
 								sleep(5)
 								# self.acquire.switch_account("", identity="edu")
 								self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
-								sleep(5)
+								sleep(10)
 								# self.acquire.switch_account(token=self.acquire.token.edu, identity="edu")
 								# print("*" * 85)
 								# print(f"token={self.acquire.token.edu}")

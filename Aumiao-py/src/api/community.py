@@ -47,6 +47,8 @@ class Login:
 		#   pid = loads(soup.find_all("script")[0].string.split("=")[1])["pid"]
 
 		# 发送登录请求
+		self.acquire.switch_account(token="", identity="blank")  # 切换账号
+
 		response = self.acquire.send_request(
 			endpoint="/tiger/v3/web/accounts/login",
 			method="POST",
