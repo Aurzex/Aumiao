@@ -10,6 +10,7 @@ import requests
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
+from requests.sessions import Session
 
 from . import data, file, tool
 from .decorator import singleton
@@ -24,6 +25,7 @@ class Token:
 	average: str = ""
 	edu: str = ""
 	judgement: str = ""
+	blank: str = ""
 
 
 class HTTPSTATUS(Enum):
@@ -53,9 +55,10 @@ FetchMethod = Literal["GET", "POST"]
 class CodeMaoClient:
 	def __init__(self) -> None:
 		"""初始化客户端实例,增强配置管理"""
-		self._session = requests.Session()
+		self._default_session = Session()  # 默认会话用于非教育账号
+		self._session = self._default_session  # 当前活跃会话
+		self._identity: str | None = None
 		self._config = data.SettingManager().data
-		self._processor = tool.CodeMaoProcess()
 		self._file = file.CodeMaoFile()
 		self.token = Token()
 		self.base_url = "https://api.codemao.cn"
@@ -79,6 +82,7 @@ class CodeMaoClient:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
 		# self._session.headers.clear()
+
 		for attempt in range(retries):
 			try:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
@@ -218,10 +222,16 @@ class CodeMaoClient:
 				if limit and yielded_count >= limit:
 					return
 
-	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu"]) -> None:
+	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu", "blank"]) -> None:
 		self.headers["Cookie"] = f"authorization={token}"
 		self.headers["Authorization"] = token
-		# print(f"\n切换到账户{identity}")
+		if identity == "edu":
+			new_session = Session()
+			new_session.cookies.clear()
+			self._session = new_session
+
+		self._identity = identity
+		print(f"切换到 {identity} | 会话ID: {id(self._session)}")
 		match identity:
 			case "average":
 				self.token.average = token
@@ -229,6 +239,8 @@ class CodeMaoClient:
 				self.token.edu = token
 			case "judgement":
 				self.token.judgement = token
+			case "blank":
+				pass
 
 	# def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
 	# 	"""仅操作headers中的Cookie,不涉及session cookies"""
@@ -264,10 +276,13 @@ class CodeMaoClient:
 			f"Method: {response.request.method}\n"
 			f"URL: {response.url}\n"
 			f"Status: {response.status_code}\n"
+			f"{'*' * 50}\n"
+			f"Request Body: {response.request.body}\n"
 			f"Request Headers: {response.request.headers}\n"
+			f"{'*' * 50}\n"
 			f"Response Headers: {response.headers}\n"
 			f"Response: {response.text}\n"
-			f"{'=' * 50}\n"
+			f"{'=' * 50}\n\n"
 		)
 		self._file.file_write(path=LOG_FILE_PATH, content=log_entry, method="a")
 
