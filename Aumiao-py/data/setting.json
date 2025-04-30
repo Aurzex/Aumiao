@@ -3,7 +3,7 @@
 		"all_read_type": ["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"],
 		"cookie_check_url": "/nemo/v2/works/174408420/like",
 		"password_login_method": "token",
-		"report_work_max": 8,
+		"report_work_max": 10,
 		"spam_del_max": 3
 	},
 	"PLUGIN": {

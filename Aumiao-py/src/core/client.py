@@ -209,79 +209,97 @@ class Obtain(ClassUnion):
 		method: Literal["user_id", "comments", "comment_id"] = "user_id",
 		max_limit: int | None = 200,
 	) -> list[dict] | list[str]:
-		def _get_replies(source: str, comment: dict) -> Generator[dict]:
+		"""获取结构化评论数据
+		Args:
+			com_id: 目标主体ID (作品/帖子/工作室ID)
+			source: 数据来源 work=作品 post=帖子 shop=工作室
+			method: 返回格式
+				user_id -> 用户ID列表
+				comment_id -> 评论ID列表
+				comments -> 结构化评论数据
+			max_limit: 最大获取数量
+		Returns:
+			根据method参数返回对应格式的数据
+		"""
+		# 预定义字段映射表
+		SOURCE_CONFIG = {
+			"work": (self.work_obtain.get_work_comments, "work_id", "reply_user"),
+			"post": (self.forum_obtain.get_post_replies_posts, "ids", "user"),
+			"shop": (self.shop_obtain.get_shop_discussion, "shop_id", "reply_user"),
+		}
+
+		# 验证来源有效性
+		if source not in SOURCE_CONFIG:
+			raise ValueError(f"不支持的来源类型: {source}，可用选项: {list(SOURCE_CONFIG.keys())}")
+
+		# 获取基础数据
+		method_func, id_key, user_field = SOURCE_CONFIG[source]
+		comments = method_func(**{id_key: com_id, "limit": max_limit})
+
+		# 定义处理函数
+		def _extract_reply_user(reply: dict) -> int:
+			"""提取回复用户ID"""
+			return reply[user_field]["id"]
+
+		def _generate_replies(comment: dict) -> Generator[dict]:
+			"""生成回复数据"""
 			if source == "post":
-				return self.forum_obtain.get_reply_post_comments(post_id=comment["id"], limit=None)
-			return comment.get("replies", {}).get("items", [])
+				yield from self.forum_obtain.get_reply_post_comments(post_id=comment["id"], limit=None)
+			else:
+				yield from comment.get("replies", {}).get("items", [])
 
-		def _extract_reply_user_id(reply: dict, source: str) -> int:
-			return reply["user"]["id"] if source == "post" else reply["reply_user"]["id"]
-
-		def _handle_user_id(comments: list[dict], source: str) -> list[int]:
+		def _process_user_id() -> list[int]:
+			"""提取用户ID列表"""
 			user_ids = []
 			for comment in comments:
 				user_ids.append(comment["user"]["id"])
-				replies = _get_replies(source, comment)
-				user_ids.extend(_extract_reply_user_id(reply, source) for reply in replies)
-			return user_ids
+				user_ids.extend(_extract_reply_user(reply) for reply in _generate_replies(comment))
+			return self.tool_process.deduplicate(user_ids)
 
-		def _handle_comment_id(comments: list[dict], source: str) -> list[str]:
+		def _process_comment_id() -> list[str]:
+			"""生成评论ID链"""
 			comment_ids = []
 			for comment in comments:
 				comment_ids.append(str(comment["id"]))
-				replies = _get_replies(source, comment)
-				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in replies)
-			return comment_ids
+				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in _generate_replies(comment))
+			return self.tool_process.deduplicate(comment_ids)
 
-		def _handle_detailed_comments(comments: list[dict], source: str) -> list[dict]:
-			detailed_comments = []
-			for comment in comments:
-				comment_data = {
-					"user_id": comment["user"]["id"],
-					"nickname": comment["user"]["nickname"],
-					"id": comment["id"],
-					"content": comment["content"],
-					"created_at": comment["created_at"],
-					"is_top": comment.get("is_top", False),
-					"replies": [],
+		def _process_detailed() -> list[dict]:
+			"""构建结构化数据"""
+			return [
+				{
+					"user_id": item["user"]["id"],
+					"nickname": item["user"]["nickname"],
+					"id": item["id"],
+					"content": item["content"],
+					"created_at": item["created_at"],
+					"is_top": item.get("is_top", False),
+					"replies": [
+						{
+							"id": r_item["id"],
+							"content": r_item["content"],
+							"created_at": r_item["created_at"],
+							"user_id": _extract_reply_user(r_item),
+							"nickname": r_item[user_field]["nickname"],
+						}
+						for r_item in _generate_replies(item)
+					],
 				}
-				for reply in _get_replies(source, comment):
-					reply_data = {
-						"id": reply["id"],
-						"content": reply["content"],
-						"created_at": reply["created_at"],
-						"user_id": _extract_reply_user_id(reply, source),
-						"nickname": reply["user" if source == "post" else "reply_user"]["nickname"],
-					}
-					comment_data["replies"].append(reply_data)
-				detailed_comments.append(comment_data)
-			return detailed_comments
+				
+				for item in comments
+			]
 
-		# 通过映射表处理不同来源的评论获取逻辑
-		source_methods = {
-			"work": (self.work_obtain.get_work_comments, "work_id"),
-			"post": (self.forum_obtain.get_post_replies_posts, "ids"),
-			"shop": (self.shop_obtain.get_shop_discussion, "shop_id"),
+		# 处理方法路由
+		method_router = {
+			"user_id": _process_user_id,
+			"comment_id": _process_comment_id,
+			"comments": _process_detailed,
 		}
-		if source not in source_methods:
-			msg = "不支持的来源类型"
-			raise ValueError(msg)
-		method_func, arg_key = source_methods[source]
-		comments = method_func(**{arg_key: com_id, "limit": max_limit})
 
-		# 处理方法映射表
-		method_handlers = {
-			"user_id": _handle_user_id,
-			"comment_id": _handle_comment_id,
-			"comments": _handle_detailed_comments,
-		}
-		if method not in method_handlers:
-			msg = "不支持的请求方法"
-			raise ValueError(msg)
+		if method not in method_router:
+			raise ValueError(f"不支持的请求方法: {method}，可用选项: {list(method_router.keys())}")
 
-		# 获取处理结果并去重
-		result = method_handlers[method](comments, source)
-		return self.tool_process.deduplicate(result) if method in {"user_id", "comment_id"} else result
+		return method_router[method]()
 
 
 @decorator.singleton
