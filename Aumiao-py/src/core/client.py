@@ -532,78 +532,81 @@ class Motion(ClassUnion):
 			return True
 
 	def clear_red_point(self, method: Literal["nemo", "web"] = "web") -> bool:
-		def get_message_counts(method: Literal["web", "nemo"]) -> dict:
-			return self.community_obtain.get_message_count(method)
+		"""清除未读消息红点提示
+		Args:
+			method: 处理模式 
+				web - 网页端消息类型
+				nemo - 客户端消息类型
+		Returns:
+			bool: 是否全部清除成功
+		"""
+		# 配置参数映射表
+		METHOD_CONFIG = {
+			"web": {
+				"endpoint": "/web/message-record",
+				"message_types": self.setting.PARAMETER.all_read_type,
+				"check_keys": ["count"],  # 对应get_message_counts返回值的结构
+			},
+			"nemo": {
+				"endpoint": "/nemo/v2/user/message/{type}",
+				"message_types": [1, 3],  # 1:点赞收藏 3:fork
+				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
+			}
+		}
 
-		def send_clear_request(url: str, params: dict) -> int:
-			response = self.acquire.send_request(endpoint=url, method="GET", params=params)
-			return response.status_code
+		# 验证方法有效性
+		if method not in METHOD_CONFIG:
+			raise ValueError(f"不支持的方法类型: {method}")
 
-		offset = 0  # 分页偏移量
+		config = METHOD_CONFIG[method]
 		page_size = 200
-		params: dict[str, int | str] = {"limit": page_size, "offset": offset}
+		params = {"limit": page_size, "offset": 0}
 
-		if method == "web":
-			query_types = self.setting.PARAMETER.all_read_type
-			while True:
-				# 检查所有指定类型消息是否均已读
-				counts = get_message_counts("web")
-				if all(count["count"] == 0 for count in counts[:3]):
-					return True
+		def is_all_cleared(counts: dict) -> bool:
+			"""检查是否全部消息已读"""
+			if method == "web":
+				return all(count["count"] == 0 for count in counts[:3])
+			return sum(counts[key] for key in config["check_keys"]) == 0
 
-				# 更新当前分页偏移量
-				params["offset"] = offset
+		def send_batch_requests() -> bool:
+			"""批量发送标记已读请求"""
+			responses = {}
+			for msg_type in config["message_types"]:
+				# 构造请求端点
+				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
+				
+				# 添加类型参数
+				request_params = params.copy()
+				if method == "web":
+					request_params["query_type"] = msg_type
 
-				# 批量发送标记已读请求
-				responses = {}
-				for q_type in query_types:
-					params["query_type"] = q_type
-					responses[q_type] = send_clear_request(
-						url="/web/message-record",
-						params=params,
-					)
-
-				# 校验请求结果
-				if any(status != OK_CODE for status in responses.values()):
-					return False
-
-				offset += page_size
-
-		elif method == "nemo":
-			message_types = [1, 3]  # 1:点赞收藏 3:fork
-			while True:
-				# 检查所有类型消息总数
-				counts = get_message_counts("nemo")
-				total_unread = sum(
-					counts[key]
-					for key in [
-						"like_collection_count",
-						"comment_count",
-						"re_create_count",
-						"system_count",
-					]
+				# 发送请求
+				response = self.acquire.send_request(
+					endpoint=endpoint,
+					method="GET",
+					params=request_params
 				)
-				if total_unread == 0:
+				responses[msg_type] = response.status_code
+
+			return all(code == OK_CODE for code in responses.values())
+
+		try:
+			while True:
+				# 获取当前未读状态
+				current_counts = self.community_obtain.get_message_count(method)
+				if is_all_cleared(current_counts):
 					return True
 
-				# 更新当前分页偏移量
-				params["offset"] = offset
-
-				# 批量发送标记已读请求
-				responses = {}
-				for m_type in message_types:
-					responses[m_type] = send_clear_request(
-						url=f"/nemo/v2/user/message/{m_type}",
-						params=params,
-					)
-
-				# 校验请求结果
-				if any(status != OK_CODE for status in responses.values()):
+				# 批量处理当前页
+				if not send_batch_requests():
 					return False
 
-				offset += page_size
+				# 更新分页参数
+				params["offset"] += page_size
 
-		return False
+		except Exception as e:
+			print(f"清除红点过程中发生异常: {e}")
+			return False
 
 	# 给某人作品全点赞
 	def like_all_work(self, user_id: str) -> bool:
