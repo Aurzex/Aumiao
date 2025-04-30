@@ -676,6 +676,27 @@ class Motion(ClassUnion):
 						candidates=comment_ids
 					)[0]
 					comment_id = int(found) if found else 0
+				print(f"\n{'='*30} 新回复 {'='*30}")
+				print(f"类型: {reply_type}")
+
+				# 提取评论内容
+				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
+				print(f"提取关键文本: {comment_text}")
+
+				# 匹配回复内容（添加匹配提示）
+				matched_keyword = None
+				for keyword, resp in formatted_answers.items():
+					if keyword in comment_text:
+						matched_keyword = keyword
+						chosen = choice(resp) if isinstance(resp, list) else resp
+						print(f"匹配到关键字「{keyword}」")
+						break
+				
+				if not matched_keyword:
+					chosen = choice(formatted_replies)
+					print("未匹配关键词，随机选择回复")
+
+				print(f"最终选择回复: 【{chosen}】")
 
 				# 调用API
 				params = {
@@ -691,6 +712,7 @@ class Motion(ClassUnion):
 				}
 				
 				(self.work_motion.reply_work if source_type == "work" else self.forum_motion.reply_comment)(**params)
+				print(f"已发送回复到{source_type}，评论ID: {comment_id}")
 
 			except Exception as e:
 				print(f"回复处理失败: {e}")
