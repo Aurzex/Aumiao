@@ -3,7 +3,6 @@ from collections.abc import Generator
 from enum import Enum
 from json import loads
 from random import choice, randint
-from time import sleep
 from typing import Any, Callable, Literal, TypedDict, cast, overload
 
 from src.api import community, edu, forum, shop, user, whale, work
@@ -755,295 +754,193 @@ class Motion(ClassUnion):
 		status = self.user_obtain.get_data_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
-	# 处理举报
-	# 需要风纪权限
+
+
 	def handle_report(self, admin_id: int) -> None:
-		def process_item(item: dict, report_type: Literal["comment", "post", "discussion"]) -> None:
-			# 类型字段映射表
-			type_config = {
-				"comment": {
-					"content_field": "comment_content",
-					"user_field": "comment_user",
-					"handle_method": "handle_comment_report",
-					"source_id_field": "comment_source_object_id",
-					"source_name_field": "comment_source_object_name",
-					"special_check": lambda: item.get("comment_source") == "WORK_SHOP",
-					"com_id": "comment_id",
-				},
-				"post": {
-					"content_field": "post_title",
-					"user_field": "post_user",
-					"handle_method": "handle_post_report",
-					"source_id_field": "post_id",
-					"special_check": lambda: True,
-					"com_id": "post_id",
-				},
-				"discussion": {
-					"content_field": "discussion_content",
-					"user_field": "discussion_user",
-					"handle_method": "handle_discussion_report",
-					"source_id_field": "post_id",
-					"special_check": lambda: True,
-					"com_id": "discussion_id",
-				},
+			"""处理举报主入口"""
+			# 类型明确的配置字典
+			REPORT_CONFIG: dict[Literal["comment", "post", "discussion"], tuple] = {
+				"comment": (self.whale_obtain.get_comment_report, "comment_source_object_id", "shop"),
+				"post": (self.whale_obtain.get_post_report, "post_id", "forum"),
+				"discussion": (self.whale_obtain.get_discussion_report, "post_id", "post")
 			}
 
-			cfg = type_config[report_type]
-			print(f"\n{'=' * 50}")
-			print(f"举报ID: {item['id']}")
-			print(f"举报内容: {item[cfg['content_field']]}")
-			print(f"所属板块: {item.get('board_name', item.get(cfg.get('source_name_field', ''), ''))}")
-			cfg_user_field = cfg["user_field"]
-			if report_type == "post":
-				print(f"被举报人: {item[f'{cfg_user_field}_nick_name']}")
-			else:
-				print(f"被举报人: {item[f'{cfg_user_field}_nickname']}")
-			print(f"举报原因: {item['reason_content']}")
-			print(f"举报时间: {self.tool_process.format_timestamp(item['created_at'])}")
-			if report_type == "post":
-				print(f"举报线索: {item['description']}")
+			for report_type, (fetcher, id_field, source_type) in REPORT_CONFIG.items():
+				reports = fetcher(types="ALL" if report_type == "comment" else None, status="TOBEDONE", limit=None)
+				for report in reports:
+					self._process_report(
+						report=report,
+						report_type=report_type,  # 类型安全的report_type
+						id_field=id_field,
+						source_type=cast(Literal["shop", "post", "forum"], source_type),
+						admin_id=admin_id
+					)
+
+			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+
+	def _process_report(
+			self, 
+			report: dict, 
+			report_type: Literal["comment", "post", "discussion"],
+			id_field: str,
+			source_type: Literal["shop", "post", "forum"],
+			admin_id: int
+		) -> None:
+			"""处理单条举报"""
+			# 显示基础信息
+			print(f"\n{'='*50}")
+			print(f"举报ID: {report['id']}")
+			print(f"被举报内容: {report.get('content', report.get('title', ''))}")
+			print(f"举报原因: {report['reason_content']}")
 
 			while True:
-				print("-" * 50)
-				choice = input("选择操作: D:删除, S:禁言7天, P:通过, C:查看, F:检查违规, J:跳过  ").upper()
-				handler = getattr(self.whale_motion, cfg["handle_method"])
+				choice = input("选择操作: D-删除/S-禁言/P-通过/C-详情/F-检查违规/J-跳过: ").upper()
+				valid_choices = {"D", "S", "P", "C", "F", "J"}
+				
+				if choice not in valid_choices:
+					print("无效输入，请重新选择")
+					continue
+					
 				if choice == "J":
 					break
+					
 				if choice in {"D", "S", "P"}:
-					status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}
-					handler(report_id=item["id"], status=status_map[choice], admin_id=admin_id)
+					self._handle_action(
+						report=report,
+						action=cast(Literal["D", "S", "P"], choice),  # 类型断言
+						admin_id=admin_id,
+						report_type=report_type
+					)
 					break
+					
 				if choice == "C":
-					self._show_details(item, report_type, cfg)
-				elif choice == "F" and cfg["special_check"]():
-					self._check_violations(item, report_type, cfg)
-				else:
-					print("无效输入")
-
-		# 获取所有待处理举报
-		lists: list[tuple[Generator[dict], Literal["comment", "post", "discussion"]]] = [
-			(self.whale_obtain.get_comment_report(types="ALL", status="TOBEDONE", limit=None), "comment"),
-			(self.whale_obtain.get_post_report(status="TOBEDONE", limit=None), "post"),
-			(self.whale_obtain.get_discussion_report(status="TOBEDONE", limit=None), "discussion"),
-		]
-
-		for report_list, report_type in lists:
-			for item in report_list:
-				process_item(item=item, report_type=report_type)
-		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-
-	def _show_details(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:
-		"""显示详细信息"""
-		if report_type == "comment":
-			print(f"违规板块ID: https://shequ.codemao.cn/work_shop/{item[cfg['source_id_field']]}")
-		elif report_type == "post":
-			print(f"违规帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
-		elif report_type == "discussion":
-			print(f"所属帖子标题: {item['post_title']}")
-			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item['post_user_id']}")
-			print(f"所属帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
-
-		cfg_user_field = cfg["user_field"]
-		print(f"违规用户ID: https://shequ.codemao.cn/user/{item[f'{cfg_user_field}_id']}")
-		if report_type in {"comment", "discussion"}:
-			source = "shop" if report_type == "comment" else "post"
-			comments = Obtain().get_comments_detail_new(com_id=item[cfg["source_id_field"]], source=source, method="comments", max_limit=200)
-			if report_type == "comment" and item["comment_parent_id"] != "0":
-				for comment in comments:
-					if comment["id"] == item["comment_parent_id"]:
-						for reply in comment["replies"]:
-							if reply["id"] == item["comment_id"]:
-								print(f"发送时间: {self.tool_process.format_timestamp(reply['created_at'])}")
-								break
-						break
+					self._show_details(report, id_field, source_type)
+					
+				elif choice == "F":
+					self._auto_check_violations(report, id_field, source_type)
+	def _show_details(
+			self,
+			report: dict,
+			id_field: str,
+			source_type: Literal["shop", "post", "forum"]
+		) -> None:
+			"""显示举报详细信息"""
+			print(f"\n{'='*30} 详细信息 {'='*30}")
+			print(f"违规内容ID: {report[id_field]}")
+			
+			# 根据来源类型显示不同信息
+			if source_type == "shop":
+				print(f"工作室链接: https://shequ.codemao.cn/work_shop/{report[id_field]}")
+			elif source_type == "post":
+				print(f"帖子链接: https://shequ.codemao.cn/community/{report[id_field]}")
 			else:
-				for comment in comments:
-					if comment["id"] == item["comment_id"]:
-						print(f"发送时间: {self.tool_process.format_timestamp(comment['created_at'])}")
-						break
-		else:
-			details = self.forum_obtain.get_single_post_details(ids=item[cfg["source_id_field"]])
-			print(f"发送时间: {self.tool_process.format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
+				print(f"论坛板块: {report.get('board_name', '未知')}")
 
-	def _check_violations(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:
-		"""统一违规检查逻辑"""
-		source_map: dict[str, tuple[Literal["shop", "post", "forum"], Literal["comments", "posts"], str]] = {
-			"comment": ("shop", "comments", item[cfg["source_id_field"]]),
-			"discussion": ("post", "comments", item[cfg["source_id_field"]]),
-			"post": ("forum", "posts", item[cfg["content_field"]]),
-		}
-		source_type, method, source_id = source_map[report_type]
+			# 显示用户信息
+			user_field = "comment_user" if source_type == "shop" else "post_user"
+			print(f"被举报用户: {report[f'{user_field}_nickname']}")
+			print(f"用户主页: https://shequ.codemao.cn/user/{report[f'{user_field}_id']}")
 
-		if report_type in {"comment", "discussion"}:
+			# 显示时间信息
+			post_details = self.forum_obtain.get_single_post_details(ids=report[id_field])
+			print(f"发布时间: {self.tool_process.format_timestamp(post_details['created_at'])}")
+			print(f"{'='*67}")
+
+	def _auto_check_violations(
+			self,
+			report: dict,
+			id_field: str,
+			source_type: Literal["shop", "post", "forum"]
+		) -> None:
+			"""自动检查违规内容"""
+			print(f"\n{'='*30} 违规检查 {'='*30}")
+			source_id = int(report[id_field])
+			
+			# 获取相关评论
 			comments = Obtain().get_comments_detail_new(
-				com_id=int(source_id),
-				source=cast("Literal['shop', 'post']", source_type),
-				method=cast("Literal['comments']", method),
-			)
-			user_comments = self.tool_process.filter_items_by_values(
-				data=comments,
-				id_path="user_id",
-				values=item[f"{cfg['user_field']}_id"],
-			)
-			# 调用新的自动举报方法
-			self._auto_report_comments(
-				user_comments=user_comments,
-				# source_type=source_type,
-				source_id=int(source_id),
-				report_source="shop" if report_type == "comment" else "forum",
+				com_id=source_id,
+				source=cast(Literal["work", "post", "shop"], source_type),
+				method="comments"
 			)
 
-	def _auto_report_comments(self, user_comments: list, source_id: int, report_source: str) -> None:  # noqa: PLR0915
-		"""自动举报违规评论的优化方法"""
-		analyze_comments = self._analyze_comments(user_comments, source_id)
-		choice = input("是否自动举报违规评论? (Y/N) ").upper()
-		if not analyze_comments or choice != "Y":
-			return
+			# 分析违规内容
+			violators = defaultdict(list)
+			for comment in comments:
+				# 广告检测
+				if any(ad in comment["content"].lower() for ad in self.data.USER_DATA.ads):
+					violators[comment["user"]["id"]].append(comment["id"])
+					print(f"⚠️ 发现广告内容：用户{comment['user']['id']} - {comment['content'][:30]}...")
+				
+				# 刷屏检测
+				if len(comment["content"]) < 5:
+					print(f"⚠️ 可疑短内容：用户{comment['user']['id']} - {comment['content'][:30]}...")
 
-		# 账号管理优化
-		# original_token = self.acquire.headers["Authorization"].split(" ")[1]
-		# del self.acquire.headers["Authorization"]
-
-		# 预先获取所有可用教育账号并缓存
-		try:
-			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-			all_accounts = self._switch_edu_account(limit=20)
-			if not all_accounts:
-				print("没有可用的教育账号")
-				return
-		except Exception as e:
-			print(f"获取教育账号失败: {e}")
-			return
-
-		current_account_idx = 0
-		report_count = 0
-		max_retries = 3  # 最大重试次数
-		success_count = 0  # 成功举报计数器
-
-		# 优化后的举报处理流程
-		for comment in analyze_comments:
-			for entry in comment.values():
-				for single_item in entry:
-					retries = 0
-					success = False
-
-					while not success and retries < max_retries:
-						try:
-							# 当达到最大举报次数或需要切换账号时
-							if report_count >= self.setting.PARAMETER.report_work_max or success_count == 0:
-								try:
-									current_account = next(all_accounts)
-								except StopIteration:
-									print("所有账号均已尝试")
-									return
-								# if current_account_idx >= len(all_accounts):
-								# 	print("所有账号均已尝试")
-								# 	return
-
-								# 获取新账号并登录
-								# current_account = all_accounts[current_account_idx]
-								# print(f"切换到账号 {current_account[0]}")
-								print("已经切换账号")
-								sleep(5)
-								# self.acquire.switch_account("", identity="edu")
-								self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
-								sleep(10)
-								# self.acquire.switch_account(token=self.acquire.token.edu, identity="edu")
-								# print("*" * 85)
-								# print(f"token={self.acquire.token.edu}")
-								# self._switch_account(current_account)
-								# current_account_idx += 1
-								report_count = 0
-								success_count = 0
-
-							# 执行举报逻辑
-							_item_id, comment_id = single_item.split(":")[0].split(".")
-							# comments = Obtain().get_comments_detail_new(
-							# 	com_id=source_id,
-							# 	source=cast(Literal["shop", "post"], source_type),
-							# 	method="comment_id",
-							# )
-							parent_id, _reply_id = self.tool_routine.find_prefix_suffix(
-								text=comment_id,
-								candidates=user_comments,
-							)
-							# self.acquire.switch_account(self.acquire.token.edu, identity="edu")
-							# self.community_motion.sign_nature()
-							if self.report_work(
-								source=cast("Literal['forum', 'work', 'shop']", report_source),
-								target_id=int(comment_id),
-								source_id=source_id,
-								reason_id=7,
-								parent_id=cast("int", parent_id),
-								is_reply=bool(":reply" in single_item),
-							):
-								report_count += 1
-								success_count += 1
-								success = True
-								print(f"举报成功: {single_item} (当前账号成功次数: {success_count})")
-							else:
-								print("举报失败,尝试切换账号")
-								retries = max_retries  # 强制切换账号
-
-						except Exception as e:
-							print(f"举报出错: {e}")
-							retries += 1
-							if retries >= max_retries:
-								print("达到最大重试次数,切换账号")
-								current_account_idx += 1
-								report_count = 0
-								success_count = 0
-
-					if not success:
-						print(f"无法处理举报项: {single_item}")
-
-		# 恢复原始账号
-		self.whale_routine.set_token(self.acquire.token.judgement)
-
-	def _switch_edu_account(self, limit: int | None) -> Generator:
-		"""使用pop随机抽取学生账密"""
-		students = list(self.edu_obtain.get_students(limit=limit))
-
-		while students:
-			# 随机选择一个索引并pop
-			student = students.pop(randint(0, len(students) - 1))  # noqa: S311
-			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
-		# return [(student["username"], self.edu_motion.reset_password(student["id"])["password"]) for student in students]
-
-	# def _switch_account(self, account: tuple[str, str]) -> None:
-	# 	"""优化后的账号切换方法"""
-	# 	try:
-	# 		# 仅在需要时注销(比如Cookie存在时)
-	# 		if "Cookie" in self.acquire.headers:
-	# 			self.community_login.logout("web")
-	# 			del self.acquire.headers["Cookie"]
-	# 		self.community_login.login_password(account[0], account[1])
-	# 		# 适当减少等待时间
-	# 		sleep(1)
-	# 	except Exception as e:
-	# 		print(f"账号切换失败: {account[0]},错误信息: {e}")
-
-	def _analyze_comments(self, comments: list, source_id: int) -> Generator[dict[tuple[int, str], list[str]]] | None:
-		content_map = defaultdict(list)
-		for comment in comments:
-			content = comment["content"].lower()
-			if any(ad in content for ad in self.data.USER_DATA.ads):
-				print(f"广告回复: {content}")
-			params = {
-				"spam_max": self.setting.PARAMETER.spam_del_max,
+			# 执行批量举报
+			if violators:
+				confirm = input(f"发现{len(violators)}个违规用户，是否批量举报？(Y/N) ").upper()
+				if confirm == "Y":
+					self._batch_report(violators, source_id, source_type)
+			else:
+				print("✅ 未发现明显违规内容")
+			print(f"{'='*67}")
+	def _handle_action(
+			self,
+			report: dict,
+			action: Literal["D", "S", "P"],
+			admin_id: int,
+			report_type: Literal["comment", "post", "discussion"]
+		) -> None:
+			"""执行处理动作"""
+			handler_map: dict[Literal["comment", "post", "discussion"], Callable] = {
+				"comment": self.whale_motion.handle_comment_report,
+				"post": self.whale_motion.handle_post_report,
+				"discussion": self.whale_motion.handle_discussion_report
 			}
-			self._find_duplicate_comments(comments, source_id, params, content_map)
-			for reply in comment.get("replies", []):
-				self._find_duplicate_comments(reply, source_id, params, content_map)
-				if any(ad in reply["content"].lower() for ad in self.data.USER_DATA.ads):
-					print(f"广告回复: {reply['content']}")
-		# (user_id,content):[item_id.comment_id1:reply/comment,item_id.comment_id2:reply/comment]
-		for (user_id, content), entry in content_map.items():
-			if len(entry) >= self.setting.PARAMETER.spam_del_max:
-				# print(f"发现刷屏评论: {content}")
-				# print(f"此用户已经刷屏,共发布{len(entry)}次")
-				yield {(user_id, content): entry}
+			
+			status_map: dict[Literal["D", "S", "P"], Literal["DELETE", "MUTE_SEVEN_DAYS", "PASS"]] = {
+				"D": "DELETE",
+				"S": "MUTE_SEVEN_DAYS",
+				"P": "PASS"
+			}
+			
+			handler = handler_map[report_type]
+			handler(
+				report_id=report["id"],
+				status=status_map[action],  # 类型安全的status
+				admin_id=admin_id
+			)
+
+	def _switch_edu_accounts(self, limit: int = 20) -> Generator[tuple[str, str], None, None]:
+			"""随机切换教育账号"""
+			students = list(self.edu_obtain.get_students(limit=limit))
+			while students:
+				idx = randint(0, len(students) - 1)
+				student = students.pop(idx)
+				yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
+
+	def _batch_report(self, violators: dict[int, list[int]], source_id: int, source_type: Literal["forum", "work", "shop"]):
+			"""批量举报处理"""
+			account_pool = self._switch_edu_accounts(20)
+			
+			for uid, comment_ids in violators.items():
+				for comment_id in comment_ids:
+					for _ in range(3):  # 最大重试3次
+						try:
+							username, pwd = next(account_pool)
+							self.community_login.login_password(username, pwd, "edu")
+							self.report_work(
+								source=cast(Literal["forum", "work", "shop"], source_type),
+								target_id=comment_id,
+								source_id=source_id,
+								reason_id=7
+							)
+							print(f"举报成功：用户{uid} 评论{comment_id}")
+							break
+						except StopIteration:
+							print("没有更多可用账号")
+							return
+						except Exception as e:
+							print(f"举报失败：{e}")
 
 	def report_work(
 		self,
