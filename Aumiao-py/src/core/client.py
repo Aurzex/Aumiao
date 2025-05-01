@@ -757,24 +757,27 @@ class Motion(ClassUnion):
 
 
 	def handle_report(self, admin_id: int) -> None:
-			"""处理举报主入口"""
-			# 类型明确的配置字典
-			REPORT_CONFIG: dict[Literal["comment", "post", "discussion"], tuple] = {
-				"comment": (self.whale_obtain.get_comment_report, "comment_source_object_id", "shop"),
-				"post": (self.whale_obtain.get_post_report, "post_id", "forum"),
-				"discussion": (self.whale_obtain.get_discussion_report, "post_id", "post")
-			}
+		"""处理举报主入口"""
+		# 统一类型定义
+		# SourceType = Literal["forum", "shop"]  # post统一用forum表示
+		
+		# 修改配置字典的类型映射
+		REPORT_CONFIG: dict[Literal["comment", "post", "discussion"], tuple] = {
+			"comment": (self.whale_obtain.get_comment_report, "comment_source_object_id", "shop"),
+			"post": (self.whale_obtain.get_post_report, "post_id", "forum"),  # post映射为forum
+			"discussion": (self.whale_obtain.get_discussion_report, "post_id", "forum")  # discussion也映射为forum
+		}
 
-			for report_type, (fetcher, id_field, source_type) in REPORT_CONFIG.items():
-				reports = fetcher(types="ALL" if report_type == "comment" else None, status="TOBEDONE", limit=None)
-				for report in reports:
-					self._process_report(
-						report=report,
-						report_type=report_type,  # 类型安全的report_type
-						id_field=id_field,
-						source_type=cast(Literal["shop", "post", "forum"], source_type),
-						admin_id=admin_id
-					)
+		for report_type, (fetcher, id_field, source_type) in REPORT_CONFIG.items():
+			reports = fetcher(types="ALL" if report_type == "comment" else None, status="TOBEDONE", limit=None)
+			for report in reports:
+				self._process_report(
+					report=report,
+					report_type=report_type,
+					id_field=id_field,
+					source_type=source_type,  # 类型直接赋值
+					admin_id=admin_id
+				)
 
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
@@ -847,25 +850,27 @@ class Motion(ClassUnion):
 			print(f"{'='*67}")
 
 	def _auto_check_violations(
-			self,
-			report: dict,
-			id_field: str,
-			source_type: Literal["shop", "post", "forum"]
-		) -> None:
-			"""自动检查违规内容"""
-			print(f"\n{'='*30} 违规检查 {'='*30}")
-			source_id = int(report[id_field])
-			
-			# 获取相关评论
-			comments = Obtain().get_comments_detail_new(
-				com_id=source_id,
-				source=cast(Literal["work", "post", "shop"], source_type),
-				method="comments"
-			)
+		self,
+		report: dict,
+		id_field: str,
+		source_type: Literal["forum", "shop"]  # 限制有效类型
+	) -> None:
+		"""自动检查违规内容"""
+		source_id = int(report[id_field])
+		
+		# 添加类型转换
+		valid_source = cast(Literal["work", "post", "shop"], 
+						"shop" if source_type == "shop" else "post")  # forum映射为post
+		
+		comments = Obtain().get_comments_detail_new(
+			com_id=source_id,
+			source=valid_source,
+			method="comments"
+		)
 
 			# 分析违规内容
-			violators = defaultdict(list)
-			for comment in comments:
+		violators = defaultdict(list)
+		for comment in comments:
 				# 广告检测
 				if any(ad in comment["content"].lower() for ad in self.data.USER_DATA.ads):
 					violators[comment["user"]["id"]].append(comment["id"])
@@ -876,13 +881,13 @@ class Motion(ClassUnion):
 					print(f"⚠️ 可疑短内容：用户{comment['user']['id']} - {comment['content'][:30]}...")
 
 			# 执行批量举报
-			if violators:
+		if violators:
 				confirm = input(f"发现{len(violators)}个违规用户，是否批量举报？(Y/N) ").upper()
 				if confirm == "Y":
 					self._batch_report(violators, source_id, source_type)
-			else:
+		else:
 				print("✅ 未发现明显违规内容")
-			print(f"{'='*67}")
+		print(f"{'='*67}")
 	def _handle_action(
 			self,
 			report: dict,
@@ -918,29 +923,42 @@ class Motion(ClassUnion):
 				student = students.pop(idx)
 				yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
 
-	def _batch_report(self, violators: dict[int, list[int]], source_id: int, source_type: Literal["forum", "work", "shop"]):
-			"""批量举报处理"""
-			account_pool = self._switch_edu_accounts(20)
-			
-			for uid, comment_ids in violators.items():
-				for comment_id in comment_ids:
-					for _ in range(3):  # 最大重试3次
-						try:
-							username, pwd = next(account_pool)
-							self.community_login.login_password(username, pwd, "edu")
-							self.report_work(
-								source=cast(Literal["forum", "work", "shop"], source_type),
-								target_id=comment_id,
-								source_id=source_id,
-								reason_id=7
-							)
-							print(f"举报成功：用户{uid} 评论{comment_id}")
-							break
-						except StopIteration:
-							print("没有更多可用账号")
-							return
-						except Exception as e:
-							print(f"举报失败：{e}")
+	def _batch_report(
+		self,
+		violators: dict[int, list[int]],
+		source_id: int,
+		source_type: Literal["forum", "shop"]  # 限制有效类型
+	) -> None:
+		"""批量举报处理"""
+		account_pool = self._switch_edu_accounts(20)
+		
+		# 添加类型转换映射
+		type_mapping = {
+			"forum": "post",  # 内部forum类型映射回post进行举报
+			"shop": "shop"
+		}
+		
+		for uid, comment_ids in violators.items():
+			for comment_id in comment_ids:
+				for _ in range(3):
+					try:
+						username, pwd = next(account_pool)
+						self.community_login.login_password(username, pwd, "edu")
+						
+						# 最终类型转换
+						report_source = cast(Literal["forum", "work", "shop"], 
+										"shop" if source_type == "shop" else "post")
+						
+						self.report_work(
+							source=report_source,
+							target_id=comment_id,
+							source_id=source_id,
+							reason_id=7
+						)
+						print(f"举报成功：用户{uid} 评论{comment_id}")
+						break
+					except Exception as e:
+						print(f"举报失败：{e}")
 
 	def report_work(
 		self,
