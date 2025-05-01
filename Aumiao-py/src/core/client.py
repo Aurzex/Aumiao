@@ -755,7 +755,7 @@ class Motion(ClassUnion):
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
 
-
+	ReportSource = Literal["forum", "shop"]
 	def handle_report(self, admin_id: int) -> None:
 		"""处理举报主入口"""
 		# 统一类型定义
@@ -782,13 +782,13 @@ class Motion(ClassUnion):
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
 	def _process_report(
-			self, 
-			report: dict, 
-			report_type: Literal["comment", "post", "discussion"],
-			id_field: str,
-			source_type: Literal["shop", "post", "forum"],
-			admin_id: int
-		) -> None:
+		self, 
+		report: dict, 
+		report_type: Literal["comment", "post", "discussion"],
+		id_field: str,
+		source_type: ReportSource,  # 使用统一定义的类型
+		admin_id: int
+	) -> None:
 			"""处理单条举报"""
 			# 显示基础信息
 			print(f"\n{'='*50}")
@@ -853,18 +853,18 @@ class Motion(ClassUnion):
 		self,
 		report: dict,
 		id_field: str,
-		source_type: Literal["forum", "shop"]  # 限制有效类型
+		source_type: ReportSource  # 使用统一定义的类型
 	) -> None:
 		"""自动检查违规内容"""
 		source_id = int(report[id_field])
 		
-		# 添加类型转换
-		valid_source = cast(Literal["work", "post", "shop"], 
-						"shop" if source_type == "shop" else "post")  # forum映射为post
+		# 添加类型安全转换
+		api_source = cast(Literal["post", "shop"], 
+						"post" if source_type == "forum" else source_type)
 		
 		comments = Obtain().get_comments_detail_new(
 			com_id=source_id,
-			source=valid_source,
+			source=api_source,  # 转换后类型与API要求一致
 			method="comments"
 		)
 
