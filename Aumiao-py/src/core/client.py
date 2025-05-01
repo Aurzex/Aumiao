@@ -222,18 +222,19 @@ class Obtain(ClassUnion):
 			根据method参数返回对应格式的数据
 		"""
 		# 预定义字段映射表
-		SOURCE_CONFIG = {
+		source_config = {
 			"work": (self.work_obtain.get_work_comments, "work_id", "reply_user"),
 			"post": (self.forum_obtain.get_post_replies_posts, "ids", "user"),
 			"shop": (self.shop_obtain.get_shop_discussion, "shop_id", "reply_user"),
 		}
 
 		# 验证来源有效性
-		if source not in SOURCE_CONFIG:
-			raise ValueError(f"不支持的来源类型: {source}，可用选项: {list(SOURCE_CONFIG.keys())}")
+		if source not in source_config:
+			msg = f"不支持的来源类型: {source},可用选项: {list(source_config.keys())}"
+			raise ValueError(msg)
 
 		# 获取基础数据
-		method_func, id_key, user_field = SOURCE_CONFIG[source]
+		method_func, id_key, user_field = source_config[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
 
 		# 定义处理函数
@@ -242,7 +243,6 @@ class Obtain(ClassUnion):
 			return reply[user_field]["id"]
 
 		def _generate_replies(comment: dict) -> Generator[dict]:
-			"""生成回复数据"""
 			if source == "post":
 				yield from self.forum_obtain.get_reply_post_comments(post_id=comment["id"], limit=None)
 			else:
@@ -296,7 +296,8 @@ class Obtain(ClassUnion):
 		}
 
 		if method not in method_router:
-			raise ValueError(f"不支持的请求方法: {method}，可用选项: {list(method_router.keys())}")
+			msg = f"不支持的请求方法: {method},可用选项: {list(method_router.keys())}"
+			raise ValueError(msg)
 
 		return method_router[method]()
 
@@ -357,7 +358,8 @@ class Motion(ClassUnion):
 	def _get_source_config(self, source: str) -> dict:
 		"""获取来源配置"""
 		if source not in self.SOURCE_CONFIG:
-			raise ValueError(f"不支持的来源类型: {source}")
+			msg = f"不支持的来源类型: {source}"
+			raise ValueError(msg)
 		return self.SOURCE_CONFIG[source]
 
 	def _process_item(self, item: dict, config: dict, action_type: str, params: dict, target_lists: defaultdict) -> None:
@@ -367,13 +369,13 @@ class Motion(ClassUnion):
 		comments = config["get_comments"](item_id)
 
 		# 分类型处理逻辑
-		if action_type in ("ads", "blacklist"):
+		if action_type in {"ads", "blacklist"}:
 			self._find_abnormal_comments(comments, item_id, title, action_type, params, target_lists)
 		elif action_type == "duplicates":
 			self._find_duplicate_comments(comments, item_id, params, target_lists)
 
 	def _find_abnormal_comments(self, comments: list, item_id: int, title: str, action_type: str, params: dict, target_lists: defaultdict) -> None:
-		"""发现异常评论（广告/黑名单）"""
+		"""发现异常评论(广告/黑名单)"""
 		for comment in comments:
 			if comment.get("is_top"):
 				continue  # 跳过置顶内容
@@ -381,7 +383,7 @@ class Motion(ClassUnion):
 			# 处理主评论
 			if self._check_condition(comment, action_type, params):
 				identifier = f"{item_id}.{comment['id']}:comment"
-				# 修正参数顺序：添加action_type参数
+				# 修正参数顺序:添加action_type参数
 				self._log_and_add(
 					target_lists=target_lists,
 					data=comment,
@@ -394,7 +396,7 @@ class Motion(ClassUnion):
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
 					identifier = f"{item_id}.{reply['id']}:reply"
-					# 修正参数顺序：添加action_type参数和parent_content
+					# 修正参数顺序:添加action_type参数和parent_content
 					self._log_and_add(
 						target_lists=target_lists,
 						data=reply,
@@ -404,7 +406,8 @@ class Motion(ClassUnion):
 						parent_content=comment["content"],  # 作为最后一个参数
 					)
 
-	def _check_condition(self, data: dict, action_type: str, params: dict) -> bool:
+	@staticmethod
+	def _check_condition(data: dict, action_type: str, params: dict) -> bool:
 		"""检查评论是否符合处理条件"""
 		content = data["content"].lower()
 		user_id = str(data["user_id"])
@@ -415,9 +418,10 @@ class Motion(ClassUnion):
 			return user_id in params["blacklist"]
 		return False
 
-	def _log_and_add(self, target_lists: defaultdict, data: dict, identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
+	@staticmethod
+	def _log_and_add(target_lists: defaultdict, data: dict, identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
 		"""记录日志并添加到处理列表"""
-		log_template = {"ads": "广告{type} [{title}]{parent}：{content}", "blacklist": "黑名单{type} [{title}]{parent}：{nickname}"}[action_type]
+		log_template = {"ads": "广告{type} [{title}]{parent}:{content}", "blacklist": "黑名单{type} [{title}]{parent}:{nickname}"}[action_type]
 
 		log_message = log_template.format(
 			type="回复" if ":reply" in identifier else "评论",
@@ -440,44 +444,46 @@ class Motion(ClassUnion):
 		# 筛选达到阈值的评论
 		for (uid, content), ids in content_map.items():
 			if len(ids) >= params["spam_max"]:
-				print(f"发现刷屏评论：用户{uid} 重复发送：{content} {len(ids)}次")
+				print(f"发现刷屏评论:用户{uid} 重复发送:{content} {len(ids)}次")
 				target_lists["duplicates"].extend(ids)
 
-	def _track_comment(self, data: dict, item_id: int, content_map: defaultdict, is_reply: bool = False) -> None:
+	@staticmethod
+	def _track_comment(data: dict, item_id: int, content_map: defaultdict, *, is_reply: bool = False) -> None:
 		"""跟踪评论数据"""
 		key = (data["user_id"], data["content"].lower())
 		identifier = f"{item_id}.{data['id']}:{'reply' if is_reply else 'comment'}"
 		content_map[key].append(identifier)
 
 	@decorator.skip_on_error
-	def _execute_deletion(self, target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
-		"""执行删除操作（保留原有注释）
+	@staticmethod
+	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
+		"""执行删除操作(保留原有注释)
 
-		注意：由于编程猫社区接口限制，需要先删除回复再删除主评论，
-		通过反转列表实现从后往前删除，避免出现删除父级评论后无法删除子回复的情况
+		注意:由于编程猫社区接口限制,需要先删除回复再删除主评论,
+		通过反转列表实现从后往前删除,避免出现删除父级评论后无法删除子回复的情况
 		"""
 		if not target_list:
 			print(f"未发现{label}")
 			return True
 
-		print(f"\n发现以下{label}（共{len(target_list)}条）：")
+		print(f"\n发现以下{label}(共{len(target_list)}条):")
 		for item in reversed(target_list):
 			print(f" - {item.split(':')[0]}")
 
-		if input(f"\n确认删除所有{label}？（Y/N）").lower() != "y":
+		if input(f"\n确认删除所有{label}?(Y/N)").lower() != "y":
 			print("操作已取消")
 			return True
 
-		# 从最后一条开始删除（先删回复后删评论）
+		# 从最后一条开始删除(先删回复后删评论)
 		for entry in reversed(target_list):
 			parts = entry.split(":")[0].split(".")
 			item_id, comment_id = map(int, parts)
 			is_reply = ":reply" in entry
 
 			if not delete_handler(item_id, comment_id, is_reply):
-				print(f"删除失败：{entry}")
+				print(f"删除失败:{entry}")
 				return False
-			print(f"已删除：{entry}")
+			print(f"已删除:{entry}")
 
 		return True
 
@@ -491,7 +497,7 @@ class Motion(ClassUnion):
 			bool: 是否全部清除成功
 		"""
 		# 配置参数映射表
-		METHOD_CONFIG = {
+		method_config = {
 			"web": {
 				"endpoint": "/web/message-record",
 				"message_types": self.setting.PARAMETER.all_read_type,
@@ -505,10 +511,11 @@ class Motion(ClassUnion):
 		}
 
 		# 验证方法有效性
-		if method not in METHOD_CONFIG:
-			raise ValueError(f"不支持的方法类型: {method}")
+		if method not in method_config:
+			msg = f"不支持的方法类型: {method}"
+			raise ValueError(msg)
 
-		config = METHOD_CONFIG[method]
+		config = method_config[method]
 		page_size = 200
 		params = {"limit": page_size, "offset": 0}
 
@@ -563,7 +570,7 @@ class Motion(ClassUnion):
 				return False
 		return True
 
-	def reply_work(self) -> bool:
+	def reply_work(self) -> bool:  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
 		# 合并预处理和数据获取逻辑
 		formatted_answers = {
@@ -571,7 +578,7 @@ class Motion(ClassUnion):
 		}
 		formatted_replies = [r.format(**self.data.INFO) for r in self.data.USER_DATA.replies]
 
-		# 获取并过滤有效回复（解决set类型问题）
+		# 获取并过滤有效回复(解决set类型问题)
 		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
 		new_replies = self.tool_process.filter_items_by_values(
 			data=Obtain().get_new_replies(),
@@ -590,12 +597,12 @@ class Motion(ClassUnion):
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 
 				# 匹配回复内容
-				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
+				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))  # noqa: S311
 
-				# 执行回复（解决source类型问题）
+				# 执行回复(解决source类型问题)
 				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
 
-				# 获取评论ID（解决find_prefix_suffix参数问题）
+				# 获取评论ID(解决find_prefix_suffix参数问题)
 				comment_ids = [
 					str(item)
 					for item in Obtain().get_comments_detail_new(
@@ -624,18 +631,18 @@ class Motion(ClassUnion):
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 				print(f"提取关键文本: {comment_text}")
 
-				# 匹配回复内容（添加匹配提示）
+				# 匹配回复内容(添加匹配提示)
 				matched_keyword = None
 				for keyword, resp in formatted_answers.items():
 					if keyword in comment_text:
 						matched_keyword = keyword
-						chosen = choice(resp) if isinstance(resp, list) else resp
+						chosen = choice(resp) if isinstance(resp, list) else resp  # noqa: S311
 						print(f"匹配到关键字「{keyword}」")
 						break
 
 				if not matched_keyword:
-					chosen = choice(formatted_replies)
-					print("未匹配关键词，随机选择回复")
+					chosen = choice(formatted_replies)  # noqa: S311
+					print("未匹配关键词,随机选择回复")
 
 				print(f"最终选择回复: 【{chosen}】")
 
@@ -657,7 +664,7 @@ class Motion(ClassUnion):
 				)
 
 				(self.work_motion.reply_work if source_type == "work" else self.forum_motion.reply_comment)(**params)
-				print(f"已发送回复到{source_type}，评论ID: {comment_id}")
+				print(f"已发送回复到{source_type},评论ID: {comment_id}")
 
 			except Exception as e:
 				print(f"回复处理失败: {e}")
