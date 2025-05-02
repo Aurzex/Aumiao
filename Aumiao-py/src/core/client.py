@@ -65,7 +65,6 @@ class Tool(ClassUnion):
 
 	def message_report(self, user_id: str) -> None:
 		# 获取用户荣誉信息
-
 		response = self.user_obtain.get_user_honor(user_id=user_id)
 		# 获取当前时间戳
 		timestamp = self.community_obtain.get_timestamp()["data"]
@@ -161,7 +160,6 @@ class Obtain(ClassUnion):
 		type_item: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"] = "COMMENT_REPLY",
 	) -> list[dict[str, str | int | dict]]:
 		list_ = []
-		# 获取新回复数量
 		reply_num = self.community_obtain.get_message_count(method="web")[0]["count"]
 		# 如果新回复数量为0且limit也为0,则返回空列表
 		if reply_num == limit == 0:
@@ -169,15 +167,10 @@ class Obtain(ClassUnion):
 		# 如果limit为0,则获取新回复数量个回复,否则获取limit个回复
 		result_num = reply_num if limit == 0 else limit
 		offset = 0
-		# 循环获取新回复
-		while result_num >= 0:
-			# 每次获取5个或剩余回复数量或200个回复
+		while result_num > 0:
 			limit = sorted([5, result_num, 200])[1]
-			# 获取回复
 			response = self.community_obtain.get_replies(types=type_item, limit=limit, offset=offset)
-			# 将回复添加到列表中
 			list_.extend(response["items"][:result_num])
-			# 更新剩余回复数量
 			result_num -= limit
 			# 更新偏移量
 			offset += limit
@@ -362,7 +355,7 @@ class Motion(ClassUnion):
 			raise ValueError(msg)
 		return self.SOURCE_CONFIG[source]
 
-	def _process_item(self, item: dict, config: dict, action_type: str, params: dict, target_lists: defaultdict) -> None:
+	def _process_item(self, item: dict, config: dict, action_type: Literal["ads", "duplicates", "blacklist"], params: dict, target_lists: defaultdict) -> None:
 		"""处理单个作品/帖子"""
 		item_id = int(item["id"])
 		title = item[config["title_key"]]
@@ -370,11 +363,12 @@ class Motion(ClassUnion):
 
 		# 分类型处理逻辑
 		if action_type in {"ads", "blacklist"}:
+			action_type = cast("Literal['ads', 'blacklist']", action_type)
 			self._find_abnormal_comments(comments, item_id, title, action_type, params, target_lists)
 		elif action_type == "duplicates":
 			self._find_duplicate_comments(comments, item_id, params, target_lists)
 
-	def _find_abnormal_comments(self, comments: list, item_id: int, title: str, action_type: str, params: dict, target_lists: defaultdict) -> None:
+	def _find_abnormal_comments(self, comments: list, item_id: int, title: str, action_type: Literal["ads", "blacklist"], params: dict, target_lists: defaultdict) -> None:
 		"""发现异常评论 (广告/黑名单 )"""
 		for comment in comments:
 			if comment.get("is_top"):
@@ -407,7 +401,7 @@ class Motion(ClassUnion):
 					)
 
 	@staticmethod
-	def _check_condition(data: dict, action_type: str, params: dict) -> bool:
+	def _check_condition(data: dict, action_type: Literal["ads", "blacklist"], params: dict) -> bool:
 		"""检查评论是否符合处理条件"""
 		content = data["content"].lower()
 		user_id = str(data["user_id"])
@@ -450,6 +444,10 @@ class Motion(ClassUnion):
 	@staticmethod
 	def _track_comment(data: dict, item_id: int, content_map: defaultdict, *, is_reply: bool = False) -> None:
 		"""跟踪评论数据"""
+		if not isinstance(data, dict):
+			msg = f"Invalid comment data type: {type(data)}, expected dict"
+			raise TypeError(msg)
+
 		key = (data["user_id"], data["content"].lower())
 		identifier = f"{item_id}.{data['id']}:{'reply' if is_reply else 'comment'}"
 		content_map[key].append(identifier)
@@ -592,16 +590,12 @@ class Motion(ClassUnion):
 				content = loads(reply["content"])
 				msg = content["message"]
 				reply_type = reply["type"]
-
 				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
-
 				# 匹配回复内容
 				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))  # noqa: S311
-
 				# 执行回复 (解决source类型问题 )
 				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
-
 				# 获取评论ID (解决find_prefix_suffix参数问题 )
 				comment_ids = [
 					str(item)
@@ -626,11 +620,9 @@ class Motion(ClassUnion):
 					comment_id = int(found) if found else 0
 				print(f"\n{'=' * 30} 新回复 {'=' * 30}")
 				print(f"类型: {reply_type}")
-
 				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 				print(f"提取关键文本: {comment_text}")
-
 				# 匹配回复内容 (添加匹配提示 )
 				matched_keyword = None
 				for keyword, resp in formatted_answers.items():
@@ -639,14 +631,11 @@ class Motion(ClassUnion):
 						chosen = choice(resp) if isinstance(resp, list) else resp  # noqa: S311
 						print(f"匹配到关键字「{keyword}」")
 						break
-
 				if not matched_keyword:
 					chosen = choice(formatted_replies)  # noqa: S311
 					print("未匹配关键词,随机选择回复")
 
 				print(f"最终选择回复: 【{chosen}】")
-
-				# 调用API
 				params = (
 					{
 						"work_id": msg["business_id"],
@@ -768,7 +757,18 @@ class Motion(ClassUnion):
 				if choice == "C":
 					self._show_details(item, report_type, cfg)
 				elif choice == "F" and cfg["special_check"]():
-					self._check_violations(item, report_type, cfg)
+					# self._check_violations(item, report_type, cfg)
+					source_map = {
+						"comment": "shop" if item.get("comment_source") == "WORK_SHOP" else "work",
+						"post": "post",
+						"discussion": "discussion",
+					}
+					self._check_report(
+						comment_id=item["id"],
+						source_id=item[cfg["source_id_field"]],
+						source_type=cast("Literal['shop', 'work', 'discussion', 'post']", source_map[report_type]),
+						title=item.get("board_name", item.get(cfg.get("source_name_field", ""), "")),
+					)
 				else:
 					print("无效输入")
 
@@ -817,141 +817,6 @@ class Motion(ClassUnion):
 			details = self.forum_obtain.get_single_post_details(ids=item[cfg["source_id_field"]])
 			print(f"发送时间: {self.tool_process.format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
 
-	def _check_violations(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:
-		"""统一违规检查逻辑"""
-		source_map: dict[str, tuple[Literal["shop", "post", "forum"], Literal["comments", "posts"], str]] = {
-			"comment": ("shop", "comments", item[cfg["source_id_field"]]),
-			"discussion": ("post", "comments", item[cfg["source_id_field"]]),
-			"post": ("forum", "posts", item[cfg["content_field"]]),
-		}
-		source_type, method, source_id = source_map[report_type]
-
-		if report_type in {"comment", "discussion"}:
-			comments = Obtain().get_comments_detail_new(
-				com_id=int(source_id),
-				source=cast("Literal['shop', 'post']", source_type),
-				method=cast("Literal['comments']", method),
-			)
-			user_comments = self.tool_process.filter_items_by_values(
-				data=comments,
-				id_path="user_id",
-				values=item[f"{cfg['user_field']}_id"],
-			)
-			# 调用新的自动举报方法
-			self._auto_report_comments(
-				user_comments=user_comments,
-				# source_type=source_type,
-				source_id=int(source_id),
-				report_source="shop" if report_type == "comment" else "forum",
-			)
-
-	def _auto_report_comments(self, user_comments: list, source_id: int, report_source: str) -> None:  # noqa: PLR0915
-		"""自动举报违规评论的优化方法"""
-		analyze_comments = self._analyze_comments(user_comments, source_id)
-		choice = input("是否自动举报违规评论? (Y/N) ").upper()
-		if not analyze_comments or choice != "Y":
-			return
-
-		# 账号管理优化
-		# original_token = self.acquire.headers["Authorization"].split(" ")[1]
-		# del self.acquire.headers["Authorization"]
-
-		# 预先获取所有可用教育账号并缓存
-		try:
-			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-			all_accounts = self._switch_edu_account(limit=20)
-			if not all_accounts:
-				print("没有可用的教育账号")
-				return
-		except Exception as e:
-			print(f"获取教育账号失败: {e}")
-			return
-
-		current_account_idx = 0
-		report_count = 0
-		max_retries = 3  # 最大重试次数
-		success_count = 0  # 成功举报计数器
-
-		# 优化后的举报处理流程
-		for comment in analyze_comments:
-			for entry in comment.values():
-				for single_item in entry:
-					retries = 0
-					success = False
-
-					while not success and retries < max_retries:
-						try:
-							# 当达到最大举报次数或需要切换账号时
-							if report_count >= self.setting.PARAMETER.report_work_max or success_count == 0:
-								try:
-									current_account = next(all_accounts)
-								except StopIteration:
-									print("所有账号均已尝试")
-									return
-								# if current_account_idx >= len(all_accounts):
-								# 	print("所有账号均已尝试")
-								# 	return
-
-								# 获取新账号并登录
-								# current_account = all_accounts[current_account_idx]
-								# print(f"切换到账号 {current_account[0]}")
-								print("已经切换账号")
-								sleep(5)
-								# self.acquire.switch_account("", identity="edu")
-								self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
-								sleep(10)
-								# self.acquire.switch_account(token=self.acquire.token.edu, identity="edu")
-								# print("*" * 85)
-								# print(f"token={self.acquire.token.edu}")
-								# self._switch_account(current_account)
-								# current_account_idx += 1
-								report_count = 0
-								success_count = 0
-
-							# 执行举报逻辑
-							_item_id, comment_id = single_item.split(":")[0].split(".")
-							# comments = Obtain().get_comments_detail_new(
-							# 	com_id=source_id,
-							# 	source=cast(Literal["shop", "post"], source_type),
-							# 	method="comment_id",
-							# )
-							parent_id, _reply_id = self.tool_routine.find_prefix_suffix(
-								text=comment_id,
-								candidates=user_comments,
-							)
-							# self.acquire.switch_account(self.acquire.token.edu, identity="edu")
-							# self.community_motion.sign_nature()
-							if self.report_work(
-								source=cast("Literal['forum', 'work', 'shop']", report_source),
-								target_id=int(comment_id),
-								source_id=source_id,
-								reason_id=7,
-								parent_id=cast("int", parent_id),
-								is_reply=bool(":reply" in single_item),
-							):
-								report_count += 1
-								success_count += 1
-								success = True
-								print(f"举报成功: {single_item} (当前账号成功次数: {success_count})")
-							else:
-								print("举报失败,尝试切换账号")
-								retries = max_retries  # 强制切换账号
-
-						except Exception as e:
-							print(f"举报出错: {e}")
-							retries += 1
-							if retries >= max_retries:
-								print("达到最大重试次数,切换账号")
-								current_account_idx += 1
-								report_count = 0
-								success_count = 0
-
-					if not success:
-						print(f"无法处理举报项: {single_item}")
-
-		# 恢复原始账号
-		self.whale_routine.set_token(self.acquire.token.judgement)
-
 	def _switch_edu_account(self, limit: int | None) -> Generator:
 		"""使用pop随机抽取学生账密"""
 		students = list(self.edu_obtain.get_students(limit=limit))
@@ -961,41 +826,111 @@ class Motion(ClassUnion):
 			student = students.pop(randint(0, len(students) - 1))  # noqa: S311
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
-		# return [(student["username"], self.edu_motion.reset_password(student["id"])["password"]) for student in students]
 
-	# def _switch_account(self, account: tuple[str, str]) -> None:
-	# 	"""优化后的账号切换方法"""
-	# 	try:
-	# 		# 仅在需要时注销(比如Cookie存在时)
-	# 		if "Cookie" in self.acquire.headers:
-	# 			self.community_login.logout("web")
-	# 			del self.acquire.headers["Cookie"]
-	# 		self.community_login.login_password(account[0], account[1])
-	# 		# 适当减少等待时间
-	# 		sleep(1)
-	# 	except Exception as e:
-	# 		print(f"账号切换失败: {account[0]},错误信息: {e}")
-
-	def _analyze_comments(self, comments: list, source_id: int) -> Generator[dict[tuple[int, str], list[str]]] | None:
-		content_map = defaultdict(list)
-		for comment in comments:
-			content = comment["content"].lower()
-			if any(ad in content for ad in self.data.USER_DATA.ads):
-				print(f"广告回复: {content}")
+	def _check_report(self, comment_id: int, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str) -> None:  # noqa: PLR0914, PLR0915
+		if source_type in {"work", "discussion", "shop"}:
+			source_type = cast("Literal['post', 'work', 'shop']", source_type)
+			comments = Obtain().get_comments_detail_new(com_id=source_id, source=source_type, method="comments")
+			source_type = cast("Literal['work', 'post', 'shop']", source_type)
 			params = {
+				"ads": self.data.USER_DATA.ads,
+				"blacklist": self.data.USER_DATA.black_room,
 				"spam_max": self.setting.PARAMETER.spam_del_max,
 			}
-			self._find_duplicate_comments(comments, source_id, params, content_map)
-			for reply in comment.get("replies", []):
-				self._find_duplicate_comments(reply, source_id, params, content_map)
-				if any(ad in reply["content"].lower() for ad in self.data.USER_DATA.ads):
-					print(f"广告回复: {reply['content']}")
-		# (user_id,content):[item_id.comment_id1:reply/comment,item_id.comment_id2:reply/comment]
-		for (user_id, content), entry in content_map.items():
-			if len(entry) >= self.setting.PARAMETER.spam_del_max:
-				# print(f"发现刷屏评论: {content}")
-				# print(f"此用户已经刷屏,共发布{len(entry)}次")
-				yield {(user_id, content): entry}
+
+			# 收集待处理项
+			target_lists_ab = defaultdict(list)
+			self._find_abnormal_comments(comments=comments, item_id=source_id, title=title, action_type="ads", params=params, target_lists=target_lists_ab)
+			target_lists_du = defaultdict(list)
+			self._find_duplicate_comments(comments=comments, item_id=source_id, params=params, target_lists=target_lists_du)
+			result_comments = target_lists_ab["ads"] + target_lists_ab["blacklist"] + target_lists_du["duplicates"]
+			print(result_comments)
+			if not result_comments:
+				print("没有违规评论")
+				return
+			choice = input("是否自动举报违规评论? (Y/N) ").upper()
+			if choice != "Y":
+				print("操作已取消")
+				return
+			try:
+				self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+				all_accounts = self._switch_edu_account(limit=20)
+				if not all_accounts:
+					print("没有可用的教育账号")
+					return
+			except Exception as e:
+				print(f"获取教育账号失败: {e}")
+				return
+			current_account_idx = 0
+			report_count = 0
+			max_retries = 3  # 最大重试次数
+			success_count = 0  # 成功举报计数器
+			for single_item in result_comments:
+				retries = 0
+				success = False
+
+				while not success and retries < max_retries:
+					try:
+						# 当达到最大举报次数或需要切换账号时
+						if report_count >= self.setting.PARAMETER.report_work_max or success_count == 0:
+							try:
+								current_account = next(all_accounts)
+							except StopIteration:
+								print("所有账号均已尝试")
+								return
+							print("已经切换账号")
+							sleep(5)
+							self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+							sleep(15)
+							report_count = 0
+							success_count = 0
+
+						# 执行举报逻辑
+						_item_id, comment_id = single_item.split(":")[0].split(".")
+						# comments = Obtain().get_comments_detail_new(
+						# 	com_id=source_id,
+						# 	source=cast(Literal["shop", "post"], source_type),
+						# 	method="comment_id",
+						# )
+						parent_id, _reply_id = self.tool_routine.find_prefix_suffix(
+							text=comment_id,
+							candidates=result_comments,
+						)
+						# self.acquire.switch_account(self.acquire.token.edu, identity="edu")
+						# self.community_motion.sign_nature()
+						source_map = {
+							"work": "work",
+							"post": "forum",
+							"shop": "shop",
+						}
+						if self.report_work(
+							source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
+							target_id=int(comment_id),
+							source_id=source_id,
+							reason_id=7,
+							parent_id=cast("int", parent_id),
+							is_reply=bool(":reply" in single_item),
+						):
+							report_count += 1
+							success_count += 1
+							success = True
+							print(f"举报成功: {single_item} (当前账号成功次数: {success_count})")
+						else:
+							print("举报失败,尝试切换账号")
+							retries = max_retries  # 强制切换账号
+
+					except Exception as e:
+						print(f"举报出错: {e}")
+						retries += 1
+						if retries >= max_retries:
+							print("达到最大重试次数,切换账号")
+							current_account_idx += 1
+							report_count = 0
+							success_count = 0
+
+				if not success:
+					print(f"无法处理举报项: {single_item}")
+			self.whale_routine.set_token(self.acquire.token.judgement)
 
 	def report_work(
 		self,

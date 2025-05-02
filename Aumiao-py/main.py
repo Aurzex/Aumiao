@@ -108,17 +108,17 @@ def reply_work() -> None:
 
 def handle_report() -> None:
 	"""尝试执行处理举报操作"""
-	try:
-		print_header("处理举报")
-		token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
-		whale.Routine().set_token(token=token)  # noqa: F405
+	# try:
+	print_header("处理举报")
+	token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
+	whale.Routine().set_token(token=token)  # noqa: F405
 
-		admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
-		client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
-		print(f"{COLOR_SUCCESS}已成功处理举报{COLOR_RESET}")
+	admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
+	client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
+	print(f"{COLOR_SUCCESS}已成功处理举报{COLOR_RESET}")
 
-	except Exception as e:
-		print(f"{COLOR_ERROR}处理举报失败: {e}{COLOR_RESET}")
+	# except Exception as e:
+	# 	print(f"{COLOR_ERROR}处理举报失败: {e}{COLOR_RESET}")
 
 
 def check_account_status() -> None:

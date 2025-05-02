@@ -1,3 +1,4 @@
+import contextlib
 import time
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ from .decorator import singleton
 LOG_DIR: Path = Path.cwd() / ".log"
 LOG_FILE_PATH: Path = LOG_DIR / f"{int(time.time())}.txt"
 DICT_ITEM = 2
+
+MAX_CHARACTER = 100
 
 
 @dataclass
@@ -86,12 +89,12 @@ class CodeMaoClient:
 		for attempt in range(retries):
 			try:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
-				# print("=" * 82)
-				# print(f"Request {method} {url} {response.status_code}")
-				# # if "Authorization" in response.request.headers:
-				# # 	print(response.request.headers["Authorization"])
-				# with contextlib.suppress(Exception):
-				# 	print(response.json() if len(response.text) <= 100 else response.text[:100] + "...")
+				print("=" * 82)
+				print(f"Request {method} {url} {response.status_code}")
+				# if "Authorization" in response.request.headers:
+				# 	print(response.request.headers["Authorization"])
+				with contextlib.suppress(Exception):
+					print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
 				response.raise_for_status()
 
 			except HTTPError as err:
