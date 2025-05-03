@@ -865,6 +865,7 @@ class Motion(ClassUnion):
 			report_count = 0
 			max_retries = 3  # 最大重试次数
 			success_count = 0  # 成功举报计数器
+			reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
 			for single_item in result_comments:
 				retries = 0
 				success = False
@@ -908,6 +909,7 @@ class Motion(ClassUnion):
 							target_id=int(comment_id),
 							source_id=source_id,
 							reason_id=7,
+							reason_content=reason_content,
 							parent_id=cast("int", parent_id),
 							is_reply=bool(":reply" in single_item),
 						):
@@ -938,6 +940,7 @@ class Motion(ClassUnion):
 		target_id: int,
 		source_id: int,
 		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
+		reason_content: str,
 		parent_id: int | None = None,
 		description: str = "",
 		*,
