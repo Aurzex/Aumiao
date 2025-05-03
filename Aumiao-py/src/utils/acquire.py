@@ -65,8 +65,8 @@ class CodeMaoClient:
 		self._file = file.CodeMaoFile()
 		self.token = Token()
 		self.base_url = "https://api.codemao.cn"
+		self.tool = tool
 		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
-		self.tool_process = tool.CodeMaoProcess()
 		LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 	def send_request(
@@ -172,8 +172,8 @@ class CodeMaoClient:
 			return
 
 		initial_data = initial_response.json()
-		first_page = cast("list[dict]", self.tool_process.get_nested_value(initial_data, data_key))
-		total_items = int(cast("int", self.tool_process.get_nested_value(initial_data, total_key)))
+		first_page = cast("list[dict]", self.tool.DataProcessor().get_nested_value(initial_data, data_key))
+		total_items = int(cast("int", self.tool.DataProcessor().get_nested_value(initial_data, total_key)))
 
 		# 安全获取分页参数配置
 		amount_key = config_.get("amount_key", "limit")
@@ -218,7 +218,7 @@ class CodeMaoClient:
 				continue
 
 			# 处理分页数据
-			page_data = cast("list[dict]", self.tool_process.get_nested_value(page_response.json(), data_key))
+			page_data = cast("list[dict]", self.tool.DataProcessor().get_nested_value(page_response.json(), data_key))
 			for item in page_data:
 				yield item
 				yielded_count += 1

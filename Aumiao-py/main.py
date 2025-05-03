@@ -148,11 +148,6 @@ def logout() -> None:
 		print(f"{COLOR_ERROR}登出失败: {e}{COLOR_RESET}")
 
 
-def mi_tao_like() -> None:
-	user_id = input("输入用户训练师编号")
-	client.Motion().mi_tao_like(user_id=int(user_id))  # noqa: F405
-
-
 def main() -> None:
 	"""主函数"""
 	enable_vt_mode()

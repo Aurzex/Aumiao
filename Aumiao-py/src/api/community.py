@@ -25,8 +25,8 @@ class Login:
 	def __init__(self) -> None:
 		# 初始化CodeMaoClient和CodeMaoProcess对象
 		self.acquire = acquire.CodeMaoClient()
-		self.tool_process = tool.CodeMaoProcess()
 		# 获取设置数据
+		self.tool = tool
 		self.setting = data.SettingManager().data
 
 	# 密码登录函数
@@ -117,7 +117,7 @@ class Login:
 		# token_ca = {"authorization": token, "__ca_uid_key__": str(uuid_ca)}
 		# 无上面这两句会缺少__ca_uid_key__
 		token_ca = {"authorization": token}
-		cookie_str = self.tool_process.convert_cookie_to_str(token_ca)  # 将cookie转换为字符串
+		cookie_str = self.tool.DataConverter().convert_cookie(token_ca)  # 将cookie转换为字符串
 		headers = {**self.acquire.headers, "cookie": cookie_str}  # 添加cookie到headers中
 		response = self.acquire.send_request(method="GET", endpoint="/web/users/details", headers=headers)  # 发送请求获取用户详情
 		auth = response.cookies.get_dict()  # 获取cookie

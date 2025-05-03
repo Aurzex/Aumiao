@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Literal
 
-from src.utils import acquire, tool
+from src.utils import acquire
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
 
@@ -380,7 +380,6 @@ class Obtain:
 	def __init__(self) -> None:
 		# 初始化获取数据类
 		self.acquire = acquire.CodeMaoClient()
-		self.tool = tool.CodeMaoProcess()
 
 	# 获取评论区评论
 	def get_work_comments(self, work_id: int, limit: int = 15) -> Generator:

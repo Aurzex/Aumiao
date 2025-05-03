@@ -43,8 +43,7 @@ class Union:
 		self.setting = data.SettingManager().data
 		self.shop_motion = shop.Motion()
 		self.shop_obtain = shop.Obtain()
-		self.tool_process = tool.CodeMaoProcess()
-		self.tool_routine = tool.CodeMaoRoutine()
+		self.tool = tool
 		self.user_motion = user.Motion()
 		self.user_obtain = user.Obtain()
 		self.whale_obtain = whale.Obtain()
@@ -83,16 +82,16 @@ class Tool(ClassUnion):
 		before_data = self.cache_manager.data
 		# 如果缓存数据不为空,则显示数据变化
 		if before_data != {}:
-			self.tool_routine.display_data_changes(
-				before_data=before_data,
-				after_data=user_data,
+			self.tool.DataAnalyzer().compare_datasets(
+				before=before_data,
+				after=user_data,
 				metrics={
 					"fans": "粉丝",
 					"collected": "被收藏",
 					"liked": "被赞",
 					"view": "被预览",
 				},
-				date_field="timestamp",
+				timestamp_field="timestamp",
 			)
 		# 更新缓存数据
 		self.cache_manager.update(user_data)  # 使用管理器的 update 方法
@@ -159,22 +158,60 @@ class Obtain(ClassUnion):
 		limit: int = 0,
 		type_item: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"] = "COMMENT_REPLY",
 	) -> list[dict[str, str | int | dict]]:
-		list_ = []
-		reply_num = self.community_obtain.get_message_count(method="web")[0]["count"]
-		# 如果新回复数量为0且limit也为0,则返回空列表
-		if reply_num == limit == 0:
-			return [{}]
-		# 如果limit为0,则获取新回复数量个回复,否则获取limit个回复
-		result_num = reply_num if limit == 0 else limit
+		"""获取社区新回复
+		Args:
+			limit: 获取数量限制 (0表示获取全部新回复)
+			type_item: 消息类型
+		Returns:
+			结构化回复数据列表
+		"""
+		replies: list[dict] = []
+
+		# 获取初始消息计数
+		try:
+			message_data = self.community_obtain.get_message_count(method="web")
+			total_replies = message_data[0].get("count", 0) if message_data else 0
+		except Exception as e:
+			print(f"获取消息计数失败: {e}")
+			return replies
+
+		# 处理无新回复的情况
+		if total_replies == 0 and limit == 0:
+			return replies
+
+		# 计算实际需要获取的数量
+		remaining = total_replies if limit == 0 else min(limit, total_replies)
 		offset = 0
-		while result_num > 0:
-			limit = sorted([5, result_num, 200])[1]
-			response = self.community_obtain.get_replies(types=type_item, limit=limit, offset=offset)
-			list_.extend(response["items"][:result_num])
-			result_num -= limit
-			# 更新偏移量
-			offset += limit
-		return list_
+
+		while remaining > 0:
+			# 动态计算每次请求量(5-200之间)
+			current_limit = self.tool.MathUtils().clamp(remaining, 5, 200)
+
+			try:
+				response = self.community_obtain.get_replies(
+					types=type_item,
+					limit=current_limit,
+					offset=offset,
+				)
+				batch = response.get("items", [])
+			except Exception as e:
+				print(f"获取回复失败: {e}")
+				break
+
+			# 计算实际有效数据量(考虑剩余需求)
+			valid_batch = batch[:remaining]
+			replies.extend(valid_batch)
+
+			# 更新迭代参数
+			actual_count = len(valid_batch)
+			remaining -= actual_count
+			offset += current_limit
+
+			# 提前退出条件(无更多数据时)
+			if actual_count < current_limit:
+				break
+
+		return replies
 
 	@overload
 	def get_comments_detail_new(
@@ -241,21 +278,21 @@ class Obtain(ClassUnion):
 			else:
 				yield from comment.get("replies", {}).get("items", [])
 
-		def _process_user_id() -> list[int]:
+		def _process_user_id() -> list[object]:
 			"""提取用户ID列表"""
 			user_ids = []
 			for comment in comments:
 				user_ids.append(comment["user"]["id"])
 				user_ids.extend(_extract_reply_user(reply) for reply in _generate_replies(comment))
-			return self.tool_process.deduplicate(user_ids)
+			return self.tool.DataProcessor().deduplicate(user_ids)
 
-		def _process_comment_id() -> list[str]:
+		def _process_comment_id() -> list[object]:
 			"""生成评论ID链"""
 			comment_ids = []
 			for comment in comments:
 				comment_ids.append(str(comment["id"]))
 				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in _generate_replies(comment))
-			return self.tool_process.deduplicate(comment_ids)
+			return self.tool.DataProcessor().deduplicate(comment_ids)
 
 		def _process_detailed() -> list[dict]:
 			"""构建结构化数据"""
@@ -576,10 +613,10 @@ class Motion(ClassUnion):
 
 		# 获取并过滤有效回复 (解决set类型问题 )
 		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
-		new_replies = self.tool_process.filter_items_by_values(
+		new_replies = self.tool.DataProcessor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
 			id_path="type",
-			values=valid_types,
+			target_values=valid_types,
 		)
 
 		for reply in new_replies:
@@ -611,7 +648,7 @@ class Motion(ClassUnion):
 					parent_id = 0
 				else:
 					parent_id = int(reply.get("reference_id", msg.get("replied_id", 0)))
-					found = self.tool_routine.find_prefix_suffix(
+					found = self.tool.StringProcessor().find_substrings(
 						text=target_id,  # 添加text参数
 						candidates=comment_ids,
 					)[0]
@@ -687,7 +724,7 @@ class Motion(ClassUnion):
 				self.edu_obtain.get_data_details(),
 			),
 		)
-		return self.tool_routine.merge_user_data(data_list=all_data)
+		return self.tool.DataMerger().merge(datasets=all_data)
 
 	# 查看账户状态
 	def get_account_status(self) -> str:
@@ -738,7 +775,7 @@ class Motion(ClassUnion):
 			else:
 				print(f"被举报人: {item[f'{cfg_user_field}_nickname']}")
 			print(f"举报原因: {item['reason_content']}")
-			print(f"举报时间: {self.tool_process.format_timestamp(item['created_at'])}")
+			print(f"举报时间: {self.tool.TimeUtils().format_timestamp(item['created_at'])}")
 			if report_type == "post":
 				print(f"举报线索: {item['description']}")
 
@@ -803,17 +840,17 @@ class Motion(ClassUnion):
 					if comment["id"] == item["comment_parent_id"]:
 						for reply in comment["replies"]:
 							if reply["id"] == item["comment_id"]:
-								print(f"发送时间: {self.tool_process.format_timestamp(reply['created_at'])}")
+								print(f"发送时间: {self.tool.TimeUtils().format_timestamp(reply['created_at'])}")
 								break
 						break
 			else:
 				for comment in comments:
 					if comment["id"] == item["comment_id"]:
-						print(f"发送时间: {self.tool_process.format_timestamp(comment['created_at'])}")
+						print(f"发送时间: {self.tool.TimeUtils().format_timestamp(comment['created_at'])}")
 						break
 		else:
 			details = self.forum_obtain.get_single_post_details(ids=item[cfg["source_id_field"]])
-			print(f"发送时间: {self.tool_process.format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
+			print(f"发送时间: {self.tool.TimeUtils().format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
 
 	def _switch_edu_account(self, limit: int | None) -> Generator[tuple[str, str]]:
 		students = list(self.edu_obtain.get_students(limit=limit))
@@ -847,7 +884,7 @@ class Motion(ClassUnion):
 		if source_type == "post":
 			source_type = cast("Literal['post']", source_type)
 			search_result = list(self.forum_obtain.search_posts(title=title, limit=None))
-			user_posts = self.tool_process.filter_items_by_values(data=search_result, id_path="user.id", values=[user_id])
+			user_posts = self.tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
 			if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
 				print(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次")
 
@@ -944,7 +981,7 @@ class Motion(ClassUnion):
 					is_reply = "reply" in violation
 
 					# 获取父评论ID
-					parent_id, _ = self.tool_routine.find_prefix_suffix(
+					parent_id, _ = self.tool.StringProcessor().find_substrings(
 						text=comment_id,
 						candidates=violations,
 					)
