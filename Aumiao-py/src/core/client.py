@@ -764,10 +764,10 @@ class Motion(ClassUnion):
 						"discussion": "discussion",
 					}
 					self._check_report(
-						comment_id=item["id"],
 						source_id=item[cfg["source_id_field"]],
 						source_type=cast("Literal['shop', 'work', 'discussion', 'post']", source_map[report_type]),
 						title=item.get("board_name", item.get(cfg.get("source_name_field", ""), "")),
+						user_id=item[f"{cfg['user_field']}_id"],
 					)
 				else:
 					print("无效输入")
@@ -827,112 +827,155 @@ class Motion(ClassUnion):
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
 
-	def _check_report(self, comment_id: int, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str) -> None:  # noqa: PLR0914, PLR0915
+	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
 		if source_type in {"work", "discussion", "shop"}:
 			source_type = cast("Literal['post', 'work', 'shop']", source_type)
-			comments = Obtain().get_comments_detail_new(com_id=source_id, source=source_type, method="comments")
-			source_type = cast("Literal['work', 'post', 'shop']", source_type)
-			params = {
-				"ads": self.data.USER_DATA.ads,
-				"blacklist": self.data.USER_DATA.black_room,
-				"spam_max": self.setting.PARAMETER.spam_del_max,
-			}
+			# 分析违规评论
+			violations = self._analyze_comments_violations(
+				source_id=source_id,
+				source_type=source_type,
+				title=title,
+			)
 
-			# 收集待处理项
-			target_lists_ab = defaultdict(list)
-			self._find_abnormal_comments(comments=comments, item_id=source_id, title=title, action_type="ads", params=params, target_lists=target_lists_ab)
-			target_lists_du = defaultdict(list)
-			self._find_duplicate_comments(comments=comments, item_id=source_id, params=params, target_lists=target_lists_du)
-			result_comments = target_lists_ab["ads"] + target_lists_ab["blacklist"] + target_lists_du["duplicates"]
-			print(result_comments)
-			if not result_comments:
+			if not violations:
 				print("没有违规评论")
 				return
-			choice = input("是否自动举报违规评论? (Y/N) ").upper()
-			if choice != "Y":
-				print("操作已取消")
-				return
-			try:
-				self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-				all_accounts = self._switch_edu_account(limit=20)
-				if not all_accounts:
-					print("没有可用的教育账号")
-					return
-			except Exception as e:
-				print(f"获取教育账号失败: {e}")
-				return
-			current_account_idx = 0
-			report_count = 0
-			max_retries = 3  # 最大重试次数
-			success_count = 0  # 成功举报计数器
-			reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
-			for single_item in result_comments:
-				retries = 0
-				success = False
 
-				while not success and retries < max_retries:
-					try:
-						# 当达到最大举报次数或需要切换账号时
-						if report_count >= self.setting.PARAMETER.report_work_max or success_count == 0:
-							try:
-								current_account = next(all_accounts)
-							except StopIteration:
-								print("所有账号均已尝试")
-								return
-							print("已经切换账号")
-							sleep(5)
-							self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
-							sleep(15)
-							report_count = 0
-							success_count = 0
+			# 处理举报请求
+			self._process_report_requests(
+				violations=violations,
+				source_id=source_id,
+				source_type=source_type,
+			)
+		if source_type == "post":
+			source_type = cast("Literal['post']", source_type)
+			search_result = list(self.forum_obtain.search_posts(title=title, limit=None))
+			user_posts = self.tool_process.filter_items_by_values(data=search_result, id_path="user.id", values=[user_id])
+			if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
+				print(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次")
 
-						# 执行举报逻辑
-						_item_id, comment_id = single_item.split(":")[0].split(".")
-						# comments = Obtain().get_comments_detail_new(
-						# 	com_id=source_id,
-						# 	source=cast(Literal["shop", "post"], source_type),
-						# 	method="comment_id",
-						# )
-						parent_id, _reply_id = self.tool_routine.find_prefix_suffix(
-							text=comment_id,
-							candidates=result_comments,
+	def _analyze_comments_violations(
+		self,
+		source_id: int,
+		source_type: Literal["post", "work", "shop"],
+		title: str,
+	) -> list[str]:
+		"""分析评论违规内容"""
+		comments = Obtain().get_comments_detail_new(
+			com_id=source_id,
+			source=source_type,
+			method="comments",
+		)
+
+		params = {
+			"ads": self.data.USER_DATA.ads,
+			"blacklist": self.data.USER_DATA.black_room,
+			"spam_max": self.setting.PARAMETER.spam_del_max,
+		}
+
+		# 收集异常评论
+		abnormal_targets = defaultdict(list)
+		self._find_abnormal_comments(
+			comments=comments,
+			item_id=source_id,
+			title=title,
+			action_type="ads",
+			params=params,
+			target_lists=abnormal_targets,
+		)
+
+		# 收集重复评论
+		duplicate_targets = defaultdict(list)
+		self._find_duplicate_comments(
+			comments=comments,
+			item_id=source_id,
+			params=params,
+			target_lists=duplicate_targets,
+		)
+
+		return abnormal_targets["ads"] + abnormal_targets["blacklist"] + duplicate_targets["duplicates"]
+
+	def _process_report_requests(
+		self,
+		violations: list[str],
+		source_id: int,
+		source_type: Literal["post", "work", "shop"],
+	) -> None:
+		"""处理举报请求核心逻辑"""
+		if input("是否自动举报违规评论? (Y/N) ").upper() != "Y":
+			print("操作已取消")
+			return
+
+		try:
+			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+			account_pool = self._switch_edu_account(limit=20)
+			if not account_pool:
+				print("没有可用的教育账号")
+				return
+		except Exception as e:
+			print(f"账号切换失败: {e}")
+			return
+
+		current_account = None
+		report_counter = 0
+		max_retries = 3
+		reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
+		source_map = {"work": "work", "post": "forum", "shop": "shop"}
+
+		for violation in violations:
+			retries = 0
+			while retries < max_retries:
+				try:
+					# 账号切换逻辑
+					if report_counter >= self.setting.PARAMETER.report_work_max:
+						current_account = next(account_pool, None)
+						if not current_account:
+							print("所有账号均已尝试")
+							return
+						print("切换教育账号")
+						sleep(5)
+						self.community_login.login_password(
+							identity=current_account[0],
+							password=current_account[1],
+							status="edu",
 						)
-						# self.acquire.switch_account(self.acquire.token.edu, identity="edu")
-						# self.community_motion.sign_nature()
-						source_map = {
-							"work": "work",
-							"post": "forum",
-							"shop": "shop",
-						}
-						if self.report_work(
-							source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
-							target_id=int(comment_id),
-							source_id=source_id,
-							reason_id=7,
-							reason_content=reason_content,
-							parent_id=cast("int", parent_id),
-							is_reply=bool(":reply" in single_item),
-						):
-							report_count += 1
-							success_count += 1
-							success = True
-							print(f"举报成功: {single_item} (当前账号成功次数: {success_count})")
-						else:
-							print("举报失败,尝试切换账号")
-							retries = max_retries  # 强制切换账号
+						report_counter = 0
 
-					except Exception as e:
-						print(f"举报出错: {e}")
-						retries += 1
-						if retries >= max_retries:
-							print("达到最大重试次数,切换账号")
-							current_account_idx += 1
-							report_count = 0
-							success_count = 0
+					# 解析评论信息
+					parts = violation.split(":")
+					_item_id, comment_id = parts[0].split(".")
+					is_reply = "reply" in violation
 
-				if not success:
-					print(f"无法处理举报项: {single_item}")
-			self.whale_routine.set_token(self.acquire.token.judgement)
+					# 获取父评论ID
+					parent_id, _ = self.tool_routine.find_prefix_suffix(
+						text=comment_id,
+						candidates=violations,
+					)
+
+					# 执行举报
+					if self.report_work(
+						source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
+						target_id=int(comment_id),
+						source_id=source_id,
+						reason_id=7,
+						reason_content=reason_content,
+						parent_id=cast("int", parent_id),
+						is_reply=is_reply,
+					):
+						report_counter += 1
+						print(f"举报成功: {violation}")
+						break
+					print(f"举报失败: {violation}")
+					retries += 1
+
+				except Exception as e:
+					print(f"处理异常: {e}")
+					retries += 1
+					if retries >= max_retries:
+						print(f"达到最大重试次数: {violation}")
+
+		# 恢复原始账号
+		self.whale_routine.set_token(self.acquire.token.judgement)
 
 	def report_work(
 		self,
