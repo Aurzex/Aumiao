@@ -12,8 +12,9 @@ T = TypeVar("T")
 DataclassInstance = T
 # 常量定义
 DATA_DIR = Path.cwd() / "data"
-DATA_FILE_PATH = DATA_DIR / "data.json"
+
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
+DATA_FILE_PATH = DATA_DIR / "data.json"
 SETTING_FILE_PATH = DATA_DIR / "setting.json"
 
 # 确保数据目录存在

@@ -58,16 +58,16 @@ FetchMethod = Literal["GET", "POST"]
 class CodeMaoClient:
 	def __init__(self) -> None:
 		"""初始化客户端实例,增强配置管理"""
-		self._default_session = Session()  # 默认会话用于非教育账号
-		self._session = self._default_session  # 当前活跃会话
-		self._identity: str | None = None
-		self._config = data.SettingManager().data
-		self._file = file.CodeMaoFile()
-		self.token = Token()
-		self.base_url = "https://api.codemao.cn"
-		self.tool = tool
-		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
 		LOG_DIR.mkdir(parents=True, exist_ok=True)
+		self._config = data.SettingManager().data
+		self._default_session = Session()  # 默认会话用于非教育账号
+		self._file = file.CodeMaoFile()
+		self._identity: str | None = None
+		self._session = self._default_session  # 当前活跃会话
+		self.base_url = "https://api.codemao.cn"
+		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
+		self.token = Token()
+		self.tool = tool
 
 	def send_request(
 		self,

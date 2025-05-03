@@ -31,12 +31,12 @@ class Union:
 	def __init__(self) -> None:
 		self.acquire = acquire.CodeMaoClient()
 		self.cache = data.CacheManager().data
-		self.community_obtain = community.Obtain()
 		self.community_login = community.Login()
 		self.community_motion = community.Motion()
+		self.community_obtain = community.Obtain()
 		self.data = data.DataManager().data
-		self.edu_obtain = edu.Obtain()
 		self.edu_motion = edu.Motion()
+		self.edu_obtain = edu.Obtain()
 		self.file = file.CodeMaoFile()
 		self.forum_motion = forum.Motion()
 		self.forum_obtain = forum.Obtain()
@@ -46,8 +46,8 @@ class Union:
 		self.tool = tool
 		self.user_motion = user.Motion()
 		self.user_obtain = user.Obtain()
-		self.whale_obtain = whale.Obtain()
 		self.whale_motion = whale.Motion()
+		self.whale_obtain = whale.Obtain()
 		self.whale_routine = whale.Routine()
 		self.work_motion = work.Motion()
 		self.work_obtain = work.Obtain()
@@ -113,12 +113,12 @@ class Index(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 		# 颜色配置
-		self.COLOR_SLOGAN = "\033[38;5;80m"  # 湖水青-标语
-		self.COLOR_VERSION = "\033[38;5;114m"  # 新芽绿-版本号
-		self.COLOR_TITLE = "\033[38;5;75m"  # 晴空蓝-标题
-		self.COLOR_LINK = "\033[4;38;5;183m"  # 薰衣草紫带下划线-链接
 		self.COLOR_DATA = "\033[38;5;228m"  # 月光黄-数据
+		self.COLOR_LINK = "\033[4;38;5;183m"  # 薰衣草紫带下划线-链接
 		self.COLOR_RESET = "\033[0m"  # 样式重置
+		self.COLOR_SLOGAN = "\033[38;5;80m"  # 湖水青-标语
+		self.COLOR_TITLE = "\033[38;5;75m"  # 晴空蓝-标题
+		self.COLOR_VERSION = "\033[38;5;114m"  # 新芽绿-版本号
 
 	def index(self) -> None:
 		"""打印引导界面"""
