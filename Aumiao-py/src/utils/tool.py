@@ -10,7 +10,7 @@ T = TypeVar("T")
 
 
 @staticmethod
-def is_dataclass_instance(obj: T) -> TypeGuard[T]:  # noqa: UP047
+def is_dataclass_instance[T](obj: T) -> TypeGuard[T]:
 	"""检查对象是否是数据类实例(类型安全的检查方法)
 
 	Args:
