@@ -559,14 +559,12 @@ class Motion(ClassUnion):
 			print(f"清除红点过程中发生异常: {e}")
 			return False
 
-	# 给某人作品全点赞
-	def like_all_work(self, user_id: str) -> bool:
-		works_list = self.user_obtain.get_user_works_web(user_id, limit=None)
+	def like_all_work(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
+		self.work_motion.follow_work(user_id=int(user_id))
 		for item in works_list:
 			item["id"] = cast("int", item["id"])
-			if not self.work_motion.like_work(work_id=item["id"]):
-				return False
-		return True
+			self.work_motion.like_work(work_id=item["id"])
+			self.work_motion.collection_work(work_id=item["id"])
 
 	def reply_work(self) -> bool:  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
@@ -817,8 +815,7 @@ class Motion(ClassUnion):
 			details = self.forum_obtain.get_single_post_details(ids=item[cfg["source_id_field"]])
 			print(f"发送时间: {self.tool_process.format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
 
-	def _switch_edu_account(self, limit: int | None) -> Generator:
-		"""使用pop随机抽取学生账密"""
+	def _switch_edu_account(self, limit: int | None) -> Generator[tuple[str, str]]:
 		students = list(self.edu_obtain.get_students(limit=limit))
 
 		while students:
@@ -1020,6 +1017,25 @@ class Motion(ClassUnion):
 					reporter_id=int(self.data.ACCOUNT_DATA.id),
 					description=description,
 				)
+
+	def mi_tao_like(self, user_id: int) -> None:
+		try:
+			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+			account_pool = self._switch_edu_account(limit=None)
+			if not account_pool:
+				print("没有可用的教育账号")
+				return
+		except Exception as e:
+			print(f"账号切换失败: {e}")
+			return
+		works_list = list(self.user_obtain.get_user_works_web(str(user_id), limit=None))
+		accounts = self._switch_edu_account(limit=None)
+		for current_account in accounts:
+			print("切换教育账号")
+			sleep(5)
+			self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+			self.like_all_work(user_id=str(user_id), works_list=works_list)
+		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
 
 # "POST_COMMENT",
