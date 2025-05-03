@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Literal
 
-from src.utils import acquire, tool
+from src.utils import acquire
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
 
@@ -11,7 +11,6 @@ class Routine:
 	# 初始化方法,创建CodeMaoClient和CodeMaoProcess对象
 	def __init__(self) -> None:
 		self.acquire = acquire.CodeMaoClient()
-		self.tool_process = tool.CodeMaoProcess()
 
 	# 登录方法,传入用户名、密码、key和code,发送POST请求,更新cookies
 	def login(self, username: str, password: str, key: int, code: str) -> dict:
@@ -40,8 +39,6 @@ class Obtain:
 	def __init__(self) -> None:
 		# 初始化获取数据客户端
 		self.acquire = acquire.CodeMaoClient()
-		# 初始化工具处理
-		self.tool_process = tool.CodeMaoProcess()
 
 	# 获取编程作品举报
 	def get_work_report(

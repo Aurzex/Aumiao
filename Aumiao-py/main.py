@@ -12,15 +12,14 @@ def enable_vt_mode() -> None:
 
 
 # 颜色代码定义(淡雅风格)
-COLOR_PROMPT = "\033[38;5;75m"  # 淡蓝色 - 输入提示(类似晴空)
-COLOR_SUCCESS = "\033[38;5;114m"  # 淡绿色 - 成功提示(类似新芽)
-COLOR_ERROR = "\033[38;5;203m"  # 浅红色 - 错误提示(类似珊瑚红)
-COLOR_MENU_TITLE = "\033[38;5;80m"  # 青绿色 - 菜单标题(类似湖水)
-COLOR_MENU_ITEM = "\033[38;5;183m"  # 薰衣草紫 - 菜单项
-COLOR_STATUS = "\033[38;5;228m"  # 浅黄色 - 状态信息(类似月光)
 COLOR_COMMENT = "\033[38;5;245m"  # 中灰色 - 辅助说明
+COLOR_ERROR = "\033[38;5;203m"  # 浅红色 - 错误提示(类似珊瑚红)
+COLOR_MENU_ITEM = "\033[38;5;183m"  # 薰衣草紫 - 菜单项
+COLOR_MENU_TITLE = "\033[38;5;80m"  # 青绿色 - 菜单标题(类似湖水)
+COLOR_PROMPT = "\033[38;5;75m"  # 淡蓝色 - 输入提示(类似晴空)
 COLOR_RESET = "\033[0m"  # 重置样式
-# 装饰线符号
+COLOR_STATUS = "\033[38;5;228m"  # 浅黄色 - 状态信息(类似月光)
+COLOR_SUCCESS = "\033[38;5;114m"  # 淡绿色 - 成功提示(类似新芽)
 SEPARATOR = f"{COLOR_PROMPT}══════════════════════════════════════════════════════════{COLOR_RESET}"
 
 
@@ -108,17 +107,17 @@ def reply_work() -> None:
 
 def handle_report() -> None:
 	"""尝试执行处理举报操作"""
-	try:
-		print_header("处理举报")
-		token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
-		whale.Routine().set_token(token=token)  # noqa: F405
+	# try:
+	print_header("处理举报")
+	token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
+	whale.Routine().set_token(token=token)  # noqa: F405
 
-		admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
-		client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
-		print(f"{COLOR_SUCCESS}已成功处理举报{COLOR_RESET}")
+	admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
+	client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
+	print(f"{COLOR_SUCCESS}已成功处理举报{COLOR_RESET}")
 
-	except Exception as e:
-		print(f"{COLOR_ERROR}处理举报失败: {e}{COLOR_RESET}")
+	# except Exception as e:
+	# 	print(f"{COLOR_ERROR}处理举报失败: {e}{COLOR_RESET}")
 
 
 def check_account_status() -> None:

@@ -1,3 +1,4 @@
+import contextlib
 import time
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ from .decorator import singleton
 LOG_DIR: Path = Path.cwd() / ".log"
 LOG_FILE_PATH: Path = LOG_DIR / f"{int(time.time())}.txt"
 DICT_ITEM = 2
+
+MAX_CHARACTER = 100
 
 
 @dataclass
@@ -55,16 +58,16 @@ FetchMethod = Literal["GET", "POST"]
 class CodeMaoClient:
 	def __init__(self) -> None:
 		"""初始化客户端实例,增强配置管理"""
-		self._default_session = Session()  # 默认会话用于非教育账号
-		self._session = self._default_session  # 当前活跃会话
-		self._identity: str | None = None
+		LOG_DIR.mkdir(parents=True, exist_ok=True)
 		self._config = data.SettingManager().data
+		self._default_session = Session()  # 默认会话用于非教育账号
 		self._file = file.CodeMaoFile()
-		self.token = Token()
+		self._identity: str | None = None
+		self._session = self._default_session  # 当前活跃会话
 		self.base_url = "https://api.codemao.cn"
 		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
-		self.tool_process = tool.CodeMaoProcess()
-		LOG_DIR.mkdir(parents=True, exist_ok=True)
+		self.token = Token()
+		self.tool = tool
 
 	def send_request(
 		self,
@@ -86,12 +89,12 @@ class CodeMaoClient:
 		for attempt in range(retries):
 			try:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
-				# print("=" * 82)
-				# print(f"Request {method} {url} {response.status_code}")
-				# # if "Authorization" in response.request.headers:
-				# # 	print(response.request.headers["Authorization"])
-				# with contextlib.suppress(Exception):
-				# 	print(response.json() if len(response.text) <= 100 else response.text[:100] + "...")
+				print("=" * 82)
+				print(f"Request {method} {url} {response.status_code}")
+				# if "Authorization" in response.request.headers:
+				# 	print(response.request.headers["Authorization"])
+				with contextlib.suppress(Exception):
+					print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
 				response.raise_for_status()
 
 			except HTTPError as err:
@@ -169,8 +172,8 @@ class CodeMaoClient:
 			return
 
 		initial_data = initial_response.json()
-		first_page = cast("list[dict]", self.tool_process.get_nested_value(initial_data, data_key))
-		total_items = int(cast("int", self.tool_process.get_nested_value(initial_data, total_key)))
+		first_page = cast("list[dict]", self.tool.DataProcessor().get_nested_value(initial_data, data_key))
+		total_items = int(cast("int", self.tool.DataProcessor().get_nested_value(initial_data, total_key)))
 
 		# 安全获取分页参数配置
 		amount_key = config_.get("amount_key", "limit")
@@ -215,7 +218,7 @@ class CodeMaoClient:
 				continue
 
 			# 处理分页数据
-			page_data = cast("list[dict]", self.tool_process.get_nested_value(page_response.json(), data_key))
+			page_data = cast("list[dict]", self.tool.DataProcessor().get_nested_value(page_response.json(), data_key))
 			for item in page_data:
 				yield item
 				yielded_count += 1
