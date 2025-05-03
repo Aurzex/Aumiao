@@ -1018,25 +1018,6 @@ class Motion(ClassUnion):
 					description=description,
 				)
 
-	def mi_tao_like(self, user_id: int) -> None:
-		try:
-			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-			account_pool = self._switch_edu_account(limit=None)
-			if not account_pool:
-				print("没有可用的教育账号")
-				return
-		except Exception as e:
-			print(f"账号切换失败: {e}")
-			return
-		works_list = list(self.user_obtain.get_user_works_web(str(user_id), limit=None))
-		accounts = self._switch_edu_account(limit=None)
-		for current_account in accounts:
-			print("切换教育账号")
-			sleep(5)
-			self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
-			self.like_all_work(user_id=str(user_id), works_list=works_list)
-		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-
 
 # "POST_COMMENT",
 # "POST_COMMENT_DELETE_FEEDBACK",

@@ -166,7 +166,6 @@ def main() -> None:
 		print("5. 账户登出")
 		print("6. 处理举报")
 		print("7. 状态查询")
-		print("114514. 蜜桃特供版")
 		print(f"8. 退出系统{COLOR_RESET}")
 
 		choice = input(f"\n{COLOR_PROMPT}↳ 请输入操作编号 (1-8): {COLOR_RESET}")
@@ -185,8 +184,6 @@ def main() -> None:
 			handle_report()
 		elif choice == "7":
 			check_account_status()
-		elif choice == "114514":
-			mi_tao_like()
 		elif choice == "8":
 			print(f"\n{COLOR_SUCCESS}感谢使用,再见!{COLOR_RESET}")
 			break
