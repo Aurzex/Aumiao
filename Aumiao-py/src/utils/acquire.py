@@ -68,6 +68,12 @@ class CodeMaoClient:
 		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
 		self.token = Token()
 		self.tool = tool
+		self._sessions = {
+			"judgement": Session(),
+			"average": Session(),
+			"edu_pool": [],
+		}
+		self._original_session: Session | None = None
 
 	def send_request(
 		self,
@@ -226,13 +232,33 @@ class CodeMaoClient:
 					return
 
 	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu", "blank"]) -> None:
-		self.headers["Cookie"] = f"authorization={token}"
-		self.headers["Authorization"] = token
-		if identity == "edu":
-			new_session = Session()
-			new_session.cookies.clear()
-			self._session = new_session
+		"""改进后的会话管理"""
+		# 保存原始会话状态(仅当从非edu切换到edu时)
+		if identity == "edu" and self._identity in {"judgement", "average"}:
+			self._original_session = self._session
+			self._original_session.close()  # 关闭原始会话连接
 
+		# 教育账号特殊处理
+		if identity == "edu":
+			# 关闭前一个教育会话
+			if self._identity == "edu" and self._session in self._sessions["edu_pool"]:
+				self._session.close()
+				self._sessions["edu_pool"].remove(self._session)
+
+			# 创建全新隔离会话
+			new_session = Session()
+			new_session.headers.update(self.headers.copy())
+			new_session.headers["Authorization"] = token
+			new_session.cookies.clear()
+
+			self._sessions["edu_pool"].append(new_session)
+			self._session = new_session
+		else:
+			# 使用预定义的独立会话
+			self._session = self._sessions[identity]
+			self._session.headers["Authorization"] = token
+
+		# 保持原有token存储逻辑
 		self._identity = identity
 		print(f"切换到 {identity} | 会话ID: {id(self._session)}")
 		match identity:
@@ -245,32 +271,13 @@ class CodeMaoClient:
 			case "blank":
 				pass
 
-	# def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
-	# 	"""仅操作headers中的Cookie,不涉及session cookies"""
-	# 	# 清除旧Cookie
-	# 	if "Cookie" in self.headers:
-	# 		del self.headers["Cookie"]
-
-	# 	# 转换所有类型为Cookie字符串
-	# 	def _to_cookie_str(cookie: RequestsCookieJar | dict | str) -> str:
-	# 		if isinstance(cookie, RequestsCookieJar):
-	# 			return "; ".join(f"{cookie.name}={cookie.value}" for cookie in cookie)
-	# 		if isinstance(cookie, dict):
-	# 			return "; ".join(f"{k}={v}" for k, v in cookie.items())
-	# 		if isinstance(cookie, str):
-	# 			# 过滤非法字符
-	# 			return ";".join(part.strip() for part in cookie.split(";") if "=" in part and len(part.split("=")) == DICT_ITEM)
-	# 		msg = f"不支持的Cookie类型: {type(cookie).__name__}"
-	# 		raise TypeError(msg)
-
-	# 	try:
-	# 		cookie_str = _to_cookie_str(cookies)
-	# 		if cookie_str:
-	# 			self.headers["Cookie"] = cookie_str
-	# 	except Exception as e:
-	# 		print(f"Cookie更新失败: {e!s}")
-	# 		msg = "无效的Cookie格式"
-	# 		raise ValueError(msg) from e
+	def __del__(self) -> None:
+		"""对象销毁时清理所有会话"""
+		for session in self._sessions["edu_pool"]:
+			session.close()
+		self._sessions["judgement"].close()
+		self._sessions["average"].close()
+		self._default_session.close()
 
 	def _log_request(self, response: requests.Response) -> None:
 		"""简化的日志记录,使用文本格式而不是字典"""
