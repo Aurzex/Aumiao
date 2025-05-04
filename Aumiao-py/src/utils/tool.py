@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Generator, Iterable, Mapping
 from dataclasses import asdict, is_dataclass
+from html import unescape
 from typing import TypeGuard, TypeVar, overload
 
 DataObject = dict | list[dict] | Generator[dict, object]
@@ -267,6 +269,70 @@ class DataConverter:
 			return vars(data)
 		msg = f"不支持的类型: {type(data).__name__}。支持类型: dict, 数据类实例,或包含__dict__属性的对象"
 		raise TypeError(msg)
+
+	@staticmethod
+	def html_to_text(
+		html_content: str,
+		*,
+		replace_images: bool = True,  # 是否替换图片标签
+		img_format: str = "[图片链接: {src}]",  # 图片替换格式
+		merge_empty_lines: bool = False,  # 是否合并连续空行
+		unescape_entities: bool = True,  # 是否解码HTML实体
+		keep_line_breaks: bool = True,  # 是否保留段落换行
+	) -> str:
+		"""
+		将HTML转换为可配置的纯文本
+
+		:param html_content: 输入的HTML内容
+		:param replace_images: 是否将图片替换为指定格式 (默认True)
+		:param img_format: 图片替换格式,可用{src}占位符 (默认"[图片链接: {src}]")
+		:param merge_empty_lines: 是否合并连续空行 (默认True)
+		:param unescape_entities: 是否解码HTML实体如&amp; (默认True)
+		:param keep_line_breaks: 是否保留原始段落换行 (默认True)
+		:return: 格式化后的纯文本
+		"""
+		# 提取可能存在的嵌套外层<p>
+		outer_match = re.match(r"<p\b[^>]*>(.*)</p>", html_content, re.DOTALL)
+		inner_content = outer_match.group(1) if outer_match else html_content
+
+		# 提取所有段落内容
+		paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", inner_content, re.DOTALL)
+
+		processed = []
+		for content in paragraphs:
+			# 图片标签处理
+			if replace_images:
+
+				def replace_img(match: re.Match) -> str:
+					src = next((g for g in match.groups()[1:] if g), "")
+					return img_format.format(src=unescape(src)) if src else img_format.format(src="")
+
+				content = re.sub(  # noqa: PLW2901
+					r'<img\b[^>]*?src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))[^>]*>',
+					replace_img,
+					content,
+					flags=re.IGNORECASE,
+				)
+
+			# 移除所有HTML标签
+			text = re.sub(r"<.*?>", "", content, flags=re.DOTALL)
+
+			# HTML实体解码
+			if unescape_entities:
+				text = unescape(text)
+
+			# 清理空白并保留空行标记
+			text = text.strip()
+			processed.append(text if keep_line_breaks else text.replace("\n", " "))
+
+		# 构建最终结果
+		result = "\n".join(processed)
+
+		# 空行合并处理
+		if merge_empty_lines:
+			result = re.sub(r"\n{2,}", "\n", result)
+
+		return result.strip()
 
 
 class StringProcessor:
