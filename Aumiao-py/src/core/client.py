@@ -733,17 +733,29 @@ class Motion(ClassUnion):
 
 	# 处理举报
 	# 需要风纪权限
-	def handle_report(self, admin_id: int) -> None:
-		def process_item(item: dict, report_type: Literal["comment", "post", "discussion"]) -> None:
-			# 类型字段映射表
-			type_config = {
+	def handle_report(self, admin_id: int) -> None:  # noqa: PLR0915
+		class ReportRecord(TypedDict):
+			item: dict
+			report_type: Literal["comment", "post", "discussion"]
+			com_id: str
+			processed: bool
+			action: str | None
+
+		batch_config = {
+			"total_threshold": 15,
+			"duplicate_threshold": 5,
+		}
+
+		def get_type_config(report_type: str, current_item: dict) -> dict:
+			"""动态生成类型配置(修复闭包问题)"""
+			return {
 				"comment": {
 					"content_field": "comment_content",
 					"user_field": "comment_user",
 					"handle_method": "handle_comment_report",
 					"source_id_field": "comment_source_object_id",
 					"source_name_field": "comment_source_object_name",
-					"special_check": lambda: item.get("comment_source") == "WORK_SHOP",
+					"special_check": lambda i=current_item: i.get("comment_source") == "WORK_SHOP",
 					"com_id": "comment_id",
 				},
 				"post": {
@@ -762,9 +774,37 @@ class Motion(ClassUnion):
 					"special_check": lambda: True,
 					"com_id": "discussion_id",
 				},
-			}
+			}[report_type]
 
-			cfg = type_config[report_type]
+		def process_report_batch(records: list[ReportRecord]) -> None:
+			com_id_map = defaultdict(list)
+			for record in records:
+				com_id_map[record["com_id"]].append(record)
+
+			total = len(records)
+			need_batch = total >= batch_config["total_threshold"] and any(len(items) >= batch_config["duplicate_threshold"] for items in com_id_map.values())
+
+			batch_actions = {}
+			for com_id, items in com_id_map.items():
+				if need_batch and len(items) >= batch_config["duplicate_threshold"]:
+					first_item = items[0]
+					if not first_item["processed"]:
+						action = process_single_item(first_item)
+						batch_actions[com_id] = action
+
+					for item in items[1:]:
+						if not item["processed"]:
+							apply_action(item, batch_actions[com_id])
+
+			for record in records:
+				if not record["processed"]:
+					process_single_item(record)
+
+		def process_single_item(record: ReportRecord) -> str:
+			item = record["item"]
+			report_type = record["report_type"]
+			cfg = get_type_config(report_type, item)
+
 			print(f"\n{'=' * 50}")
 			print(f"举报ID: {item['id']}")
 			print(f"举报内容: {item[cfg['content_field']]}")
@@ -780,15 +820,13 @@ class Motion(ClassUnion):
 				print(f"举报线索: {item['description']}")
 
 			while True:
-				print("-" * 50)
 				choice = input("选择操作: D:删除, S:禁言7天, P:通过, C:查看, F:检查违规, J:跳过  ").upper()
-				handler = getattr(self.whale_motion, cfg["handle_method"])
-				if choice == "J":
-					break
 				if choice in {"D", "S", "P"}:
 					status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}
+					handler = getattr(self.whale_motion, cfg["handle_method"])
 					handler(report_id=item["id"], status=status_map[choice], admin_id=admin_id)
-					break
+					record["processed"] = True
+					return choice
 				if choice == "C":
 					self._show_details(item, report_type, cfg)
 				elif choice == "F" and cfg["special_check"]():
@@ -807,16 +845,36 @@ class Motion(ClassUnion):
 				else:
 					print("无效输入")
 
-		# 获取所有待处理举报
-		lists: list[tuple[Generator[dict], Literal["comment", "post", "discussion"]]] = [
+		def apply_action(record: ReportRecord, action: str) -> None:
+			cfg = get_type_config(record["report_type"], record["item"])
+			handler = getattr(self.whale_motion, cfg["handle_method"])
+			handler(
+				report_id=record["item"]["id"],
+				status={"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}[action],
+				admin_id=admin_id,
+			)
+			record["processed"] = True
+
+		# 数据收集
+		all_records: list[ReportRecord] = []
+		for report_list, report_type in [
 			(self.whale_obtain.get_comment_report(types="ALL", status="TOBEDONE", limit=None), "comment"),
 			(self.whale_obtain.get_post_report(status="TOBEDONE", limit=None), "post"),
 			(self.whale_obtain.get_discussion_report(status="TOBEDONE", limit=None), "discussion"),
-		]
-
-		for report_list, report_type in lists:
+		]:
 			for item in report_list:
-				process_item(item=item, report_type=report_type)
+				cfg = get_type_config(report_type, item)
+				all_records.append(
+					{
+						"item": item,
+						"report_type": cast("Literal['comment', 'post', 'discussion']", report_type),
+						"com_id": str(item[cfg["com_id"]]),
+						"processed": False,
+						"action": None,
+					},
+				)
+
+		process_report_batch(all_records)
 		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
 	def _show_details(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:
