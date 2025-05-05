@@ -889,10 +889,10 @@ class Motion(ClassUnion):
 						title=item.get("board_name", item.get(cfg.get("source_name_field", ""), "")),
 						user_id=item[f"{cfg['user_field']}_id"],
 					)
-				if choice == "J" and batch_mode:
-					print("批量处理已取消")
-
-				print("无效输入")
+				elif choice == "J":
+					print("已跳过")
+				else:
+					print("无效输入")
 
 		def apply_action(record: ReportRecord, action: str) -> None:
 			cfg = get_type_config(record["report_type"], record["item"])
@@ -932,6 +932,11 @@ class Motion(ClassUnion):
 			print(f"违规板块ID: https://shequ.codemao.cn/work_shop/{item[cfg['source_id_field']]}")
 		elif report_type == "post":
 			print(f"违规帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
+			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
+			post_id = item[cfg["source_id_field"]]  # 获取实际的帖子ID数值
+			content = self.forum_obtain.get_posts_details(ids=int(post_id))["items"][0]["content"]
+			print(content)
+			print(self.tool.DataConverter().html_to_text(content))
 		elif report_type == "discussion":
 			print(f"所属帖子标题: {item['post_title']}")
 			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item['post_user_id']}")
@@ -970,7 +975,8 @@ class Motion(ClassUnion):
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
 		if source_type in {"work", "discussion", "shop"}:
-			source_type = cast("Literal['post', 'work', 'shop']", source_type)
+			if source_type == "discussion":
+				source_type = "post"
 			# 分析违规评论
 			violations = self._analyze_comments_violations(
 				source_id=source_id,
