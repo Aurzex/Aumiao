@@ -293,10 +293,14 @@ class DataConverter:
 		"""
 		# 提取可能存在的嵌套外层<p>
 		outer_match = re.match(r"<p\b[^>]*>(.*)</p>", html_content, re.DOTALL)
-		inner_content = outer_match.group(1) if outer_match else html_content
+		inner_content = outer_match.group(1).strip() if outer_match else html_content
 
-		# 提取所有段落内容
+		# 修正段落提取逻辑
 		paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", inner_content, re.DOTALL)
+
+		# 新增：处理无段落情况
+		if not paragraphs:
+			paragraphs = [inner_content]
 
 		processed = []
 		for content in paragraphs:
