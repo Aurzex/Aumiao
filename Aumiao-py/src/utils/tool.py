@@ -298,7 +298,7 @@ class DataConverter:
 		# 修正段落提取逻辑
 		paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", inner_content, re.DOTALL)
 
-		# 新增：处理无段落情况
+		# 新增:处理无段落情况
 		if not paragraphs:
 			paragraphs = [inner_content]
 
