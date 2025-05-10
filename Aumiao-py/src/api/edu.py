@@ -1,6 +1,8 @@
 from collections.abc import Generator
 from typing import Literal
 
+from requests import Response
+
 from src.utils import acquire
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
@@ -65,7 +67,7 @@ class Motion:
 		return response.status_code == HTTPSTATUS.OK.value
 
 	# 重置密码
-	def reset_password(self, stu_id: list[int]) -> dict:
+	def reset_password(self, stu_id: int) -> dict:
 		response = self.acquire.send_request(
 			endpoint=f"https://eduzone.codemao.cn/edu/zone/students/{stu_id}/password",
 			method="PATCH",
@@ -73,6 +75,10 @@ class Motion:
 		)
 		# {"id":405584024,"password":"805753"}
 		return response.json()
+
+	# 批量重置密码(返回xlsx文件)
+	def reset_password_list(self, stu_list: list[int]) -> Response:
+		return self.acquire.send_request(endpoint="https://eduzone.codemao.cn/edu/zone/students/password", method="PATCH", payload={"student_id": stu_list})
 
 	# 删除班级内学生
 	def remove_student(self, stu_id: int) -> bool:
