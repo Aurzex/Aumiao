@@ -30,7 +30,7 @@ class Routine:
 		return response.json()
 
 	def set_token(self, token: str) -> None:
-		self.acquire.switch_account(f"Bearer {token}", "judgement")
+		self.acquire.switch_account(token, "judgement")
 		# self.acquire.headers["Authorization"] = f"Bearer {token}"
 
 

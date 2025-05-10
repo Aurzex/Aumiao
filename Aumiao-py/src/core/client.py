@@ -1206,14 +1206,14 @@ class Motion(ClassUnion):
 			for class_idx in range(class_count):
 				# 创建班级
 				class_id = edu.Motion().create_class(name=class_names[class_idx])["id"]
-
+				print(f"创建班级 {class_id}")
 				# 计算本班学生范围
 				start = class_idx * class_capacity
 				end = start + class_capacity
 				batch_names = student_names[start:end]
-
 				# 批量创建学生
 				edu.Motion().create_student(name=batch_names, class_id=class_id)
+				print("添加学生ing")
 
 		def _delete_students(delete_limit: int | None) -> None:
 			"""删除学生账号内部逻辑"""
