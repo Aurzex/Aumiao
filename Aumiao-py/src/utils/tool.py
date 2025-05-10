@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import random
 import re
 import time
 from collections.abc import Generator, Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from html import unescape
-from typing import TypeGuard, TypeVar, overload
+from typing import Literal, TypeGuard, TypeVar, overload
 
 DataObject = dict | list[dict] | Generator[dict, object]
 T = TypeVar("T")
@@ -489,3 +490,277 @@ class MathUtils:
 			0
 		"""
 		return max(min_val, min(value, max_val))
+
+
+class StudentDataGenerator:
+	# 定义常量
+	CLASS_NUM_LIMIT = 12
+	LETTER_PROBABILITY = 0.3
+	SPECIALTY_PROBABILITY = 0.4
+	NAME_SUFFIX_PROBABILITY = 0.2
+
+	@staticmethod
+	def generate_class_names(
+		num_classes: int,
+		grade_range: tuple[int, int] = (1, 6),
+		*,
+		use_letters: bool = False,
+		add_specialty: bool = False,
+	) -> list[str]:
+		"""
+		生成随机班级名称
+
+		参数:
+			num_classes: 需要生成的班级数量
+			grade_range: 年级范围,默认小学1-6年级
+			use_letters: 是否使用字母后缀,默认False
+			add_specialty: 是否添加特色班级类型,默认False
+
+		返回:
+			包含班级名称的列表
+		"""
+
+		def number_to_chinese(n: int) -> str:
+			chinese_numbers = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
+			return chinese_numbers[n - 1] if 1 <= n <= StudentDataGenerator.CLASS_NUM_LIMIT else str(n)
+
+		specialties = ["实验", "重点", "国际", "理科", "文科", "艺术", "体育", "国防"]
+
+		class_names: list[str] = []
+		for _ in range(num_classes):
+			# 生成年级部分
+			grade = random.randint(grade_range[0], grade_range[1])
+			grade_str = f"{number_to_chinese(grade)}年级"
+
+			# 生成班级序号
+			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < StudentDataGenerator.LETTER_PROBABILITY else str(random.randint(1, 20))
+
+			# 添加特色类型
+			specialty = ""
+			if add_specialty and random.random() < StudentDataGenerator.SPECIALTY_PROBABILITY:
+				specialty = random.choice(specialties)
+
+			# 组合班级名称
+			class_name = f"{grade_str}{class_num}{specialty}班"
+			class_names.append(class_name)
+
+		return class_names
+
+	@staticmethod
+	def generate_student_names(
+		num_students: int,
+		gender: Literal["male", "female"] | None = None,
+	) -> list[str]:
+		"""
+		生成随机学生姓名
+
+		参数:
+			num_students: 需要生成的学生数量
+			gender: 性别限制,'male'或'female',默认None表示随机
+
+		返回:
+			包含学生姓名的列表
+		"""
+		surnames = [
+			"李",
+			"王",
+			"张",
+			"刘",
+			"陈",
+			"杨",
+			"黄",
+			"赵",
+			"周",
+			"吴",
+			"徐",
+			"孙",
+			"马",
+			"朱",
+			"胡",
+			"郭",
+			"何",
+			"高",
+			"林",
+			"罗",
+			"郑",
+			"梁",
+			"谢",
+			"宋",
+			"唐",
+			"许",
+			"韩",
+			"冯",
+			"邓",
+			"曹",
+			"彭",
+			"曾",
+			"肖",
+			"田",
+			"董",
+			"袁",
+			"潘",
+			"于",
+			"蒋",
+			"蔡",
+			"余",
+			"杜",
+			"叶",
+			"程",
+			"苏",
+			"魏",
+			"吕",
+			"丁",
+			"任",
+			"沈",
+			"姚",
+			"卢",
+			"姜",
+			"崔",
+			"钟",
+			"谭",
+			"陆",
+			"汪",
+			"范",
+			"金",
+			"石",
+			"廖",
+			"贾",
+			"夏",
+			"韦",
+			"付",
+			"方",
+			"白",
+			"邹",
+			"孟",
+			"熊",
+			"秦",
+			"邱",
+			"江",
+			"尹",
+			"薛",
+			"闫",
+			"段",
+			"雷",
+			"侯",
+			"龙",
+			"史",
+			"陶",
+			"黎",
+			"贺",
+			"顾",
+			"毛",
+			"郝",
+			"龚",
+			"邵",
+			"万",
+			"钱",
+			"严",
+			"覃",
+			"武",
+		]
+
+		# 现代常见名字库
+		male_names = [
+			"浩",
+			"宇",
+			"轩",
+			"杰",
+			"博",
+			"晨",
+			"俊",
+			"鑫",
+			"昊",
+			"睿",
+			"涛",
+			"鹏",
+			"翔",
+			"泽",
+			"楷",
+			"子轩",
+			"浩然",
+			"俊杰",
+			"宇航",
+			"皓轩",
+			"子豪",
+			"宇轩",
+			"致远",
+			"天佑",
+			"明轩",
+			"雨泽",
+			"思聪",
+			"瑞霖",
+			"瑾瑜",
+			"煜城",
+			"逸辰",
+			"梓睿",
+			"旭尧",
+			"晟睿",
+			"明哲",
+		]
+
+		female_names = [
+			"欣",
+			"怡",
+			"婷",
+			"雨",
+			"梓",
+			"涵",
+			"诗",
+			"静",
+			"雅",
+			"娜",
+			"雪",
+			"雯",
+			"璐",
+			"颖",
+			"琳",
+			"雨萱",
+			"梓涵",
+			"诗琪",
+			"欣怡",
+			"紫萱",
+			"思雨",
+			"梦瑶",
+			"梓晴",
+			"语嫣",
+			"可馨",
+			"雨彤",
+			"若曦",
+			"欣妍",
+			"雅雯",
+			"慧敏",
+			"佳琪",
+			"美琳",
+			"晓菲",
+			"思婷",
+			"雨欣",
+			"静怡",
+			"晨曦",
+		]
+
+		names: list[str] = []
+		for _ in range(num_students):
+			surname = random.choice(surnames)
+
+			# 确定性别
+			current_gender = gender or random.choice(["male", "female"])
+
+			# 使用三元运算符选择名字
+			first_name = (
+				random.choice(male_names)
+				if current_gender == "male"
+				else random.choice(
+					female_names,
+				)
+			)
+
+			# 添加后缀
+			if random.random() < StudentDataGenerator.NAME_SUFFIX_PROBABILITY:
+				suffix = random.choice(["儿", "然", "轩", "瑶", "豪", "菲"])
+				if current_gender == "male" and suffix in {"儿", "瑶", "菲"}:
+					suffix = random.choice(["然", "轩", "豪"])  # 保持性别特征
+				first_name += suffix
+
+			names.append(f"{surname}{first_name}")
+
+		return names

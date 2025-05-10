@@ -628,7 +628,7 @@ class Motion(ClassUnion):
 				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 				# 匹配回复内容
-				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))  # noqa: S311
+				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
 				# 执行回复 (解决source类型问题 )
 				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
 				# 获取评论ID (解决find_prefix_suffix参数问题 )
@@ -663,11 +663,11 @@ class Motion(ClassUnion):
 				for keyword, resp in formatted_answers.items():
 					if keyword in comment_text:
 						matched_keyword = keyword
-						chosen = choice(resp) if isinstance(resp, list) else resp  # noqa: S311
+						chosen = choice(resp) if isinstance(resp, list) else resp
 						print(f"匹配到关键字「{keyword}」")
 						break
 				if not matched_keyword:
-					chosen = choice(formatted_replies)  # noqa: S311
+					chosen = choice(formatted_replies)
 					print("未匹配关键词,随机选择回复")
 
 				print(f"最终选择回复: 【{chosen}】")
@@ -969,7 +969,7 @@ class Motion(ClassUnion):
 
 		while students:
 			# 随机选择一个索引并pop
-			student = students.pop(randint(0, len(students) - 1))  # noqa: S311
+			student = students.pop(randint(0, len(students) - 1))
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
 
@@ -1167,6 +1167,65 @@ class Motion(ClassUnion):
 					reporter_id=int(self.data.ACCOUNT_DATA.id),
 					description=description,
 				)
+
+	def chiaroscuro_chronicles(self, user_id: int) -> None:
+		try:
+			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+			account_pool = self._switch_edu_account(limit=None)
+			if not account_pool:
+				print("没有可用的教育账号")
+				return
+		except Exception as e:
+			print(f"账号切换失败: {e}")
+			return
+		works_list = list(self.user_obtain.get_user_works_web(str(user_id), limit=None))
+		accounts = self._switch_edu_account(limit=None)
+		for current_account in accounts:
+			print("切换教育账号")
+			sleep(5)
+			self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+			self.like_all_work(user_id=str(user_id), works_list=works_list)
+		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+
+	@staticmethod
+	def batch_handle_account(method: Literal["create", "delete"], limit: int | None = 100) -> None:
+		"""批量处理教育账号"""
+
+		def _create_students(student_limit: int) -> None:
+			"""创建学生账号内部逻辑"""
+			class_capacity = 60
+			# 计算需要创建的班级数量
+			class_count = (student_limit + class_capacity - 1) // class_capacity
+
+			# 批量生成名称
+			generator = tool.StudentDataGenerator()
+			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
+			student_names = generator.generate_student_names(num_students=student_limit)
+
+			# 按班级批量创建
+			for class_idx in range(class_count):
+				# 创建班级
+				class_id = edu.Motion().create_class(name=class_names[class_idx])["id"]
+
+				# 计算本班学生范围
+				start = class_idx * class_capacity
+				end = start + class_capacity
+				batch_names = student_names[start:end]
+
+				# 批量创建学生
+				edu.Motion().create_student(name=batch_names, class_id=class_id)
+
+		def _delete_students(delete_limit: int | None) -> None:
+			"""删除学生账号内部逻辑"""
+			students = edu.Obtain().get_students(limit=delete_limit)
+			for student in students:
+				edu.Motion().remove_student(stu_id=student["id"])
+
+		if method == "delete":
+			_delete_students(limit)
+		elif method == "create":
+			actual_limit = limit or 100
+			_create_students(actual_limit)
 
 
 # "POST_COMMENT",
