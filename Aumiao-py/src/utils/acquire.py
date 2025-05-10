@@ -70,6 +70,7 @@ class CodeMaoClient:
 		self._sessions = {
 			"judgement": Session(),
 			"average": Session(),
+			"blank": Session(),
 			"edu_pool": [],
 		}
 		self._original_session: Session | None = None
@@ -94,10 +95,10 @@ class CodeMaoClient:
 		for attempt in range(retries):
 			try:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
-				# print("=" * 82)
-				# print(f"Request {method} {url} {response.status_code}")
-				# # if "Authorization" in response.request.headers:
-				# # 	print(response.request.headers["Authorization"])
+				print("=" * 82)
+				print(f"Request {method} {url} {response.status_code}")
+				# if "Authorization" in response.request.headers:
+				# 	print(response.request.headers["Authorization"])
 				# with contextlib.suppress(Exception):
 				# 	print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
 				response.raise_for_status()
@@ -247,15 +248,14 @@ class CodeMaoClient:
 			# 创建全新隔离会话
 			new_session = Session()
 			new_session.headers.update(self.headers.copy())
-			new_session.headers["Authorization"] = token
+			new_session.headers["Authorization"] = f"Bearer {token}"
 			new_session.cookies.clear()
-
 			self._sessions["edu_pool"].append(new_session)
 			self._session = new_session
 		else:
 			# 使用预定义的独立会话
 			self._session = self._sessions[identity]
-			self._session.headers["Authorization"] = token
+			self._session.headers["Authorization"] = f"Bearer {token}"
 
 		# 保持原有token存储逻辑
 		self._identity = identity

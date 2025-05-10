@@ -63,7 +63,7 @@ class Motion:
 			method="POST",
 			payload=data,
 		)
-
+		# 这个api需要验证headers中的Accept-Language,否则报403
 		return response.status_code == HTTPSTATUS.OK.value
 
 	# 重置密码
