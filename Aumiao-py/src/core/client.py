@@ -628,7 +628,7 @@ class Motion(ClassUnion):
 				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 				# 匹配回复内容
-				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))  # noqa: S311
+				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
 				# 执行回复 (解决source类型问题 )
 				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
 				# 获取评论ID (解决find_prefix_suffix参数问题 )
@@ -663,11 +663,11 @@ class Motion(ClassUnion):
 				for keyword, resp in formatted_answers.items():
 					if keyword in comment_text:
 						matched_keyword = keyword
-						chosen = choice(resp) if isinstance(resp, list) else resp  # noqa: S311
+						chosen = choice(resp) if isinstance(resp, list) else resp
 						print(f"匹配到关键字「{keyword}」")
 						break
 				if not matched_keyword:
-					chosen = choice(formatted_replies)  # noqa: S311
+					chosen = choice(formatted_replies)
 					print("未匹配关键词,随机选择回复")
 
 				print(f"最终选择回复: 【{chosen}】")
@@ -733,17 +733,40 @@ class Motion(ClassUnion):
 
 	# 处理举报
 	# 需要风纪权限
-	def handle_report(self, admin_id: int) -> None:
-		def process_item(item: dict, report_type: Literal["comment", "post", "discussion"]) -> None:
-			# 类型字段映射表
-			type_config = {
+	def handle_report(self, admin_id: int) -> None:  # noqa: PLR0915
+		class ReportRecord(TypedDict):
+			item: dict
+			report_type: Literal["comment", "post", "discussion"]
+			com_id: str
+			content: str  # 新增内容字段
+			processed: bool
+			action: str | None
+
+		batch_config = {
+			"total_threshold": 15,
+			"duplicate_threshold": 5,
+			"content_threshold": 3,  # 新增内容相同阈值
+		}
+
+		def get_content_key(record: ReportRecord) -> tuple:
+			"""生成内容唯一标识"""
+			cfg = get_type_config(record["report_type"], record["item"])
+			return (
+				record["item"][cfg["content_field"]],
+				record["report_type"],
+				record["item"][cfg["source_id_field"]],
+			)
+
+		def get_type_config(report_type: str, current_item: dict) -> dict:
+			"""动态生成类型配置(修复闭包问题)"""
+			return {
 				"comment": {
 					"content_field": "comment_content",
 					"user_field": "comment_user",
 					"handle_method": "handle_comment_report",
 					"source_id_field": "comment_source_object_id",
 					"source_name_field": "comment_source_object_name",
-					"special_check": lambda: item.get("comment_source") == "WORK_SHOP",
+					"special_check": lambda i=current_item: i.get("comment_source") == "WORK_SHOP",
 					"com_id": "comment_id",
 				},
 				"post": {
@@ -762,9 +785,73 @@ class Motion(ClassUnion):
 					"special_check": lambda: True,
 					"com_id": "discussion_id",
 				},
-			}
+			}[report_type]
 
-			cfg = type_config[report_type]
+		def process_report_batch(records: list[ReportRecord]) -> None:  # noqa: PLR0912
+			"""智能批量处理核心逻辑(增强版)"""
+			# 分组策略:按ID和内容双重分组
+			id_map = defaultdict(list)
+			content_map = defaultdict(list)
+
+			for record in records:
+				# ID分组
+				id_map[record["com_id"]].append(record)
+				# 内容分组
+				content_key = get_content_key(record)
+				content_map[content_key].append(record)
+
+			# 合并需要批量处理的项目
+
+			# 1. 按ID分组
+			batch_groups = [("ID", items[0]["com_id"], items) for items in id_map.values() if len(items) >= batch_config["duplicate_threshold"]]
+
+			# 2. 按内容分组
+			for (content, report_type, _), items in content_map.items():
+				if len(items) >= batch_config["content_threshold"]:
+					batch_groups.append(("内容", f"{report_type}:{content[:20]}...", items))
+
+			# 批量处理提示
+			if batch_groups and len(records) >= batch_config["total_threshold"]:
+				print("\n发现以下批量处理项:")
+				for i, (g_type, g_key, items) in enumerate(batch_groups, 1):
+					print(f"{i}. [{g_type}] {g_key} ({len(items)}次举报)")
+
+				if input("\n是否查看详情?(Y/N) ").upper() == "Y":
+					for g_type, g_key, items in batch_groups:
+						print(f"\n=== {g_type}组: {g_key} ===")
+						for item in items[:3]:  # 展示前3条
+							print(f"举报ID: {item['item']['id']} | 时间: {self.tool.TimeUtils().format_timestamp(item['item']['created_at'])}")
+						if len(items) > batch_config["content_threshold"]:
+							print(f"...及其他{len(items) - 3}条举报")
+
+				if input("\n确认批量处理这些项目?(Y/N) ").upper() == "Y":
+					# 处理批量组
+					for g_type, g_key, items in batch_groups:
+						print(f"\n正在处理 [{g_type}] {g_key}...")
+						first_action = None
+
+						# 处理首个项目
+						if not items[0]["processed"]:
+							first_action = process_single_item(items[0], batch_mode=True)
+
+						# 自动应用操作到同组项目
+						if first_action:
+							for item in items[1:]:
+								if not item["processed"]:
+									apply_action(item, first_action)
+									print(f"已自动处理举报ID: {item['item']['id']}")
+
+			# 处理剩余项目
+			for record in records:
+				if not record["processed"]:
+					process_single_item(record)
+
+		def process_single_item(record: ReportRecord, *, batch_mode: bool = False) -> str:
+			item = record["item"]
+			report_type = record["report_type"]
+			cfg = get_type_config(report_type, item)
+			if batch_mode:
+				print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
 			print(f"\n{'=' * 50}")
 			print(f"举报ID: {item['id']}")
 			print(f"举报内容: {item[cfg['content_field']]}")
@@ -780,15 +867,13 @@ class Motion(ClassUnion):
 				print(f"举报线索: {item['description']}")
 
 			while True:
-				print("-" * 50)
-				choice = input("选择操作: D:删除, S:禁言7天, P:通过, C:查看, F:检查违规, J:跳过  ").upper()
-				handler = getattr(self.whale_motion, cfg["handle_method"])
-				if choice == "J":
-					break
-				if choice in {"D", "S", "P"}:
-					status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}
+				choice = input("选择操作: D:删除, S:禁言7天, T:禁言3月 P:通过, C:查看, F:检查违规, J:跳过  ").upper()
+				if choice in {"D", "S", "T", "P"}:
+					status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS", "T": "MUTE_THREE_MONTHS"}
+					handler = getattr(self.whale_motion, cfg["handle_method"])
 					handler(report_id=item["id"], status=status_map[choice], admin_id=admin_id)
-					break
+					record["processed"] = True
+					return choice
 				if choice == "C":
 					self._show_details(item, report_type, cfg)
 				elif choice == "F" and cfg["special_check"]():
@@ -804,19 +889,41 @@ class Motion(ClassUnion):
 						title=item.get("board_name", item.get(cfg.get("source_name_field", ""), "")),
 						user_id=item[f"{cfg['user_field']}_id"],
 					)
+				elif choice == "J":
+					print("已跳过")
 				else:
 					print("无效输入")
 
-		# 获取所有待处理举报
-		lists: list[tuple[Generator[dict], Literal["comment", "post", "discussion"]]] = [
+		def apply_action(record: ReportRecord, action: str) -> None:
+			cfg = get_type_config(record["report_type"], record["item"])
+			handler = getattr(self.whale_motion, cfg["handle_method"])
+			handler(
+				report_id=record["item"]["id"],
+				status={"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}[action],
+				admin_id=admin_id,
+			)
+			record["processed"] = True
+
+		# 数据收集
+		all_records: list[ReportRecord] = []
+		for report_list, report_type in [
 			(self.whale_obtain.get_comment_report(types="ALL", status="TOBEDONE", limit=None), "comment"),
 			(self.whale_obtain.get_post_report(status="TOBEDONE", limit=None), "post"),
 			(self.whale_obtain.get_discussion_report(status="TOBEDONE", limit=None), "discussion"),
-		]
-
-		for report_list, report_type in lists:
+		]:
 			for item in report_list:
-				process_item(item=item, report_type=report_type)
+				cfg = get_type_config(report_type, item)
+				all_records.append(
+					{
+						"item": item,
+						"report_type": cast("Literal['comment', 'post', 'discussion']", report_type),
+						"com_id": str(item[cfg["com_id"]]),
+						"content": item[cfg["content_field"]],  # 记录内容
+						"processed": False,
+						"action": None,
+					},
+				)
+		process_report_batch(all_records)
 		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
 	def _show_details(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:
@@ -825,6 +932,11 @@ class Motion(ClassUnion):
 			print(f"违规板块ID: https://shequ.codemao.cn/work_shop/{item[cfg['source_id_field']]}")
 		elif report_type == "post":
 			print(f"违规帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
+			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
+			post_id = item[cfg["source_id_field"]]  # 获取实际的帖子ID数值
+			content = self.forum_obtain.get_posts_details(ids=int(post_id))["items"][0]["content"]
+			print(content)
+			print(self.tool.DataConverter().html_to_text(content))
 		elif report_type == "discussion":
 			print(f"所属帖子标题: {item['post_title']}")
 			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item['post_user_id']}")
@@ -857,13 +969,14 @@ class Motion(ClassUnion):
 
 		while students:
 			# 随机选择一个索引并pop
-			student = students.pop(randint(0, len(students) - 1))  # noqa: S311
+			student = students.pop(randint(0, len(students) - 1))
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
 		if source_type in {"work", "discussion", "shop"}:
-			source_type = cast("Literal['post', 'work', 'shop']", source_type)
+			if source_type == "discussion":
+				source_type = "post"
 			# 分析违规评论
 			violations = self._analyze_comments_violations(
 				source_id=source_id,
@@ -1054,6 +1167,65 @@ class Motion(ClassUnion):
 					reporter_id=int(self.data.ACCOUNT_DATA.id),
 					description=description,
 				)
+
+	def chiaroscuro_chronicles(self, user_id: int) -> None:
+		try:
+			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+			account_pool = self._switch_edu_account(limit=None)
+			if not account_pool:
+				print("没有可用的教育账号")
+				return
+		except Exception as e:
+			print(f"账号切换失败: {e}")
+			return
+		works_list = list(self.user_obtain.get_user_works_web(str(user_id), limit=None))
+		accounts = self._switch_edu_account(limit=None)
+		for current_account in accounts:
+			print("切换教育账号")
+			sleep(5)
+			self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+			self.like_all_work(user_id=str(user_id), works_list=works_list)
+		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
+
+	@staticmethod
+	def batch_handle_account(method: Literal["create", "delete"], limit: int | None = 100) -> None:
+		"""批量处理教育账号"""
+
+		def _create_students(student_limit: int) -> None:
+			"""创建学生账号内部逻辑"""
+			class_capacity = 60
+			# 计算需要创建的班级数量
+			class_count = (student_limit + class_capacity - 1) // class_capacity
+
+			# 批量生成名称
+			generator = tool.StudentDataGenerator()
+			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
+			student_names = generator.generate_student_names(num_students=student_limit)
+
+			# 按班级批量创建
+			for class_idx in range(class_count):
+				# 创建班级
+				class_id = edu.Motion().create_class(name=class_names[class_idx])["id"]
+				print(f"创建班级 {class_id}")
+				# 计算本班学生范围
+				start = class_idx * class_capacity
+				end = start + class_capacity
+				batch_names = student_names[start:end]
+				# 批量创建学生
+				edu.Motion().create_student(name=batch_names, class_id=class_id)
+				print("添加学生ing")
+
+		def _delete_students(delete_limit: int | None) -> None:
+			"""删除学生账号内部逻辑"""
+			students = edu.Obtain().get_students(limit=delete_limit)
+			for student in students:
+				edu.Motion().remove_student(stu_id=student["id"])
+
+		if method == "delete":
+			_delete_students(limit)
+		elif method == "create":
+			actual_limit = limit or 100
+			_create_students(actual_limit)
 
 
 # "POST_COMMENT",

@@ -13,6 +13,7 @@ class Obtain:
 		self.acquire = acquire.CodeMaoClient()
 
 	# 获取多个帖子信息
+	# 相较于get_single_post_details,这个api在帖子删除后依然可以获取到帖子信息
 	def get_posts_details(self, ids: int | list[int]) -> dict:
 		# 判断传入的ids类型
 		if isinstance(ids, int):

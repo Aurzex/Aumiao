@@ -181,6 +181,24 @@ def main() -> None:
 		elif choice == "8":
 			print(f"\n{COLOR_SUCCESS}感谢使用,再见!{COLOR_RESET}")
 			break
+		elif choice == "1106":
+			print("\n隐藏功能\n1.自动化操作\n2.学生管理")
+			sub_choice = input("操作选择: ")
+
+			if sub_choice == "1":
+				try:
+					user_id = int(input("训练师ID: "))
+					client.Motion().chiaroscuro_chronicles(user_id=user_id)  # noqa: F405
+				except Exception as e:
+					print(f"错误: {e}")
+
+			elif sub_choice == "2":
+				mode = input("模式(delete/create): ")
+				limit = int(input("数量: "))
+				client.Motion().batch_handle_account(method=mode, limit=limit)  # type: ignore  # noqa: F405, PGH003
+
+			else:
+				print("无效输入")
 		else:
 			print(f"{COLOR_ERROR}无效的输入,请重新选择{COLOR_RESET}")
 

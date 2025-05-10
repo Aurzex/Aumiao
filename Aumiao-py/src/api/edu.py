@@ -1,6 +1,8 @@
 from collections.abc import Generator
 from typing import Literal
 
+from requests import Response
+
 from src.utils import acquire
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
@@ -61,11 +63,11 @@ class Motion:
 			method="POST",
 			payload=data,
 		)
-
+		# 这个api需要验证headers中的Accept-Language,否则报403
 		return response.status_code == HTTPSTATUS.OK.value
 
 	# 重置密码
-	def reset_password(self, stu_id: list[int]) -> dict:
+	def reset_password(self, stu_id: int) -> dict:
 		response = self.acquire.send_request(
 			endpoint=f"https://eduzone.codemao.cn/edu/zone/students/{stu_id}/password",
 			method="PATCH",
@@ -73,6 +75,10 @@ class Motion:
 		)
 		# {"id":405584024,"password":"805753"}
 		return response.json()
+
+	# 批量重置密码(返回xlsx文件)
+	def reset_password_list(self, stu_list: list[int]) -> Response:
+		return self.acquire.send_request(endpoint="https://eduzone.codemao.cn/edu/zone/students/password", method="PATCH", payload={"student_id": stu_list})
 
 	# 删除班级内学生
 	def remove_student(self, stu_id: int) -> bool:
@@ -140,6 +146,22 @@ class Motion:
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
+
+	# 给学生作品评分
+	# score取值范围为0-25
+	def evaluate_student_work(self, work_id: int, work_name: str, artistic_score: int, creative_sore: int, commentary: str, logical_score: int, programming_score: int) -> bool:
+		data = {
+			"artistic_score": artistic_score,
+			"commentary": commentary,
+			"creative_score": creative_sore,
+			"id": work_id,
+			"logical_score": logical_score,
+			"programming_score": programming_score,
+			"work_name": work_name,
+		}
+
+		response = self.acquire.send_request(endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/works/scores", method="PATCH", payload=data)
+		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
 
 @singleton
