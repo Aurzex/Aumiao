@@ -141,6 +141,22 @@ class Motion:
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
+	# 给学生作品评分
+	# score取值范围为0-25
+	def evaluate_student_work(self, work_id: int, work_name: str, artistic_score: int, creative_sore: int, commentary: str, logical_score: int, programming_score: int) -> bool:
+		data = {
+			"artistic_score": artistic_score,
+			"commentary": commentary,
+			"creative_score": creative_sore,
+			"id": work_id,
+			"logical_score": logical_score,
+			"programming_score": programming_score,
+			"work_name": work_name,
+		}
+
+		response = self.acquire.send_request(endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/works/scores", method="PATCH", payload=data)
+		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+
 
 @singleton
 class Obtain:
