@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13" # 保留 Python 3.13
+  PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
 
@@ -36,24 +36,31 @@ jobs:
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          architecture: "x64"
+          architecture: x64
           cache: "pip"
 
-      - name: Cache Dependencies
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          path: |
-            .venv
-            ~/.cache/pip
-            ~/.cache/uv
-            upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}-upx-${{ env.UPX_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/*requirements*.in
+            **/pyproject.toml
+            **/uv.lock
+
+      # - name: Cache Dependencies
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cache/uv
+      #       ~/AppData/Local/uv
+      #     key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
 
       - name: Install 7-Zip
         shell: pwsh
@@ -61,27 +68,21 @@ jobs:
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
           Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
-          $sevenZipPath = "C:\Program Files\7-Zip"
-          if (Test-Path $sevenZipPath) {
-              "$sevenZipPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-              $env:PATH += ";$sevenZipPath"
-          } else {
-              Write-Error "7-Zip installation failed!"
-              exit 1
-          }
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\7-Zip"
 
-      - name: Setup Python Environment
+      - name: Setup Virtual Environment
         shell: pwsh
         run: |
-          python -m venv .venv
-          .\.venv\Scripts\activate
-          python -m pip install --upgrade pip
-          pip install uv
-          uv pip install --system -r ./Aumiao-py/src/project/requirements.txt
-          pip list
+          # 确保Python版本匹配
+          uv python install ${{ env.PYTHON_VERSION }}
+          uv venv .venv --python=3.13
+          # 将venv路径持久化
+          echo "VENV_PATH=$pwd/.venv" >> $env:GITHUB_ENV
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
+        env:
+          VIRTUAL_ENV: ${{ env.VENV_PATH }}
         with:
           assume-yes-for-downloads: true
           company-name: "Aumiao Team"
@@ -96,7 +97,7 @@ jobs:
           product-name: "Aumiao"
           product-version: "2.0.0"
           script-name: ./Aumiao-py/main.py
-          show-progress: true # 保留进度显示
+          show-progress: true
           windows-console-mode: force
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
