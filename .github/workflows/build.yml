@@ -17,18 +17,23 @@ env:
   PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
-  UV_CACHE_DIR: "~/.uv_cache" # 新增全局缓存路径
+  PROJECT_DIR: "Aumiao-py" # 新增项目目录变量
 
 jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 30
 
+    defaults:
+      run:
+        working-directory: ${{ env.PROJECT_DIR }} # 全局工作目录设置
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: ${{ env.PROJECT_DIR }} # 明确检出到子目录
 
       - name: Setup Beijing Timezone
         shell: bash
@@ -37,45 +42,24 @@ jobs:
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          architecture: x64
+          architecture: "x64"
           cache: "pip"
 
-      - name: Install uv with caching
-        uses: astral-sh/setup-uv@v6
-        id: uv_install
+      - name: Cache Dependencies
+        uses: actions/cache@v4
         with:
-          version: "latest"
-          enable-cache: true
-          cache-local-path: ${{ env.UV_CACHE_DIR }}
-          cache-suffix: ${{ env.PYTHON_VERSION }}
-          prune-cache: false
-          activate-environment: true
-
-      - name: Validate dependency files
-        shell: pwsh
-        run: |
-          if (-not (Test-Path "pyproject.toml") -and -not (Test-Path "requirements.txt")) {
-              Write-Error "Missing dependency file (pyproject.toml or requirements.txt)"
-              exit 1
-          }
-
-      - name: Setup Virtual Environment
-        shell: pwsh
-        run: |
-          $venvPath = Join-Path -Path $pwd -ChildPath ".venv"
-          uv venv $venvPath --python=${{ env.PYTHON_VERSION }}
-          echo "VENV_PATH=$venvPath" >> $env:GITHUB_ENV
-
-      - name: Install dependencies
-        shell: pwsh
-        run: |
-          . $env:VENV_PATH/Scripts/activate
-          uv sync --python=${{ env.PYTHON_VERSION }} --verbose
-          uv pip list
+          path: |
+            ${{ env.PROJECT_DIR }}/.venv
+            ~/.cache/pip
+            ~/.cache/uv
+            upx.exe
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('${{ env.PROJECT_DIR }}/**/requirements.txt') }}-upx-${{ env.UPX_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
 
       - name: Install 7-Zip
         shell: pwsh
@@ -83,12 +67,46 @@ jobs:
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
           Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\7-Zip"
+          $sevenZipPath = "C:\Program Files\7-Zip"
+          if (Test-Path $sevenZipPath) {
+              "$sevenZipPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              $env:PATH += ";$sevenZipPath"
+          } else {
+              Write-Error "7-Zip installation failed!"
+              exit 1
+          }
+
+      - name: Validate project structure
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          # 验证关键文件路径
+          $requiredFiles = @(
+              "pyproject.toml",
+              "requirements.txt",
+              "src/project/favicon.ico"
+          )
+
+          foreach ($file in $requiredFiles) {
+              if (-not (Test-Path $file)) {
+                  Write-Error "Missing required file: $file"
+                  Get-ChildItem -Recurse -Depth 3  # 打印目录结构用于调试
+                  exit 1
+              }
+          }
+
+      - name: Setup Python Environment
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\activate
+          python -m pip install --upgrade pip uv
+          uv sync
+          uv pip list
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
-        env:
-          VIRTUAL_ENV: ${{ env.VENV_PATH }}
         with:
           assume-yes-for-downloads: true
           company-name: "Aumiao Team"
@@ -98,26 +116,28 @@ jobs:
           jobs: 4
           lto: "yes"
           mode: standalone
-          output-dir: build
+          output-dir: ../build # 输出到仓库根目录
           output-filename: aumiao
           product-name: "Aumiao"
           product-version: "2.0.0"
-          script-name: ./Aumiao-py/main.py
+          script-name: ./main.py # 相对项目目录路径
           show-progress: true
           windows-console-mode: force
-          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
+          windows-icon-from-ico: "./src/project/favicon.ico" # 相对项目目录路径
 
       - name: Prepare Distribution
         shell: pwsh
         run: |
-          $distDir = "build/main.dist"
-          New-Item -Path "$distDir/.log" -ItemType Directory -Force
+          $distDir = "../build/main.dist"  # 指向仓库根目录
+          New-Item -Path $distDir -ItemType Directory -Force
+
           $essentialFiles = @(
-              "./Aumiao-py/README.txt",
-              "./Aumiao-py/DISCLAIMER.txt",
-              "./Aumiao-py/data"
+              "./README.txt",
+              "./DISCLAIMER.txt",
+              "./data"
           )
           Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
+
           $versionInfo = @{
               Version   = "2.0.0"
               BuildDate = "${{ env.BUILD_DATE }}"
@@ -128,6 +148,7 @@ jobs:
       - name: Optimize Binaries
         shell: pwsh
         continue-on-error: true
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           if (-not (Test-Path "./upx.exe")) {
               $ProgressPreference = 'SilentlyContinue'
@@ -136,24 +157,25 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
+
           $ErrorActionPreference = 'Continue'
-          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log"
-          Get-ChildItem ./build/main.dist/*.dll | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
+          ./upx.exe --best --lzma ../build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "../build/upx-main.log"
+          Get-ChildItem ../build/main.dist/*.dll | ForEach-Object {
+              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "../build/upx-dll.log" -Append
           }
 
       - name: Package Artifacts
         shell: pwsh
         run: |
-          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha.zip"
-          $distDir = Resolve-Path "./build/main.dist"
-          7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
+          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}.zip"
+          $distDir = Resolve-Path "../build/main.dist"
+          7z a -tzip "$(Resolve-Path "../build")/$packageName" "$distDir\*"
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
-          name: Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha
-          path: build/*.zip
+          name: Aumiao_v2.0.0.${{ env.BUILD_DATE }}
+          path: ../build/*.zip # 指向仓库根目录
           retention-days: 7
 
       - name: Upload Debug Files
@@ -162,8 +184,8 @@ jobs:
         with:
           name: Build_Debug_${{ env.BUILD_DATE }}
           path: |
-            build/**/*.log
-            build/**/*.json
+            ../build/**/*.log
+            ../build/**/*.json
             **/nuitka-*.log
             **/nuitka-*.xml
           if-no-files-found: ignore
