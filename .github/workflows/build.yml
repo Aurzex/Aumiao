@@ -17,7 +17,7 @@ env:
   PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
-  PROJECT_DIR: "Aumiao-py" # 新增项目目录变量
+  PROJECT_DIR: "Aumiao-py"
 
 jobs:
   build:
@@ -26,14 +26,14 @@ jobs:
 
     defaults:
       run:
-        working-directory: ${{ env.PROJECT_DIR }} # 全局工作目录设置
+        working-directory: ${{ env.PROJECT_DIR }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          path: ${{ env.PROJECT_DIR }} # 明确检出到子目录
+          path: ${{ env.PROJECT_DIR }}
 
       - name: Setup Beijing Timezone
         shell: bash
@@ -76,24 +76,20 @@ jobs:
               exit 1
           }
 
-      # - name: Validate project structure
-      #   shell: pwsh
-      #   working-directory: ${{ env.PROJECT_DIR }}
-      #   run: |
-      #     # 验证关键文件路径
-      #     $requiredFiles = @(
-      #         "pyproject.toml",
-      #         "requirements.txt",
-      #         "src/project/favicon.ico"
-      #     )
-
-      #     foreach ($file in $requiredFiles) {
-      #         if (-not (Test-Path $file)) {
-      #             Write-Error "Missing required file: $file"
-      #             Get-ChildItem -Recurse -Depth 3  # 打印目录结构用于调试
-      #             exit 1
-      #         }
-      #     }
+      - name: Validate project structure
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          $requiredFiles = @(
+              "src/project/favicon.ico"
+          )
+          foreach ($file in $requiredFiles) {
+              if (-not (Test-Path $file)) {
+                  Write-Error "Missing required file: $file"
+                  Get-ChildItem -Recurse -Depth 3
+                  exit 1
+              }
+          }
 
       - name: Setup Python Environment
         shell: pwsh
@@ -117,28 +113,24 @@ jobs:
           jobs: 4
           lto: "yes"
           mode: standalone
-          output-dir: ../build # 输出到仓库根目录
+          output-dir: ../build
           output-filename: aumiao
           product-name: "Aumiao"
           product-version: "2.0.0"
-          script-name: ./main.py # 相对项目目录路径
+          script-name: ./main.py
           show-progress: true
           windows-console-mode: force
-          windows-icon-from-ico: "./src/project/favicon.ico" # 相对项目目录路径
+          windows-icon-from-ico: "src/project/favicon.ico" # 修正路径
+        env:
+          NUITKA_CACHE_DIR: ${{ github.workspace }}/nuitka/cache # 显式设置缓存目录
 
       - name: Prepare Distribution
         shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          $distDir = "../build/main.dist"  # 指向仓库根目录
+          $distDir = "../build/main.dist"
           New-Item -Path $distDir -ItemType Directory -Force
-
-          $essentialFiles = @(
-              "./README.txt",
-              "./DISCLAIMER.txt",
-              "./data"
-          )
-          Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
-
+          Copy-Item -Path README.txt, DISCLAIMER.txt, data -Destination $distDir -Recurse -Force
           $versionInfo = @{
               Version   = "2.0.0"
               BuildDate = "${{ env.BUILD_DATE }}"
@@ -158,8 +150,6 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
-
-          $ErrorActionPreference = 'Continue'
           ./upx.exe --best --lzma ../build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "../build/upx-main.log"
           Get-ChildItem ../build/main.dist/*.dll | ForEach-Object {
               ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "../build/upx-dll.log" -Append
@@ -167,6 +157,7 @@ jobs:
 
       - name: Package Artifacts
         shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}.zip"
           $distDir = Resolve-Path "../build/main.dist"
@@ -176,7 +167,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Aumiao_v2.0.0.${{ env.BUILD_DATE }}
-          path: ../build/*.zip # 指向仓库根目录
+          path: ../build/*.zip
           retention-days: 7
 
       - name: Upload Debug Files
