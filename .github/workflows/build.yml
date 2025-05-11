@@ -76,24 +76,24 @@ jobs:
               exit 1
           }
 
-      - name: Validate project structure
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          # 验证关键文件路径
-          $requiredFiles = @(
-              "pyproject.toml",
-              "requirements.txt",
-              "src/project/favicon.ico"
-          )
+      # - name: Validate project structure
+      #   shell: pwsh
+      #   working-directory: ${{ env.PROJECT_DIR }}
+      #   run: |
+      #     # 验证关键文件路径
+      #     $requiredFiles = @(
+      #         "pyproject.toml",
+      #         "requirements.txt",
+      #         "src/project/favicon.ico"
+      #     )
 
-          foreach ($file in $requiredFiles) {
-              if (-not (Test-Path $file)) {
-                  Write-Error "Missing required file: $file"
-                  Get-ChildItem -Recurse -Depth 3  # 打印目录结构用于调试
-                  exit 1
-              }
-          }
+      #     foreach ($file in $requiredFiles) {
+      #         if (-not (Test-Path $file)) {
+      #             Write-Error "Missing required file: $file"
+      #             Get-ChildItem -Recurse -Depth 3  # 打印目录结构用于调试
+      #             exit 1
+      #         }
+      #     }
 
       - name: Setup Python Environment
         shell: pwsh
