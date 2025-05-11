@@ -103,6 +103,7 @@ jobs:
           .\.venv\Scripts\activate
           python -m pip install --upgrade pip uv
           uv sync
+          uv add requests
           uv pip list
 
       - name: Build with Nuitka
