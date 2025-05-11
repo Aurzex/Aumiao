@@ -17,6 +17,7 @@ env:
   PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
+  UV_CACHE_DIR: "~/.uv_cache" # 新增全局缓存路径
 
 jobs:
   build:
@@ -43,24 +44,38 @@ jobs:
           architecture: x64
           cache: "pip"
 
-      - name: Install uv
+      - name: Install uv with caching
         uses: astral-sh/setup-uv@v6
+        id: uv_install
         with:
           version: "latest"
           enable-cache: true
-          cache-dependency-glob: |
-            **/*requirements*.txt
-            **/*requirements*.in
-            **/pyproject.toml
-            **/uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: ${{ env.PYTHON_VERSION }}
+          prune-cache: false
+          activate-environment: true
 
-      # - name: Cache Dependencies
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/.cache/uv
-      #       ~/AppData/Local/uv
-      #     key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+      - name: Validate dependency files
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "pyproject.toml") -and -not (Test-Path "requirements.txt")) {
+              Write-Error "Missing dependency file (pyproject.toml or requirements.txt)"
+              exit 1
+          }
+
+      - name: Setup Virtual Environment
+        shell: pwsh
+        run: |
+          $venvPath = Join-Path -Path $pwd -ChildPath ".venv"
+          uv venv $venvPath --python=${{ env.PYTHON_VERSION }}
+          echo "VENV_PATH=$venvPath" >> $env:GITHUB_ENV
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          . $env:VENV_PATH/Scripts/activate
+          uv sync --python=${{ env.PYTHON_VERSION }} --verbose
+          uv pip list
 
       - name: Install 7-Zip
         shell: pwsh
@@ -69,15 +84,6 @@ jobs:
           Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
           Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\7-Zip"
-
-      - name: Setup Virtual Environment
-        shell: pwsh
-        run: |
-          # 确保Python版本匹配
-          uv python install ${{ env.PYTHON_VERSION }}
-          uv venv .venv --python=3.13
-          # 将venv路径持久化
-          echo "VENV_PATH=$pwd/.venv" >> $env:GITHUB_ENV
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
