@@ -105,7 +105,7 @@ jobs:
           script-name: ./main.py  # 根据工作目录调整路径
           show-progress: true
           windows-console-mode: force
-          windows-icon-from-ico: "src/project/favicon.ico"  # 确保路径正确
+          windows-icon-from-ico: "./src/project/favicon.ico"  # 确保路径正确
         env:
           NUITKA_CACHE_DIR: ${{ github.workspace }}/nuitka/cache
 
