@@ -14,26 +14,20 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.13" # 保留 Python 3.13
   UPX_VERSION: "4.2.4"
   BUILD_TYPE: Release
-  PROJECT_DIR: "Aumiao-py"
 
 jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 30
 
-    defaults:
-      run:
-        working-directory: ${{ env.PROJECT_DIR }}
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          path: ${{ env.PROJECT_DIR }}
 
       - name: Setup Beijing Timezone
         shell: bash
@@ -53,11 +47,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.PROJECT_DIR }}/.venv
+            .venv
             ~/.cache/pip
             ~/.cache/uv
             upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('${{ env.PROJECT_DIR }}/**/requirements.txt') }}-upx-${{ env.UPX_VERSION }}
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}-upx-${{ env.UPX_VERSION }}
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
 
@@ -78,14 +72,13 @@ jobs:
 
       - name: Setup Python Environment
         shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           python -m venv .venv
           .\.venv\Scripts\activate
-          python -m pip install --upgrade pip uv
-          uv sync
-          uv add requests
-          uv pip list
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install --system -r ./Aumiao-py/requirements.in
+          pip list
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
@@ -98,24 +91,26 @@ jobs:
           jobs: 4
           lto: "yes"
           mode: standalone
-          output-dir: build  # 修复路径，不再使用../
+          output-dir: build
           output-filename: aumiao
           product-name: "Aumiao"
           product-version: "2.0.0"
-          script-name: ./main.py  # 根据工作目录调整路径
-          show-progress: true
+          script-name: ./Aumiao-py/main.py
+          show-progress: true # 保留进度显示
           windows-console-mode: force
-          windows-icon-from-ico: "./src/project/favicon.ico"  # 确保路径正确
-        env:
-          NUITKA_CACHE_DIR: ${{ github.workspace }}/nuitka/cache
+          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
       - name: Prepare Distribution
         shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          $distDir = "build/main.dist"  # 使用相对当前目录的路径
-          New-Item -Path $distDir -ItemType Directory -Force
-          Copy-Item -Path README.txt, DISCLAIMER.txt, data -Destination $distDir -Recurse -Force
+          $distDir = "build/main.dist"
+          New-Item -Path "$distDir/.log" -ItemType Directory -Force
+          $essentialFiles = @(
+              "./Aumiao-py/README.txt",
+              "./Aumiao-py/DISCLAIMER.txt",
+              "./Aumiao-py/data"
+          )
+          Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
           $versionInfo = @{
               Version   = "2.0.0"
               BuildDate = "${{ env.BUILD_DATE }}"
@@ -126,7 +121,6 @@ jobs:
       - name: Optimize Binaries
         shell: pwsh
         continue-on-error: true
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           if (-not (Test-Path "./upx.exe")) {
               $ProgressPreference = 'SilentlyContinue'
@@ -135,24 +129,24 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
-          ./upx.exe --best --lzma build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "build/upx-main.log"
-          Get-ChildItem build/main.dist/*.dll | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "build/upx-dll.log" -Append
+          $ErrorActionPreference = 'Continue'
+          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log"
+          Get-ChildItem ./build/main.dist/*.dll | ForEach-Object {
+              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
           }
 
       - name: Package Artifacts
         shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}.zip"
-          $distDir = Resolve-Path "build/main.dist"
-          7z a -tzip "build/$packageName" "$distDir\*"
+          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha.zip"
+          $distDir = Resolve-Path "./build/main.dist"
+          7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
           name: Aumiao_v2.0.0.${{ env.BUILD_DATE }}
-          path: ${{ env.PROJECT_DIR }}/build/*.zip
+          path: build/*.zip
           retention-days: 7
 
       - name: Upload Debug Files
@@ -161,9 +155,9 @@ jobs:
         with:
           name: Build_Debug_${{ env.BUILD_DATE }}
           path: |
-            ${{ env.PROJECT_DIR }}/build/**/*.log
-            ${{ env.PROJECT_DIR }}/build/**/*.json
-            ${{ env.PROJECT_DIR }}/**/nuitka-*.log
-            ${{ env.PROJECT_DIR }}/**/nuitka-*.xml
+            build/**/*.log
+            build/**/*.json
+            **/nuitka-*.log
+            **/nuitka-*.xml
           if-no-files-found: ignore
           retention-days: 14
