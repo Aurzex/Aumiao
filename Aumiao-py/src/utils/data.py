@@ -11,7 +11,9 @@ from . import decorator
 T = TypeVar("T")
 DataclassInstance = T
 # 常量定义
-DATA_DIR = Path.cwd() / "data"
+CURRENT_DIR = Path.cwd()
+
+DATA_DIR = CURRENT_DIR / "data"
 
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
 DATA_FILE_PATH = DATA_DIR / "data.json"

@@ -383,17 +383,17 @@ class TimeUtils:
 	"""时间处理工具类"""
 
 	@staticmethod
-	def current_timestamp() -> float:
+	def current_timestamp() -> int:
 		"""获取当前时间戳
 
 		Example:
-			>>> isinstance(TimeUtils.current_timestamp(), float)
+			>>> isinstance(TimeUtils.current_timestamp(), int)
 			True
 		"""
-		return time.time()
+		return int(time.time())
 
 	@staticmethod
-	def format_timestamp(ts: float) -> str:
+	def format_timestamp(ts: float | None = None) -> str:
 		"""格式化时间戳为字符串
 
 		Example:
