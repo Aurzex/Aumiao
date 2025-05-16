@@ -182,7 +182,7 @@ def main() -> None:
 			print(f"\n{COLOR_SUCCESS}感谢使用,再见!{COLOR_RESET}")
 			break
 		elif choice == "1106":
-			print("\n隐藏功能\n1.自动化操作\n2.学生管理")
+			print("\n隐藏功能\n1.自动点赞\n2.学生管理")
 			sub_choice = input("操作选择: ")
 
 			if sub_choice == "1":
@@ -193,7 +193,7 @@ def main() -> None:
 					print(f"错误: {e}")
 
 			elif sub_choice == "2":
-				mode = input("模式(delete/create): ")
+				mode = input("模式 删除学生/创建学生(delete/create): ")
 				limit = int(input("数量: "))
 				client.Motion().batch_handle_account(method=mode, limit=limit)  # type: ignore  # noqa: F405, PGH003
 
