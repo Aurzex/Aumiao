@@ -731,6 +731,39 @@ class Motion(ClassUnion):
 		status = self.user_obtain.get_data_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
+	def judgement_login(self) -> None:
+		choice = input("请选择登录方式: 1.Token登录 2.账密登录 ")
+		if choice == "1":
+			token = input("请输入 Authorization: ")
+			whale.Routine().set_token(token=token)
+		if choice == "2":
+
+			def input_password() -> tuple[str, str]:
+				identity = input("请输入用户名: ")
+				password = input("请输入密码: ")
+				return (identity, password)
+
+			def input_captcha() -> str:
+				print("正在获取验证码...")
+				self.whale_routine.get_captcha()
+				return input("请输入验证码: ")
+
+			identity, password = input_password()
+			captcha = input_captcha()
+			while True:
+				timestamp = self.community_obtain.get_timestamp()["data"]
+				response = self.whale_routine.login(username=identity, password=password, key=timestamp, code=captcha)
+				if "token" in response:
+					self.whale_routine.set_token(response["token"])
+				if "error_code" in response:
+					print(response["error_msg"])
+					if response["error_code"] in {"Admin-Password-Error@Community-Admin", "Param - Invalid @ Common"}:
+						identity, password = input_password()
+					elif response["error_code"] == "Captcha-Error@Community-Admin":
+						pass
+					captcha = input_captcha()
+					print(captcha)
+
 	# 处理举报
 	# 需要风纪权限
 	def handle_report(self, admin_id: int) -> None:  # noqa: PLR0915

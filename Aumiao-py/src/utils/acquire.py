@@ -1,9 +1,9 @@
-import time
 from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
 from pathlib import Path
+from time import sleep
 from typing import Literal, TypedDict, cast
 
 import requests
@@ -15,8 +15,8 @@ from requests.sessions import Session
 from . import data, file, tool
 from .decorator import singleton
 
-LOG_DIR: Path = Path.cwd() / ".log"
-LOG_FILE_PATH: Path = LOG_DIR / f"{int(time.time())}.txt"
+LOG_DIR: Path = data.CURRENT_DIR / ".log"
+LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 DICT_ITEM = 2
 
 MAX_CHARACTER = 100
@@ -97,6 +97,7 @@ class CodeMaoClient:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
 				print("=" * 82)
 				print(f"Request {method} {url} {response.status_code}")
+				print(response.request.body)
 				# if "Authorization" in response.request.headers:
 				# 	print(response.request.headers["Authorization"])
 				# with contextlib.suppress(Exception):
@@ -105,15 +106,16 @@ class CodeMaoClient:
 
 			except HTTPError as err:
 				print(f"HTTP Error {type(err).__name__} - {err}")
-				if err.response.status_code in {429, 503}:
-					time.sleep(2**attempt * backoff_factor)
-					continue
+				sleep(2**attempt * backoff_factor)
+				if attempt == retries - 1:
+					return err.response  # type: ignore  # noqa: PGH003
+				continue
 				break
 			except (ReqConnectionError, Timeout) as err:
 				print(f"Network error ({type(err).__name__}): {err}")
 				if attempt == retries - 1:
 					raise
-				time.sleep(2**attempt * backoff_factor)
+				sleep(2**attempt * backoff_factor)
 			except RequestException as err:
 				print(f"Request failed: {type(err).__name__} - {err}")
 				break
@@ -281,7 +283,7 @@ class CodeMaoClient:
 	def _log_request(self, response: requests.Response) -> None:
 		"""简化的日志记录,使用文本格式而不是字典"""
 		log_entry = (
-			f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]\n"
+			f"[{tool.TimeUtils().format_timestamp()}]\n"
 			f"Method: {response.request.method}\n"
 			f"URL: {response.url}\n"
 			f"Status: {response.status_code}\n"

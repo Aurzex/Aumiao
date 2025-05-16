@@ -49,20 +49,19 @@ class CodeMaoFile:
 	@staticmethod
 	def file_write(
 		path: Path,
-		content: str | dict | list[str],
+		content: str | bytes | dict | list[str],
 		method: str = "w",
 	) -> None:
 		# 检查文件是否存在
 		# self.check_file(path=path)
 		# 打开文件并写入内容
-		with Path.open(self=path, mode=method, encoding="utf-8") as file:
-			# 如果内容是字符串,直接写入
+		with Path.open(self=path, mode=method) as file:
 			if isinstance(content, str):
 				file.write(content + "\n")
-			# 如果内容是字典,将字典转换为JSON字符串并写入
+			elif isinstance(content, bytes):
+				file.write(content)
 			elif isinstance(content, dict):
 				file.write(json.dumps(obj=content, ensure_ascii=False, indent=4, sort_keys=True))
-			# 如果内容是列表,将列表中的每个元素写入
 			elif isinstance(content, list):
 				for line in content:
 					file.write(line + "\n")
