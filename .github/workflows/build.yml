@@ -76,21 +76,6 @@ jobs:
               exit 1
           }
 
-      - name: Validate project structure
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          $requiredFiles = @(
-              "src/project/favicon.ico"
-          )
-          foreach ($file in $requiredFiles) {
-              if (-not (Test-Path $file)) {
-                  Write-Error "Missing required file: $file"
-                  Get-ChildItem -Recurse -Depth 3
-                  exit 1
-              }
-          }
-
       - name: Setup Python Environment
         shell: pwsh
         working-directory: ${{ env.PROJECT_DIR }}
@@ -113,22 +98,22 @@ jobs:
           jobs: 4
           lto: "yes"
           mode: standalone
-          output-dir: ../build
+          output-dir: build  # 修复路径，不再使用../
           output-filename: aumiao
           product-name: "Aumiao"
           product-version: "2.0.0"
-          script-name: ./main.py
+          script-name: ./main.py  # 根据工作目录调整路径
           show-progress: true
           windows-console-mode: force
-          windows-icon-from-ico: "src/project/favicon.ico" # 修正路径
+          windows-icon-from-ico: "src/project/favicon.ico"  # 确保路径正确
         env:
-          NUITKA_CACHE_DIR: ${{ github.workspace }}/nuitka/cache # 显式设置缓存目录
+          NUITKA_CACHE_DIR: ${{ github.workspace }}/nuitka/cache
 
       - name: Prepare Distribution
         shell: pwsh
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          $distDir = "../build/main.dist"
+          $distDir = "build/main.dist"  # 使用相对当前目录的路径
           New-Item -Path $distDir -ItemType Directory -Force
           Copy-Item -Path README.txt, DISCLAIMER.txt, data -Destination $distDir -Recurse -Force
           $versionInfo = @{
@@ -150,9 +135,9 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
-          ./upx.exe --best --lzma ../build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "../build/upx-main.log"
-          Get-ChildItem ../build/main.dist/*.dll | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "../build/upx-dll.log" -Append
+          ./upx.exe --best --lzma build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "build/upx-main.log"
+          Get-ChildItem build/main.dist/*.dll | ForEach-Object {
+              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "build/upx-dll.log" -Append
           }
 
       - name: Package Artifacts
@@ -160,14 +145,14 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}.zip"
-          $distDir = Resolve-Path "../build/main.dist"
-          7z a -tzip "$(Resolve-Path "../build")/$packageName" "$distDir\*"
+          $distDir = Resolve-Path "build/main.dist"
+          7z a -tzip "build/$packageName" "$distDir\*"
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
           name: Aumiao_v2.0.0.${{ env.BUILD_DATE }}
-          path: ../build/*.zip
+          path: ${{ env.PROJECT_DIR }}/build/*.zip
           retention-days: 7
 
       - name: Upload Debug Files
@@ -176,9 +161,9 @@ jobs:
         with:
           name: Build_Debug_${{ env.BUILD_DATE }}
           path: |
-            ../build/**/*.log
-            ../build/**/*.json
-            **/nuitka-*.log
-            **/nuitka-*.xml
+            ${{ env.PROJECT_DIR }}/build/**/*.log
+            ${{ env.PROJECT_DIR }}/build/**/*.json
+            ${{ env.PROJECT_DIR }}/**/nuitka-*.log
+            ${{ env.PROJECT_DIR }}/**/nuitka-*.xml
           if-no-files-found: ignore
           retention-days: 14
