@@ -49,8 +49,8 @@ class UserData:
 
 @dataclass
 class CodeMaoData:
-	INFO: dict[str, str] = field(default_factory=dict)
 	ACCOUNT_DATA: AccountData = field(default_factory=AccountData)
+	INFO: dict[str, str] = field(default_factory=dict)
 	USER_DATA: UserData = field(default_factory=UserData)
 
 
@@ -58,8 +58,9 @@ class CodeMaoData:
 class Parameter:
 	all_read_type: list[Literal["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"]] = field(default_factory=list)
 	cookie_check_url: str = ""
-	report_work_max: int = 0
+	log: bool = True
 	password_login_method: str = ""
+	report_work_max: int = 0
 	spam_del_max: int = 0
 
 

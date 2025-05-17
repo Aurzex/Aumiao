@@ -2,11 +2,11 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Literal
 
+from requests.cookies import RequestsCookieJar
+
 from src.utils import acquire, data, file, tool
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
-
-from . import community
 
 CAPTCHA_DIR: Path = data.CURRENT_DIR / "captcha"
 CAPTCHA_DIR.mkdir(parents=True, exist_ok=True)
@@ -28,14 +28,14 @@ class Routine:
 		response = self.acquire.send_request(endpoint="https://api-whale.codemao.cn/admins/logout", method="DELETE", payload={})
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def get_captcha(self) -> None:
-		timestamp = community.Obtain().get_timestamp()["data"]
+	def get_captcha(self, timestamp: int) -> RequestsCookieJar:
 		response = self.acquire.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
 		if response.status_code == acquire.HTTPSTATUS.OK.value:
 			file.CodeMaoFile().file_write(path=CAPTCHA_IMG_DIR, content=response.content, method="wb")
 			print(f"请到{CAPTCHA_DIR}查看验证码")
 		else:
 			print(f"获取验证码失败, 错误代码{response.status_code}")
+		return response.cookies
 
 	def get_data_info(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://api-whale.codemao.cn/admins/info", method="GET")

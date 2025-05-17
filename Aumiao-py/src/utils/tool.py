@@ -380,17 +380,35 @@ class StringProcessor:
 
 
 class TimeUtils:
-	"""时间处理工具类"""
-
 	@staticmethod
-	def current_timestamp() -> int:
-		"""获取当前时间戳
+	def current_timestamp(length: Literal[10, 13] = 10) -> int:
+		"""获取指定精度的时间戳
+
+		Args:
+			length: 时间戳长度选项
+				10 - 秒级(默认)
+				13 - 毫秒级
+
+		Returns:
+			int: 对应精度的时间戳整数
+
+		Raises:
+			ValueError: 当传入无效长度参数时
 
 		Example:
-			>>> isinstance(TimeUtils.current_timestamp(), int)
-			True
+			>>> # 获取秒级时间戳
+			>>> TimeUtils.current_timestamp()
+			1717821234
+
+			>>> # 获取毫秒级时间戳
+			>>> TimeUtils.current_timestamp(13)
+			1717821234123
 		"""
-		return int(time.time())
+		if length not in {10, 13}:
+			msg = f"Invalid timestamp length: {length}. Valid options are 10 or 13"
+			raise ValueError(msg)
+		ts = time.time()
+		return int(ts * 1000) if length == 13 else int(ts)  # noqa: PLR2004
 
 	@staticmethod
 	def format_timestamp(ts: float | None = None) -> str:

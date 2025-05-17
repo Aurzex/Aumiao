@@ -45,27 +45,40 @@ class CodeMaoFile:
 			msg = "不支持的读取方法"
 			raise ValueError(msg)
 
-	# 将文本写入到指定文件
 	@staticmethod
 	def file_write(
 		path: Path,
 		content: str | bytes | dict | list[str],
 		method: str = "w",
+		encoding: str = "utf-8",
 	) -> None:
-		# 检查文件是否存在
-		# self.check_file(path=path)
-		# 打开文件并写入内容
-		with Path.open(self=path, mode=method) as file:
-			if isinstance(content, str):
-				file.write(content + "\n")
-			elif isinstance(content, bytes):
-				file.write(content)
+		# 确保父目录存在
+		path.parent.mkdir(parents=True, exist_ok=True)
+
+		# 根据内容类型自动决定模式和编码
+		mode = method
+		kwargs = {}
+		if isinstance(content, (str, dict, list)):
+			# 文本模式需指定编码
+			kwargs["encoding"] = encoding
+			if "b" in mode:
+				# 禁止文本内容使用二进制模式
+				msg = f"文本内容不能使用二进制模式: {mode}"
+				raise ValueError(msg)
+		elif isinstance(content, bytes):
+			# 字节内容强制使用二进制模式
+			if "b" not in mode:
+				mode += "b"
+		else:
+			msg = "不支持的内容类型"
+			raise TypeError(msg)
+
+		# 打开文件并写入
+		with Path.open(path, mode, **kwargs) as f:
+			if isinstance(content, (str, bytes)):
+				f.write(content)
 			elif isinstance(content, dict):
-				file.write(json.dumps(obj=content, ensure_ascii=False, indent=4, sort_keys=True))
+				json_str = json.dumps(content, ensure_ascii=False, indent=4)
+				f.write(json_str)
 			elif isinstance(content, list):
-				for line in content:
-					file.write(line + "\n")
-			# 如果内容类型不支持,抛出异常
-			else:
-				msg = "不支持的写入方法"
-				raise TypeError(msg)
+				f.writelines(line + "\n" for line in content)
