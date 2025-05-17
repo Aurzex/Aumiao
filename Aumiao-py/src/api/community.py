@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from functools import lru_cache
 from typing import Any, Literal
 
 from src.utils import acquire, data, tool
@@ -310,6 +311,7 @@ class Obtain:
 		return response.json()
 
 	# 获取举报类型
+	@lru_cache  # noqa: B019
 	def get_report_reason(self) -> dict:
 		response = self.acquire.send_request(endpoint="/web/reports/reasons/all", method="GET")
 		return response.json()

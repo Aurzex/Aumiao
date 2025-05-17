@@ -1,6 +1,7 @@
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from enum import Enum
+from functools import lru_cache
 from json import loads
 from random import choice, randint
 from time import sleep
@@ -230,7 +231,7 @@ class Obtain(ClassUnion):
 		method: Literal["comments"],
 		max_limit: int | None = 200,
 	) -> list[dict]: ...
-
+	@lru_cache  # noqa: B019
 	# 获取评论区信息
 	def get_comments_detail_new(
 		self,
