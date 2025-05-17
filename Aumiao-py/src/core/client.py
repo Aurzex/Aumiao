@@ -743,26 +743,28 @@ class Motion(ClassUnion):
 				password = input("请输入密码: ")
 				return (identity, password)
 
-			def input_captcha() -> str:
+			def input_captcha(timestamp: int) -> tuple[str, whale.RequestsCookieJar]:
 				print("正在获取验证码...")
-				self.whale_routine.get_captcha()
-				return input("请输入验证码: ")
+				cookies: whale.RequestsCookieJar = self.whale_routine.get_captcha(timestamp=timestamp)
+				return input("请输入验证码: "), cookies
 
+			timestamp = self.tool.TimeUtils().current_timestamp(13)
 			identity, password = input_password()
-			captcha = input_captcha()
+			captcha, cookies = input_captcha(timestamp=timestamp)
 			while True:
-				timestamp = self.community_obtain.get_timestamp()["data"]
+				self.acquire.update_cookies(cookies)
 				response = self.whale_routine.login(username=identity, password=password, key=timestamp, code=captcha)
 				if "token" in response:
 					self.whale_routine.set_token(response["token"])
+					break
 				if "error_code" in response:
 					print(response["error_msg"])
 					if response["error_code"] in {"Admin-Password-Error@Community-Admin", "Param - Invalid @ Common"}:
 						identity, password = input_password()
 					elif response["error_code"] == "Captcha-Error@Community-Admin":
 						pass
-					captcha = input_captcha()
-					print(captcha)
+					timestamp = self.tool.TimeUtils().current_timestamp(13)
+					captcha, cookies = input_captcha(timestamp=timestamp)
 
 	# 处理举报
 	# 需要风纪权限

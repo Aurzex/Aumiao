@@ -109,8 +109,9 @@ def handle_report() -> None:
 	"""尝试执行处理举报操作"""
 	# try:
 	print_header("处理举报")
-	token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
-	whale.Routine().set_token(token=token)  # noqa: F405
+	client.Motion().judgement_login()  # noqa: F405
+	# token = input(f"{COLOR_PROMPT}↳ 请输入 Authorization: {COLOR_RESET}")
+	# whale.Routine().set_token(token=token)
 
 	admin_id = int(input(f"{COLOR_PROMPT}↳ 请输入管理员ID: {COLOR_RESET}"))
 	client.Motion().handle_report(admin_id=admin_id)  # noqa: F405

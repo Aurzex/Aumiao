@@ -74,6 +74,7 @@ class CodeMaoClient:
 			"edu_pool": [],
 		}
 		self._original_session: Session | None = None
+		self.log_request: bool = data.SettingManager().data.PARAMETER.log
 
 	def send_request(
 		self,
@@ -91,17 +92,17 @@ class CodeMaoClient:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
 		# self._session.headers.clear()
-
+		log = bool(self.log_request and log)
 		for attempt in range(retries):
 			try:
 				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
-				print("=" * 82)
-				print(f"Request {method} {url} {response.status_code}")
-				print(response.request.body)
 				# if "Authorization" in response.request.headers:
 				# 	print(response.request.headers["Authorization"])
-				# with contextlib.suppress(Exception):
-				# 	print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
+				if log:
+					print("=" * 82)
+					print(f"Request {method} {url} {response.status_code}")
+					# with contextlib.suppress(Exception):
+					# 	print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
 				response.raise_for_status()
 
 			except HTTPError as err:
