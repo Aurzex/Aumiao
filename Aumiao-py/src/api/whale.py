@@ -32,7 +32,7 @@ class Routine:
 		response = self.acquire.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
 		if response.status_code == acquire.HTTPSTATUS.OK.value:
 			file.CodeMaoFile().file_write(path=CAPTCHA_IMG_DIR, content=response.content, method="wb")
-			print(f"请到{CAPTCHA_DIR}查看验证码")
+			print(f"请到 {CAPTCHA_DIR} 查看验证码")
 		else:
 			print(f"获取验证码失败, 错误代码{response.status_code}")
 		return response.cookies
