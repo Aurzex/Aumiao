@@ -320,6 +320,8 @@ class Motion:
 		return response.status_code == HTTPSTATUS.OK.value
 
 	def set_data_username(self, username: str) -> bool:
+		msg = "此为实验性功能"
+		raise ValueError(msg)
 		response = self.acquire.send_request(
 			endpoint="/tiger/v3/web/accounts/username",
 			method="PATCH",
@@ -425,3 +427,14 @@ class Motion:
 		)
 		# 返回请求状态码是否为204
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+
+
+# TODO@Aurzex: 待完善
+# /tiger/v3/web/accounts/captcha/password/update
+# 发送修改密码的短信验证码
+
+# /tiger/v3/web/accounts/password/phone
+# 通过短信验证码修改密码
+
+# /tiger/v3/web/accounts/tokens/convert
+# 获取用户访问令牌(Token)
