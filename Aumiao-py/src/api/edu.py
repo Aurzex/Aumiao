@@ -639,3 +639,124 @@ class Obtain:
 		params = {"CMTIME": timestamp}
 		response = self.acquire.send_request(endpoint="https://static.codemao.cn/teacher-edu/organization_ids.json", method="GET", params=params)
 		return response.json()
+
+	# 获取报告信息
+	def get_report_info(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/report/info",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取课程报告
+	def get_course_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/course",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取课程包报告
+	def get_package_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/packages",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取班级报告
+	def get_class_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/class/info",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取作品报告
+	def get_works_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/works/situations",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取作品星级报告
+	def get_works_star_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/works/star/info",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取能力报告
+	def get_ability_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/ability/dimensions",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取雷达图报告
+	def get_radar_chart_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/ability/radars",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取艺术报告
+	def get_artistic_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/ability/artistic/dimensions",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取逻辑报告
+	def get_logical_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/ability/logical/dimensions",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取编程报告
+	def get_programming_report(self) -> dict:
+		timestamp = self.tool.TimeUtils().current_timestamp(13)
+		params = {"TIME": timestamp}
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/analysis/student/ability/programming/dimensions",
+			method="GET",
+			params=params,
+		)
+		return response.json()
