@@ -1100,62 +1100,59 @@ class Motion(ClassUnion):
 			return
 
 		current_account = None
-		report_counter = 0
-		max_retries = 3
+		report_counter = -1
 		reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
 		source_map = {"work": "work", "post": "forum", "shop": "shop"}
 
 		for violation in violations:
-			retries = 0
-			while retries < max_retries:
-				try:
-					# 账号切换逻辑
-					if report_counter >= self.setting.PARAMETER.report_work_max:
-						current_account = next(account_pool, None)
-						if not current_account:
-							print("所有账号均已尝试")
-							return
-						print("切换教育账号")
-						sleep(5)
-						self.community_login.login_password(
-							identity=current_account[0],
-							password=current_account[1],
-							status="edu",
-						)
-						report_counter = 0
-
-					# 解析评论信息
-					parts = violation.split(":")
-					_item_id, comment_id = parts[0].split(".")
-					is_reply = "reply" in violation
-
-					# 获取父评论ID
-					parent_id, _ = self.tool.StringProcessor().find_substrings(
-						text=comment_id,
-						candidates=violations,
+			try:
+				# 账号切换逻辑
+				if report_counter >= self.setting.PARAMETER.report_work_max or report_counter == -1:
+					current_account = next(account_pool, None)
+					if not current_account:
+						print("所有账号均已尝试")
+						return
+					print("切换教育账号")
+					sleep(5)
+					self.community_login.login_password(
+						identity=current_account[0],
+						password=current_account[1],
+						status="edu",
 					)
+					sleep(5)
+					report_counter = 0
 
-					# 执行举报
-					if self.report_work(
-						source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
-						target_id=int(comment_id),
-						source_id=source_id,
-						reason_id=7,
-						reason_content=reason_content,
-						parent_id=cast("int", parent_id),
-						is_reply=is_reply,
-					):
-						report_counter += 1
-						print(f"举报成功: {violation}")
-						break
-					print(f"举报失败: {violation}")
-					retries += 1
+				# 解析评论信息
+				parts = violation.split(":")
+				_item_id, comment_id = parts[0].split(".")
+				is_reply = "reply" in violation
 
-				except Exception as e:
-					print(f"处理异常: {e}")
-					retries += 1
-					if retries >= max_retries:
-						print(f"达到最大重试次数: {violation}")
+				# 获取父评论ID
+				parent_id, _ = self.tool.StringProcessor().find_substrings(
+					text=comment_id,
+					candidates=violations,
+				)
+				self.community_obtain.get_replies(types="COMMENT_REPLY")
+				self.community_obtain.get_message_count(method="web")
+				self.community_obtain.get_community_status(types="WEB_FORUM_STATUS")
+				# 执行举报
+				if self.report_work(
+					source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
+					target_id=int(comment_id),
+					source_id=source_id,
+					reason_id=7,
+					reason_content=reason_content,
+					parent_id=cast("int", parent_id),
+					is_reply=is_reply,
+				):
+					report_counter += 1
+					print(f"举报成功: {violation}")
+					break
+				print(f"举报失败: {violation}")
+				report_counter += 1
+
+			except Exception as e:
+				print(f"处理异常: {e}")
 
 		# 恢复原始账号
 		self.whale_routine.set_token(self.acquire.token.judgement)
