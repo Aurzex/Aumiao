@@ -34,6 +34,7 @@ class CartoonObtain:
 
 @singleton
 class NovelObtain:
+	# ["未知", "连载中", "已完结", "已删除"]
 	def __init__(self) -> None:
 		# 初始化获取小说的客户端
 		self.acquire = acquire.CodeMaoClient()
