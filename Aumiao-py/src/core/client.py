@@ -3,12 +3,16 @@ from collections.abc import Callable, Generator
 from enum import Enum
 from functools import lru_cache
 from json import loads
+from pathlib import Path
 from random import choice, randint
 from time import sleep
 from typing import Any, Literal, TypedDict, cast, overload
 
-from src.api import community, edu, forum, shop, user, whale, work
+from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
+
+DOWNLOAD_DIR: Path = data.CURRENT_DIR / "download"
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class FormattedAnswer(TypedDict):
@@ -52,6 +56,7 @@ class Union:
 		self.whale_routine = whale.Routine()
 		self.work_motion = work.Motion()
 		self.work_obtain = work.Obtain()
+		self.library_obtain = library.NovelObtain()
 
 
 ClassUnion = Union().__class__
@@ -717,7 +722,6 @@ class Motion(ClassUnion):
 			(
 				self.user_obtain.get_data_details(),
 				self.user_obtain.get_data_level(),
-				self.user_obtain.get_data_name(),
 				self.user_obtain.get_data_privacy(),
 				self.user_obtain.get_data_score(),
 				self.user_obtain.get_data_profile("web"),
@@ -1259,6 +1263,24 @@ class Motion(ClassUnion):
 		elif method == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
+
+	def download_fiction(self, fiction_id: int) -> None:
+		details = self.library_obtain.get_novel_detail(fiction_id)
+		info = details["data"]["fanficInfo"]
+		print(f"正在下载: {info['title']}-{info['nickname']}")
+		print(f"简介: {info['introduction']}")
+		print(f"类别: {info['fanfic_type_name']}")
+		print(f"词数: {info['total_words']}")
+		print(f"更新时间: {self.tool.TimeUtils().format_timestamp(info['update_time'])}")
+		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir.mkdir(parents=True, exist_ok=True)
+		for section in details["data"]["sectionList"]:
+			section_id = section["id"]
+			section_title = section["title"]
+			section_path = fiction_dir / f"{section_title}.txt"
+			content = self.library_obtain.get_chapter_detail(chapter_id=section_id)["data"]["section"]["content"]
+			formatted_content = self.tool.DataConverter().html_to_text(html_content=content, merge_empty_lines=True)
+			self.file.file_write(path=section_path, content=formatted_content)
 
 
 # "POST_COMMENT",
