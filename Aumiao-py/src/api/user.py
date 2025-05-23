@@ -88,8 +88,8 @@ class Obtain:
 		response = self.acquire.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
 		return response.json()
 
-	# 获取用户姓名
-	def get_data_name(self) -> dict:
+	# 可能会返回{"code":6404,"msg":"未绑定手机号"},从而可以检测是否绑定手机号
+	def get_data_lesson_info(self) -> dict:
 		response = self.acquire.send_request(endpoint="/api/v2/pc/lesson/user/info", method="GET")
 		return response.json()
 
