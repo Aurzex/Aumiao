@@ -1,7 +1,6 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
-from io import BytesIO
 from pathlib import Path
 from time import sleep
 from typing import Literal, TypedDict, cast
@@ -82,6 +81,7 @@ class CodeMaoClient:
 		method: HttpMethod,
 		params: dict | None = None,
 		payload: dict | None = None,
+		files: dict | None = None,
 		headers: dict | None = None,
 		retries: int = 1,
 		backoff_factor: float = 0.3,
@@ -95,7 +95,7 @@ class CodeMaoClient:
 		log = bool(self.log_request and log)
 		for attempt in range(retries):
 			try:
-				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
+				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, files=files, timeout=timeout)
 				# if "Authorization" in response.request.headers:
 				# 	print(response.request.headers["Authorization"])
 				if log:
@@ -307,45 +307,6 @@ class CodeMaoClient:
 			"response_offset_key": "offset",
 		}
 
-	@staticmethod
-	def stream_upload(file_path: Path, upload_path: str = "aumiao", chunk_size: int = 8192) -> str:
-		try:
-			# 打开文件并定义生成器
-			with file_path.open("rb") as f:
-
-				def file_generator() -> Generator[bytes]:
-					while True:
-						chunk = f.read(chunk_size)
-						if not chunk:
-							break
-						yield chunk
-
-				# 将生成器内容包装为 BytesIO 对象,模拟文件对象
-				file_content = BytesIO()
-				for chunk in file_generator():
-					file_content.write(chunk)
-				file_content.seek(0)  # 重置文件指针
-
-				files = {
-					"file": (file_path.name, file_content, "application/octet-stream"),
-				}
-				data = {"path": upload_path}
-
-				response = requests.post(
-					url="https://api.pgaot.com/user/up_cat_file",
-					files=files,
-					data=data,
-					timeout=120,
-				)
-				# 处理响应
-				response.raise_for_status()  # 如果响应状态码不是 200,会抛出异常
-				result = response.json()
-				return result.get("url", None)
-		except requests.exceptions.RequestException as e:
-			return f"请求错误: {e}"
-		except Exception as e:
-			return f"上传出错: {e!s}"
-
 	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
 		# 清除旧Cookie
 		if "Cookie" in self.headers:
@@ -371,3 +332,44 @@ class CodeMaoClient:
 			print(f"Cookie更新失败: {e!s}")
 			msg = "无效的Cookie格式"
 			raise ValueError(msg) from e
+
+
+class FileUploader:
+	def __init__(self, codemao_cookie: str | None = None) -> None:
+		self.codemao_cookie = codemao_cookie
+
+	def upload_via_codemao(self, file_path: Path) -> str:
+		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
+		# 1. 获取上传Token
+		token_info = self.get_codemao_token(file_path.suffix)
+
+		# 2. 直接使用默认类型上传
+		files = {"file": (file_path.name, Path.open(file_path, "rb"), "application/octet-stream")}
+		data = {"token": token_info["token"], "key": token_info["file_path"]}
+		_response = CodeMaoClient().send_request(token_info["upload_url"], files=files, payload=data, method="POST")
+		return token_info["pic_host"] + token_info["file_path"]
+
+	@staticmethod
+	def upload_via_pgaot(file_path: Path, save_path: str = "aumiao") -> str:
+		"""直接上传到Pgaot服务器(使用默认文件类型)"""
+		files = {"file": (file_path.name, Path.open(file_path, "rb"), "application/octet-stream")}
+		data = {"path": save_path}
+		response = CodeMaoClient().send_request(endpoint="https://api.pgaot.com/user/up_cat_file", files=files, payload=data, method="POST")
+		return response.json()["url"]
+
+	@staticmethod
+	def get_codemao_token(file_extension: str, project_name: str = "community_frontend", cdn_name: str = "qiniu") -> dict:
+		"""获取七牛云上传凭证(封装原GET请求)"""
+		params = {
+			"projectName": project_name,
+			"filePaths": f"mw/xxx{file_extension}",
+			"filePath": f"mw/xxx{file_extension}",
+			"tokensCount": 1,
+			"fileSign": "p1",
+			"cdnName": cdn_name,
+		}
+
+		response = CodeMaoClient().send_request(endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading", method="GET", params=params)
+
+		data = response.json()
+		return {"token": data["tokens"][0]["token"], "file_path": data["tokens"][0]["file_path"], "upload_url": data["upload_url"], "pic_host": data["bucket_url"]}
