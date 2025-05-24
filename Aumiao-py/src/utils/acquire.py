@@ -31,9 +31,12 @@ class Token:
 
 
 class HTTPSTATUS(Enum):
-	OK = 200
 	CREATED = 201
+	FORBIDDEN = 403
+	NOT_FOUND = 404
+	NOT_MODIFIED = 304
 	NO_CONTENT = 204
+	OK = 200
 
 
 class PaginationConfig(TypedDict, total=False):

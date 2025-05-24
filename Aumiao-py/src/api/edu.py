@@ -186,6 +186,46 @@ class Motion:
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
+	# 提升账号权限
+	def improve_account(
+		self,
+		user_id: int,
+		real_name: str,
+		grade: list[str],
+		school_id: int,
+		school_name: str,
+		school_type: int,
+		country_id: str,
+		province_id: int,
+		city_id: int,
+		district_id: int,
+		teacher_card_number: str,
+	) -> bool:
+		data = {
+			"id": user_id,
+			"real_name": real_name,
+			"grade": grade,
+			"schoolId": school_id,
+			"schoolName": school_name,
+			"schoolType": school_type,
+			"country_id": country_id,
+			"province_id": province_id,
+			"city_id": city_id,
+			"district_id": district_id,
+			"teacherCardNumber": teacher_card_number,
+		}
+
+		response = self.acquire.send_request(
+			endpoint="https://eduzone.codemao.cn/edu/zone/sign/login/teacher/info/improve",
+			method="POST",
+			payload=data,
+		)
+		if response.status_code == HTTPSTATUS.NOT_FOUND.value:
+			print("教师号注册失败,原因:该账户是学生账户,无法注册教师号")
+		elif response.status_code == HTTPSTATUS.FORBIDDEN.value:
+			print("教师号注册失败,原因:你的ip地址被封禁")
+		return response.status_code == HTTPSTATUS.OK.value
+
 
 @singleton
 class Obtain:
