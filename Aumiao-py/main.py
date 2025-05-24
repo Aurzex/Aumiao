@@ -165,7 +165,7 @@ def main() -> None:
 	menu_options = {
 		"1": ("用户登录", lambda: login(account_data_manager)),
 		"2": ("清除评论", clear_comments),
-		"3": ("清除红点提醒", clear_red_point),
+		"3": ("邮箱已读", clear_red_point),
 		"4": ("自动回复", reply_work),
 		"5": ("账户登出", logout),
 		"6": ("处理举报", handle_report),
