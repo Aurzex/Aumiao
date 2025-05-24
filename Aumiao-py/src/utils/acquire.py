@@ -338,32 +338,60 @@ class FileUploader:
 	def __init__(self, codemao_cookie: str | None = None) -> None:
 		self.codemao_cookie = codemao_cookie
 
-	def upload_via_codemao(self, file_path: Path) -> str:
-		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
-		# 1. 获取上传Token
-		token_info = self.get_codemao_token(file_path.suffix)
-
-		# 2. 直接使用默认类型上传
-		files = {"file": (file_path.name, Path.open(file_path, "rb"), "application/octet-stream")}
-		data = {"token": token_info["token"], "key": token_info["file_path"]}
-		_response = CodeMaoClient().send_request(token_info["upload_url"], files=files, payload=data, method="POST")
-		return token_info["pic_host"] + token_info["file_path"]
-
 	@staticmethod
 	def upload_via_pgaot(file_path: Path, save_path: str = "aumiao") -> str:
 		"""直接上传到Pgaot服务器(使用默认文件类型)"""
-		files = {"file": (file_path.name, Path.open(file_path, "rb"), "application/octet-stream")}
+		file_obj = file_path.open("rb")
+		files = {"file": (file_path.name, file_obj, "application/octet-stream")}
 		data = {"path": save_path}
-		response = CodeMaoClient().send_request(endpoint="https://api.pgaot.com/user/up_cat_file", files=files, payload=data, method="POST")
-		return response.json()["url"]
+		response = requests.post(
+			url="https://api.pgaot.com/user/up_cat_file",
+			files=files,
+			data=data,
+			timeout=120,
+		)
+		file_obj.close()  # Ensure the file is closed
+		return response.json()
+
+	def upload_via_codemao(self, file_path: Path) -> str:
+		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
+		# Generate unique filename with timestamp
+		timestamp = tool.TimeUtils().current_timestamp()
+		unique_name = f"aumiao/{timestamp}{file_path.name}"
+
+		# 1. 获取上传Token (with unique filename)
+		token_info = self.get_codemao_token(
+			file_path=unique_name,  # Pass the unique path
+		)
+
+		# 2. 上传文件
+		with file_path.open("rb") as file_obj:
+			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			data = {
+				"token": token_info["token"],
+				"key": token_info["file_path"],
+				"fname": file_path.name,  # Add original filename
+			}
+			_response = requests.post(
+				token_info["upload_url"],
+				files=files,
+				data=data,
+				timeout=120,
+			)
+
+		return token_info["pic_host"] + token_info["file_path"]
 
 	@staticmethod
-	def get_codemao_token(file_extension: str, project_name: str = "community_frontend", cdn_name: str = "qiniu") -> dict:
+	def get_codemao_token(
+		file_path: str = "aumiao",  # Now accepts custom path
+		project_name: str = "community_frontend",
+		cdn_name: str = "qiniu",
+	) -> dict:
 		"""获取七牛云上传凭证(封装原GET请求)"""
 		params = {
 			"projectName": project_name,
-			"filePaths": f"mw/xxx{file_extension}",
-			"filePath": f"mw/xxx{file_extension}",
+			"filePaths": file_path,
+			"filePath": file_path,
 			"tokensCount": 1,
 			"fileSign": "p1",
 			"cdnName": cdn_name,
