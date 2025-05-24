@@ -1282,6 +1282,45 @@ class Motion(ClassUnion):
 			formatted_content = self.tool.DataConverter().html_to_text(html_content=content, merge_empty_lines=True)
 			self.file.file_write(path=section_path, content=formatted_content)
 
+	def generate_nemo_code(self, work_id: int) -> None:
+		try:
+			# Step 1: Get work information
+			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
+			work_info = self.acquire.send_request(endpoint=work_info_url, method="GET").json()
+
+			# Get the latest work URL
+			bcm_url = work_info["work_urls"][0]
+
+			# Step 2: Generate the miao code
+			headers = {
+				"User-Agent": "okhttp/4.2.2",
+			}
+
+			payload = {
+				"app_version": "4.3.4",
+				"bcm_version": "0.16.2",
+				"equipment": "Redmi",
+				"name": work_info["name"],
+				"os": "android",
+				"preview": work_info["preview"],
+				"work_id": work_id,
+				"work_url": bcm_url,
+			}
+
+			response = self.acquire.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", headers=headers, payload=payload)
+
+			# Process the response
+			if response.ok:
+				result = response.json()
+				miao_code = f"【喵口令】$&{result['token']}&$"
+				print("\nGenerated Miao Code:")
+				print(miao_code)
+			else:
+				print(f"Error: {response.status_code} - {response.text}")
+
+		except Exception as e:
+			print(f"An error occurred: {e!s}")
+
 
 # "POST_COMMENT",
 # "POST_COMMENT_DELETE_FEEDBACK",
