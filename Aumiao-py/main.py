@@ -123,6 +123,14 @@ def download_fiction() -> None:
 	print(f"{COLOR_CODES['SUCCESS']}小说下载完成{COLOR_CODES['RESET']}")
 
 
+def generate_nemo_code() -> None:
+	"""Generate a meow password"""
+	print_header("生成喵口令")
+	work_id = int(input(f"{COLOR_CODES['PROMPT']}↳ 请输入作品编号(Nemo作品): {COLOR_CODES['RESET']}"))
+	client.Motion().generate_nemo_code(work_id=work_id)  # noqa: F405
+	print(f"{COLOR_CODES['SUCCESS']}生成完成{COLOR_CODES['RESET']}")
+
+
 def logout() -> None:
 	"""Log out from the system."""
 	valid_methods = {"web"}
@@ -171,7 +179,8 @@ def main() -> None:
 		"6": ("处理举报", handle_report),
 		"7": ("状态查询", check_account_status),
 		"8": ("下载小说", download_fiction),
-		"9": ("退出系统", lambda: print(f"\n{COLOR_CODES['SUCCESS']}感谢使用,再见!{COLOR_CODES['RESET']}")),
+		"9": ("生成喵口令", generate_nemo_code),
+		"10": ("退出系统", lambda: print(f"\n{COLOR_CODES['SUCCESS']}感谢使用,再见!{COLOR_CODES['RESET']}")),
 		"1106": ("隐藏功能", handle_hidden_features),
 	}
 
@@ -187,7 +196,7 @@ def main() -> None:
 			action = menu_options[choice][1]
 			try:
 				action()
-				if choice == "9":  # Exit condition
+				if choice == "10":  # Exit condition
 					break
 			except Exception as e:
 				print(f"{COLOR_CODES['ERROR']}操作失败: {e}{COLOR_CODES['RESET']}")
