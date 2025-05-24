@@ -10,6 +10,7 @@
 *captcha/
 *data/
 *dist/
+*download/
 *media/
 *test.py
 *test/

@@ -3,12 +3,16 @@ from collections.abc import Callable, Generator
 from enum import Enum
 from functools import lru_cache
 from json import loads
+from pathlib import Path
 from random import choice, randint
 from time import sleep
 from typing import Any, Literal, TypedDict, cast, overload
 
-from src.api import community, edu, forum, shop, user, whale, work
+from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
+
+DOWNLOAD_DIR: Path = data.CURRENT_DIR / "download"
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class FormattedAnswer(TypedDict):
@@ -52,6 +56,7 @@ class Union:
 		self.whale_routine = whale.Routine()
 		self.work_motion = work.Motion()
 		self.work_obtain = work.Obtain()
+		self.library_obtain = library.NovelObtain()
 
 
 ClassUnion = Union().__class__
@@ -717,7 +722,6 @@ class Motion(ClassUnion):
 			(
 				self.user_obtain.get_data_details(),
 				self.user_obtain.get_data_level(),
-				self.user_obtain.get_data_name(),
 				self.user_obtain.get_data_privacy(),
 				self.user_obtain.get_data_score(),
 				self.user_obtain.get_data_profile("web"),
@@ -1100,62 +1104,59 @@ class Motion(ClassUnion):
 			return
 
 		current_account = None
-		report_counter = 0
-		max_retries = 3
+		report_counter = -1
 		reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
 		source_map = {"work": "work", "post": "forum", "shop": "shop"}
 
 		for violation in violations:
-			retries = 0
-			while retries < max_retries:
-				try:
-					# 账号切换逻辑
-					if report_counter >= self.setting.PARAMETER.report_work_max:
-						current_account = next(account_pool, None)
-						if not current_account:
-							print("所有账号均已尝试")
-							return
-						print("切换教育账号")
-						sleep(5)
-						self.community_login.login_password(
-							identity=current_account[0],
-							password=current_account[1],
-							status="edu",
-						)
-						report_counter = 0
-
-					# 解析评论信息
-					parts = violation.split(":")
-					_item_id, comment_id = parts[0].split(".")
-					is_reply = "reply" in violation
-
-					# 获取父评论ID
-					parent_id, _ = self.tool.StringProcessor().find_substrings(
-						text=comment_id,
-						candidates=violations,
+			try:
+				# 账号切换逻辑
+				if report_counter >= self.setting.PARAMETER.report_work_max or report_counter == -1:
+					current_account = next(account_pool, None)
+					if not current_account:
+						print("所有账号均已尝试")
+						return
+					print("切换教育账号")
+					sleep(5)
+					self.community_login.login_password(
+						identity=current_account[0],
+						password=current_account[1],
+						status="edu",
 					)
+					sleep(5)
+					report_counter = 0
 
-					# 执行举报
-					if self.report_work(
-						source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
-						target_id=int(comment_id),
-						source_id=source_id,
-						reason_id=7,
-						reason_content=reason_content,
-						parent_id=cast("int", parent_id),
-						is_reply=is_reply,
-					):
-						report_counter += 1
-						print(f"举报成功: {violation}")
-						break
-					print(f"举报失败: {violation}")
-					retries += 1
+				# 解析评论信息
+				parts = violation.split(":")
+				_item_id, comment_id = parts[0].split(".")
+				is_reply = "reply" in violation
 
-				except Exception as e:
-					print(f"处理异常: {e}")
-					retries += 1
-					if retries >= max_retries:
-						print(f"达到最大重试次数: {violation}")
+				# 获取父评论ID
+				parent_id, _ = self.tool.StringProcessor().find_substrings(
+					text=comment_id,
+					candidates=violations,
+				)
+				self.community_obtain.get_replies(types="COMMENT_REPLY")
+				self.community_obtain.get_message_count(method="web")
+				self.community_obtain.get_community_status(types="WEB_FORUM_STATUS")
+				# 执行举报
+				if self.report_work(
+					source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
+					target_id=int(comment_id),
+					source_id=source_id,
+					reason_id=7,
+					reason_content=reason_content,
+					parent_id=cast("int", parent_id),
+					is_reply=is_reply,
+				):
+					report_counter += 1
+					print(f"举报成功: {violation}")
+					break
+				print(f"举报失败: {violation}")
+				report_counter += 1
+
+			except Exception as e:
+				print(f"处理异常: {e}")
 
 		# 恢复原始账号
 		self.whale_routine.set_token(self.acquire.token.judgement)
@@ -1223,6 +1224,22 @@ class Motion(ClassUnion):
 			self.like_all_work(user_id=str(user_id), works_list=works_list)
 		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
+	def celestial_maiden_chronicles(self, real_name: str) -> None:
+		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+		self.edu_motion.improve_account(
+			user_id=int(self.data.ACCOUNT_DATA.id),
+			real_name=real_name,
+			grade=["2", "3", "4"],
+			school_id=11000161,
+			school_name="北京景山学校",
+			school_type=1,
+			country_id="156",
+			province_id=1,
+			city_id=1,
+			district_id=1,
+			teacher_card_number="20234400171011626",
+		)
+
 	@staticmethod
 	def batch_handle_account(method: Literal["create", "delete"], limit: int | None = 100) -> None:
 		"""批量处理教育账号"""
@@ -1262,6 +1279,63 @@ class Motion(ClassUnion):
 		elif method == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
+
+	def download_fiction(self, fiction_id: int) -> None:
+		details = self.library_obtain.get_novel_detail(fiction_id)
+		info = details["data"]["fanficInfo"]
+		print(f"正在下载: {info['title']}-{info['nickname']}")
+		print(f"简介: {info['introduction']}")
+		print(f"类别: {info['fanfic_type_name']}")
+		print(f"词数: {info['total_words']}")
+		print(f"更新时间: {self.tool.TimeUtils().format_timestamp(info['update_time'])}")
+		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir.mkdir(parents=True, exist_ok=True)
+		for section in details["data"]["sectionList"]:
+			section_id = section["id"]
+			section_title = section["title"]
+			section_path = fiction_dir / f"{section_title}.txt"
+			content = self.library_obtain.get_chapter_detail(chapter_id=section_id)["data"]["section"]["content"]
+			formatted_content = self.tool.DataConverter().html_to_text(html_content=content, merge_empty_lines=True)
+			self.file.file_write(path=section_path, content=formatted_content)
+
+	def generate_nemo_code(self, work_id: int) -> None:
+		try:
+			# Step 1: Get work information
+			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
+			work_info = self.acquire.send_request(endpoint=work_info_url, method="GET").json()
+
+			# Get the latest work URL
+			bcm_url = work_info["work_urls"][0]
+
+			# Step 2: Generate the miao code
+			headers = {
+				"User-Agent": "okhttp/4.2.2",
+			}
+
+			payload = {
+				"app_version": "4.3.4",
+				"bcm_version": "0.16.2",
+				"equipment": "Redmi",
+				"name": work_info["name"],
+				"os": "android",
+				"preview": work_info["preview"],
+				"work_id": work_id,
+				"work_url": bcm_url,
+			}
+
+			response = self.acquire.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", headers=headers, payload=payload)
+
+			# Process the response
+			if response.ok:
+				result = response.json()
+				miao_code = f"【喵口令】$&{result['token']}&$"
+				print("\nGenerated Miao Code:")
+				print(miao_code)
+			else:
+				print(f"Error: {response.status_code} - {response.text}")
+
+		except Exception as e:
+			print(f"An error occurred: {e!s}")
 
 
 # "POST_COMMENT",
