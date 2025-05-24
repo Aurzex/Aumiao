@@ -5,7 +5,8 @@ from pathlib import Path
 from time import sleep
 from typing import Literal, TypedDict, cast
 
-import requests
+from requests import Response
+from requests import post as re_post
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
@@ -88,7 +89,7 @@ class CodeMaoClient:
 		timeout: float = 10.0,
 		*,
 		log: bool = True,
-	) -> requests.Response:
+	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
 		# self._session.headers.clear()
@@ -129,7 +130,7 @@ class CodeMaoClient:
 				# self.update_cookies(response.cookies)
 				return response
 
-		return cast("requests.Response", None)
+		return cast("Response", None)
 
 	def fetch_data(  # noqa: PLR0914
 		self,
@@ -281,7 +282,7 @@ class CodeMaoClient:
 		self._sessions["average"].close()
 		self._default_session.close()
 
-	def _log_request(self, response: requests.Response) -> None:
+	def _log_request(self, response: Response) -> None:
 		"""简化的日志记录,使用文本格式而不是字典"""
 		log_entry = (
 			f"[{tool.TimeUtils().format_timestamp()}]\n"
@@ -344,7 +345,7 @@ class FileUploader:
 		file_obj = file_path.open("rb")
 		files = {"file": (file_path.name, file_obj, "application/octet-stream")}
 		data = {"path": save_path}
-		response = requests.post(
+		response = re_post(
 			url="https://api.pgaot.com/user/up_cat_file",
 			files=files,
 			data=data,
@@ -372,7 +373,7 @@ class FileUploader:
 				"key": token_info["file_path"],
 				"fname": file_path.name,  # Add original filename
 			}
-			_response = requests.post(
+			_response = re_post(
 				token_info["upload_url"],
 				files=files,
 				data=data,
