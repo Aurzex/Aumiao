@@ -1224,6 +1224,22 @@ class Motion(ClassUnion):
 			self.like_all_work(user_id=str(user_id), works_list=works_list)
 		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
+	def celestial_maiden_chronicles(self, real_name: str) -> None:
+		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+		self.edu_motion.improve_account(
+			user_id=int(self.data.ACCOUNT_DATA.id),
+			real_name=real_name,
+			grade=["2", "3", "4"],
+			school_id=11000161,
+			school_name="北京景山学校",
+			school_type=1,
+			country_id="156",
+			province_id=1,
+			city_id=1,
+			district_id=1,
+			teacher_card_number="20234400171011626",
+		)
+
 	@staticmethod
 	def batch_handle_account(method: Literal["create", "delete"], limit: int | None = 100) -> None:
 		"""批量处理教育账号"""

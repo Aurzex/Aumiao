@@ -148,7 +148,7 @@ def logout() -> None:
 
 def handle_hidden_features() -> None:
 	"""Process hidden menu features."""
-	print("\n隐藏功能\n1.自动点赞\n2.学生管理")
+	print("隐藏功能 1.自动点赞 2.学生管理 3.账号提权")
 	sub_choice = input("操作选择: ")
 
 	if sub_choice == "1":
@@ -159,6 +159,10 @@ def handle_hidden_features() -> None:
 		limit = int(input("数量: "))
 		mode = cast("Literal['create', 'delete']", mode)
 		client.Motion().batch_handle_account(method=mode, limit=limit)  # noqa: F405
+	elif sub_choice == "3":
+		real_name = input("输入姓名: ")
+		client.Motion().celestial_maiden_chronicles(real_name=real_name)  # noqa: F405
+		print(f"{COLOR_CODES['SUCCESS']}已成功处理{COLOR_CODES['RESET']}")
 	else:
 		print("无效输入")
 
