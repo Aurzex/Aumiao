@@ -1,13 +1,15 @@
 # Aumiao ✨
 
-[![Aurzex](https://img.shields.io/badge/Aurzex-66ccff?style=for-the-badge)](https://github.com/aurzex/)
-[![DontLoveby](https://img.shields.io/badge/DontLoveby-66ccff?style=for-the-badge)](https://github.com/dontLoveby/)
-[![Moonleeeaf](https://img.shields.io/badge/Moonleeeaf-66ccff?style=for-the-badge)](https://github.com/MoonLeeeaf/)
-[![Nomen](https://img.shields.io/badge/Nomen-66ccff?style=for-the-badge)](https://github.com/helloyork/)
+[![Aurzex](https://img.shields.io/badge/Aurzex-66ccff)](https://github.com/aurzex/)
+[![DontLoveby](https://img.shields.io/badge/DontLoveby-66ccff)](https://github.com/dontLoveby/)
+[![Moonleeeaf](https://img.shields.io/badge/Moonleeeaf-66ccff)](https://github.com/MoonLeeeaf/)
+[![Nomen](https://img.shields.io/badge/Nomen-66ccff)](https://github.com/helloyork/)
 
-[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-
+[![Python](https://img.shields.io/badge/Python-3776AB?&logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Typescript-0277c8?&logo=typescript&logoColor=white)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Lua-01007c?logo=lua&logoColor=white)](https://nodejs.org/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
 ## 📌 项目简介
 
 **Aumiao** 是一款专为编程猫社区设计的自动化工具套件，由 Aumiao 开发团队倾力打造。项目于 2023 年 5 月 2 日正式发布，旨在为用户提供更高效的编程猫社区交互体验。
