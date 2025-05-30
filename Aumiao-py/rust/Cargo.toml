@@ -1,0 +1,24 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+chrono = "0.4"
+rand = "0.8"
+html-escape = "0.2"
+lazy_static = "1.4"
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "multipart", "cookies"] }
+url = "2.5"
+async-trait = "0.1"
+futures = "0.3"
+parking_lot = "0.12"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+once_cell = "1.19"
+bytes = "1.5"
