@@ -48,10 +48,6 @@ class PaginationConfig(TypedDict, total=False):
 	response_offset_key: Literal["offset", "page"]
 
 
-# class Loggable(Protocol):
-# 	def file_write(self, path: Path, content: str, method: str) -> None: ...
-
-
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT"]
 FetchMethod = Literal["GET", "POST"]
 
