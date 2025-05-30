@@ -1,18 +1,22 @@
 from collections import defaultdict
 from collections.abc import Callable, Generator
+from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from json import loads
 from pathlib import Path
 from random import choice, randint
 from time import sleep
-from typing import Any, Literal, TypedDict, cast, overload
+from typing import Any, ClassVar, Literal, TypedDict, cast, overload
 
 from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
 
+# 常量定义
 DOWNLOAD_DIR: Path = data.CURRENT_DIR / "download"
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+VALID_REPLY_TYPES = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
+REPORT_BATCH_THRESHOLD = 15
 
 
 class FormattedAnswer(TypedDict):
@@ -23,11 +27,18 @@ class FormattedAnswer(TypedDict):
 class ReplyType(Enum):
 	WORK_COMMENT = "WORK_COMMENT"
 	WORK_REPLY = "WORK_REPLY"
-	# 其他类型同理
+	WORK_REPLY_REPLY = "WORK_REPLY_REPLY"
+	POST_COMMENT = "POST_COMMENT"
+	POST_REPLY = "POST_REPLY"
+	POST_REPLY_REPLY = "POST_REPLY_REPLY"
 
 
-VALID_REPLY_TYPES = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
-OK_CODE = 200
+@dataclass
+class SourceConfig:
+	get_items: Callable[..., Any]
+	get_comments: Callable[..., Any]
+	delete: Callable[..., Any]
+	title_key: str
 
 
 @decorator.singleton
@@ -66,14 +77,12 @@ ClassUnion = Union().__class__
 class Tool(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
-		self.cache_manager = data.CacheManager()  # 添加这行
+		self.cache_manager = data.CacheManager()
 
 	def message_report(self, user_id: str) -> None:
-		# 获取用户荣誉信息
 		response = self.user_obtain.get_user_honor(user_id=user_id)
-		# 获取当前时间戳
 		timestamp = self.community_obtain.get_timestamp()["data"]
-		# 构造用户数据字典
+
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -84,12 +93,10 @@ class Tool(ClassUnion):
 			"view": response["view_times"],
 			"timestamp": timestamp,
 		}
-		# 获取缓存数据
-		before_data = self.cache_manager.data
-		# 如果缓存数据不为空,则显示数据变化
-		if before_data != {}:
+
+		if self.cache_manager.data:
 			self.tool.DataAnalyzer().compare_datasets(
-				before=before_data,
+				before=self.cache_manager.data,
 				after=user_data,
 				metrics={
 					"fans": "粉丝",
@@ -99,16 +106,12 @@ class Tool(ClassUnion):
 				},
 				timestamp_field="timestamp",
 			)
-		# 更新缓存数据
-		self.cache_manager.update(user_data)  # 使用管理器的 update 方法
+		self.cache_manager.update(user_data)
 
-	# 猜测手机号码(暴力枚举)
 	def guess_phonenum(self, phonenum: str) -> int | None:
-		# 枚举10000个四位数
 		for i in range(10000):
-			guess = f"{i:04d}"  # 格式化为四位数,前面补零
+			guess = f"{i:04d}"
 			test_string = int(phonenum.replace("****", guess))
-			print(test_string)
 			if self.user_motion.verify_phone(test_string):
 				return test_string
 		return None
@@ -116,54 +119,55 @@ class Tool(ClassUnion):
 
 @decorator.singleton
 class Index(ClassUnion):
-	def __init__(self) -> None:
-		super().__init__()
-		# 颜色配置
-		self.COLOR_DATA = "\033[38;5;228m"  # 月光黄-数据
-		self.COLOR_LINK = "\033[4;38;5;183m"  # 薰衣草紫带下划线-链接
-		self.COLOR_RESET = "\033[0m"  # 样式重置
-		self.COLOR_SLOGAN = "\033[38;5;80m"  # 湖水青-标语
-		self.COLOR_TITLE = "\033[38;5;75m"  # 晴空蓝-标题
-		self.COLOR_VERSION = "\033[38;5;114m"  # 新芽绿-版本号
+	COLOR_DATA = "\033[38;5;228m"
+	COLOR_LINK = "\033[4;38;5;183m"
+	COLOR_RESET = "\033[0m"
+	COLOR_SLOGAN = "\033[38;5;80m"
+	COLOR_TITLE = "\033[38;5;75m"
+	COLOR_VERSION = "\033[38;5;114m"
 
-	def index(self) -> None:
-		"""打印引导界面"""
-		# 打印slogan
+	def _print_title(self, title: str) -> None:
+		print(f"\n{self.COLOR_TITLE}{'*' * 22} {title} {'*' * 22}{self.COLOR_RESET}")
+
+	def _print_slogan(self) -> None:
 		print(f"\n{self.COLOR_SLOGAN}{self.setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
-		# 打印版本号
 		print(f"{self.COLOR_VERSION}版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
 
-		title = f"{'*' * 22} 一言 {'*' * 22}"
-		print(f"\n{self.COLOR_TITLE}{title}{self.COLOR_RESET}")
+	def _print_lyric(self) -> None:
+		self._print_title("一言")
 		lyric: str = self.acquire.send_request(endpoint="https://lty.vc/lyric", method="GET").text
 		print(f"{self.COLOR_SLOGAN}{lyric}{self.COLOR_RESET}")
-		# 打印公告标题
-		title = f"{'*' * 22} 公告 {'*' * 22}"
-		print(f"\n{self.COLOR_TITLE}{title}{self.COLOR_RESET}")
-		# 打印链接
+
+	def _print_announcements(self) -> None:
+		self._print_title("公告")
 		print(f"{self.COLOR_LINK}编程猫社区行为守则 https://shequ.codemao.cn/community/1619098{self.COLOR_RESET}")
 		print(f"{self.COLOR_LINK}2025编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855{self.COLOR_RESET}")
 
-		# 打印数据标题
-		data_title = f"{'*' * 22} 数据 {'*' * 22}"
-		print(f"\n{self.COLOR_DATA}{data_title}{self.COLOR_RESET}")
-		# 调用数据报告
+	def _print_user_data(self) -> None:
+		self._print_title("数据")
 		Tool().message_report(user_id=self.data.ACCOUNT_DATA.id)
-		# 分隔线
 		print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
+
+	def index(self) -> None:
+		self._print_slogan()
+		self._print_lyric()
+		self._print_announcements()
+		self._print_user_data()
 
 
 @decorator.singleton
 class Obtain(ClassUnion):
-	def __init__(self) -> None:
-		super().__init__()
+	SOURCE_MAP: ClassVar[dict[str, tuple[Callable[..., Any], str, str]]] = {
+		"work": (work.Obtain.get_work_comments, "work_id", "reply_user"),
+		"post": (forum.Obtain.get_post_replies_posts, "ids", "user"),
+		"shop": (shop.Obtain.get_shop_discussion, "shop_id", "reply_user"),
+	}
 
-	# 获取新回复(传入参数就获取前*个回复,若没传入就获取新回复数量, 再获取新回复数量个回复)
 	def get_new_replies(
 		self,
 		limit: int = 0,
 		type_item: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"] = "COMMENT_REPLY",
-	) -> list[dict[str, str | int | dict]]:
+	) -> list[dict]:
 		"""获取社区新回复
 		Args:
 			limit: 获取数量限制 (0表示获取全部新回复)
@@ -171,28 +175,22 @@ class Obtain(ClassUnion):
 		Returns:
 			结构化回复数据列表
 		"""
-		replies: list[dict] = []
-
-		# 获取初始消息计数
 		try:
 			message_data = self.community_obtain.get_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
-			return replies
+			return []
 
-		# 处理无新回复的情况
 		if total_replies == 0 and limit == 0:
-			return replies
+			return []
 
-		# 计算实际需要获取的数量
 		remaining = total_replies if limit == 0 else min(limit, total_replies)
 		offset = 0
+		replies = []
 
 		while remaining > 0:
-			# 动态计算每次请求量(5-200之间)
 			current_limit = self.tool.MathUtils().clamp(remaining, 5, 200)
-
 			try:
 				response = self.community_obtain.get_replies(
 					types=type_item,
@@ -200,21 +198,15 @@ class Obtain(ClassUnion):
 					offset=offset,
 				)
 				batch = response.get("items", [])
+				replies.extend(batch[:remaining])
+				actual_count = len(batch[:remaining])
+				remaining -= actual_count
+				offset += current_limit
+
+				if actual_count < current_limit:
+					break
 			except Exception as e:
 				print(f"获取回复失败: {e}")
-				break
-
-			# 计算实际有效数据量(考虑剩余需求)
-			valid_batch = batch[:remaining]
-			replies.extend(valid_batch)
-
-			# 更新迭代参数
-			actual_count = len(valid_batch)
-			remaining -= actual_count
-			offset += current_limit
-
-			# 提前退出条件(无更多数据时)
-			if actual_count < current_limit:
 				break
 
 		return replies
@@ -223,7 +215,7 @@ class Obtain(ClassUnion):
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
+		source: str,
 		method: Literal["user_id", "comment_id"],
 		max_limit: int | None = 200,
 	) -> list[str]: ...
@@ -232,17 +224,17 @@ class Obtain(ClassUnion):
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
+		source: str,
 		method: Literal["comments"],
 		max_limit: int | None = 200,
 	) -> list[dict]: ...
+
 	@lru_cache  # noqa: B019
-	# 获取评论区信息
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
-		method: Literal["user_id", "comments", "comment_id"] = "user_id",
+		source: str,
+		method: str = "user_id",
 		max_limit: int | None = 200,
 	) -> list[dict] | list[str]:
 		"""获取结构化评论数据
@@ -257,51 +249,37 @@ class Obtain(ClassUnion):
 		Returns:
 			根据method参数返回对应格式的数据
 		"""
-		# 预定义字段映射表
-		source_config = {
-			"work": (self.work_obtain.get_work_comments, "work_id", "reply_user"),
-			"post": (self.forum_obtain.get_post_replies_posts, "ids", "user"),
-			"shop": (self.shop_obtain.get_shop_discussion, "shop_id", "reply_user"),
-		}
-
-		# 验证来源有效性
-		if source not in source_config:
-			msg = f"不支持的来源类型: {source},可用选项: {list(source_config.keys())}"
+		if source not in self.SOURCE_MAP:
+			msg = f"无效来源: {source}"
 			raise ValueError(msg)
 
-		# 获取基础数据
-		method_func, id_key, user_field = source_config[source]
+		method_func, id_key, user_field = self.SOURCE_MAP[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
 
-		# 定义处理函数
-		def _extract_reply_user(reply: dict) -> int:
-			"""提取回复用户ID"""
+		def extract_reply_user(reply: dict) -> int:
 			return reply[user_field]["id"]
 
-		def _generate_replies(comment: dict) -> Generator[dict]:
+		def generate_replies(comment: dict) -> Generator[dict[Any, Any] | Any, Any]:
 			if source == "post":
 				yield from self.forum_obtain.get_reply_post_comments(post_id=comment["id"], limit=None)
 			else:
 				yield from comment.get("replies", {}).get("items", [])
 
-		def _process_user_id() -> list[object]:
-			"""提取用户ID列表"""
+		def process_user_id() -> list:
 			user_ids = []
 			for comment in comments:
 				user_ids.append(comment["user"]["id"])
-				user_ids.extend(_extract_reply_user(reply) for reply in _generate_replies(comment))
+				user_ids.extend(extract_reply_user(reply) for reply in generate_replies(comment))
 			return self.tool.DataProcessor().deduplicate(user_ids)
 
-		def _process_comment_id() -> list[object]:
-			"""生成评论ID链"""
+		def process_comment_id() -> list:
 			comment_ids = []
 			for comment in comments:
 				comment_ids.append(str(comment["id"]))
-				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in _generate_replies(comment))
+				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in generate_replies(comment))
 			return self.tool.DataProcessor().deduplicate(comment_ids)
 
-		def _process_detailed() -> list[dict]:
-			"""构建结构化数据"""
+		def process_detailed() -> list[dict]:
 			return [
 				{
 					"user_id": item["user"]["id"],
@@ -312,140 +290,130 @@ class Obtain(ClassUnion):
 					"is_top": item.get("is_top", False),
 					"replies": [
 						{
-							"id": r_item["id"],
-							"content": r_item["content"],
-							"created_at": r_item["created_at"],
-							"user_id": _extract_reply_user(r_item),
-							"nickname": r_item[user_field]["nickname"],
+							"id": reply["id"],
+							"content": reply["content"],
+							"created_at": reply["created_at"],
+							"user_id": extract_reply_user(reply),
+							"nickname": reply[user_field]["nickname"],
 						}
-						for r_item in _generate_replies(item)
+						for reply in generate_replies(item)
 					],
 				}
 				for item in comments
 			]
 
-		# 处理方法路由
-		method_router = {
-			"user_id": _process_user_id,
-			"comment_id": _process_comment_id,
-			"comments": _process_detailed,
+		method_handlers = {
+			"user_id": process_user_id,
+			"comment_id": process_comment_id,
+			"comments": process_detailed,
 		}
 
-		if method not in method_router:
-			msg = f"不支持的请求方法: {method},可用选项: {list(method_router.keys())}"
+		if method not in method_handlers:
+			msg = f"无效方法: {method}"
 			raise ValueError(msg)
 
-		return method_router[method]()
+		method_handlers = {
+			"user_id": process_user_id,
+			"comment_id": process_comment_id,
+			"comments": process_detailed,
+		}
+
+		if method not in method_handlers:
+			msg = f"无效方法: {method}"
+			raise ValueError(msg)
+
+		return method_handlers[method]()
 
 
 @decorator.singleton
 class Motion(ClassUnion):
-	def __init__(self) -> None:
-		super().__init__()
-		# 配置不同来源的参数
-		self.SOURCE_CONFIG = {
-			"work": {
-				"items": lambda: self.user_obtain.get_user_works_web(self.data.ACCOUNT_DATA.id, limit=None),
-				"get_comments": lambda _id: Obtain().get_comments_detail_new(_id, "work", "comments"),
-				"delete": self.work_motion.del_comment_work,
-				"title_key": "work_name",
-			},
-			"post": {
-				"items": lambda: self.forum_obtain.get_post_mine_all("created", limit=None),
-				"get_comments": lambda _id: Obtain().get_comments_detail_new(_id, "post", "comments"),
-				"delete": lambda _id, comment_id, **_: self.forum_motion.delete_comment_post_reply(comment_id, "comments" if _.get("is_reply") else "replies"),
-				"title_key": "title",
-			},
-		}
+	SOURCE_CONFIG: ClassVar[dict[str, SourceConfig]] = {
+		"work": SourceConfig(
+			get_items=lambda self=None: self.user_obtain.get_user_works_web(self.data.ACCOUNT_DATA.id, limit=None),
+			get_comments=lambda _id: Obtain().get_comments_detail_new(_id, "work", "comments"),
+			delete=lambda self=None: self.work_motion.del_comment_work,
+			title_key="work_name",
+		),
+		"post": SourceConfig(
+			get_items=lambda self=None: self.forum_obtain.get_post_mine_all("created", limit=None),
+			get_comments=lambda _id: Obtain().get_comments_detail_new(_id, "post", "comments"),
+			delete=lambda self=None, _id=None, comment_id=None, **_: self.forum_motion.delete_comment_post_reply(
+				comment_id,
+				"comments" if _.get("is_reply") else "replies",
+			),
+			title_key="title",
+		),
+	}
 
 	def clear_comments(
 		self,
-		source: Literal["work", "post"],
-		action_type: Literal["ads", "duplicates", "blacklist"],
+		source: str,
+		action_type: str,
 	) -> bool:
 		"""清理评论核心方法
 		Args:
-			source: 数据来源 work=作品评论 post=帖子回复
-			action_type: 处理类型
-				ads=广告评论
-				duplicates=重复刷屏
-				blacklist=黑名单用户
+		source: 数据来源 work=作品评论 post=帖子回复
+		action_type: 处理类型
+			ads=广告评论
+			duplicates=重复刷屏
+			blacklist=黑名单用户
 		"""
-		# 初始化配置参数
-		config = self._get_source_config(source)
+		config = self.SOURCE_CONFIG[source]
 		params = {
 			"ads": self.data.USER_DATA.ads,
 			"blacklist": self.data.USER_DATA.black_room,
 			"spam_max": self.setting.PARAMETER.spam_del_max,
 		}
 
-		# 收集待处理项
 		target_lists = defaultdict(list)
-		for item in config["items"]():
+		for item in config.get_items(self):
 			self._process_item(item, config, action_type, params, target_lists)
 
-		# 执行删除操作
 		return self._execute_deletion(
 			target_list=target_lists[action_type],
-			delete_handler=config["delete"],
+			delete_handler=config.delete,
 			label={"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}[action_type],
 		)
 
-	def _get_source_config(self, source: str) -> dict:
-		"""获取来源配置"""
-		if source not in self.SOURCE_CONFIG:
-			msg = f"不支持的来源类型: {source}"
-			raise ValueError(msg)
-		return self.SOURCE_CONFIG[source]
-
-	def _process_item(self, item: dict, config: dict, action_type: Literal["ads", "duplicates", "blacklist"], params: dict, target_lists: defaultdict) -> None:
-		"""处理单个作品/帖子"""
+	def _process_item(self, item: dict, config: SourceConfig, action_type: str, params: dict, target_lists: defaultdict) -> None:
 		item_id = int(item["id"])
-		title = item[config["title_key"]]
-		comments = config["get_comments"](item_id)
+		title = item[config.title_key]
+		comments = config.get_comments(self, item_id)
 
-		# 分类型处理逻辑
 		if action_type in {"ads", "blacklist"}:
-			action_type = cast("Literal['ads', 'blacklist']", action_type)
 			self._find_abnormal_comments(comments, item_id, title, action_type, params, target_lists)
 		elif action_type == "duplicates":
 			self._find_duplicate_comments(comments, item_id, params, target_lists)
 
-	def _find_abnormal_comments(self, comments: list, item_id: int, title: str, action_type: Literal["ads", "blacklist"], params: dict, target_lists: defaultdict) -> None:
-		"""发现异常评论 (广告/黑名单 )"""
+	def _find_abnormal_comments(self, comments: list, item_id: int, title: str, action_type: str, params: dict, target_lists: defaultdict) -> None:
 		for comment in comments:
 			if comment.get("is_top"):
-				continue  # 跳过置顶内容
+				continue
 
-			# 处理主评论
 			if self._check_condition(comment, action_type, params):
 				identifier = f"{item_id}.{comment['id']}:comment"
-				# 修正参数顺序 :添加action_type参数
 				self._log_and_add(
 					target_lists=target_lists,
 					data=comment,
 					identifier=identifier,
 					title=title,
-					action_type=action_type,  # 正确传递action_type
+					action_type=action_type,
 				)
 
-			# 处理回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
 					identifier = f"{item_id}.{reply['id']}:reply"
-					# 修正参数顺序 :添加action_type参数和parent_content
 					self._log_and_add(
 						target_lists=target_lists,
 						data=reply,
 						identifier=identifier,
 						title=title,
 						action_type=action_type,
-						parent_content=comment["content"],  # 作为最后一个参数
+						parent_content=comment["content"],
 					)
 
 	@staticmethod
-	def _check_condition(data: dict, action_type: Literal["ads", "blacklist"], params: dict) -> bool:
-		"""检查评论是否符合处理条件"""
+	def _check_condition(data: dict, action_type: str, params: dict) -> bool:
 		content = data["content"].lower()
 		user_id = str(data["user_id"])
 
@@ -457,48 +425,55 @@ class Motion(ClassUnion):
 
 	@staticmethod
 	def _log_and_add(target_lists: defaultdict, data: dict, identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
-		"""记录日志并添加到处理列表"""
-		log_template = {"ads": "广告{type} [{title}]{parent} :{content}", "blacklist": "黑名单{type} [{title}]{parent} :{nickname}"}[action_type]
+		log_templates = {
+			"ads": "广告{type} [{title}]{parent} :{content}",
+			"blacklist": "黑名单{type} [{title}]{parent} :{nickname}",
+		}
 
-		log_message = log_template.format(
-			type="回复" if ":reply" in identifier else "评论",
-			title=title,
-			parent=f" ({parent_content})" if parent_content else "",
-			content=data["content"],
-			nickname=data["nickname"],
-		)
+		log_type = "回复" if ":reply" in identifier else "评论"
+		parent_info = f" ({parent_content})" if parent_content else ""
+
+		if action_type == "ads":
+			log_message = log_templates[action_type].format(
+				type=log_type,
+				title=title,
+				parent=parent_info,
+				content=data["content"],
+			)
+		else:
+			log_message = log_templates[action_type].format(
+				type=log_type,
+				title=title,
+				parent=parent_info,
+				nickname=data["nickname"],
+			)
+
 		print(log_message)
 		target_lists[action_type].append(identifier)
 
-	def _find_duplicate_comments(self, comments: list, item_id: int, params: dict, target_lists: defaultdict) -> None:
-		"""发现重复刷屏评论"""
+	@staticmethod
+	def _find_duplicate_comments(comments: list, item_id: int, params: dict, target_lists: defaultdict) -> None:
 		content_map = defaultdict(list)
 		for comment in comments:
-			self._track_comment(comment, item_id, content_map)
+			Motion._track_comment(comment, item_id, content_map)
 			for reply in comment.get("replies", []):
-				self._track_comment(reply, item_id, content_map, is_reply=True)
+				Motion._track_comment(reply, item_id, content_map, is_reply=True)
 
-		# 筛选达到阈值的评论
-		for (uid, content), ids in content_map.items():
+		for (_, content), ids in content_map.items():
 			if len(ids) >= params["spam_max"]:
-				print(f"发现刷屏评论 :用户{uid} 重复发送 :{content} {len(ids)}次")
+				print(f"发现刷屏评论: {content} {len(ids)}次")
 				target_lists["duplicates"].extend(ids)
 
 	@staticmethod
 	def _track_comment(data: dict, item_id: int, content_map: defaultdict, *, is_reply: bool = False) -> None:
-		"""跟踪评论数据"""
-		if not isinstance(data, dict):
-			msg = f"Invalid comment data type: {type(data)}, expected dict"
-			raise TypeError(msg)
-
 		key = (data["user_id"], data["content"].lower())
 		identifier = f"{item_id}.{data['id']}:{'reply' if is_reply else 'comment'}"
 		content_map[key].append(identifier)
 
-	@staticmethod
 	@decorator.skip_on_error
+	@staticmethod
 	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
-		"""执行删除操作 (保留原有注释 )
+		"""执行删除操作
 
 		注意 :由于编程猫社区接口限制,需要先删除回复再删除主评论,
 		通过反转列表实现从后往前删除,避免出现删除父级评论后无法删除子回复的情况
@@ -507,24 +482,23 @@ class Motion(ClassUnion):
 			print(f"未发现{label}")
 			return True
 
-		print(f"\n发现以下{label} (共{len(target_list)}条 ) :")
+		print(f"\n发现以下{label} (共{len(target_list)}条):")
 		for item in reversed(target_list):
 			print(f" - {item.split(':')[0]}")
 
-		if input(f"\n确认删除所有{label}? (Y/N )").lower() != "y":
+		if input(f"\n确认删除所有{label}? (Y/N)").lower() != "y":
 			print("操作已取消")
 			return True
 
-		# 从最后一条开始删除 (先删回复后删评论 )
 		for entry in reversed(target_list):
 			parts = entry.split(":")[0].split(".")
 			item_id, comment_id = map(int, parts)
 			is_reply = ":reply" in entry
 
 			if not delete_handler(item_id, comment_id, is_reply):
-				print(f"删除失败 :{entry}")
+				print(f"删除失败: {entry}")
 				return False
-			print(f"已删除 :{entry}")
+			print(f"已删除: {entry}")
 
 		return True
 
@@ -532,26 +506,24 @@ class Motion(ClassUnion):
 		"""清除未读消息红点提示
 		Args:
 			method: 处理模式
-				web - 网页端消息类型
-				nemo - 客户端消息类型
+			web - 网页端消息类型
+			nemo - 客户端消息类型
 		Returns:
-			bool: 是否全部清除成功
+		bool: 是否全部清除成功
 		"""
-		# 配置参数映射表
 		method_config = {
 			"web": {
 				"endpoint": "/web/message-record",
 				"message_types": self.setting.PARAMETER.all_read_type,
-				"check_keys": ["count"],  # 对应get_message_counts返回值的结构
+				"check_keys": ["count"],
 			},
 			"nemo": {
 				"endpoint": "/nemo/v2/user/message/{type}",
-				"message_types": [1, 3],  # 1:点赞收藏 3:fork
+				"message_types": [1, 3],
 				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
 			},
 		}
 
-		# 验证方法有效性
 		if method not in method_config:
 			msg = f"不支持的方法类型: {method}"
 			raise ValueError(msg)
@@ -561,41 +533,33 @@ class Motion(ClassUnion):
 		params = {"limit": page_size, "offset": 0}
 
 		def is_all_cleared(counts: dict) -> bool:
-			"""检查是否全部消息已读"""
 			if method == "web":
 				return all(count["count"] == 0 for count in counts[:3])
 			return sum(counts[key] for key in config["check_keys"]) == 0
 
 		def send_batch_requests() -> bool:
-			"""批量发送标记已读请求"""
 			responses = {}
 			for msg_type in config["message_types"]:
-				# 构造请求端点
 				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
 
-				# 添加类型参数
 				request_params = params.copy()
 				if method == "web":
 					request_params["query_type"] = msg_type
 
-				# 发送请求
 				response = self.acquire.send_request(endpoint=endpoint, method="GET", params=request_params)
 				responses[msg_type] = response.status_code
 
-			return all(code == OK_CODE for code in responses.values())
+			return all(code == acquire.HTTPSTATUS.OK.value for code in responses.values())
 
 		try:
 			while True:
-				# 获取当前未读状态
 				current_counts = self.community_obtain.get_message_count(method)
 				if is_all_cleared(current_counts):
 					return True
 
-				# 批量处理当前页
 				if not send_batch_requests():
 					return False
 
-				# 更新分页参数
 				params["offset"] += page_size
 
 		except Exception as e:
@@ -611,13 +575,11 @@ class Motion(ClassUnion):
 
 	def reply_work(self) -> bool:  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
-		# 合并预处理和数据获取逻辑
 		formatted_answers = {
 			k: v.format(**self.data.INFO) if isinstance(v, str) else [i.format(**self.data.INFO) for i in v] for answer in self.data.USER_DATA.answers for k, v in answer.items()
 		}
 		formatted_replies = [r.format(**self.data.INFO) for r in self.data.USER_DATA.replies]
 
-		# 获取并过滤有效回复 (解决set类型问题 )
 		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
 		new_replies = self.tool.DataProcessor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
@@ -627,17 +589,12 @@ class Motion(ClassUnion):
 
 		for reply in new_replies:
 			try:
-				# 合并处理逻辑
 				content = loads(reply["content"])
 				msg = content["message"]
 				reply_type = reply["type"]
-				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
-				# 匹配回复内容
 				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
-				# 执行回复 (解决source类型问题 )
 				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
-				# 获取评论ID (解决find_prefix_suffix参数问题 )
 				comment_ids = [
 					str(item)
 					for item in Obtain().get_comments_detail_new(
@@ -655,16 +612,14 @@ class Motion(ClassUnion):
 				else:
 					parent_id = int(reply.get("reference_id", msg.get("replied_id", 0)))
 					found = self.tool.StringProcessor().find_substrings(
-						text=target_id,  # 添加text参数
+						text=target_id,
 						candidates=comment_ids,
 					)[0]
 					comment_id = int(found) if found else 0
 				print(f"\n{'=' * 30} 新回复 {'=' * 30}")
 				print(f"类型: {reply_type}")
-				# 提取评论内容
 				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
 				print(f"提取关键文本: {comment_text}")
-				# 匹配回复内容 (添加匹配提示 )
 				matched_keyword = None
 				for keyword, resp in formatted_answers.items():
 					if keyword in comment_text:
@@ -715,9 +670,7 @@ class Motion(ClassUnion):
 
 	# 查看账户所有信息综合
 	def get_account_all_data(self) -> dict[Any, Any]:
-		# 创建一个空列表来存储所有字典
 		all_data: list[dict] = []
-		# 调用每个函数并将结果添加到列表中
 		all_data.extend(
 			(
 				self.user_obtain.get_data_details(),
@@ -829,7 +782,6 @@ class Motion(ClassUnion):
 
 		def process_report_batch(records: list[ReportRecord]) -> None:  # noqa: PLR0912
 			"""智能批量处理核心逻辑(增强版)"""
-			# 分组策略:按ID和内容双重分组
 			id_map = defaultdict(list)
 			content_map = defaultdict(list)
 
@@ -917,7 +869,6 @@ class Motion(ClassUnion):
 				if choice == "C":
 					self._show_details(item, report_type, cfg)
 				elif choice == "F" and cfg["special_check"]():
-					# self._check_violations(item, report_type, cfg)
 					source_map = {
 						"comment": "shop" if item.get("comment_source") == "WORK_SHOP" else "work",
 						"post": "post",
@@ -1247,24 +1198,18 @@ class Motion(ClassUnion):
 		def _create_students(student_limit: int) -> None:
 			"""创建学生账号内部逻辑"""
 			class_capacity = 60
-			# 计算需要创建的班级数量
 			class_count = (student_limit + class_capacity - 1) // class_capacity
 
-			# 批量生成名称
 			generator = tool.StudentDataGenerator()
 			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
 			student_names = generator.generate_student_names(num_students=student_limit)
 
-			# 按班级批量创建
 			for class_idx in range(class_count):
-				# 创建班级
 				class_id = edu.Motion().create_class(name=class_names[class_idx])["id"]
 				print(f"创建班级 {class_id}")
-				# 计算本班学生范围
 				start = class_idx * class_capacity
 				end = start + class_capacity
 				batch_names = student_names[start:end]
-				# 批量创建学生
 				edu.Motion().create_student(name=batch_names, class_id=class_id)
 				print("添加学生ing")
 
@@ -1283,19 +1228,22 @@ class Motion(ClassUnion):
 	def download_fiction(self, fiction_id: int) -> None:
 		details = self.library_obtain.get_novel_detail(fiction_id)
 		info = details["data"]["fanficInfo"]
+
 		print(f"正在下载: {info['title']}-{info['nickname']}")
 		print(f"简介: {info['introduction']}")
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
 		print(f"更新时间: {self.tool.TimeUtils().format_timestamp(info['update_time'])}")
+
 		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
+
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
 			section_title = section["title"]
 			section_path = fiction_dir / f"{section_title}.txt"
 			content = self.library_obtain.get_chapter_detail(chapter_id=section_id)["data"]["section"]["content"]
-			formatted_content = self.tool.DataConverter().html_to_text(html_content=content, merge_empty_lines=True)
+			formatted_content = self.tool.DataConverter().html_to_text(content, merge_empty_lines=True)
 			self.file.file_write(path=section_path, content=formatted_content)
 
 	def generate_nemo_code(self, work_id: int) -> None:
