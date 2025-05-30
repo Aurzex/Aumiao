@@ -157,6 +157,9 @@ class Index(ClassUnion):
 
 @decorator.singleton
 class Obtain(ClassUnion):
+	def __init__(self) -> None:
+		super().__init__()
+		
 	SOURCE_MAP: ClassVar[dict[str, tuple[Callable[..., Any], str, str]]] = {
 		"work": (work.Obtain.get_work_comments, "work_id", "reply_user"),
 		"post": (forum.Obtain.get_post_replies_posts, "ids", "user"),
