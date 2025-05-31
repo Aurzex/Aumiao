@@ -1,6 +1,5 @@
 name: Build and Package with Nuitka
 
-# 添加最小权限声明
 permissions:
   contents: read
   actions: write
@@ -11,13 +10,13 @@ on:
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
-      - "Aumiao-py/pyproject.toml" # 添加版本文件监控
+      - "Aumiao-py/pyproject.toml"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
-      - "Aumiao-py/pyproject.toml" # 添加版本文件监控
+      - "Aumiao-py/pyproject.toml"
   workflow_dispatch:
 
 env:
@@ -46,21 +45,29 @@ jobs:
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Read Project Version
-        id: version
+      - name: Read Project Version (Debug)
+        id: read_version
         shell: pwsh
         run: |
           # 从pyproject.toml中提取版本号
           $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw
+          Write-Host "TOML content: $tomlContent"
+
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
+              Write-Host "Extracted version: $version"
               echo "PROJECT_VERSION=$version" >> $GITHUB_ENV
-              echo "version=$version" >> $GITHUB_OUTPUT
           } else {
               Write-Error "Version not found in pyproject.toml"
               exit 1
           }
+
+      - name: Verify Version Extraction
+        run: |
+          echo "PROJECT_VERSION=${{ env.PROJECT_VERSION }}"
+          echo "GITHUB_ENV content:"
+          cat $GITHUB_ENV || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -112,7 +119,7 @@ jobs:
           assume-yes-for-downloads: true
           company-name: "Aumiao Team"
           copyright: "Copyright © 2025 喵鱼a. All rights reserved."
-          file-version: ${{ env.PROJECT_VERSION }} # 使用动态版本
+          file-version: ${{ env.PROJECT_VERSION || '2.0.0' }} # 添加回退值
           follow-imports: true
           jobs: 4
           lto: "yes"
@@ -120,7 +127,7 @@ jobs:
           output-dir: build
           output-filename: aumiao
           product-name: "Aumiao"
-          product-version: ${{ env.PROJECT_VERSION }} # 使用动态版本
+          product-version: ${{ env.PROJECT_VERSION || '2.0.0' }} # 添加回退值
           script-name: ./Aumiao-py/main.py
           show-progress: true
           windows-console-mode: force
@@ -138,7 +145,7 @@ jobs:
           )
           Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
           $versionInfo = @{
-              Version   = "${{ env.PROJECT_VERSION }}"
+              Version   = "${{ env.PROJECT_VERSION || '2.0.0' }}"
               BuildDate = "${{ env.BUILD_DATE }}"
               GitCommit = "${{ env.GIT_SHA }}"
           } | ConvertTo-Json
@@ -146,7 +153,7 @@ jobs:
 
       - name: Optimize Binaries
         shell: pwsh
-        continue-on-error: true # 确保即使UPX失败也不会中断构建
+        continue-on-error: true
         run: |
           if (-not (Test-Path "./upx.exe")) {
               $ProgressPreference = 'SilentlyContinue'
@@ -170,14 +177,14 @@ jobs:
       - name: Package Artifacts
         shell: pwsh
         run: |
-          $packageName = "Aumiao_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
+          $packageName = "Aumiao_v${{ env.PROJECT_VERSION || '2.0.0' }}.${{ env.BUILD_DATE }}_alpha.zip"
           $distDir = Resolve-Path "./build/main.dist"
           7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
         with:
-          name: Aumiao_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}
+          name: Aumiao_v${{ env.PROJECT_VERSION || '2.0.0' }}.${{ env.BUILD_DATE }}
           path: build/*.zip
           retention-days: 7
 
