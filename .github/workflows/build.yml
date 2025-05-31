@@ -45,29 +45,36 @@ jobs:
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Read Project Version (Debug)
-        id: read_version
+      - name: Read Project Version
+        id: version
         shell: pwsh
         run: |
           # 从pyproject.toml中提取版本号
-          $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw
+          $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw -Encoding UTF8
           Write-Host "TOML content: $tomlContent"
 
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
               Write-Host "Extracted version: $version"
-              echo "PROJECT_VERSION=$version" >> $GITHUB_ENV
+              
+              # 正确设置环境变量
+              Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           } else {
               Write-Error "Version not found in pyproject.toml"
               exit 1
           }
 
       - name: Verify Version Extraction
+        shell: pwsh
         run: |
-          echo "PROJECT_VERSION=${{ env.PROJECT_VERSION }}"
-          echo "GITHUB_ENV content:"
-          cat $GITHUB_ENV || true
+          Write-Host "PROJECT_VERSION = $env:PROJECT_VERSION"
+          Write-Host "GITHUB_ENV content:"
+          if (Test-Path $env:GITHUB_ENV) {
+              Get-Content $env:GITHUB_ENV
+          } else {
+              Write-Host "GITHUB_ENV file not found"
+          }
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -119,7 +126,7 @@ jobs:
           assume-yes-for-downloads: true
           company-name: "Aumiao Team"
           copyright: "Copyright © 2025 喵鱼a. All rights reserved."
-          file-version: ${{ env.PROJECT_VERSION || '2.0.0' }} # 添加回退值
+          file-version: ${{ env.PROJECT_VERSION || '2.0.0' }}
           follow-imports: true
           jobs: 4
           lto: "yes"
@@ -127,7 +134,7 @@ jobs:
           output-dir: build
           output-filename: aumiao
           product-name: "Aumiao"
-          product-version: ${{ env.PROJECT_VERSION || '2.0.0' }} # 添加回退值
+          product-version: ${{ env.PROJECT_VERSION || '2.0.0' }}
           script-name: ./Aumiao-py/main.py
           show-progress: true
           windows-console-mode: force
