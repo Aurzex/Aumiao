@@ -104,14 +104,28 @@ def process_stream(stream: TextIO, command_name: str, replacements: list[dict[st
 			output_stream.flush()
 
 
+# 在原代码基础上修改 execute_command 函数
 def execute_command(command: list[str], replacements: list[dict[str, Any]], locale: str = "default") -> int:
 	"""执行命令并处理输出"""
 	try:
 		# 获取命令名称用于过滤规则
 		command_name = Path(command[0]).name
 
+		# 特殊处理交互式命令
+		is_interactive = command_name.lower() in {"python", "python3", "ipython", "bash", "sh", "cmd"}
+
 		# 启动子进程 - 安全地执行命令
-		proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True, bufsize=1, encoding="utf-8", errors="replace")  # noqa: S603
+		proc = subprocess.Popen(
+			command if not is_interactive else [" ".join(command)],
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			stdin=subprocess.PIPE,
+			text=True,
+			bufsize=1,
+			encoding="utf-8",
+			errors="replace",
+			shell=is_interactive,  # 对于交互式命令, 需要设置shell=True
+		)
 
 		# 创建处理输出的线程
 		stdout_thread = threading.Thread(target=process_stream, args=(proc.stdout, command_name, replacements, sys.stdout, locale))
@@ -123,22 +137,41 @@ def execute_command(command: list[str], replacements: list[dict[str, Any]], loca
 		stdout_thread.start()
 		stderr_thread.start()
 
-		# 处理标准输入
-		try:
-			while True:
-				if proc.stdin is None:
-					break
-				input_line = sys.stdin.readline()
-				if not input_line:  # EOF
-					break
-				proc.stdin.write(input_line)
-				proc.stdin.flush()
-		except (KeyboardInterrupt, BrokenPipeError):
-			# 用户中断或管道关闭
-			pass
-		finally:
-			if proc.stdin:
-				proc.stdin.close()
+		# 特殊处理交互式输入
+		if is_interactive:
+			try:
+				while proc.poll() is None:
+					if proc.stdin is None:
+						break
+					try:
+						input_line = sys.stdin.readline()
+						if not input_line:  # EOF
+							break
+						proc.stdin.write(input_line)
+						proc.stdin.flush()
+					except (KeyboardInterrupt, EOFError):
+						# 处理Ctrl+C和Ctrl+D
+						proc.stdin.write("\n")
+						proc.stdin.flush()
+			except Exception as e:
+				print(f"处理输入时出错: {e}", file=sys.stderr)
+		else:
+			# 非交互式命令的标准输入处理
+			try:
+				while True:
+					if proc.stdin is None:
+						break
+					input_line = sys.stdin.readline()
+					if not input_line:  # EOF
+						break
+					proc.stdin.write(input_line)
+					proc.stdin.flush()
+			except (KeyboardInterrupt, BrokenPipeError):
+				pass
+
+		# 关闭标准输入
+		if proc.stdin:
+			proc.stdin.close()
 
 		# 等待进程结束
 		return_code = proc.wait()
@@ -149,7 +182,7 @@ def execute_command(command: list[str], replacements: list[dict[str, Any]], loca
 
 	except FileNotFoundError:
 		print(f"错误: 找不到命令 '{command[0]}'", file=sys.stderr)
-		return 127  # 标准命令未找到退出码
+		return 127
 	except Exception as e:
 		print(f"执行命令时出错: {e}", file=sys.stderr)
 		return 1
@@ -196,3 +229,4 @@ def main() -> None:
 if __name__ == "__main__":
 	main()
 # python Aumiao-py/clitheme/clitheme.py -apply Aumiao-py/clitheme/theme.json -- python3 Aumiao-py/main.py
+# python Aumiao-py/clitheme/clitheme.py -apply Aumiao-py/clitheme/theme.json -- python3 -i
