@@ -1,0 +1,89 @@
+{
+	"replacements": [
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^Type \"help\", \"copyright\", \"credits\" or \"license\" for more information\\.",
+			"replacement": "主人，我是超萌超可爱的Python喵！很高兴为你服务喵！～\n如果你想了解我，请使用\"help\"、\"copyright\"、\"credits\"、或\"license\"喵～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<esc>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)Traceback \\(most recent call last\\):",
+			"replacement": "杂鱼♡～主人的代码出错了呢～真是个杂鱼♡～："
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<spc>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*[ ]{2})File (?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)\"(?P<filename>.+)\"(?P<c2>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*), line (?P<c3>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)(?P<line>\\d+)(?P<c4>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*), in (?P<c5>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)(?P<func>[^\\x1b\\r\\n]+)(?P<c6>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)",
+			"replacement": "\\g<spc>在文件\\g<c1>\"\\g<filename>\"\\g<c2>中第\\g<c3>\\g<line>\\g<c4>行的函数\\g<c5>\\g<func>\\g<c6>中～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<spc>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*[ ]{2})File (?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)\"(?P<filename>.+)\"(?P<c2>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*), line (?P<c3>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)(?P<line>\\d+)(?P<c4>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)",
+			"replacement": "\\g<spc>在文件\\g<c1>\"\\g<filename>\"\\g<c2>中的第\\g<c3>\\g<line>\\g<c4>行～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)SyntaxError: invalid syntax\\. Perhaps you forgot a comma\\?",
+			"replacement": "\\g<c1>(SyntaxError): 主人的代码有语法错误呢～真是个杂鱼♡～（或许主人忘记加逗号了喵？～）"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)SyntaxError: invalid syntax",
+			"replacement": "\\g<c1>(SyntaxError): 主人的代码有语法错误呢～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)NameError: name '(?P<n>.+)' is not defined\\. Did you mean: '(?P<name2>.+)'\\? Or did you forget to import '(?P<name3>.+)'\\?",
+			"replacement": "\\g<c1>(NameError): 主人尝试访问的\"\\g<n>\"不存在呢～真是个杂鱼♡～（或许主人要找的是'\\g<name2>'喵？或者主人忘记import '\\g<name3>'了喵？～）"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)NameError: name '(?P<n>.+)' is not defined\\. Did you mean: '(?P<name2>.+)'\\?",
+			"replacement": "\\g<c1>(NameError): 主人尝试访问的\"\\g<n>\"不存在呢～真是个杂鱼♡～（或许主人要找的是'\\g<name2>'喵？～）"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)NameError: name '(?P<n>.+)' is not defined\\. Did you forget to import '(?P<name2>.+)'\\?",
+			"replacement": "\\g<c1>(NameError): 主人尝试访问的\"\\g<n>\"不存在呢～真是个杂鱼♡～（或许主人忘记import '\\g<name2>'了喵？～）"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)(?P<e>NameError|ModuleNotFoundError|KeyError): [^\\r\\n]+",
+			"replacement": "\\g<c1>(\\g<e>): 主人尝试访问的对象不存在呢～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)AttributeError: '(?P<name1>[^']+)' object has no attribute '(?P<name2>[^']+)'\\. Did you mean: '(?P<name3>[^']+)'\\?",
+			"replacement": "\\g<c1>(AttributeError): 主人尝试访问\"\\g<name1>\"中的\"\\g<name2>\"不存在呢～真是个杂鱼♡～（或许主人要找的是'\\g<name3>'喵？～）"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)AttributeError: '(?P<name1>[^']+)' object has no attribute '(?P<name2>[^']+)'",
+			"replacement": "\\g<c1>(AttributeError): 主人尝试访问\"\\g<name1>\"中的\"\\g<name2>\"不存在呢～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)ZeroDivisionError: division by zero",
+			"replacement": "\\g<c1>(ZeroDivisionError): 主人竟然尝试把数字除与0呢～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)IndexError: (?P<msg>\\w+ index out of range)",
+			"replacement": "\\g<c1>(IndexError): 主人竟然尝试偷窥本喵的隐私呢～真是个杂鱼♡～(\\g<msg>)"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)IndentationError: [^\\r\\n]+",
+			"replacement": "\\g<c1>(IndentationError): 主人代码中的缩进有问题呢～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^(?P<c1>(\\x1b\\[[\\[()\\]][\\d?;]*?[a-zA-Z]|\\x1b.)*)TabError: inconsistent use of tabs and spaces in indentation",
+			"replacement": "\\g<c1>(TabError): 主人居然把缩进和空格放在一起用～真是个杂鱼♡～"
+		},
+		{
+			"filter_commands": ["python", "python3"],
+			"pattern": "^During handling of the above exception, another exception occurred:",
+			"replacement": "主人的代码竟然同时出现了多个报错呢～真是个杂鱼♡～："
+		}
+	]
+}
