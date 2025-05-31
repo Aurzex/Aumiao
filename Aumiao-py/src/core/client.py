@@ -150,7 +150,7 @@ class Index(ClassUnion):
 
 	def index(self) -> None:
 		self._print_slogan()
-		self._print_lyric()
+		# self._print_lyric()
 		self._print_announcements()
 		self._print_user_data()
 

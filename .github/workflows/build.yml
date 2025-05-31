@@ -1,5 +1,10 @@
 name: Build and Package with Nuitka
 
+# 添加最小权限声明
+permissions:
+  contents: read # 默认只读权限
+  actions: write # 允许上传构建产物
+
 on:
   push:
     branches: [main]
@@ -20,6 +25,10 @@ env:
 
 jobs:
   build:
+    # 显式声明作业权限（继承全局）
+    permissions:
+      contents: read
+      actions: write
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -100,11 +109,11 @@ jobs:
           windows-console-mode: force
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
+      # New-Item -Path "$distDir/.log" -ItemType Directory -Force
       - name: Prepare Distribution
         shell: pwsh
         run: |
           $distDir = "build/main.dist"
-          New-Item -Path "$distDir/.log" -ItemType Directory -Force
           $essentialFiles = @(
               "./Aumiao-py/README.txt",
               "./Aumiao-py/DISCLAIMER.txt",
@@ -138,7 +147,7 @@ jobs:
       - name: Package Artifacts
         shell: pwsh
         run: |
-          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}_alpha.zip"
+          $packageName = "Aumiao_v2.0.0.${{ env.BUILD_DATE }}.zip"
           $distDir = Resolve-Path "./build/main.dist"
           7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
 
