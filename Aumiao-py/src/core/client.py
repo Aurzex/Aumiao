@@ -159,12 +159,11 @@ class Index(ClassUnion):
 class Obtain(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
-		
-	SOURCE_MAP: ClassVar[dict[str, tuple[Callable[..., Any], str, str]]] = {
-		"work": (work.Obtain.get_work_comments, "work_id", "reply_user"),
-		"post": (forum.Obtain.get_post_replies_posts, "ids", "user"),
-		"shop": (shop.Obtain.get_shop_discussion, "shop_id", "reply_user"),
-	}
+		self.source_map: dict[str, tuple[Callable[..., Any], str, str]] = {
+			"work": (self.work_obtain.get_work_comments, "work_id", "reply_user"),
+			"post": (self.forum_obtain.get_post_replies_posts, "ids", "user"),
+			"shop": (self.shop_obtain.get_shop_discussion, "shop_id", "reply_user"),
+		}
 
 	def get_new_replies(
 		self,
@@ -178,6 +177,7 @@ class Obtain(ClassUnion):
 		Returns:
 			结构化回复数据列表
 		"""
+
 		try:
 			message_data = self.community_obtain.get_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
@@ -252,11 +252,11 @@ class Obtain(ClassUnion):
 		Returns:
 			根据method参数返回对应格式的数据
 		"""
-		if source not in self.SOURCE_MAP:
+		if source not in self.source_map:
 			msg = f"无效来源: {source}"
 			raise ValueError(msg)
 
-		method_func, id_key, user_field = self.SOURCE_MAP[source]
+		method_func, id_key, user_field = self.source_map[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
 
 		def extract_reply_user(reply: dict) -> int:
