@@ -90,27 +90,50 @@ class CodeMaoClient:
 	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
-		# self._session.headers.clear()
+
+		# 当有文件上传时,移除 Content-Type 头,让 requests 自动生成正确的 multipart 边界
+		if files is not None and "Content-Type" in merged_headers:
+			del merged_headers["Content-Type"]
+
 		log = bool(self.log_request and log)
+
 		for attempt in range(retries):
 			try:
-				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, files=files, timeout=timeout)
-				# if "Authorization" in response.request.headers:
-				# 	print(response.request.headers["Authorization"])
+				# 根据是否有文件选择不同的数据传递方式
+				if files is not None:
+					# 文件上传时,使用 data 而不是 json
+					response = self._session.request(
+						method=method,
+						url=url,
+						headers=merged_headers,
+						params=params,
+						data=payload,  # 使用 data 而不是 json
+						files=files,
+						timeout=timeout,
+					)
+				else:
+					# 普通请求使用 json
+					response = self._session.request(
+						method=method,
+						url=url,
+						headers=merged_headers,
+						params=params,
+						json=payload,
+						timeout=timeout,
+					)
+
 				if log:
 					print("=" * 82)
 					print(f"Request {method} {url} {response.status_code}")
-					# with contextlib.suppress(Exception):
-					# 	print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
+
 				response.raise_for_status()
 
 			except HTTPError as err:
 				print(f"HTTP Error {type(err).__name__} - {err}")
 				sleep(2**attempt * backoff_factor)
 				if attempt == retries - 1:
-					return err.response  # type: ignore  # noqa: PGH003
+					return err.response
 				continue
-				break
 			except (ReqConnectionError, Timeout) as err:
 				print(f"Network error ({type(err).__name__}): {err}")
 				if attempt == retries - 1:
@@ -125,7 +148,6 @@ class CodeMaoClient:
 			else:
 				if log:
 					self._log_request(response)
-				# self.update_cookies(response.cookies)
 				return response
 
 		return cast("Response", None)
@@ -334,8 +356,8 @@ class CodeMaoClient:
 
 
 class FileUploader:
-	def __init__(self, client: CodeMaoClient | None = None) -> None:
-		self.client = client or CodeMaoClient()
+	def __init__(self) -> None:
+		self.client = CodeMaoClient()
 
 	def upload_via_pgaot(self, file_path: Path, save_path: str = "aumiao") -> str:
 		"""直接上传到Pgaot服务器(使用默认文件类型)"""
@@ -353,22 +375,17 @@ class FileUploader:
 
 	def upload_via_codemao(self, file_path: Path) -> str:
 		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
-		# Generate unique filename with timestamp
 		timestamp = tool.TimeUtils().current_timestamp()
 		unique_name = f"aumiao/{timestamp}{file_path.name}"
 
-		# 1. 获取上传Token (with unique filename)
-		token_info = self.get_codemao_token(
-			file_path=unique_name,  # Pass the unique path
-		)
+		token_info = self.get_codemao_token(file_path=unique_name)
 
-		# 2. 上传文件
 		with file_path.open("rb") as file_obj:
 			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
 			data = {
 				"token": token_info["token"],
 				"key": token_info["file_path"],
-				"fname": file_path.name,  # Add original filename
+				"fname": file_path.name,
 			}
 			self.client.send_request(
 				endpoint=token_info["upload_url"],
@@ -386,7 +403,7 @@ class FileUploader:
 		project_name: str = "community_frontend",
 		cdn_name: str = "qiniu",
 	) -> dict:
-		"""获取七牛云上传凭证(封装原GET请求)"""
+		"""获取七牛云上传凭证"""
 		params = {
 			"projectName": project_name,
 			"filePaths": file_path,
