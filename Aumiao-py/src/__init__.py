@@ -16,24 +16,25 @@ if TYPE_CHECKING or _is_compiling:
 	# 显式导入所有子模块以确保类型系统识别
 	from .api import coco, community, edu, forum, library, pickduck, shop, user, whale, work
 	from .core import client
-	from .utils import data, decorator, tool
+	from .utils import acquire, data, decorator, tool
 
 # 模块路径映射 (使用 Final 类型提示)
 _MODULE_PATHS: Final[dict[str, str]] = {
+	"acquire": ".utils.acquire",
 	"client": ".core.client",
+	"coco": ".api.coco",
+	"community": ".api.community",
 	"data": ".utils.data",
 	"decorator": ".utils.decorator",
-	"community": ".api.community",
 	"edu": ".api.edu",
 	"forum": ".api.forum",
 	"library": ".api.library",
 	"pickduck": ".api.pickduck",
 	"shop": ".api.shop",
+	"tool": ".utils.tool",
 	"user": ".api.user",
 	"whale": ".api.whale",
 	"work": ".api.work",
-	"tool": ".utils.tool",
-	"coco": ".api.coco",
 }
 
 # 导出列表 (根据映射自动生成)
@@ -54,6 +55,7 @@ __all__: list[str] = [  # noqa: PLE0604
 	"decorator",
 	"tool",
 	"coco",
+	"acquire",
 ]  # type: ignore  # noqa: PGH003
 
 # 模块缓存 (使用弱引用字典可考虑 WeakValueDictionary)
