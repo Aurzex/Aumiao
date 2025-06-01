@@ -400,7 +400,7 @@ class FileUploader:
 	def get_codemao_token(
 		self,
 		file_path: str = "aumiao",
-		project_name: str = "community_frontend",
+		project_name: Literal["community_frontend", "nemo_android_ios"] = "community_frontend",
 		cdn_name: str = "qiniu",
 	) -> dict:
 		"""获取七牛云上传凭证"""
