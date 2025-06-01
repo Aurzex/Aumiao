@@ -6,7 +6,6 @@ from time import sleep
 from typing import Literal, TypedDict, cast
 
 from requests import Response
-from requests import post as re_post
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
@@ -46,10 +45,6 @@ class PaginationConfig(TypedDict, total=False):
 	offset_key: Literal["offset", "page", "current_page"]
 	response_amount_key: Literal["limit", "page_size"]
 	response_offset_key: Literal["offset", "page"]
-
-
-# class Loggable(Protocol):
-# 	def file_write(self, path: Path, content: str, method: str) -> None: ...
 
 
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT"]
@@ -339,22 +334,21 @@ class CodeMaoClient:
 
 
 class FileUploader:
-	def __init__(self, codemao_cookie: str | None = None) -> None:
-		self.codemao_cookie = codemao_cookie
+	def __init__(self, client: CodeMaoClient | None = None) -> None:
+		self.client = client or CodeMaoClient()
 
-	@staticmethod
-	def upload_via_pgaot(file_path: Path, save_path: str = "aumiao") -> str:
+	def upload_via_pgaot(self, file_path: Path, save_path: str = "aumiao") -> str:
 		"""直接上传到Pgaot服务器(使用默认文件类型)"""
-		file_obj = file_path.open("rb")
-		files = {"file": (file_path.name, file_obj, "application/octet-stream")}
-		data = {"path": save_path}
-		response = re_post(
-			url="https://api.pgaot.com/user/up_cat_file",
-			files=files,
-			data=data,
-			timeout=120,
-		)
-		file_obj.close()  # Ensure the file is closed
+		with file_path.open("rb") as file_obj:
+			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			data = {"path": save_path}
+			response = self.client.send_request(
+				endpoint="https://api.pgaot.com/user/up_cat_file",
+				method="POST",
+				files=files,
+				payload=data,
+				timeout=120,
+			)
 		return response.json()
 
 	def upload_via_codemao(self, file_path: Path) -> str:
@@ -376,18 +370,19 @@ class FileUploader:
 				"key": token_info["file_path"],
 				"fname": file_path.name,  # Add original filename
 			}
-			_response = re_post(
-				token_info["upload_url"],
+			self.client.send_request(
+				endpoint=token_info["upload_url"],
+				method="POST",
 				files=files,
-				data=data,
+				payload=data,
 				timeout=120,
 			)
 
 		return token_info["pic_host"] + token_info["file_path"]
 
-	@staticmethod
 	def get_codemao_token(
-		file_path: str = "aumiao",  # Now accepts custom path
+		self,
+		file_path: str = "aumiao",
 		project_name: str = "community_frontend",
 		cdn_name: str = "qiniu",
 	) -> dict:
@@ -401,7 +396,16 @@ class FileUploader:
 			"cdnName": cdn_name,
 		}
 
-		response = CodeMaoClient().send_request(endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading", method="GET", params=params)
+		response = self.client.send_request(
+			endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
+			method="GET",
+			params=params,
+		)
 
 		data = response.json()
-		return {"token": data["tokens"][0]["token"], "file_path": data["tokens"][0]["file_path"], "upload_url": data["upload_url"], "pic_host": data["bucket_url"]}
+		return {
+			"token": data["tokens"][0]["token"],
+			"file_path": data["tokens"][0]["file_path"],
+			"upload_url": data["upload_url"],
+			"pic_host": data["bucket_url"],
+		}
