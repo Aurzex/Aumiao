@@ -428,6 +428,22 @@ class Motion:
 		# 返回请求状态码是否为204
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
+	# 四个预设封面
+	# https://static.codemao.cn/nemo/cover/cover_mountain.png
+	# https://static.codemao.cn/nemo/cover/cover_moon.png
+	# https://static.codemao.cn/nemo/cover/cover_sunrise.png
+	# https://static.codemao.cn/nemo/cover/cover_forest.png
+	def set_preview_cover(self, cover_url: str) -> bool:
+		# 设置预览封面
+		data = {"preview": cover_url}
+		response = self.acquire.send_request(
+			endpoint="/nemo/v2/user/preview",
+			method="POST",
+			payload=data,
+		)
+		# 返回请求状态码是否为204
+		return response.status_code == HTTPSTATUS.OK.value
+
 
 # TODO@Aurzex: 待完善
 # /tiger/v3/web/accounts/captcha/password/update
