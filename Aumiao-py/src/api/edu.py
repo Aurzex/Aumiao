@@ -220,10 +220,10 @@ class Motion:
 			method="POST",
 			payload=data,
 		)
-		if response.status_code == HTTPSTATUS.NOT_FOUND.value:
-			print("教师号注册失败,原因:该账户是学生账户,无法注册教师号")
-		elif response.status_code == HTTPSTATUS.FORBIDDEN.value:
-			print("教师号注册失败,原因:你的ip地址被封禁")
+		# if response.status_code == HTTPSTATUS.NOT_FOUND.value:
+		# 	print("教师号注册失败,原因:该账户是学生账户,无法注册教师号")
+		# elif response.status_code == HTTPSTATUS.FORBIDDEN.value:
+		# 	print("教师号注册失败,原因:你的ip地址被封禁")
 		return response.status_code == HTTPSTATUS.OK.value
 
 
