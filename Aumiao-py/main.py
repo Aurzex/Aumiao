@@ -68,7 +68,7 @@ def clear_comments() -> None:
 	source = input(f"{COLOR_CODES['PROMPT']}↳ 请输入来源类型 (work/post): {COLOR_CODES['RESET']}").lower()
 	action_type = input(f"{COLOR_CODES['PROMPT']}↳ 请输入操作类型 (ads/duplicates/blacklist): {COLOR_CODES['RESET']}").lower()
 	source = cast("Literal['work', 'post']", source)
-	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", source)
+	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
 	if source not in valid_sources or action_type not in valid_actions:
 		print(f"{COLOR_CODES['ERROR']}无效的输入,请检查选项是否正确{COLOR_CODES['RESET']}")
 		return
