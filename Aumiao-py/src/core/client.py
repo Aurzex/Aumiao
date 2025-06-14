@@ -108,10 +108,10 @@ class Tool(ClassUnion):
 			)
 		self.cache_manager.update(user_data)
 
-	def guess_phonenum(self, phonenum: str) -> int | None:
+	def guess_phone_num(self, phone_num: str) -> int | None:
 		for i in range(10000):
 			guess = f"{i:04d}"
-			test_string = int(phonenum.replace("****", guess))
+			test_string = int(phone_num.replace("****", guess))
 			if self.user_motion.verify_phone(test_string):
 				return test_string
 		return None
