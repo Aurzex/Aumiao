@@ -1,11 +1,19 @@
 name: Code Quality Automation
 
+# 添加最小权限声明
+permissions:
+  contents: read  # 默认只读权限
+  pull-requests: write  # 需要写权限推送修复
+
 on:
   pull_request:
   pull_request_target:
 
 jobs:
   code-styling:
+    # 显式声明作业权限（继承全局）
+    permissions:
+      contents: read
     name: "Lint & Format"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -28,6 +36,8 @@ jobs:
           src: "./Aumiao-py/src"
 
   spell-check:
+    permissions:
+      contents: read
     name: "Spell Check"
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -42,22 +52,21 @@ jobs:
           files: ./Aumiao-py/src
 
   apply-fixes:
+    # 此作业需要写权限
+    permissions:
+      contents: write
+      pull-requests: write
     name: "Apply Fixes"
     needs: [code-styling, spell-check]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout Code
+      # 安全修复：使用受信任的checkout方式
+      - name: Checkout Code (Safe)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event.pull_request.head.sha }}  # 直接使用提交SHA
           token: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Set HEAD_REF environment variable
-      #   run: echo "HEAD_REF=${{ github.head_ref }}" >> $GITHUB_ENV
-      - name: Set HEAD_REF environment variable
-        run: echo "HEAD_REF=${HEAD_REF}" >> $GITHUB_ENV
-        env:
-          HEAD_REF: ${{ github.head_ref }}
 
       - name: Detect Modifications
         id: changes
@@ -66,6 +75,8 @@ jobs:
 
       - name: Commit Fixes
         if: env.HAS_CHANGES == 'true'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config --global user.name "Code Quality Bot"
           git config --global user.email "bot@aumiao-py"
