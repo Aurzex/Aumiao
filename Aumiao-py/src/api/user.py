@@ -88,8 +88,8 @@ class Obtain:
 		response = self.acquire.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
 		return response.json()
 
-	# 获取用户姓名
-	def get_data_name(self) -> dict:
+	# 可能会返回{"code":6404,"msg":"未绑定手机号"},从而可以检测是否绑定手机号
+	def get_data_lesson_info(self) -> dict:
 		response = self.acquire.send_request(endpoint="/api/v2/pc/lesson/user/info", method="GET")
 		return response.json()
 
@@ -320,6 +320,8 @@ class Motion:
 		return response.status_code == HTTPSTATUS.OK.value
 
 	def set_data_username(self, username: str) -> bool:
+		msg = "此为实验性功能"
+		raise ValueError(msg)
 		response = self.acquire.send_request(
 			endpoint="/tiger/v3/web/accounts/username",
 			method="PATCH",
@@ -425,3 +427,30 @@ class Motion:
 		)
 		# 返回请求状态码是否为204
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+
+	# 四个预设封面
+	# https://static.codemao.cn/nemo/cover/cover_mountain.png
+	# https://static.codemao.cn/nemo/cover/cover_moon.png
+	# https://static.codemao.cn/nemo/cover/cover_sunrise.png
+	# https://static.codemao.cn/nemo/cover/cover_forest.png
+	def set_preview_cover(self, cover_url: str) -> bool:
+		# 设置预览封面
+		data = {"preview": cover_url}
+		response = self.acquire.send_request(
+			endpoint="/nemo/v2/user/preview",
+			method="POST",
+			payload=data,
+		)
+		# 返回请求状态码是否为204
+		return response.status_code == HTTPSTATUS.OK.value
+
+
+# TODO@Aurzex: 待完善
+# /tiger/v3/web/accounts/captcha/password/update
+# 发送修改密码的短信验证码
+
+# /tiger/v3/web/accounts/password/phone
+# 通过短信验证码修改密码
+
+# /tiger/v3/web/accounts/tokens/convert
+# 获取用户访问令牌(Token)

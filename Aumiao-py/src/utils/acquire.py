@@ -1,12 +1,11 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
-from io import BytesIO
 from pathlib import Path
 from time import sleep
 from typing import Literal, TypedDict, cast
 
-import requests
+from requests import Response
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
@@ -18,7 +17,6 @@ from .decorator import singleton
 LOG_DIR: Path = data.CURRENT_DIR / ".log"
 LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 DICT_ITEM = 2
-
 MAX_CHARACTER = 100
 
 
@@ -31,9 +29,12 @@ class Token:
 
 
 class HTTPSTATUS(Enum):
-	OK = 200
 	CREATED = 201
+	FORBIDDEN = 403
+	NOT_FOUND = 404
+	NOT_MODIFIED = 304
 	NO_CONTENT = 204
+	OK = 200
 
 
 class PaginationConfig(TypedDict, total=False):
@@ -43,10 +44,6 @@ class PaginationConfig(TypedDict, total=False):
 	offset_key: Literal["offset", "page", "current_page"]
 	response_amount_key: Literal["limit", "page_size"]
 	response_offset_key: Literal["offset", "page"]
-
-
-# class Loggable(Protocol):
-# 	def file_write(self, path: Path, content: str, method: str) -> None: ...
 
 
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT"]
@@ -82,36 +79,60 @@ class CodeMaoClient:
 		method: HttpMethod,
 		params: dict | None = None,
 		payload: dict | None = None,
+		files: dict | None = None,
 		headers: dict | None = None,
 		retries: int = 1,
 		backoff_factor: float = 0.3,
 		timeout: float = 10.0,
 		*,
 		log: bool = True,
-	) -> requests.Response:
+	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		merged_headers = {**self.headers, **(headers or {})}
-		# self._session.headers.clear()
+
+		# 当有文件上传时,移除 Content-Type 头,让 requests 自动生成正确的 multipart 边界
+		if files is not None and "Content-Type" in merged_headers:
+			del merged_headers["Content-Type"]
+
 		log = bool(self.log_request and log)
+
 		for attempt in range(retries):
 			try:
-				response = self._session.request(method=method, url=url, headers=merged_headers, params=params, json=payload, timeout=timeout)
-				# if "Authorization" in response.request.headers:
-				# 	print(response.request.headers["Authorization"])
+				# 根据是否有文件选择不同的数据传递方式
+				if files is not None:
+					# 文件上传时,使用 data 而不是 json
+					response = self._session.request(
+						method=method,
+						url=url,
+						headers=merged_headers,
+						params=params,
+						data=payload,  # 使用 data 而不是 json
+						files=files,
+						timeout=timeout,
+					)
+				else:
+					# 普通请求使用 json
+					response = self._session.request(
+						method=method,
+						url=url,
+						headers=merged_headers,
+						params=params,
+						json=payload,
+						timeout=timeout,
+					)
+
 				if log:
 					print("=" * 82)
 					print(f"Request {method} {url} {response.status_code}")
-					# with contextlib.suppress(Exception):
-					# 	print(response.json() if len(response.text) <= MAX_CHARACTER else response.text[:MAX_CHARACTER] + "...")
+
 				response.raise_for_status()
 
 			except HTTPError as err:
 				print(f"HTTP Error {type(err).__name__} - {err}")
 				sleep(2**attempt * backoff_factor)
 				if attempt == retries - 1:
-					return err.response  # type: ignore  # noqa: PGH003
+					return err.response
 				continue
-				break
 			except (ReqConnectionError, Timeout) as err:
 				print(f"Network error ({type(err).__name__}): {err}")
 				if attempt == retries - 1:
@@ -126,10 +147,9 @@ class CodeMaoClient:
 			else:
 				if log:
 					self._log_request(response)
-				# self.update_cookies(response.cookies)
 				return response
 
-		return cast("requests.Response", None)
+		return cast("Response", None)
 
 	def fetch_data(  # noqa: PLR0914
 		self,
@@ -281,7 +301,7 @@ class CodeMaoClient:
 		self._sessions["average"].close()
 		self._default_session.close()
 
-	def _log_request(self, response: requests.Response) -> None:
+	def _log_request(self, response: Response) -> None:
 		"""简化的日志记录,使用文本格式而不是字典"""
 		log_entry = (
 			f"[{tool.TimeUtils().format_timestamp()}]\n"
@@ -306,45 +326,6 @@ class CodeMaoClient:
 			"response_amount_key": "limit",
 			"response_offset_key": "offset",
 		}
-
-	@staticmethod
-	def stream_upload(file_path: Path, upload_path: str = "aumiao", chunk_size: int = 8192) -> str:
-		try:
-			# 打开文件并定义生成器
-			with file_path.open("rb") as f:
-
-				def file_generator() -> Generator[bytes]:
-					while True:
-						chunk = f.read(chunk_size)
-						if not chunk:
-							break
-						yield chunk
-
-				# 将生成器内容包装为 BytesIO 对象,模拟文件对象
-				file_content = BytesIO()
-				for chunk in file_generator():
-					file_content.write(chunk)
-				file_content.seek(0)  # 重置文件指针
-
-				files = {
-					"file": (file_path.name, file_content, "application/octet-stream"),
-				}
-				data = {"path": upload_path}
-
-				response = requests.post(
-					url="https://api.pgaot.com/user/up_cat_file",
-					files=files,
-					data=data,
-					timeout=120,
-				)
-				# 处理响应
-				response.raise_for_status()  # 如果响应状态码不是 200,会抛出异常
-				result = response.json()
-				return result.get("url", None)
-		except requests.exceptions.RequestException as e:
-			return f"请求错误: {e}"
-		except Exception as e:
-			return f"上传出错: {e!s}"
 
 	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
 		# 清除旧Cookie
@@ -371,3 +352,76 @@ class CodeMaoClient:
 			print(f"Cookie更新失败: {e!s}")
 			msg = "无效的Cookie格式"
 			raise ValueError(msg) from e
+
+
+class FileUploader:
+	def __init__(self) -> None:
+		self.client = CodeMaoClient()
+
+	def upload_via_pgaot(self, file_path: Path, save_path: str = "aumiao") -> str:
+		"""直接上传到Pgaot服务器(使用默认文件类型)"""
+		with file_path.open("rb") as file_obj:
+			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			data = {"path": save_path}
+			response = self.client.send_request(
+				endpoint="https://api.pgaot.com/user/up_cat_file",
+				method="POST",
+				files=files,
+				payload=data,
+				timeout=120,
+			)
+		return response.json()
+
+	def upload_via_codemao(self, file_path: Path) -> str:
+		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
+		timestamp = tool.TimeUtils().current_timestamp()
+		unique_name = f"aumiao/{timestamp}{file_path.name}"
+
+		token_info = self.get_codemao_token(file_path=unique_name)
+
+		with file_path.open("rb") as file_obj:
+			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			data = {
+				"token": token_info["token"],
+				"key": token_info["file_path"],
+				"fname": file_path.name,
+			}
+			self.client.send_request(
+				endpoint=token_info["upload_url"],
+				method="POST",
+				files=files,
+				payload=data,
+				timeout=120,
+			)
+
+		return token_info["pic_host"] + token_info["file_path"]
+
+	def get_codemao_token(
+		self,
+		file_path: str = "aumiao",
+		project_name: Literal["community_frontend", "nemo_android_ios"] = "community_frontend",
+		cdn_name: str = "qiniu",
+	) -> dict:
+		"""获取七牛云上传凭证"""
+		params = {
+			"projectName": project_name,
+			"filePaths": file_path,
+			"filePath": file_path,
+			"tokensCount": 1,
+			"fileSign": "p1",
+			"cdnName": cdn_name,
+		}
+
+		response = self.client.send_request(
+			endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
+			method="GET",
+			params=params,
+		)
+
+		data = response.json()
+		return {
+			"token": data["tokens"][0]["token"],
+			"file_path": data["tokens"][0]["file_path"],
+			"upload_url": data["upload_url"],
+			"pic_host": data["bucket_url"],
+		}

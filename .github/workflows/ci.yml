@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }} # Checkout the PR branch directly
 
       - name: Run Ruff Linter
         uses: astral-sh/ruff-action@v3
@@ -34,6 +36,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }} # Checkout the PR branch
 
       - name: Validate Spelling
         uses: crate-ci/typos@v1.30.1
@@ -47,28 +51,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout Code
+      - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Set HEAD_REF environment variable
-      #   run: echo "HEAD_REF=${{ github.head_ref }}" >> $GITHUB_ENV
-      - name: Set HEAD_REF environment variable
-        run: echo "HEAD_REF=${HEAD_REF}" >> $GITHUB_ENV
-        env:
-          HEAD_REF: ${{ github.head_ref }}
+
+      - name: Download Changes from Previous Jobs
+        uses: actions/download-artifact@v4
+        with:
+          name: code-fixes
+          path: ./Aumiao-py/src
 
       - name: Detect Modifications
         id: changes
         run: |
-          git status --porcelain | grep -q . && echo "HAS_CHANGES=true" >> $GITHUB_ENV || echo "HAS_CHANGES=false" >> $GITHUB_ENV
+          git diff --quiet || echo "HAS_CHANGES=true" >> $GITHUB_ENV
 
       - name: Commit Fixes
         if: env.HAS_CHANGES == 'true'
         run: |
-          git config --global user.name "Code Quality Bot"
-          git config --global user.email "bot@aumiao-py"
+          git config user.name "Code Quality Bot"
+          git config user.email "bot@aumiao-py"
           git add -A
           git commit -m "style: Automated code quality fixes"
-          git push origin HEAD:$HEAD_REF
+          git push origin HEAD:${{ github.head_ref }}
