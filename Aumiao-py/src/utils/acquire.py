@@ -17,7 +17,6 @@ from .decorator import singleton
 LOG_DIR: Path = data.CURRENT_DIR / ".log"
 LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 DICT_ITEM = 2
-
 MAX_CHARACTER = 100
 
 
