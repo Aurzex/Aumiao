@@ -759,7 +759,7 @@ class Motion(ClassUnion):
 				"comment": {
 					"content_field": "comment_content",
 					"user_field": "comment_user",
-					"handle_method": "handle_comment_report",
+					"handle_method": "process_comment_report",
 					"source_id_field": "comment_source_object_id",
 					"source_name_field": "comment_source_object_name",
 					"special_check": lambda i=current_item: i.get("comment_source") == "WORK_SHOP",
@@ -768,7 +768,7 @@ class Motion(ClassUnion):
 				"post": {
 					"content_field": "post_title",
 					"user_field": "post_user",
-					"handle_method": "handle_post_report",
+					"handle_method": "process_post_report",
 					"source_id_field": "post_id",
 					"special_check": lambda: True,
 					"com_id": "post_id",
@@ -776,7 +776,7 @@ class Motion(ClassUnion):
 				"discussion": {
 					"content_field": "discussion_content",
 					"user_field": "discussion_user",
-					"handle_method": "handle_discussion_report",
+					"handle_method": "process_discussion_report",
 					"source_id_field": "post_id",
 					"special_check": lambda: True,
 					"com_id": "discussion_id",
@@ -866,7 +866,7 @@ class Motion(ClassUnion):
 				if choice in {"D", "S", "T", "P"}:
 					status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS", "T": "MUTE_THREE_MONTHS"}
 					handler = getattr(self.whale_motion, cfg["handle_method"])
-					handler(report_id=item["id"], status=status_map[choice], admin_id=admin_id)
+					handler(report_id=item["id"], resolution=status_map[choice], admin_id=admin_id)
 					record["processed"] = True
 					return choice
 				if choice == "C":
@@ -893,7 +893,7 @@ class Motion(ClassUnion):
 			handler = getattr(self.whale_motion, cfg["handle_method"])
 			handler(
 				report_id=record["item"]["id"],
-				status={"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}[action],
+				resolution={"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS"}[action],
 				admin_id=admin_id,
 			)
 			record["processed"] = True

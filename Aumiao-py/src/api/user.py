@@ -12,6 +12,15 @@ class UserDataFetcher:
 		"""初始化用户数据获取类"""
 		self.acquire = acquire.CodeMaoClient()
 
+	# BUG 貌似api不起作用
+	# 获取账户信息(简略)
+	# def get_data_info(self) -> dict:
+	# 	response = self.acquire.send_request(
+	# 		method="GET",
+	# 		endpoint="/web/user/info",
+	# 	)
+
+	# 	return response.json()
 	def fetch_user_profile(self, user_id: str) -> dict:
 		"""
 		获取用户详细信息
@@ -122,6 +131,7 @@ class UserDataFetcher:
 		response = self.acquire.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
 		return response.json()
 
+	# 可能会返回{"code":6404,"msg":"未绑定手机号"},从而可以检测是否绑定手机号
 	def fetch_lesson_account_info(self) -> dict:
 		"""
 		获取课程账号信息(可用于检测手机号绑定状态)
