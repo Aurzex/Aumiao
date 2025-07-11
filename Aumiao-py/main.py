@@ -40,8 +40,8 @@ def login(account_data_manager: Any) -> dict[str, dict]:  # noqa: ANN401
 	identity = input(f"{COLOR_CODES['PROMPT']}↳ 请输入用户名: {COLOR_CODES['RESET']}")
 	password = input(f"{COLOR_CODES['PROMPT']}↳ 请输入密码: {COLOR_CODES['RESET']}")
 
-	community.Login().login_token(identity=identity, password=password)  # noqa: F405
-	data_ = user.Obtain().get_data_details()  # noqa: F405
+	community.AuthManager().authenticate_with_token(identity=identity, password=password)  # noqa: F405
+	data_ = user.UserDataFetcher().fetch_account_details()  # noqa: F405
 
 	account_data = {
 		"ACCOUNT_DATA": {
@@ -142,7 +142,7 @@ def logout() -> None:
 		print(f"{COLOR_CODES['ERROR']}无效的输入,目前仅支持 web 登出方式{COLOR_CODES['RESET']}")
 		return
 	method = cast("Literal['web', 'app']", method)
-	community.Login().logout(method=method)  # noqa: F405
+	community.AuthManager().logout("web")  # noqa: F405
 	print(f"{COLOR_CODES['SUCCESS']}已成功登出账户{COLOR_CODES['RESET']}")
 
 
@@ -198,12 +198,9 @@ def main() -> None:
 
 		if choice in menu_options:
 			action = menu_options[choice][1]
-			try:
-				action()
-				if choice == "10":  # Exit condition
-					break
-			except Exception as e:
-				print(f"{COLOR_CODES['ERROR']}操作失败: {e}{COLOR_CODES['RESET']}")
+			action()
+			if choice == "10":  # Exit condition
+				break
 		else:
 			print(f"{COLOR_CODES['ERROR']}无效的输入,请重新选择{COLOR_CODES['RESET']}")
 
@@ -211,6 +208,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+	main()
 	try:
 		main()
 	except KeyboardInterrupt:

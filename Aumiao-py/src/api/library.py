@@ -57,6 +57,7 @@ class NovelDataFetcher:
 		# category_id: 0:不限 1:魔法 2:科幻 3:游戏 4:推理 5:治愈 6:冒险 7:日常 8:校园 9:格斗 10:古风 11:恐怖
 		# status: 0:全部 1:连载中 2:已完结
 		# list_type: all:全部 recommend:推荐
+		# 经测试recommend返回数据不受params影响 recommend
 		params = {
 			"sort_id": sort_id,
 			"type_id": category_id,

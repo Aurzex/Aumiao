@@ -55,10 +55,10 @@ class ReportFetcher:
 		status: Literal["TOBEDONE", "DONE", "ALL"],
 		filter_type: Literal["admin_id", "work_user_id", "work_id"] | None = None,
 		target_id: int | None = None,
-		limit: int = 15,
+		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"type": report_type, "status": status, filter_type: target_id, "offset": offset, "limit": limit}
+		params = {"type": report_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
 		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
 	def fetch_comment_reports_generator(
@@ -70,7 +70,7 @@ class ReportFetcher:
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"source": source_type, "status": status, filter_type: target_id, "offset": offset, "limit": limit}
+		params = {"source": source_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
 		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
 
 	def fetch_post_reports_generator(
@@ -81,7 +81,7 @@ class ReportFetcher:
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": limit}
+		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
 		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
 	def fetch_discussion_reports_generator(
@@ -92,7 +92,7 @@ class ReportFetcher:
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": limit}
+		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
 		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
 
 
