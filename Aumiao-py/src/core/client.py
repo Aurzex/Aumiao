@@ -47,27 +47,27 @@ class Union:
 	def __init__(self) -> None:
 		self.acquire = acquire.CodeMaoClient()
 		self.cache = data.CacheManager().data
-		self.community_login = community.Login()
-		self.community_motion = community.Motion()
-		self.community_obtain = community.Obtain()
+		self.community_login = community.AuthManager()
+		self.community_motion = community.UserAction()
+		self.community_obtain = community.DataFetcher()
 		self.data = data.DataManager().data
-		self.edu_motion = edu.Motion()
-		self.edu_obtain = edu.Obtain()
+		self.edu_motion = edu.UserAction()
+		self.edu_obtain = edu.DataFetcher()
 		self.file = file.CodeMaoFile()
-		self.forum_motion = forum.Motion()
-		self.forum_obtain = forum.Obtain()
+		self.forum_motion = forum.ForumActionHandler()
+		self.forum_obtain = forum.ForumDataFetcher()
 		self.setting = data.SettingManager().data
-		self.shop_motion = shop.Motion()
-		self.shop_obtain = shop.Obtain()
+		self.shop_motion = shop.WorkshopActionHandler()
+		self.shop_obtain = shop.WorkshopDataFetcher()
 		self.tool = tool
-		self.user_motion = user.Motion()
-		self.user_obtain = user.Obtain()
-		self.whale_motion = whale.Motion()
-		self.whale_obtain = whale.Obtain()
-		self.whale_routine = whale.Routine()
-		self.work_motion = work.Motion()
-		self.work_obtain = work.Obtain()
-		self.library_obtain = library.NovelObtain()
+		self.user_motion = user.UserManager()
+		self.user_obtain = user.UserDataFetcher()
+		self.whale_motion = whale.ReportHandler()
+		self.whale_obtain = whale.ReportFetcher()
+		self.whale_routine = whale.AuthManager()
+		self.work_motion = work.WorkManager()
+		self.work_obtain = work.WorkDataFetcher()
+		self.library_obtain = library.NovelDataFetcher()
 
 
 ClassUnion = Union().__class__
@@ -80,8 +80,8 @@ class Tool(ClassUnion):
 		self.cache_manager = data.CacheManager()
 
 	def message_report(self, user_id: str) -> None:
-		response = self.user_obtain.get_user_honor(user_id=user_id)
-		timestamp = self.community_obtain.get_timestamp()["data"]
+		response = self.user_obtain.fetch_user_honors(user_id=user_id)
+		timestamp = self.community_obtain.fetch_current_timestamp()["data"]
 
 		user_data = {
 			"user_id": response["user_id"],
@@ -112,7 +112,7 @@ class Tool(ClassUnion):
 		for i in range(10000):
 			guess = f"{i:04d}"
 			test_string = int(phone_num.replace("****", guess))
-			if self.user_motion.verify_phone(test_string):
+			if self.user_motion.verify_phone_number(test_string):
 				return test_string
 		return None
 
@@ -160,9 +160,9 @@ class Obtain(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 		self.source_map: dict[str, tuple[Callable[..., Any], str, str]] = {
-			"work": (self.work_obtain.get_work_comments, "work_id", "reply_user"),
-			"post": (self.forum_obtain.get_post_replies_posts, "ids", "user"),
-			"shop": (self.shop_obtain.get_shop_discussion, "shop_id", "reply_user"),
+			"work": (self.work_obtain.fetch_work_comments_generator, "work_id", "reply_user"),
+			"post": (self.forum_obtain.fetch_post_replies_generator, "ids", "user"),
+			"shop": (self.shop_obtain.fetch_workshop_discussions, "shop_id", "reply_user"),
 		}
 
 	def get_new_replies(
@@ -179,7 +179,7 @@ class Obtain(ClassUnion):
 		"""
 
 		try:
-			message_data = self.community_obtain.get_message_count(method="web")
+			message_data = self.community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
@@ -195,7 +195,7 @@ class Obtain(ClassUnion):
 		while remaining > 0:
 			current_limit = self.tool.MathUtils().clamp(remaining, 5, 200)
 			try:
-				response = self.community_obtain.get_replies(
+				response = self.community_obtain.fetch_replies(
 					types=type_item,
 					limit=current_limit,
 					offset=offset,
@@ -264,7 +264,7 @@ class Obtain(ClassUnion):
 
 		def generate_replies(comment: dict) -> Generator[dict[Any, Any] | Any, Any]:
 			if source == "post":
-				yield from self.forum_obtain.get_reply_post_comments(post_id=comment["id"], limit=None)
+				yield from self.forum_obtain.fetch_reply_comments_generator(reply_id=comment["id"], limit=None)
 			else:
 				yield from comment.get("replies", {}).get("items", [])
 
@@ -556,7 +556,7 @@ class Motion(ClassUnion):
 
 		try:
 			while True:
-				current_counts = self.community_obtain.get_message_count(method)
+				current_counts = self.community_obtain.fetch_message_count(method)
 				if is_all_cleared(current_counts):
 					return True
 
@@ -570,11 +570,11 @@ class Motion(ClassUnion):
 			return False
 
 	def like_all_work(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
-		self.work_motion.follow_work(user_id=int(user_id))
+		self.work_motion.manage_follow(user_id=int(user_id))
 		for item in works_list:
 			item["id"] = cast("int", item["id"])
-			self.work_motion.like_work(work_id=item["id"])
-			self.work_motion.collection_work(work_id=item["id"])
+			self.work_motion.manage_like(work_id=item["id"])
+			self.work_motion.manage_collection(work_id=item["id"])
 
 	def reply_work(self) -> bool:  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
@@ -651,7 +651,7 @@ class Motion(ClassUnion):
 					}
 				)
 
-				(self.work_motion.reply_work if source_type == "work" else self.forum_motion.reply_comment)(**params)
+				(self.work_motion.reply_to_comment if source_type == "work" else self.forum_motion.create_comment_reply)(**params)
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
 
 			except Exception as e:
@@ -662,41 +662,41 @@ class Motion(ClassUnion):
 
 	# 工作室常驻置顶
 	def top_work(self) -> None:
-		detail = self.shop_obtain.get_shops_details()
-		description = self.shop_obtain.get_shop_details(detail["work_subject_id"])["description"]
-		self.shop_motion.update_shop_details(
+		detail = self.shop_obtain.fetch_workshop_details_list()
+		description = self.shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
+		self.shop_motion.update_workshop_details(
 			description=description,
-			shop_id=detail["id"],
+			workshop_id=detail["id"],
 			name=detail["name"],
 			preview_url=detail["preview_url"],
 		)
 
-	# 查看账户所有信息综合
-	def get_account_all_data(self) -> dict[Any, Any]:
-		all_data: list[dict] = []
-		all_data.extend(
-			(
-				self.user_obtain.get_data_details(),
-				self.user_obtain.get_data_level(),
-				self.user_obtain.get_data_privacy(),
-				self.user_obtain.get_data_score(),
-				self.user_obtain.get_data_profile("web"),
-				self.user_obtain.get_data_tiger(),
-				self.edu_obtain.get_data_details(),
-			),
-		)
-		return self.tool.DataMerger().merge(datasets=all_data)
+	# # 查看账户所有信息综合
+	# def get_account_all_data(self) -> dict[Any, Any]:
+	# 	all_data: list[dict] = []
+	# 	all_data.extend(
+	# 		(
+	# 			self.user_obtain.get_data_details(),
+	# 			self.user_obtain.get_data_level(),
+	# 			self.user_obtain.get_data_privacy(),
+	# 			self.user_obtain.get_data_score(),
+	# 			self.user_obtain.get_data_profile("web"),
+	# 			self.user_obtain.get_data_tiger(),
+	# 			self.edu_obtain.get_data_details(),
+	# 		),
+	# 	)
+	# 	return self.tool.DataMerger().merge(datasets=all_data)
 
 	# 查看账户状态
 	def get_account_status(self) -> str:
-		status = self.user_obtain.get_data_details()
+		status = self.user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
 	def judgement_login(self) -> None:
 		choice = input("请选择登录方式: 1.Token登录 2.账密登录 ")
 		if choice == "1":
 			token = input("请输入 Authorization: ")
-			whale.Routine().set_token(token=token)
+			self.whale_routine.configure_authentication_token(token)
 		if choice == "2":
 
 			def input_password() -> tuple[str, str]:
@@ -706,7 +706,7 @@ class Motion(ClassUnion):
 
 			def input_captcha(timestamp: int) -> tuple[str, whale.RequestsCookieJar]:
 				print("正在获取验证码...")
-				cookies: whale.RequestsCookieJar = self.whale_routine.get_captcha(timestamp=timestamp)
+				cookies: whale.RequestsCookieJar = self.whale_routine.fetch_verification_captcha(timestamp=timestamp)
 				return input("请输入验证码: "), cookies
 
 			timestamp = self.tool.TimeUtils().current_timestamp(13)
@@ -714,9 +714,9 @@ class Motion(ClassUnion):
 			captcha, cookies = input_captcha(timestamp=timestamp)
 			while True:
 				self.acquire.update_cookies(cookies)
-				response = self.whale_routine.login(username=identity, password=password, key=timestamp, code=captcha)
+				response = self.whale_routine.authenticate_user(username=identity, password=password, key=timestamp, code=captcha)
 				if "token" in response:
-					self.whale_routine.set_token(response["token"])
+					self.whale_routine.configure_authentication_token(response["token"])
 					break
 				if "error_code" in response:
 					print(response["error_msg"])
@@ -901,9 +901,9 @@ class Motion(ClassUnion):
 		# 数据收集
 		all_records: list[ReportRecord] = []
 		for report_list, report_type in [
-			(self.whale_obtain.get_comment_report(types="ALL", status="TOBEDONE", limit=None), "comment"),
-			(self.whale_obtain.get_post_report(status="TOBEDONE", limit=None), "post"),
-			(self.whale_obtain.get_discussion_report(status="TOBEDONE", limit=None), "discussion"),
+			(self.whale_obtain.fetch_comment_reports_generator(source_type="ALL", status="TOBEDONE", limit=None), "comment"),
+			(self.whale_obtain.fetch_post_reports_generator(status="TOBEDONE", limit=None), "post"),
+			(self.whale_obtain.fetch_discussion_reports_generator(status="TOBEDONE", limit=None), "discussion"),
 		]:
 			for item in report_list:
 				cfg = get_type_config(report_type, item)
@@ -928,7 +928,7 @@ class Motion(ClassUnion):
 			print(f"违规帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
 			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
 			post_id = item[cfg["source_id_field"]]  # 获取实际的帖子ID数值
-			content = self.forum_obtain.get_posts_details(ids=int(post_id))["items"][0]["content"]
+			content = self.forum_obtain.fetch_posts_details(post_ids=int(post_id))["items"][0]["content"]
 			print(content)
 			print(self.tool.DataConverter().html_to_text(content))
 		elif report_type == "discussion":
@@ -955,17 +955,17 @@ class Motion(ClassUnion):
 						print(f"发送时间: {self.tool.TimeUtils().format_timestamp(comment['created_at'])}")
 						break
 		else:
-			details = self.forum_obtain.get_single_post_details(ids=item[cfg["source_id_field"]])
+			details = self.forum_obtain.fetch_single_post_details(post_id=item[cfg["source_id_field"]])
 			print(f"发送时间: {self.tool.TimeUtils().format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
 
 	def _switch_edu_account(self, limit: int | None) -> Generator[tuple[str, str]]:
-		students = list(self.edu_obtain.get_students(limit=limit))
+		students = list(self.edu_obtain.fetch_class_students_generator(limit=limit))
 
 		while students:
 			# 随机选择一个索引并pop
 			student = students.pop(randint(0, len(students) - 1))
 			self.acquire.switch_account(token=self.acquire.token.average, identity="average")
-			yield student["username"], self.edu_motion.reset_password(student["id"])["password"]
+			yield student["username"], self.edu_motion.reset_student_password(student["id"])["password"]
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
 		if source_type in {"work", "discussion", "shop"}:
@@ -990,7 +990,7 @@ class Motion(ClassUnion):
 			)
 		if source_type == "post":
 			source_type = cast("Literal['post']", source_type)
-			search_result = list(self.forum_obtain.search_posts(title=title, limit=None))
+			search_result = list(self.forum_obtain.search_posts_generator(title=title, limit=None))
 			user_posts = self.tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
 			if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
 				print(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次")
@@ -1059,7 +1059,7 @@ class Motion(ClassUnion):
 
 		current_account = None
 		report_counter = -1
-		reason_content = self.community_obtain.get_report_reason()["items"][7]["content"]
+		reason_content = self.community_obtain.fetch_report_reasons()["items"][7]["content"]
 		source_map = {"work": "work", "post": "forum", "shop": "shop"}
 
 		for violation in violations:
@@ -1072,7 +1072,7 @@ class Motion(ClassUnion):
 						return
 					print("切换教育账号")
 					sleep(5)
-					self.community_login.login_password(
+					self.community_login.authenticate_with_password(
 						identity=current_account[0],
 						password=current_account[1],
 						status="edu",
@@ -1090,9 +1090,9 @@ class Motion(ClassUnion):
 					text=comment_id,
 					candidates=violations,
 				)
-				self.community_obtain.get_replies(types="COMMENT_REPLY")
-				self.community_obtain.get_message_count(method="web")
-				self.community_obtain.get_community_status(types="WEB_FORUM_STATUS")
+				self.community_obtain.fetch_replies(types="COMMENT_REPLY")
+				self.community_obtain.fetch_message_count(method="web")
+				self.community_obtain.fetch_community_status(types="WEB_FORUM_STATUS")
 				# 执行举报
 				if self.report_work(
 					source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
@@ -1113,7 +1113,7 @@ class Motion(ClassUnion):
 				print(f"处理异常: {e}")
 
 		# 恢复原始账号
-		self.whale_routine.set_token(self.acquire.token.judgement)
+		self.whale_routine.configure_authentication_token(self.acquire.token.judgement)
 
 	def report_work(
 		self,
@@ -1133,13 +1133,13 @@ class Motion(ClassUnion):
 		# 7: 无意义刷屏; 8: 不良信息
 		# 0: 自定义
 
-		reason_content = self.community_obtain.get_report_reason()["items"][reason_id]["content"]
+		reason_content = self.community_obtain.fetch_report_reasons()["items"][reason_id]["content"]
 		match source:
 			case "work":
-				return self.work_motion.report_comment_work(work_id=target_id, comment_id=source_id, reason=reason_content)
+				return self.work_motion.report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
 			case "forum":
 				source_ = "COMMENT" if is_reply else "REPLY"
-				return self.forum_motion.report_reply_or_comment(comment_id=target_id, reason_id=reason_id, description=description, source=source_, return_data=False)
+				return self.forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=source_, return_data=False)
 			case "shop":
 				if is_reply:
 					parent_id = cast("int", parent_id)
@@ -1169,18 +1169,18 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"账号切换失败: {e}")
 			return
-		works_list = list(self.user_obtain.get_user_works_web(str(user_id), limit=None))
+		works_list = list(self.user_obtain.fetch_user_works_web_generator(str(user_id), limit=None))
 		accounts = self._switch_edu_account(limit=None)
 		for current_account in accounts:
 			print("切换教育账号")
 			sleep(5)
-			self.community_login.login_password(identity=current_account[0], password=current_account[1], status="edu")
+			self.community_login.authenticate_with_password(identity=current_account[0], password=current_account[1], status="edu")
 			self.like_all_work(user_id=str(user_id), works_list=works_list)
 		self.acquire.switch_account(token=self.acquire.token.average, identity="average")
 
 	def celestial_maiden_chronicles(self, real_name: str) -> None:
 		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
-		self.edu_motion.improve_account(
+		self.edu_motion.upgrade_to_teacher(
 			user_id=int(self.data.ACCOUNT_DATA.id),
 			real_name=real_name,
 			grade=["2", "3", "4"],
@@ -1208,19 +1208,19 @@ class Motion(ClassUnion):
 			student_names = generator.generate_student_names(num_students=student_limit)
 
 			for class_idx in range(class_count):
-				class_id = edu.Motion().create_class(name=class_names[class_idx])["id"]
+				class_id = edu.UserAction().create_class(name=class_names[class_idx])["id"]
 				print(f"创建班级 {class_id}")
 				start = class_idx * class_capacity
 				end = start + class_capacity
 				batch_names = student_names[start:end]
-				edu.Motion().create_student(name=batch_names, class_id=class_id)
+				edu.UserAction().add_students(name=batch_names, class_id=class_id)
 				print("添加学生ing")
 
 		def _delete_students(delete_limit: int | None) -> None:
 			"""删除学生账号内部逻辑"""
-			students = edu.Obtain().get_students(limit=delete_limit)
+			students = edu.DataFetcher().fetch_class_students_generator(limit=delete_limit)
 			for student in students:
-				edu.Motion().remove_student(stu_id=student["id"])
+				edu.UserAction().remove_student_from_class(stu_id=student["id"])
 
 		if method == "delete":
 			_delete_students(limit)
@@ -1229,7 +1229,7 @@ class Motion(ClassUnion):
 			_create_students(actual_limit)
 
 	def download_fiction(self, fiction_id: int) -> None:
-		details = self.library_obtain.get_novel_detail(fiction_id)
+		details = self.library_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
 
 		print(f"正在下载: {info['title']}-{info['nickname']}")
@@ -1245,7 +1245,7 @@ class Motion(ClassUnion):
 			section_id = section["id"]
 			section_title = section["title"]
 			section_path = fiction_dir / f"{section_title}.txt"
-			content = self.library_obtain.get_chapter_detail(chapter_id=section_id)["data"]["section"]["content"]
+			content = self.library_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
 			formatted_content = self.tool.DataConverter().html_to_text(content, merge_empty_lines=True)
 			self.file.file_write(path=section_path, content=formatted_content)
 
