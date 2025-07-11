@@ -9,7 +9,7 @@ from src.utils.decorator import singleton
 
 # 编程猫所有api中若包含v2等字样,表示第几版本,同样比它低的版本也可使用
 @singleton
-class Login:
+class AuthManager:
 	"""
 	概述:用户登录
 
@@ -31,7 +31,7 @@ class Login:
 		self.setting = data.SettingManager().data
 
 	# 密码登录函数
-	def login_password(
+	def authenticate_with_password(
 		self,
 		identity: str,
 		password: str,
@@ -67,7 +67,7 @@ class Login:
 		return response.json()
 
 	# cookie登录
-	def login_cookie(
+	def authenticate_with_cookies(
 		self,
 		cookies: str,
 		status: Literal["judgement", "average", "edu"] = "average",
@@ -92,22 +92,22 @@ class Login:
 		return None
 
 	# token登录(毛毡最新登录方式)
-	def login_token(
+	def authenticate_with_token(
 		self,
 		identity: str,
 		password: str,
 		pid: str = "65edCTyg",
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
-		timestamp = Obtain().get_timestamp()["data"]
-		response = self.get_login_ticket(identity=identity, timestamp=timestamp, pid=pid)
+		timestamp = DataFetcher().fetch_current_timestamp()["data"]
+		response = self._get_auth_ticket(identity=identity, timestamp=timestamp, pid=pid)
 		ticket = response["ticket"]
-		resp = self.get_login_security(identity=identity, password=password, ticket=ticket, pid=pid)
+		resp = self._get_security_info(identity=identity, password=password, ticket=ticket, pid=pid)
 		self.acquire.switch_account(token=resp["auth"]["token"], identity=status)
 		return resp
 
 	# 返回完整cookie
-	def get_login_auth(self, token: str) -> dict[str, Any]:
+	def get_auth_details(self, token: str) -> dict[str, Any]:
 		# response = self.acquire.send_request(
 		# 	endpoint="https://shequ.codemao.cn/",
 		# 	method="GET",
@@ -136,7 +136,7 @@ class Login:
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
 	# 登录信息
-	def get_login_security(
+	def _get_security_info(
 		self,
 		identity: str,
 		password: str,
@@ -165,7 +165,7 @@ class Login:
 		return response.json()
 
 	# 登录ticket获取
-	def get_login_ticket(
+	def _get_auth_ticket(
 		self,
 		identity: str | int,
 		timestamp: int,
@@ -197,13 +197,13 @@ class Login:
 
 
 @singleton
-class Obtain:
+class DataFetcher:
 	def __init__(self) -> None:
 		# 初始化acquire对象
 		self.acquire = acquire.CodeMaoClient()
 
 	# 获取随机昵称
-	def get_name_random(self) -> str:
+	def fetch_random_nickname(self) -> str:
 		# 发送GET请求,获取随机昵称
 		response = self.acquire.send_request(
 			method="GET",
@@ -213,7 +213,7 @@ class Obtain:
 		return response.json()["data"]["nickname"]
 
 	# 获取新消息数量
-	def get_message_count(self, method: Literal["web", "nemo"]) -> dict:
+	def fetch_message_count(self, method: Literal["web", "nemo"]) -> dict:
 		# 根据方法选择不同的url
 		if method == "web":
 			url = "/web/message-record/count"
@@ -231,7 +231,7 @@ class Obtain:
 		return record.json()
 
 	# 获取回复
-	def get_replies(
+	def fetch_replies(
 		self,
 		types: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"],
 		limit: int = 15,
@@ -248,52 +248,52 @@ class Obtain:
 		return response.json()
 
 	# 获取nemo消息
-	def get_nemo_message(self, types: Literal["fork", "like"]) -> dict:
+	def fetch_nemo_messages(self, types: Literal["fork", "like"]) -> dict:
 		extra_url = 1 if types == "like" else 3
 		url = f"/nemo/v2/user/message/{extra_url}"
 		response = self.acquire.send_request(endpoint=url, method="GET")
 		return response.json()
 
 	# 获取点个猫更新
-	def get_update_pickcat(self) -> dict:
+	def fetch_pickcat_update(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://update.codemao.cn/updatev2/appsdk", method="GET")
 		return response.json()
 
 	# 获取kitten4更新
-	def get_update_kitten4(self) -> dict:
-		time_stamp = self.get_timestamp()["data"]
+	def fetch_kitten4_update(self) -> dict:
+		time_stamp = self.fetch_current_timestamp()["data"]
 		params = {"TIME": time_stamp}
 		response = self.acquire.send_request(endpoint="https://kn-cdn.codemao.cn/kitten4/application/kitten4_update_info.json", method="GET", params=params)
 		return response.json()
 
 	# 获取kitten更新
-	def get_update_kitten(self) -> dict:
-		time_stamp = self.get_timestamp()["data"]
+	def fetch_kitten_update(self) -> dict:
+		time_stamp = self.fetch_current_timestamp()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self.acquire.send_request(endpoint="https://kn-cdn.codemao.cn/application/kitten_update_info.json", method="GET", params=params)
 		return response.json()
 
 	# 获取海龟编辑器更新
-	def get_update_wood(self) -> dict:
-		time_stamp = self.get_timestamp()["data"]
+	def fetch_wood_editor_update(self) -> dict:
+		time_stamp = self.fetch_current_timestamp()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self.acquire.send_request(endpoint="https://static-am.codemao.cn/wood/client/xp/prod/package.json", method="GET", params=params)
 		return response.json()
 
 	# 获取源码智造编辑器更新
-	def get_update_matrix(self) -> dict:
-		time_stamp = self.get_timestamp()["data"]
+	def fetch_matrix_editor_update(self) -> dict:
+		time_stamp = self.fetch_current_timestamp()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self.acquire.send_request(endpoint="https://public-static-edu.codemao.cn/matrix/publish/desktop_matrix.json", method="GET", params=params)
 		return response.json()
 
 	# 获取时间戳
-	def get_timestamp(self) -> dict:
+	def fetch_current_timestamp(self) -> dict:
 		response = self.acquire.send_request(endpoint="/coconut/clouddb/currentTime", method="GET")
 		return response.json()
 
 	# 获取推荐头图
-	def get_banner_web(
+	def fetch_web_banners(
 		self,
 		types: (Literal["FLOAT_BANNER", "OFFICIAL", "CODE_TV", "WOKE_SHOP", "MATERIAL_NORMAL"] | None) = None,
 	) -> dict:
@@ -304,7 +304,7 @@ class Obtain:
 		return response.json()
 
 	# 获取推荐头图
-	def get_banner_nemo(self, types: Literal[1, 2, 3]) -> dict:
+	def fetch_nemo_banners(self, types: Literal[1, 2, 3]) -> dict:
 		# 1:点个猫推荐页 2:点个猫主题页 3:点个猫课程页
 		params = {"banner_type": types}
 		response = self.acquire.send_request(endpoint="/nemo/v2/home/banners", method="GET", params=params)
@@ -312,28 +312,28 @@ class Obtain:
 
 	# 获取举报类型
 	@lru_cache  # noqa: B019
-	def get_report_reason(self) -> dict:
+	def fetch_report_reasons(self) -> dict:
 		response = self.acquire.send_request(endpoint="/web/reports/reasons/all", method="GET")
 		return response.json()
 
 	# 获取nemo配置
 	# TODO@Aurzex: 待完善
-	def get_nemo_config(self) -> str:
+	def _fetch_nemo_config(self) -> str:
 		response = self.acquire.send_request(endpoint="https://nemo.codemao.cn/config", method="GET")
 		return response.json()
 
 	# 获取社区网络服务
-	def get_community_config(self) -> dict:
+	def fetch_community_config(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://c.codemao.cn/config", method="GET")
 		return response.json()
 
 	# 获取编程猫网络服务
-	def get_client_config(self) -> dict:
+	def fetch_client_config(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://player.codemao.cn/new/client_config.json", method="GET")
 		return response.json()
 
 	# 获取编程猫首页作品
-	def discover_works_recommended_home(self, types: Literal[1, 2]) -> dict:
+	def fetch_recommended_works(self, types: Literal[1, 2]) -> dict:
 		# 1为点猫精选,2为新作喵喵看
 		params = {"type": types}
 		response = self.acquire.send_request(
@@ -344,7 +344,7 @@ class Obtain:
 		return response.json()
 
 	# 获取编程猫首页推荐channel
-	def get_channels_list(self, types: Literal["KITTEN", "NEMO"]) -> dict:
+	def fetch_work_channels(self, types: Literal["KITTEN", "NEMO"]) -> dict:
 		params = {"type": types}
 		response = self.acquire.send_request(
 			endpoint="/web/works/channels/list",
@@ -354,7 +354,7 @@ class Obtain:
 		return response.json()
 
 	# 获取指定channel
-	def get_channel(self, channel_id: int, types: Literal["KITTEN", "NEMO"], limit: int = 5, page: int = 1) -> dict:
+	def fetch_channel_works(self, channel_id: int, types: Literal["KITTEN", "NEMO"], limit: int = 5, page: int = 1) -> dict:
 		params = {"type": types, "page": page, "limit": limit}
 		response = self.acquire.send_request(
 			endpoint=f"/web/works/channels/{channel_id}/works",
@@ -364,22 +364,22 @@ class Obtain:
 		return response.json()
 
 	# 获取推荐作者
-	def get_user_recommended(self) -> dict:
+	def fetch_recommended_users(self) -> dict:
 		response = self.acquire.send_request(endpoint="/web/users/recommended", method="GET")
 		return response.json()
 
 	# 获取训练师小课堂
-	def get_post_lesion(self) -> dict:
+	def fetch_training_courses(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://backend.box3.fun/diversion/codemao/post", method="GET")
 		return response.json()
 
 	# 获取KN课程
-	def get_kn_course(self) -> dict:
+	def fetch_kn_courses(self) -> dict:
 		response = self.acquire.send_request(endpoint="/creation-tools/v1/home/especially/course", method="GET")
 		return response.json()
 
 	# 获取KN公开课
-	def get_kn_publish_course(self, limit: int | None = 10) -> Generator[dict]:
+	def fetch_public_courses_generator(self, limit: int | None = 10) -> Generator[dict]:
 		params = {"limit": 10, "offset": 0}
 		return self.acquire.fetch_data(
 			endpoint="https://api-creation.codemao.cn/neko/course/publish/list",
@@ -392,19 +392,19 @@ class Obtain:
 
 	# 获取KN模板作品
 	# subject_id为一时返回基础指南,为2时返回进阶指南
-	def get_kn_sample_work(self, subject_id: Literal[1, 2]) -> dict:
+	def fetch_sample_works(self, subject_id: Literal[1, 2]) -> dict:
 		params = {"subject_id": subject_id}
 		response = self.acquire.send_request(endpoint="https://api-creation.codemao.cn/neko/sample/list", params=params, method="GET")
 		return response.json()
 
 	# 获取社区各个部分开启状态
 	# TODO@Aurzex: 待完善
-	def get_community_status(self, types: Literal["WEB_FORUM_STATUS", "WEB_FICTION_STATUS"]) -> dict:
+	def fetch_community_status(self, types: Literal["WEB_FORUM_STATUS", "WEB_FICTION_STATUS"]) -> dict:
 		response = self.acquire.send_request(endpoint=f"/web/config/tab/on-off/status?config_type={types}", method="GET")
 		return response.json()
 
 	# 获取kitten编辑页面精选活动
-	def get_kitten_activity(self) -> dict:
+	def fetch_kitten_activities(self) -> dict:
 		response = self.acquire.send_request(
 			endpoint="https://api-creation.codemao.cn/kitten/activity/choiceness/list",
 			method="GET",
@@ -412,7 +412,7 @@ class Obtain:
 		return response.json()
 
 	# 获取nemo端教程合集
-	def get_nemo_course_package(self, platform: int = 1, limit: int | None = 50) -> Generator[dict]:
+	def fetch_course_packages_generator(self, platform: int = 1, limit: int | None = 50) -> Generator[dict]:
 		params = {"limit": 50, "offset": 0, "platform": platform}
 		return self.acquire.fetch_data(
 			endpoint="/creation-tools/v1/course/package/list",
@@ -421,8 +421,8 @@ class Obtain:
 		)
 
 	# 获取nemo教程
-	def get_nemo_package(self, course_package_id: int, limit: int | None = 50) -> Generator[dict]:
-		# course_package_id由get_nemo_course_package中获取
+	def fetch_course_details_generator(self, course_package_id: int, limit: int | None = 50) -> Generator[dict]:
+		# course_package_id由fetch_course_packages_generator中获取
 		params = {
 			"course_package_id": course_package_id,
 			"limit": 50,
@@ -438,24 +438,24 @@ class Obtain:
 
 	# 获取教学计划
 	# TODO @Aurzex: 未知
-	def get_teaching_plan(self, limit: int = 100) -> Generator[dict]:
+	def fetch_teaching_plans_generator(self, limit: int = 100) -> Generator[dict]:
 		params = {"limit": limit, "offset": 0}
 		return self.acquire.fetch_data(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/team", params=params, limit=limit)
 
 
 @singleton
-class Motion:
+class UserAction:
 	def __init__(self) -> None:
 		# 初始化CodeMaoClient对象
 		self.acquire = acquire.CodeMaoClient()
 
 	# 签订友好协议
-	def sign_nature(self) -> bool:
+	def sign_agreement(self) -> bool:
 		response = self.acquire.send_request(endpoint="/nemo/v3/user/level/signature", method="POST")
 		return response.status_code == HTTPSTATUS.OK.value
 
 	# 获取用户协议
-	def get_nature(self) -> dict:
+	def fetch_agreements(self) -> dict:
 		response = self.acquire.send_request(endpoint="/tiger/v3/web/accounts/agreements", method="GET")
 		return response.json()
 
