@@ -1257,18 +1257,12 @@ class Motion(ClassUnion):
 
 	def generate_nemo_code(self, work_id: int) -> None:
 		try:
-			# Step 1: Get work information
 			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
 			work_info = self.acquire.send_request(endpoint=work_info_url, method="GET").json()
-
-			# Get the latest work URL
 			bcm_url = work_info["work_urls"][0]
-
-			# Step 2: Generate the miao code
 			headers = {
 				"User-Agent": "okhttp/4.2.2",
 			}
-
 			payload = {
 				"app_version": "4.3.4",
 				"bcm_version": "0.16.2",
@@ -1279,9 +1273,7 @@ class Motion(ClassUnion):
 				"work_id": work_id,
 				"work_url": bcm_url,
 			}
-
 			response = self.acquire.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", headers=headers, payload=payload)
-
 			# Process the response
 			if response.ok:
 				result = response.json()
@@ -1290,7 +1282,6 @@ class Motion(ClassUnion):
 				print(miao_code)
 			else:
 				print(f"Error: {response.status_code} - {response.text}")
-
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
 
