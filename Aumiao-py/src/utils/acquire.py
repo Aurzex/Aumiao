@@ -214,7 +214,6 @@ class CodeMaoClient:
 			amount_key,
 			initial_data.get(page_size_key, 0),
 		)
-		print(items_per_page)
 		if items_per_page <= 0:
 			msg = f"无效的每页数量: {items_per_page}"
 			raise ValueError(msg)
