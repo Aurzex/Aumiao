@@ -161,7 +161,7 @@ class Obtain(ClassUnion):
 		super().__init__()
 		self.source_map: dict[str, tuple[Callable[..., Any], str, str]] = {
 			"work": (self.work_obtain.fetch_work_comments_generator, "work_id", "reply_user"),
-			"post": (self.forum_obtain.fetch_post_replies_generator, "ids", "user"),
+			"post": (self.forum_obtain.fetch_post_replies_generator, "post_id", "user"),
 			"shop": (self.shop_obtain.fetch_workshop_discussions, "shop_id", "reply_user"),
 		}
 
@@ -332,17 +332,22 @@ class Obtain(ClassUnion):
 class Motion(ClassUnion):
 	SOURCE_CONFIG: ClassVar[dict[str, SourceConfig]] = {
 		"work": SourceConfig(
-			get_items=lambda self=None: self.user_obtain.get_user_works_web(self.data.ACCOUNT_DATA.id, limit=None),
-			get_comments=lambda _id: Obtain().get_comments_detail_new(_id, "work", "comments"),
-			delete=lambda self=None: self.work_motion.del_comment_work,
+			get_items=lambda self=None: self.user_obtain.fetch_user_works_web_generator(self.data.ACCOUNT_DATA.id, limit=None),
+			get_comments=lambda _self, _id: Obtain().get_comments_detail_new(_id, "work", "comments"),
+			# 修正 delete lambda 函数的参数定义
+			delete=lambda self, _item_id, comment_id, is_reply: self.work_motion.delete_comment(
+				comment_id,
+				"comments" if is_reply else "replies",
+			),
 			title_key="work_name",
 		),
 		"post": SourceConfig(
-			get_items=lambda self=None: self.forum_obtain.get_post_mine_all("created", limit=None),
-			get_comments=lambda _id: Obtain().get_comments_detail_new(_id, "post", "comments"),
-			delete=lambda self=None, _id=None, comment_id=None, **_: self.forum_motion.delete_comment_post_reply(
+			get_items=lambda self=None: self.forum_obtain.fetch_my_posts_generator("created", limit=None),
+			get_comments=lambda _self, _id: Obtain().get_comments_detail_new(_id, "post", "comments"),
+			# 修正 delete lambda 函数的参数定义
+			delete=lambda self, _item_id, comment_id, is_reply: self.forum_motion.delete_item(
 				comment_id,
-				"comments" if _.get("is_reply") else "replies",
+				"comments" if is_reply else "replies",
 			),
 			title_key="title",
 		),
@@ -380,11 +385,10 @@ class Motion(ClassUnion):
 
 	def _process_item(self, item: dict, config: SourceConfig, action_type: str, params: dict, target_lists: defaultdict) -> None:
 		item_id = int(item["id"])
-		title = item[config.title_key]
 		comments = config.get_comments(self, item_id)
 
 		if action_type in {"ads", "blacklist"}:
-			self._find_abnormal_comments(comments, item_id, title, action_type, params, target_lists)
+			self._find_abnormal_comments(comments, item_id, item[config.title_key], action_type, params, target_lists)
 		elif action_type == "duplicates":
 			self._find_duplicate_comments(comments, item_id, params, target_lists)
 
@@ -454,27 +458,29 @@ class Motion(ClassUnion):
 		print(log_message)
 		target_lists[action_type].append(identifier)
 
-	@staticmethod
-	def _find_duplicate_comments(comments: list, item_id: int, params: dict, target_lists: defaultdict) -> None:
+	def _find_duplicate_comments(self, comments: list, item_id: int, params: dict, target_lists: defaultdict) -> None:
+		"""查找重复评论 (修复静态方法调用问题)"""
 		content_map = defaultdict(list)
-		for comment in comments:
-			Motion._track_comment(comment, item_id, content_map)
-			for reply in comment.get("replies", []):
-				Motion._track_comment(reply, item_id, content_map, is_reply=True)
 
-		for (_, content), ids in content_map.items():
+		for comment in comments:
+			self._track_comment(comment, item_id, content_map)
+			for reply in comment.get("replies", []):
+				self._track_comment(reply, item_id, content_map, is_reply=True)
+
+		for (user_id, content), ids in content_map.items():
 			if len(ids) >= params["spam_max"]:
-				print(f"发现刷屏评论: {content} {len(ids)}次")
+				print(f"用户 {user_id} 刷屏评论: {content} - 出现 {len(ids)} 次")
 				target_lists["duplicates"].extend(ids)
 
 	@staticmethod
 	def _track_comment(data: dict, item_id: int, content_map: defaultdict, *, is_reply: bool = False) -> None:
+		"""追踪评论到内容映射"""
 		key = (data["user_id"], data["content"].lower())
 		identifier = f"{item_id}.{data['id']}:{'reply' if is_reply else 'comment'}"
 		content_map[key].append(identifier)
 
-	@decorator.skip_on_error
 	@staticmethod
+	@decorator.skip_on_error
 	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
 		"""执行删除操作
 
