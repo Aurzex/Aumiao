@@ -295,14 +295,11 @@ class DataConverter:
 		# 提取可能存在的嵌套外层<p>
 		outer_match = re.match(r"<p\b[^>]*>(.*)</p>", html_content, re.DOTALL)
 		inner_content = outer_match.group(1).strip() if outer_match else html_content
-
 		# 修正段落提取逻辑
 		paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", inner_content, re.DOTALL)
-
 		# 新增:处理无段落情况
 		if not paragraphs:
 			paragraphs = [inner_content]
-
 		processed = []
 		for content in paragraphs:
 			# 图片标签处理
@@ -318,25 +315,19 @@ class DataConverter:
 					content,
 					flags=re.IGNORECASE,
 				)
-
 			# 移除所有HTML标签
 			text = re.sub(r"<.*?>", "", content, flags=re.DOTALL)
-
 			# HTML实体解码
 			if unescape_entities:
 				text = unescape(text)
-
 			# 清理空白并保留空行标记
 			text = text.strip()
 			processed.append(text if keep_line_breaks else text.replace("\n", " "))
-
 		# 构建最终结果
 		result = "\n".join(processed)
-
 		# 空行合并处理
 		if merge_empty_lines:
 			result = re.sub(r"\n{2,}", "\n", result)
-
 		return result.strip()
 
 
