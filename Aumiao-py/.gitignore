@@ -12,6 +12,6 @@
 *dist/
 *download/
 *media/
-*test.py
-*test/
 *target/
+*test.**
+*test/

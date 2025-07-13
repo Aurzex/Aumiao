@@ -85,13 +85,13 @@ class WorkshopDataFetcher:
 	# 获取工作室讨论
 	def fetch_workshop_discussions(
 		self,
-		workshop_id: int,
+		shop_id: int,
 		source: Literal["WORK_SHOP"] = "WORK_SHOP",
 		sort: Literal["-created_at"] = "-created_at",
 		limit: int | None = 15,
 	) -> Generator[dict]:
 		params = {"source": source, "sort": sort, "limit": 20, "offset": 0}
-		return self.acquire.fetch_data(endpoint=f"/web/discussions/{workshop_id}/comments", params=params, limit=limit)
+		return self.acquire.fetch_data(endpoint=f"/web/discussions/{shop_id}/comments", params=params, limit=limit)
 
 	# 获取工作室投稿作品
 	def fetch_workshop_works(self, workshop_id: int, user_id: int, sort: str = "-created_at,-id", limit: int | None = 20) -> Generator[dict]:

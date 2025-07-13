@@ -288,7 +288,7 @@ class DataFetcher:
 		)
 		return response.json()
 
-	def fetch_classrooms(self, method: Literal["detail", "simple"] = "simple", limit: int | None = 20) -> dict | Generator:
+	def fetch_classrooms(self, method: Literal["detail", "simple"] = "simple", limit: int | None = 20) -> dict | Generator | None:
 		if method == "simple":
 			response = self.acquire.send_request(
 				endpoint="https://eduzone.codemao.cn/edu/zone/classes/simple",
