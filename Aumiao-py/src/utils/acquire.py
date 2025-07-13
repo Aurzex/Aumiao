@@ -68,9 +68,11 @@ class CodeMaoClient:
 			"judgement": Session(),
 			"average": Session(),
 			"blank": Session(),
-			"edu_pool": [],
+			"edu": None,
 		}
-		self._original_session: Session | None = None
+		# 当前状态
+		self._session = self._sessions["blank"]
+		self._identity = "blank"
 		self.log_request: bool = data.SettingManager().data.PARAMETER.log
 
 	def send_request(
@@ -255,34 +257,55 @@ class CodeMaoClient:
 					return
 
 	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu", "blank"]) -> None:
-		"""改进后的会话管理"""
-		# 保存原始会话状态(仅当从非edu切换到edu时)
-		if identity == "edu" and self._identity in {"judgement", "average"}:
-			self._original_session = self._session
-			self._original_session.close()  # 关闭原始会话连接
+		"""简化版的会话切换方法"""
+		# 清除前一会话状态
+		self._clean_session()
 
-		# 教育账号特殊处理
+		# 教育账户特殊处理
 		if identity == "edu":
-			# 关闭前一个教育会话
-			if self._identity == "edu" and self._session in self._sessions["edu_pool"]:
-				self._session.close()
-				self._sessions["edu_pool"].remove(self._session)
+			# 关闭并移除现有edu会话
+			if self._sessions["edu"]:
+				self._sessions["edu"].close()
 
-			# 创建全新隔离会话
+			# 创建全新的edu会话
 			new_session = Session()
-			new_session.headers.update(self.headers.copy())
+			new_session.headers = self._create_headers()
 			new_session.headers["Authorization"] = f"Bearer {token}"
-			new_session.cookies.clear()
-			self._sessions["edu_pool"].append(new_session)
+			self._sessions["edu"] = new_session
 			self._session = new_session
 		else:
-			# 使用预定义的独立会话
+			# 使用预定义的固定会话
 			self._session = self._sessions[identity]
 			self._session.headers["Authorization"] = f"Bearer {token}"
 
-		# 保持原有token存储逻辑
 		self._identity = identity
 		print(f"切换到 {identity} | 会话ID: {id(self._session)}")
+
+		# 更新token存储
+		self._update_token_storage(token, identity)
+
+	def _clean_session(self) -> None:
+		"""清除当前会话的敏感状态"""
+		if self._session:
+			# 清除认证头
+			if "Authorization" in self._session.headers:
+				del self._session.headers["Authorization"]
+
+			# 清除Cookies
+			self._session.cookies.clear()
+
+			# 清除可能残留的headers
+			sensitive_headers = ["Referer", "X-Identity", "X-User-Id"]
+			for header in sensitive_headers:
+				if header in self._session.headers:
+					del self._session.headers[header]
+
+	def _create_headers(self) -> dict:
+		"""创建干净的请求头"""
+		return self._config.PROGRAM.HEADERS.copy()
+
+	def _update_token_storage(self, token: str, identity: str) -> None:
+		"""更新token存储'9'保持原有逻辑)"""
 		match identity:
 			case "average":
 				self.token.average = token
@@ -292,14 +315,6 @@ class CodeMaoClient:
 				self.token.judgement = token
 			case "blank":
 				pass
-
-	def __del__(self) -> None:
-		"""对象销毁时清理所有会话"""
-		for session in self._sessions["edu_pool"]:
-			session.close()
-		self._sessions["judgement"].close()
-		self._sessions["average"].close()
-		self._default_session.close()
 
 	def _log_request(self, response: Response) -> None:
 		"""简化的日志记录,使用文本格式而不是字典"""

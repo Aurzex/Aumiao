@@ -847,7 +847,7 @@ class Motion(ClassUnion):
 				if not record["processed"]:
 					process_single_item(record)
 
-		def process_single_item(record: ReportRecord, *, batch_mode: bool = False) -> str:
+		def process_single_item(record: ReportRecord, *, batch_mode: bool = False) -> str | None:
 			item = record["item"]
 			report_type = record["report_type"]
 			cfg = get_type_config(report_type, item)
@@ -891,6 +891,7 @@ class Motion(ClassUnion):
 					)
 				elif choice == "J":
 					print("已跳过")
+					return None
 				else:
 					print("无效输入")
 
@@ -966,7 +967,6 @@ class Motion(ClassUnion):
 
 	def _switch_edu_account(self, limit: int | None) -> Generator[tuple[str, str]]:
 		students = list(self.edu_obtain.fetch_class_students_generator(limit=limit))
-
 		while students:
 			# 随机选择一个索引并pop
 			student = students.pop(randint(0, len(students) - 1))
