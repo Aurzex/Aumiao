@@ -8,7 +8,6 @@
 *.vscode/
 *__pycache__/
 *captcha/
-*data/
 *dist/
 *download/
 *media/
