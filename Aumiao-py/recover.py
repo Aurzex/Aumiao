@@ -1,5 +1,12 @@
 import json
+import sys
 from pathlib import Path
+
+# 确保输出支持中文
+if sys.stdout.encoding != "utf-8":
+	import io
+
+	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 # 定义 data 文件夹路径
 data_folder = Path("data")
