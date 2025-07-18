@@ -140,6 +140,12 @@ jobs:
           windows-console-mode: force
           windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
 
+      - name: Run recover.py
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\activate
+          python ./Aumiao-py/recover.py
+
       - name: Prepare Distribution
         shell: pwsh
         run: |
