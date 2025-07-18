@@ -260,7 +260,6 @@ class CodeMaoClient:
 		"""简化版的会话切换方法"""
 		# 清除前一会话状态
 		self._clean_session()
-
 		# 教育账户特殊处理
 		if identity == "edu":
 			# 关闭并移除现有edu会话
@@ -290,10 +289,10 @@ class CodeMaoClient:
 			# 清除认证头
 			if "Authorization" in self._session.headers:
 				del self._session.headers["Authorization"]
-
+			if "Cookies" in self._session.headers:
+				del self._session.headers["Cookies"]
 			# 清除Cookies
 			self._session.cookies.clear()
-
 			# 清除可能残留的headers
 			sensitive_headers = ["Referer", "X-Identity", "X-User-Id"]
 			for header in sensitive_headers:
@@ -305,7 +304,7 @@ class CodeMaoClient:
 		return self._config.PROGRAM.HEADERS.copy()
 
 	def _update_token_storage(self, token: str, identity: str) -> None:
-		"""更新token存储'9'保持原有逻辑)"""
+		"""更新token存储"""
 		match identity:
 			case "average":
 				self.token.average = token

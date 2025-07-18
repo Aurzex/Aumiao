@@ -8,7 +8,7 @@ from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
 
 
-# sb编程猫,params中的{"_": timestamp}可以替换为{"TIME": timestamp}
+# params中的{"_": timestamp}可以替换为{"TIME": timestamp}
 @singleton
 class UserAction:
 	def __init__(self) -> None:

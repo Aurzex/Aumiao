@@ -501,7 +501,7 @@ class MathUtils:
 		return max(min_val, min(value, max_val))
 
 
-class StudentDataGenerator:
+class EduDataGenerator:
 	# 定义常量
 	CLASS_NUM_LIMIT = 12
 	LETTER_PROBABILITY = 0.3
@@ -531,7 +531,7 @@ class StudentDataGenerator:
 
 		def number_to_chinese(n: int) -> str:
 			chinese_numbers = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
-			return chinese_numbers[n - 1] if 1 <= n <= StudentDataGenerator.CLASS_NUM_LIMIT else str(n)
+			return chinese_numbers[n - 1] if 1 <= n <= EduDataGenerator.CLASS_NUM_LIMIT else str(n)
 
 		specialties = ["实验", "重点", "国际", "理科", "文科", "艺术", "体育", "国防"]
 
@@ -542,11 +542,11 @@ class StudentDataGenerator:
 			grade_str = f"{number_to_chinese(grade)}年级"
 
 			# 生成班级序号
-			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < StudentDataGenerator.LETTER_PROBABILITY else str(random.randint(1, 20))
+			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < EduDataGenerator.LETTER_PROBABILITY else str(random.randint(1, 20))
 
 			# 添加特色类型
 			specialty = ""
-			if add_specialty and random.random() < StudentDataGenerator.SPECIALTY_PROBABILITY:
+			if add_specialty and random.random() < EduDataGenerator.SPECIALTY_PROBABILITY:
 				specialty = random.choice(specialties)
 
 			# 组合班级名称
@@ -764,7 +764,7 @@ class StudentDataGenerator:
 			)
 
 			# 添加后缀
-			if random.random() < StudentDataGenerator.NAME_SUFFIX_PROBABILITY:
+			if random.random() < EduDataGenerator.NAME_SUFFIX_PROBABILITY:
 				suffix = random.choice(["儿", "然", "轩", "瑶", "豪", "菲"])
 				if current_gender == "male" and suffix in {"儿", "瑶", "菲"}:
 					suffix = random.choice(["然", "轩", "豪"])  # 保持性别特征
@@ -773,3 +773,55 @@ class StudentDataGenerator:
 			names.append(f"{surname}{first_name}")
 
 		return names
+
+	@staticmethod
+	def generate_teacher_certificate_number() -> str:
+		year_number = 2009
+		# 1. 年度代码(前4位):2000-2025随机年份
+		year = random.randint(2000, 2025)
+		# 2. 省级行政区代码(5-6位):国家标准行政区代码
+		province_codes = [
+			"11",
+			"12",
+			"13",
+			"14",
+			"15",  # 华北
+			"21",
+			"22",
+			"23",  # 东北
+			"31",
+			"32",
+			"33",
+			"34",
+			"35",
+			"36",
+			"37",  # 华东
+			"41",
+			"42",
+			"43",
+			"44",
+			"45",
+			"46",  # 中南
+			"50",
+			"51",
+			"52",
+			"53",
+			"54",  # 西南
+			"61",
+			"62",
+			"63",
+			"64",
+			"65",  # 西北
+		]
+		province = random.choice(province_codes)
+		# 3. 认定机构代码(7-9位):随机3位数字
+		agency = f"{random.randint(0, 999):03d}"
+		# 4. 教师资格类型(第10位):1-7随机
+		teacher_type = random.randint(1, 7)
+		# 5. 性别代码(第11位):根据年份区分编码规则
+		gender = random.choice(["male", "female"])
+		gender_code = ("0" if gender == "male" else "1") if year <= year_number else "1" if gender == "male" else "2"
+		# 6. 顺序号(12-17位):6位随机序列号
+		sequence = f"{random.randint(1, 999999):06d}"
+		# 组合所有部分
+		return f"{year}{province}{agency}{teacher_type}{gender_code}{sequence}"
