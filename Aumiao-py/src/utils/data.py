@@ -3,7 +3,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import Any, Generic, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from . import decorator
 
@@ -244,9 +244,9 @@ def save_json_file(path: Path, data: object) -> None:
 
 
 # --------------------------
-# 统一管理器基类 - 使用 PEP 695 语法解决 UP046 警告
+# 统一管理器基类
 # --------------------------
-class BaseManager[T]:
+class BaseManager(Generic[T]):  # noqa: UP046 # 此处修改规范nuitka编译会报错
 	_data: T | None = None
 	_file_path: Path
 
