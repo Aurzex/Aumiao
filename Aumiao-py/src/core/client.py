@@ -1186,6 +1186,7 @@ class Motion(ClassUnion):
 
 	def celestial_maiden_chronicles(self, real_name: str) -> None:
 		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+		generator = tool.EduDataGenerator()
 		self.edu_motion.upgrade_to_teacher(
 			user_id=int(self.data.ACCOUNT_DATA.id),
 			real_name=real_name,
@@ -1197,7 +1198,7 @@ class Motion(ClassUnion):
 			province_id=1,
 			city_id=1,
 			district_id=1,
-			teacher_card_number="20234400171011626",
+			teacher_card_number=generator.generate_teacher_certificate_number(),
 		)
 
 	@staticmethod
@@ -1209,7 +1210,7 @@ class Motion(ClassUnion):
 			class_capacity = 60
 			class_count = (student_limit + class_capacity - 1) // class_capacity
 
-			generator = tool.StudentDataGenerator()
+			generator = tool.EduDataGenerator()
 			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
 			student_names = generator.generate_student_names(num_students=student_limit)
 
