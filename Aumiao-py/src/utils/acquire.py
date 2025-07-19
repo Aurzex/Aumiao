@@ -506,10 +506,10 @@ class FileUploader:
 			)
 		return response.json()
 
-	def upload_via_codemao(self, file_path: Path) -> str:
+	def upload_via_codemao(self, file_path: Path, save_path: str = "aumiao") -> str:
 		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
 		timestamp = tool.TimeUtils().current_timestamp()
-		unique_name = f"aumiao/{timestamp}{file_path.name}"
+		unique_name = f"{save_path}/{timestamp}{file_path.name}"
 
 		token_info = self.get_codemao_token(file_path=unique_name)
 
