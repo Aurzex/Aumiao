@@ -1,11 +1,13 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
+from http.cookies import SimpleCookie
 from pathlib import Path
 from time import sleep
 from typing import Literal, TypedDict, cast
 
 from requests import Response
+from requests.adapters import HTTPAdapter
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
@@ -14,9 +16,10 @@ from requests.sessions import Session
 from . import data, file, tool
 from .decorator import singleton
 
-LOG_DIR: Path = data.CURRENT_DIR / ".log"
-LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 DICT_ITEM = 2
+LOG_DIR: Path = data.CURRENT_DIR / ".log"
+ERROR_LOG_PATH = LOG_DIR / f"errors_{tool.TimeUtils().current_timestamp()}.txt"
+LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 MAX_CHARACTER = 100
 
 
@@ -130,6 +133,9 @@ class CodeMaoClient:
 				response.raise_for_status()
 
 			except HTTPError as err:
+				# 记录所有HTTP错误
+				self._log_http_error(err.response, attempt, retries)
+
 				print(f"HTTP Error {type(err).__name__} - {err}")
 				sleep(2**attempt * backoff_factor)
 				if attempt == retries - 1:
@@ -152,6 +158,71 @@ class CodeMaoClient:
 				return response
 
 		return cast("Response", None)
+
+	def _log_http_error(self, response: Response, attempt: int, max_attempts: int) -> None:
+		"""
+		记录HTTP错误的详细信息
+		"""
+
+		try:
+			# 提取请求信息
+			request_info = {
+				"method": response.request.method,
+				"url": response.request.url,
+				"headers": dict(response.request.headers),
+				"body": response.request.body[:1000] if response.request.body else None,
+			}
+
+			# 提取响应信息,安全处理可能不存在的键
+			response_info = {
+				"status_code": response.status_code,
+				"headers": dict(response.headers),
+				"text": response.text[:1000] if response.text else None,
+			}
+
+			# 尝试解析JSON响应,避免因解析失败导致日志记录中断
+			try:
+				response_info["json"] = response.json()
+			except Exception:
+				response_info["json"] = "Failed to parse JSON"
+
+			# 提取额外的上下文信息
+			context_info = {
+				"attempt": attempt + 1,
+				"max_attempts": max_attempts,
+				"session_identity": self._identity,
+				"timestamp": tool.TimeUtils().format_timestamp(),
+			}
+
+			# 构建完整的日志条目
+			log_entry = (
+				f"{'=' * 80}\n"
+				f"HTTP Error {response.status_code}\n"
+				f"Timestamp: {context_info['timestamp']}\n"
+				f"Attempt {context_info['attempt']}/{context_info['max_attempts']}\n"
+				f"Session Identity: {context_info['session_identity']}\n\n"
+				f"Request:\n"
+				f"  Method: {request_info['method']}\n"
+				f"  URL: {request_info['url']}\n"
+				f"  Headers: {request_info['headers']}\n"
+				f"  Body: {request_info['body']}\n\n"
+				f"Response:\n"
+				f"  Status: {response_info['status_code']}\n"
+				f"  Headers: {response_info['headers']}\n"
+				f"  Text: {response_info['text']}\n"
+				f"  JSON: {response_info['json']}\n"
+				f"{'=' * 80}\n\n"
+			)
+
+			# 写入日志文件
+			self._file.file_write(path=ERROR_LOG_PATH, content=log_entry, method="a")
+
+			# 同时在控制台输出简要信息
+			print(f"[ERROR] HTTP {response.status_code} - Logged to {ERROR_LOG_PATH}")
+
+		except Exception as e:
+			# 确保日志记录过程中不会引发新的异常
+			print(f"Failed to log HTTP error: {e}")
 
 	def fetch_data(  # noqa: PLR0914
 		self,
@@ -257,51 +328,126 @@ class CodeMaoClient:
 					return
 
 	def switch_account(self, token: str, identity: Literal["judgement", "average", "edu", "blank"]) -> None:
-		"""简化版的会话切换方法"""
+		"""改进版的会话切换方法,确保完全隔离会话状态"""
 		# 清除前一会话状态
 		self._clean_session()
-		# 教育账户特殊处理
+
+		# 教育账户特殊处理 - 总是创建全新会话
 		if identity == "edu":
 			# 关闭并移除现有edu会话
 			if self._sessions["edu"]:
 				self._sessions["edu"].close()
+				del self._sessions["edu"]
 
 			# 创建全新的edu会话
 			new_session = Session()
-			new_session.headers = self._create_headers()
+			# 配置连接池限制
+			adapter = HTTPAdapter(pool_connections=1, pool_maxsize=1, max_retries=0)
+			new_session.mount("http://", adapter)
+			new_session.mount("https://", adapter)
+
+			new_session.headers.update(self._create_headers())
 			new_session.headers["Authorization"] = f"Bearer {token}"
+			# 确保清除所有可能的残留cookies
+			new_session.cookies.clear()
 			self._sessions["edu"] = new_session
 			self._session = new_session
 		else:
-			# 使用预定义的固定会话
+			# 对于非教育账户,重用会话但彻底清理
 			self._session = self._sessions[identity]
+			# 彻底清理会话状态
+			self._clean_session()
+			# 设置新token
 			self._session.headers["Authorization"] = f"Bearer {token}"
+			# 确保清除所有cookies
+			self._session.cookies.clear()
 
 		self._identity = identity
-		print(f"切换到 {identity} | 会话ID: {id(self._session)}")
+		print(f"切换到 {identity} | 会话ID: {id(self._session)} | Token: {token[:10]}...")
 
 		# 更新token存储
 		self._update_token_storage(token, identity)
 
 	def _clean_session(self) -> None:
-		"""清除当前会话的敏感状态"""
-		if self._session:
-			# 清除认证头
-			if "Authorization" in self._session.headers:
-				del self._session.headers["Authorization"]
-			if "Cookies" in self._session.headers:
-				del self._session.headers["Cookies"]
-			# 清除Cookies
-			self._session.cookies.clear()
-			# 清除可能残留的headers
-			sensitive_headers = ["Referer", "X-Identity", "X-User-Id"]
-			for header in sensitive_headers:
-				if header in self._session.headers:
-					del self._session.headers[header]
+		"""更彻底的会话清理方法"""
+		if not self._session:
+			return
+
+		# 清除所有headers
+		headers_to_keep = set(self._config.PROGRAM.HEADERS.keys()) - {"Authorization", "Cookie"}
+		new_headers = {k: v for k, v in self._config.PROGRAM.HEADERS.items() if k in headers_to_keep}
+		self._session.headers.clear()
+		self._session.headers.update(new_headers)
+
+		# 更彻底的cookies清理
+		self._session.cookies.clear()
+
+		# 清除可能的连接池
+		if hasattr(self._session, "adapters"):
+			for adapter in self._session.adapters.values():
+				adapter.close()
 
 	def _create_headers(self) -> dict:
-		"""创建干净的请求头"""
-		return self._config.PROGRAM.HEADERS.copy()
+		"""创建完全干净的请求头,排除敏感信息"""
+		clean_headers = self._config.PROGRAM.HEADERS.copy()
+
+		# 移除可能干扰的headers
+		for header in ["Authorization", "Cookie", "X-Identity", "X-User-Id"]:
+			if header in clean_headers:
+				del clean_headers[header]
+
+		return clean_headers
+
+	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
+		"""更安全的cookie更新方法
+
+		Args:
+			cookies: 可以是 RequestsCookieJar、字典或字符串格式的cookie
+
+		Raises:
+			TypeError: 当传入不支持的cookie类型时
+			ValueError: 当cookie格式无效时
+		"""  # noqa: DOC502
+		# 完全清除现有cookies
+		self._session.cookies.clear()
+
+		if "Cookie" in self._session.headers:
+			del self._session.headers["Cookie"]
+
+		def _to_cookie_str(cookie: RequestsCookieJar | dict | str) -> str:
+			"""将各种cookie格式转换为字符串
+
+			Args:
+				cookie: 要转换的cookie对象
+
+			Returns:
+				格式化后的cookie字符串
+
+			Raises:
+				TypeError: 当传入不支持的cookie类型时
+			"""
+			if isinstance(cookie, RequestsCookieJar):
+				return "; ".join(f"{k}={v}" for k, v in cookie.get_dict().items())
+			if isinstance(cookie, dict):
+				return "; ".join(f"{k}={v}" for k, v in cookie.items())
+			if isinstance(cookie, str):
+				return ";".join(part.strip() for part in cookie.split(";") if "=" in part and len(part.split("=")) == 2)  # noqa: PLR2004
+			msg = f"不支持的Cookie类型: {type(cookie).__name__}"
+			raise TypeError(msg)
+
+		try:
+			cookie_str = _to_cookie_str(cookies)
+			if cookie_str:
+				# 同时设置headers和cookies对象
+				self._session.headers["Cookie"] = cookie_str
+				cookie_obj = SimpleCookie()
+				cookie_obj.load(cookie_str)
+				for key, morsel in cookie_obj.items():
+					self._session.cookies.set(key, morsel.value, domain=morsel.get("domain"), path=morsel.get("path"))
+		except Exception as e:
+			error_msg = "无效的Cookie格式"
+			print(f"Cookie更新失败: {e!s}")
+			raise ValueError(error_msg) from e
 
 	def _update_token_storage(self, token: str, identity: str) -> None:
 		"""更新token存储"""
@@ -340,32 +486,6 @@ class CodeMaoClient:
 			"response_amount_key": "limit",
 			"response_offset_key": "offset",
 		}
-
-	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
-		# 清除旧Cookie
-		if "Cookie" in self.headers:
-			del self.headers["Cookie"]
-
-		# 转换所有类型为Cookie字符串
-		def _to_cookie_str(cookie: RequestsCookieJar | dict | str) -> str:
-			if isinstance(cookie, RequestsCookieJar):
-				return "; ".join(f"{cookie.name}={cookie.value}" for cookie in cookie)
-			if isinstance(cookie, dict):
-				return "; ".join(f"{k}={v}" for k, v in cookie.items())
-			if isinstance(cookie, str):
-				# 过滤非法字符
-				return ";".join(part.strip() for part in cookie.split(";") if "=" in part and len(part.split("=")) == DICT_ITEM)
-			msg = f"不支持的Cookie类型: {type(cookie).__name__}"
-			raise TypeError(msg)
-
-		try:
-			cookie_str = _to_cookie_str(cookies)
-			if cookie_str:
-				self.headers["Cookie"] = cookie_str
-		except Exception as e:
-			print(f"Cookie更新失败: {e!s}")
-			msg = "无效的Cookie格式"
-			raise ValueError(msg) from e
 
 
 class FileUploader:

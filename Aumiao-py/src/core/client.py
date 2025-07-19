@@ -1067,7 +1067,6 @@ class Motion(ClassUnion):
 		report_counter = -1
 		reason_content = self.community_obtain.fetch_report_reasons()["items"][7]["content"]
 		source_map = {"work": "work", "post": "forum", "shop": "shop"}
-
 		for violation in violations:
 			try:
 				# 账号切换逻辑
@@ -1111,7 +1110,7 @@ class Motion(ClassUnion):
 				):
 					report_counter += 1
 					print(f"举报成功: {violation}")
-					break
+					continue
 				print(f"举报失败: {violation}")
 				report_counter += 1
 
@@ -1207,7 +1206,7 @@ class Motion(ClassUnion):
 
 		def _create_students(student_limit: int) -> None:
 			"""创建学生账号内部逻辑"""
-			class_capacity = 60
+			class_capacity = 95
 			class_count = (student_limit + class_capacity - 1) // class_capacity
 
 			generator = tool.EduDataGenerator()
@@ -1261,20 +1260,17 @@ class Motion(ClassUnion):
 			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
 			work_info = self.acquire.send_request(endpoint=work_info_url, method="GET").json()
 			bcm_url = work_info["work_urls"][0]
-			headers = {
-				"User-Agent": "okhttp/4.2.2",
-			}
 			payload = {
-				"app_version": "4.3.4",
+				"app_version": "5.6.2",
 				"bcm_version": "0.16.2",
-				"equipment": "Redmi",
+				"equipment": "Aumiao",
 				"name": work_info["name"],
 				"os": "android",
 				"preview": work_info["preview"],
 				"work_id": work_id,
 				"work_url": bcm_url,
 			}
-			response = self.acquire.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", headers=headers, payload=payload)
+			response = self.acquire.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", payload=payload)
 			# Process the response
 			if response.ok:
 				result = response.json()
