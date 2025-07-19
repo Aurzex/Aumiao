@@ -66,7 +66,7 @@ jobs:
       - name: Upload Spell Fixes
         uses: actions/upload-artifact@v4
         with:
-          name: code-fixes
+          name: spell-fixes
           path: ./Aumiao-py/src
           retention-days: 1
 
