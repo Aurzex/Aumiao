@@ -1282,6 +1282,13 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
 
+	@staticmethod
+	def upload_file(method: Literal["pgaot", "codemao"], file_path: Path, save_path: str = "aumiao") -> None:
+		uploader = acquire.FileUploader()
+		method_name = f"upload_via_{method}"
+		upload_method = getattr(uploader, method_name)
+		upload_method(file_path, save_path)
+
 
 # "POST_COMMENT",
 # "POST_COMMENT_DELETE_FEEDBACK",
