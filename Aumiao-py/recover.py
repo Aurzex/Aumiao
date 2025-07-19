@@ -9,7 +9,9 @@ if sys.stdout.encoding != "utf-8":
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 # 定义 data 文件夹路径
-data_folder = Path("data")
+
+# 获取当前脚本所在的目录,然后在其下创建data文件夹
+data_folder = Path(__file__).parent / "data"
 
 # 检查 data 文件夹是否存在,如果不存在则创建
 if not data_folder.exists():

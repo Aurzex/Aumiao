@@ -1,8 +1,19 @@
 name: Code Quality Automation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/pyproject.toml"
   pull_request:
-  pull_request_target:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/pyproject.toml"
+  workflow_dispatch:
 
 jobs:
   code-styling:
@@ -28,7 +39,7 @@ jobs:
           version: "latest"
           args: "format"
           src: "./Aumiao-py/src"
-          
+
       - name: Upload Ruff Fixes
         uses: actions/upload-artifact@v4
         with:
@@ -51,7 +62,7 @@ jobs:
         with:
           config: ./Aumiao-py/typos.toml
           files: ./Aumiao-py/src
-          
+
       - name: Upload Spell Fixes
         uses: actions/upload-artifact@v4
         with:
@@ -83,7 +94,7 @@ jobs:
         id: changes
         run: |
           git diff --quiet || echo "HAS_CHANGES=true" >> $GITHUB_ENV
-          
+
       - name: Commit Fixes
         if: env.HAS_CHANGES == 'true'
         env:
