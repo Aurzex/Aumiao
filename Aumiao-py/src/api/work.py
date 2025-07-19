@@ -1206,3 +1206,47 @@ class WorkDataFetcher:
 			method="GET",
 		)
 		return response.json()
+
+	def search_works_by_name_web(self, name: str, limit: int = 20, offset: int = 0) -> dict:
+		"""
+		通过名称搜索作品
+		Args:
+			name: 搜索名称
+			limit: 获取数量(可选)
+			offset: 偏移量(可选)
+		Returns:
+			搜索结果字典
+		"""
+		params = {
+			"query": name,
+			"offset": offset,
+			"limit": limit,
+		}
+		response = self.acquire.send_request(
+			endpoint="/nemo/community/work/name/search",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	def search_works_by_name_nemo(self, name: str, limit: int = 20, offset: int = 0) -> dict:
+		"""
+		通过名称搜索作品(版本2)
+		Args:
+			name: 搜索名称
+			limit: 获取数量(可选)
+			offset: 偏移量(可选)
+		Returns:
+			搜索结果字典
+		"""
+		params = {
+			"key": name,
+			"offset": offset,
+			"limit": limit,
+		}
+		response = self.acquire.send_request(
+			endpoint="/nemo/v2/work/name/search",
+			method="GET",
+			params=params,
+		)
+		return response.json()
