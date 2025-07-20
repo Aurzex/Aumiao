@@ -1,5 +1,6 @@
 import json
 import os
+from collections import UserDict
 from collections.abc import Mapping
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
@@ -17,8 +18,8 @@ DATA_DIR = Path(os.getenv("APP_DATA_DIR", CURRENT_DIR / "data"))
 
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
 DATA_FILE_PATH = DATA_DIR / "data.json"
+HISTORY_FILE_PATH = DATA_DIR / "history.json"
 SETTING_FILE_PATH = DATA_DIR / "setting.json"
-
 # 确保数据目录存在
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -101,6 +102,15 @@ class Program:
 
 
 @dataclass
+class UploadHistory:
+	file_name: str = ""
+	file_size: str = ""
+	method: Literal["codemao", "pgaot"] = "pgaot"
+	save_url: str = ""
+	upload_time: int = 0
+
+
+@dataclass
 class CodeMaoCache:
 	collected: int = 0
 	fans: int = 0
@@ -117,6 +127,11 @@ class CodeMaoSetting:
 	PARAMETER: Parameter = field(default_factory=Parameter)
 	PLUGIN: Plugin = field(default_factory=Plugin)
 	PROGRAM: Program = field(default_factory=Program)
+
+
+@dataclass
+class CodemaoHistory:
+	history: list[UploadHistory] = field(default_factory=list)
 
 
 # --------------------------
@@ -305,16 +320,38 @@ class BaseManager(Generic[T]):  # noqa: UP046 # 此处修改规范nuitka编译�
 @decorator.singleton
 class DataManager(BaseManager[CodeMaoData]):
 	def __init__(self) -> None:
-		super().__init__(DATA_FILE_PATH, CodeMaoData)
+		super().__init__(file_path=DATA_FILE_PATH, data_class=CodeMaoData)
 
 
 @decorator.singleton
 class CacheManager(BaseManager[CodeMaoCache]):
 	def __init__(self) -> None:
-		super().__init__(CACHE_FILE_PATH, CodeMaoCache)
+		super().__init__(file_path=CACHE_FILE_PATH, data_class=CodeMaoCache)
 
 
 @decorator.singleton
 class SettingManager(BaseManager[CodeMaoSetting]):
 	def __init__(self) -> None:
-		super().__init__(SETTING_FILE_PATH, CodeMaoSetting)
+		super().__init__(file_path=SETTING_FILE_PATH, data_class=CodeMaoSetting)
+
+
+@decorator.singleton
+class HistoryManger(BaseManager[CodemaoHistory]):
+	def __init__(self) -> None:
+		super().__init__(file_path=HISTORY_FILE_PATH, data_class=CodemaoHistory)
+
+
+class NestedDefaultDict(UserDict):
+	__annotations__ = {"return": dict[str, Any]}
+
+	def __getitem__(self, key: str) -> ...:
+		if key not in self.data:
+			return "UNKNOWN"
+		val = self.data[key]
+		if isinstance(val, dict):
+			return cast("dict[str, Any]", NestedDefaultDict(val))
+		return val
+
+	# 显式声明为普通 dict 的方法
+	def to_dict(self) -> dict[str, Any]:
+		return dict(self.data)
