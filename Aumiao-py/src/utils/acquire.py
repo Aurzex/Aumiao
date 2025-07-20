@@ -96,8 +96,9 @@ class CodeMaoClient:
 		merged_headers = {**self.headers, **(headers or {})}
 
 		# 当有文件上传时,移除 Content-Type 头,让 requests 自动生成正确的 multipart 边界
-		if files is not None and "Content-Type" in merged_headers:
-			del merged_headers["Content-Type"]
+		if files is not None:
+			for header_to_remove in ["Content-Type", "Content-Length"]:
+				merged_headers.pop(header_to_remove, None)
 
 		log = bool(self.log_request and log)
 
@@ -504,13 +505,15 @@ class FileUploader:
 				payload=data,
 				timeout=120,
 			)
-		return response.json()
+		return response.json()["url"]
 
 	def upload_via_codemao(self, file_path: Path, save_path: str = "aumiao") -> str:
 		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
 		timestamp = tool.TimeUtils().current_timestamp()
 		unique_name = f"{save_path}/{timestamp}{file_path.name}"
-
+		# FIX: 移除默认Content-Type头,解决七牛云上传400错误
+		# 原因:会话级默认头会覆盖multipart/form-data设置
+		# 方案:初始化时不设置Content-Type,由requests自动处理
 		token_info = self.get_codemao_token(file_path=unique_name)
 
 		with file_path.open("rb") as file_obj:

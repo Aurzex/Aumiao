@@ -15,8 +15,9 @@ from src.utils import acquire, data, decorator, file, tool
 # 常量定义
 DOWNLOAD_DIR: Path = data.CURRENT_DIR / "download"
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-VALID_REPLY_TYPES = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
+MAX_SIZE_BYTES = 15 * 1024 * 1024  # 转换为字节
 REPORT_BATCH_THRESHOLD = 15
+VALID_REPLY_TYPES = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
 
 
 class FormattedAnswer(TypedDict):
@@ -56,10 +57,12 @@ class Union:
 		self.file = file.CodeMaoFile()
 		self.forum_motion = forum.ForumActionHandler()
 		self.forum_obtain = forum.ForumDataFetcher()
+		self.library_obtain = library.NovelDataFetcher()
 		self.setting = data.SettingManager().data
 		self.shop_motion = shop.WorkshopActionHandler()
 		self.shop_obtain = shop.WorkshopDataFetcher()
 		self.tool = tool
+		self.upload_history = data.HistoryManger()
 		self.user_motion = user.UserManager()
 		self.user_obtain = user.UserDataFetcher()
 		self.whale_motion = whale.ReportHandler()
@@ -67,7 +70,6 @@ class Union:
 		self.whale_routine = whale.AuthManager()
 		self.work_motion = work.WorkManager()
 		self.work_obtain = work.WorkDataFetcher()
-		self.library_obtain = library.NovelDataFetcher()
 
 
 ClassUnion = Union().__class__
@@ -848,9 +850,9 @@ class Motion(ClassUnion):
 					process_single_item(record)
 
 		def process_single_item(record: ReportRecord, *, batch_mode: bool = False) -> str | None:
-			item = record["item"]
+			item = data.NestedDefaultDict(record["item"])
 			report_type = record["report_type"]
-			cfg = get_type_config(report_type, item)
+			cfg = get_type_config(report_type, item.to_dict())
 			if batch_mode:
 				print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
 			print(f"\n{'=' * 50}")
@@ -876,7 +878,7 @@ class Motion(ClassUnion):
 					record["processed"] = True
 					return choice
 				if choice == "C":
-					self._show_details(item, report_type, cfg)
+					self._show_details(item.to_dict(), report_type, cfg)
 				elif choice == "F" and cfg["special_check"]():
 					source_map = {
 						"comment": "shop" if item.get("comment_source") == "WORK_SHOP" else "work",
@@ -1282,12 +1284,172 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
 
-	@staticmethod
-	def upload_file(method: Literal["pgaot", "codemao"], file_path: Path, save_path: str = "aumiao") -> None:
+	def upload_file(
+		self,
+		method: Literal["pgaot", "codemao"],
+		file_path: Path,
+		save_path: str = "aumiao",
+		*,
+		recursive: bool = True,  # 默认最大15MB
+	) -> dict[str, str | None] | str | None:
+		"""
+		上传文件或文件夹
+
+		Args:
+			method: 上传方法 ("pgaot" 或 "codemao")
+			file_path: 要上传的文件或文件夹路径
+			save_path: 保存路径 (默认为 "aumiao")
+			recursive: 是否递归上传子文件夹中的文件 (默认为 True)
+
+		Returns:
+			- 如果是单个文件: 返回上传后的URL或None
+			- 如果是文件夹: 返回字典 {文件路径: 上传URL或None}
+		"""
 		uploader = acquire.FileUploader()
 		method_name = f"upload_via_{method}"
+		if not hasattr(uploader, method_name):
+			return None if file_path.is_file() else {}
 		upload_method = getattr(uploader, method_name)
-		upload_method(file_path, save_path)
+		# 如果是文件,直接上传
+		if file_path.is_file():
+			file_size = file_path.stat().st_size
+			if file_size > MAX_SIZE_BYTES:
+				print(f"警告: 文件 {file_path.name} 大小 {file_size / 1024 / 1024:.2f}MB 超过 15MB 限制,跳过上传")
+				return None
+			url = upload_method(file_path, save_path)
+			file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+			history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
+			self.upload_history.data.history.append(history)
+			self.upload_history.save()
+			return url
+
+		# 如果是文件夹,上传所有文件
+		if file_path.is_dir():
+			results = {}
+			# 使用 rglob 递归查找所有文件
+			pattern = "**/*" if recursive else "*"
+			for child_file in file_path.rglob(pattern):
+				if child_file.is_file():
+					try:
+						file_size = child_file.stat().st_size
+						if file_size > MAX_SIZE_BYTES:
+							print(f"警告: 文件 {child_file.name} 大小 {file_size / 1024 / 1024:.2f}MB 超过 15MB 限制,跳过上传")
+							results[str(child_file)] = None
+							continue
+						# 保持相对路径结构
+						relative_path = child_file.relative_to(file_path)
+						child_save_path = str(Path(save_path) / relative_path.parent)
+						url = upload_method(child_file, child_save_path)
+						file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+						history = data.UploadHistory(
+							file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp()
+						)
+						self.upload_history.data.history.append(history)
+						results[str(child_file)] = url
+					except Exception as e:
+						results[str(child_file)] = None
+						print(f"上传 {child_file} 失败: {e}")
+			self.upload_history.save()
+			return results
+		return None
+
+	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0914, PLR0915
+		"""
+		打印上传历史记录(支持分页和详细查看)
+
+		Args:
+			limit: 每页显示记录数(默认10条)
+			reverse: 是否按时间倒序显示(最新的在前)
+		"""
+		history_list = self.upload_history.data.history
+
+		if not history_list:
+			print("暂无上传历史记录")
+			return
+
+		# 排序历史记录
+		sorted_history = sorted(
+			history_list,
+			key=lambda x: x.upload_time,
+			reverse=reverse,
+		)
+
+		total_records = len(sorted_history)
+		page = 1
+		max_page = (total_records + limit - 1) // limit
+
+		while True:
+			start = (page - 1) * limit
+			end = min(start + limit, total_records)
+			page_data = sorted_history[start:end]
+
+			# 打印当前页
+			print(f"\n上传历史记录(第{page}/{max_page}页):")
+			print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
+			print("-" * 85)
+
+			for i, record in enumerate(page_data, start + 1):
+				upload_time = record.upload_time
+				if isinstance(upload_time, (int, float)):
+					upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+				file_name = record.file_name.replace("\\", "/")
+				url = record.save_url.replace("\\", "/")
+				url_type = ""
+				if "static.codemao.cn" in url:
+					parts = url.split("/aumiao/")
+					simplified_url = parts[-1].split("?")[0] if len(parts) > 1 else url.split("/")[-1]
+					url_type = "[static]"
+				elif "cdn-community.bcmcdn.com" in url:
+					parts = url.split("/aumiao/")
+					simplified_url = parts[-1] if len(parts) > 1 else url.split("/")[-1]
+					url_type = "[cdn]"
+				else:
+					simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
+					url_type = "[other]"
+
+				print(f"{i:<3} | {file_name[:25]:<25} | {str(upload_time)[:19]:<19} | {url_type}{simplified_url}")
+
+			print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
+
+			# 用户操作提示
+			print("\n操作选项:")
+			print("n:下一页 p:上一页 d[ID]:查看详情 q:退出")
+			action = input("请输入操作: ").strip().lower()
+
+			if action == "q":
+				break
+			if action == "n" and page < max_page:
+				page += 1
+			elif action == "p" and page > 1:
+				page -= 1
+			elif action.startswith("d"):
+				try:
+					record_id = int(action[1:])
+					if 1 <= record_id <= total_records:
+						self._show_record_detail(sorted_history[record_id - 1])
+					else:
+						print(f"错误:ID超出范围(1-{total_records})")
+				except ValueError:
+					print("错误:无效的ID格式(正确格式:d1,d2等)")
+			else:
+				print("错误:无效操作或超出页码范围")
+
+	def _show_record_detail(self, record: data.UploadHistory) -> None:
+		"""显示单条记录的详细信息"""
+		print("\n文件上传详情:")
+		print("-" * 60)
+		print(f"文件名: {record.file_name}")
+		print(f"文件大小: {record.file_size}")
+		print(f"上传方式: {record.method}")
+		upload_time = record.upload_time
+		if isinstance(upload_time, (int, float)):
+			upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+		print(f"上传时间: {upload_time}")
+		print(f"完整URL: {record.save_url}")
+		if record.save_url.startswith("http"):
+			print("\n提示:复制上方URL到浏览器可直接访问或下载")
+		print("-" * 60)
+		input("按Enter键返回...")
 
 
 # "POST_COMMENT",

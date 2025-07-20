@@ -103,7 +103,9 @@ def handle_report() -> None:
 	"""Handle reports with admin privileges."""
 	print_header("处理举报")
 	client.Motion().judgement_login()  # noqa: F405
-	admin_id = int(input(f"{COLOR_CODES['PROMPT']}↳ 请输入管理员ID: {COLOR_CODES['RESET']}"))
+	judgment_data = whale.AuthManager().fetch_user_dashboard_data()  # noqa: F405
+	print(f"{COLOR_CODES['SUCCESS']}登录成功!欢迎 {judgment_data['admin']['username']}{COLOR_CODES['RESET']}")
+	admin_id: int = judgment_data["admin"]["id"]
 	client.Motion().handle_report(admin_id=admin_id)  # noqa: F405
 	print(f"{COLOR_CODES['SUCCESS']}已成功处理举报{COLOR_CODES['RESET']}")
 
@@ -183,7 +185,7 @@ def main() -> None:
 		"6": ("处理举报", handle_report),
 		"7": ("状态查询", check_account_status),
 		"8": ("下载小说", download_fiction),
-		"9": ("生成喵口令", generate_nemo_code),
+		"9": ("做喵口令", generate_nemo_code),
 		"10": ("退出系统", lambda: print(f"\n{COLOR_CODES['SUCCESS']}感谢使用,再见!{COLOR_CODES['RESET']}")),
 		"1106": ("隐藏功能", handle_hidden_features),
 	}
@@ -191,7 +193,7 @@ def main() -> None:
 	while True:
 		print_header("主菜单")
 		for key, (label, _) in menu_options.items():
-			if key.isdigit() and len(key) == 1:  # Only show main menu options
+			if key.isdigit() and len(key) <= 2:  # Only show main menu options  # noqa: PLR2004
 				print(f"{COLOR_CODES['MENU_ITEM']}{key}. {label}")
 
 		choice = input(f"\n{COLOR_CODES['PROMPT']}↳ 请输入操作编号 (1-9): {COLOR_CODES['RESET']}")

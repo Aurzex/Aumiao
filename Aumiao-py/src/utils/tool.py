@@ -10,6 +10,7 @@ from typing import Literal, TypeGuard, TypeVar, overload
 
 DataObject = dict | list[dict] | Generator[dict, object]
 T = TypeVar("T")
+FILE_SIZE: int = 1024
 
 
 @staticmethod
@@ -329,6 +330,16 @@ class DataConverter:
 		if merge_empty_lines:
 			result = re.sub(r"\n{2,}", "\n", result)
 		return result.strip()
+
+	@staticmethod
+	def bytes_to_human(size: int) -> str:
+		"""将字节数转换为易读格式(如 KB/MB/GB)"""
+		size_float = float(size)  # 转为float避免除法问题
+		for unit in ["B", "KB", "MB", "GB"]:
+			if size_float < FILE_SIZE or unit == "GB":
+				return f"{size_float:.2f} {unit}"
+			size_float /= FILE_SIZE
+		return f"{size_float:.2f} GB"  # 兜底返回
 
 
 class StringProcessor:
