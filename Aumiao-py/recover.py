@@ -33,7 +33,6 @@ setting_data = {
 		"HEADERS": {
 			"Accept-Encoding": "gzip, deflate, br, zstd",
 			"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-			"Content-Type": "application/json;charset=UTF-8",
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
 		},
 		"MEMBER": "Aurzex, MoonLeaaaf, Nomen, MiTao, DontLoveBy",
