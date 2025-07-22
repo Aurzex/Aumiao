@@ -1353,7 +1353,7 @@ class Motion(ClassUnion):
 			return results
 		return None
 
-	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0914, PLR0915
+	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0912, PLR0914, PLR0915
 		"""
 		打印上传历史记录(支持分页和详细查看)
 
@@ -1373,21 +1373,16 @@ class Motion(ClassUnion):
 			key=lambda x: x.upload_time,
 			reverse=reverse,
 		)
-
 		total_records = len(sorted_history)
 		page = 1
 		max_page = (total_records + limit - 1) // limit
-
 		while True:
 			start = (page - 1) * limit
 			end = min(start + limit, total_records)
 			page_data = sorted_history[start:end]
-
-			# 打印当前页
 			print(f"\n上传历史记录(第{page}/{max_page}页):")
 			print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
 			print("-" * 85)
-
 			for i, record in enumerate(page_data, start + 1):
 				upload_time = record.upload_time
 				if isinstance(upload_time, (int, float)):
@@ -1395,27 +1390,34 @@ class Motion(ClassUnion):
 				file_name = record.file_name.replace("\\", "/")
 				url = record.save_url.replace("\\", "/")
 				url_type = ""
+				simplified_url = ""
+				# 处理static.codemao.cn域名的URL
 				if "static.codemao.cn" in url:
-					parts = url.split("/aumiao/")
-					simplified_url = parts[-1].split("?")[0] if len(parts) > 1 else url.split("/")[-1]
+					cn_index = url.find(".cn")
+					if cn_index != -1:
+						after_domain = url[cn_index + 3 :]  # +3是因为".cn"长度为3
+						simplified_url = after_domain.split("?")[0]
+					else:
+						simplified_url = url.split("/")[-1].split("?")[0]
 					url_type = "[static]"
 				elif "cdn-community.bcmcdn.com" in url:
-					parts = url.split("/aumiao/")
-					simplified_url = parts[-1] if len(parts) > 1 else url.split("/")[-1]
+					# 找到.com的位置并提取其后的部分
+					com_index = url.find(".com")
+					if com_index != -1:
+						# 从.com后面开始截取并去除查询参数
+						after_domain = url[com_index + 4 :]  # +4是因为".com"长度为4
+						simplified_url = after_domain.split("?")[0]
+					else:
+						simplified_url = url.split("/")[-1].split("?")[0]
 					url_type = "[cdn]"
 				else:
 					simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
 					url_type = "[other]"
-
 				print(f"{i:<3} | {file_name[:25]:<25} | {str(upload_time)[:19]:<19} | {url_type}{simplified_url}")
-
 			print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
-
-			# 用户操作提示
 			print("\n操作选项:")
 			print("n:下一页 p:上一页 d[ID]:查看详情 q:退出")
 			action = input("请输入操作: ").strip().lower()
-
 			if action == "q":
 				break
 			if action == "n" and page < max_page:
