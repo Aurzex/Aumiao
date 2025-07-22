@@ -49,7 +49,7 @@ class PaginationConfig(TypedDict, total=False):
 	response_offset_key: Literal["offset", "page"]
 
 
-HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT"]
+HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD"]
 FetchMethod = Literal["GET", "POST"]
 
 

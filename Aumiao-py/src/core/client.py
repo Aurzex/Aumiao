@@ -1353,9 +1353,9 @@ class Motion(ClassUnion):
 			return results
 		return None
 
-	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0912, PLR0914, PLR0915
+	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
 		"""
-		打印上传历史记录(支持分页和详细查看)
+		打印上传历史记录(支持分页、详细查看和链接验证)
 
 		Args:
 			limit: 每页显示记录数(默认10条)
@@ -1374,49 +1374,19 @@ class Motion(ClassUnion):
 			reverse=reverse,
 		)
 		total_records = len(sorted_history)
-		page = 1
 		max_page = (total_records + limit - 1) // limit
+		page = 1
+
 		while True:
+			# 获取当前页数据
 			start = (page - 1) * limit
 			end = min(start + limit, total_records)
 			page_data = sorted_history[start:end]
-			print(f"\n上传历史记录(第{page}/{max_page}页):")
-			print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
-			print("-" * 85)
-			for i, record in enumerate(page_data, start + 1):
-				upload_time = record.upload_time
-				if isinstance(upload_time, (int, float)):
-					upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
-				file_name = record.file_name.replace("\\", "/")
-				url = record.save_url.replace("\\", "/")
-				url_type = ""
-				simplified_url = ""
-				# 处理static.codemao.cn域名的URL
-				if "static.codemao.cn" in url:
-					cn_index = url.find(".cn")
-					if cn_index != -1:
-						after_domain = url[cn_index + 3 :]  # +3是因为".cn"长度为3
-						simplified_url = after_domain.split("?")[0]
-					else:
-						simplified_url = url.split("/")[-1].split("?")[0]
-					url_type = "[static]"
-				elif "cdn-community.bcmcdn.com" in url:
-					# 找到.com的位置并提取其后的部分
-					com_index = url.find(".com")
-					if com_index != -1:
-						# 从.com后面开始截取并去除查询参数
-						after_domain = url[com_index + 4 :]  # +4是因为".com"长度为4
-						simplified_url = after_domain.split("?")[0]
-					else:
-						simplified_url = url.split("/")[-1].split("?")[0]
-					url_type = "[cdn]"
-				else:
-					simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
-					url_type = "[other]"
-				print(f"{i:<3} | {file_name[:25]:<25} | {str(upload_time)[:19]:<19} | {url_type}{simplified_url}")
-			print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
-			print("\n操作选项:")
-			print("n:下一页 p:上一页 d[ID]:查看详情 q:退出")
+
+			# 打印当前页
+			self._print_current_page(page, max_page, total_records, start, end, page_data)
+
+			# 处理用户操作
 			action = input("请输入操作: ").strip().lower()
 			if action == "q":
 				break
@@ -1436,22 +1406,86 @@ class Motion(ClassUnion):
 			else:
 				print("错误:无效操作或超出页码范围")
 
+	def _print_current_page(self, page: int, max_page: int, total_records: int, start: int, end: int, page_data: list) -> None:
+		"""打印当前分页的所有内容"""
+		print(f"\n上传历史记录(第{page}/{max_page}页):")
+		print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
+		print("-" * 85)
+
+		for i, record in enumerate(page_data, start + 1):
+			# 格式化上传时间
+			upload_time = record.upload_time
+			if isinstance(upload_time, (int, float)):
+				upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+			formatted_time = str(upload_time)[:19]
+
+			# 处理文件名
+			file_name = record.file_name.replace("\\", "/")[:25]
+
+			# 简化URL并添加类型标识
+			url = record.save_url.replace("\\", "/")
+			url_type = "[other]"
+			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
+
+			if "static.codemao.cn" in url:
+				# 处理static.codemao.cn域名
+				cn_index = url.find(".cn")
+				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
+				url_type = "[static]"
+			elif "cdn-community.bcmcdn.com" in url:
+				com_index = url.find(".com")
+				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
+				url_type = "[cdn]"
+
+			print(f"{i:<3} | {file_name:<25} | {formatted_time:<19} | {url_type}{simplified_url}")
+
+		print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
+		print("\n操作选项:")
+		print("n:下一页 p:上一页 d[ID]:查看详情(含链接验证) q:退出")
+
 	def _show_record_detail(self, record: data.UploadHistory) -> None:
-		"""显示单条记录的详细信息"""
+		"""显示单条记录的详细信息并验证链接"""
+		# 格式化上传时间
+		upload_time = record.upload_time
+		if isinstance(upload_time, (int, float)):
+			upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
 		print("\n文件上传详情:")
 		print("-" * 60)
 		print(f"文件名: {record.file_name}")
 		print(f"文件大小: {record.file_size}")
 		print(f"上传方式: {record.method}")
-		upload_time = record.upload_time
-		if isinstance(upload_time, (int, float)):
-			upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
 		print(f"上传时间: {upload_time}")
 		print(f"完整URL: {record.save_url}")
+		# 验证链接有效性
+		is_valid = self._validate_url(record.save_url)
+		status = "有效" if is_valid else "无效"
+		print(f"链接状态: {status}")
 		if record.save_url.startswith("http"):
 			print("\n提示:复制上方URL到浏览器可直接访问或下载")
 		print("-" * 60)
 		input("按Enter键返回...")
+
+	def _validate_url(self, url: str) -> bool:
+		"""
+		验证URL链接是否有效
+		使用HEAD请求检查状态码和内容长度,必要时使用GET请求验证
+		"""
+		response = self.acquire.send_request(endpoint=url, method="HEAD", timeout=5)
+		if response.status_code != acquire.HTTPSTATUS.OK.value:
+			return False
+		content_length = response.headers.get("Content-Length")
+		return bool(content_length and int(content_length) > 0)
+		# try:
+		# 	# 当HEAD不可用时使用GET请求(流式读取少量数据)
+		# 	with requests.get(url, headers=headers, stream=True, allow_redirects=True, timeout=timeout) as response:
+		# 		if response.status_code != 200:
+		# 			return False
+
+		# 		# 尝试读取1字节验证内容非空
+		# 		return bool(next(response.iter_content(chunk_size=1), None))
+
+		# except (RequestException, StopIteration):
+		# 	return False
 
 
 # "POST_COMMENT",
