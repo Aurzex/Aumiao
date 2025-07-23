@@ -90,6 +90,7 @@ class CodeMaoClient:
 		backoff_factor: float = 0.3,
 		timeout: float = 10.0,
 		*,
+		stream: bool | None = None,
 		log: bool = True,
 	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
@@ -115,6 +116,7 @@ class CodeMaoClient:
 						data=payload,  # 使用 data 而不是 json
 						files=files,
 						timeout=timeout,
+						stream=stream,
 					)
 				else:
 					# 普通请求使用 json
