@@ -3,7 +3,7 @@
 **.pdb
 *.VSCodeCounter/
 *.idea/
-*.log/
+*.log
 *.venv/
 *.vscode/
 *__pycache__/
