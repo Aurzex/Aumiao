@@ -1290,7 +1290,7 @@ class Motion(ClassUnion):
 		file_path: Path,
 		save_path: str = "aumiao",
 		*,
-		recursive: bool = True,  # 默认最大15MB
+		recursive: bool = True,
 	) -> dict[str, str | None] | str | None:
 		"""
 		上传文件或文件夹
@@ -1310,48 +1310,66 @@ class Motion(ClassUnion):
 		if not hasattr(uploader, method_name):
 			return None if file_path.is_file() else {}
 		upload_method = getattr(uploader, method_name)
-		# 如果是文件,直接上传
 		if file_path.is_file():
-			file_size = file_path.stat().st_size
-			if file_size > MAX_SIZE_BYTES:
-				print(f"警告: 文件 {file_path.name} 大小 {file_size / 1024 / 1024:.2f}MB 超过 15MB 限制,跳过上传")
-				return None
-			url = upload_method(file_path, save_path)
-			file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
-			history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
-			self.upload_history.data.history.append(history)
-			self.upload_history.save()
-			return url
-
-		# 如果是文件夹,上传所有文件
+			return self._handle_file_upload(file_path=file_path, save_path=save_path, upload_method=upload_method, method=method)
 		if file_path.is_dir():
-			results = {}
-			# 使用 rglob 递归查找所有文件
-			pattern = "**/*" if recursive else "*"
-			for child_file in file_path.rglob(pattern):
-				if child_file.is_file():
-					try:
-						file_size = child_file.stat().st_size
-						if file_size > MAX_SIZE_BYTES:
-							print(f"警告: 文件 {child_file.name} 大小 {file_size / 1024 / 1024:.2f}MB 超过 15MB 限制,跳过上传")
-							results[str(child_file)] = None
-							continue
-						# 保持相对路径结构
-						relative_path = child_file.relative_to(file_path)
-						child_save_path = str(Path(save_path) / relative_path.parent)
-						url = upload_method(child_file, child_save_path)
-						file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
-						history = data.UploadHistory(
-							file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp()
-						)
-						self.upload_history.data.history.append(history)
-						results[str(child_file)] = url
-					except Exception as e:
-						results[str(child_file)] = None
-						print(f"上传 {child_file} 失败: {e}")
-			self.upload_history.save()
-			return results
+			return self._handle_directory_upload(dir_path=file_path, save_path=save_path, upload_method=upload_method, method=method, recursive=recursive)
+
 		return None
+
+	def _handle_file_upload(self, file_path: Path, save_path: str, upload_method: Callable, method: Literal["pgaot", "codemao"]) -> str | None:
+		"""处理单个文件的上传流程"""
+		file_size = file_path.stat().st_size
+		if file_size > MAX_SIZE_BYTES:
+			size_mb = file_size / 1024 / 1024
+			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+			return None
+		url = upload_method(file_path, save_path)
+		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
+		self.upload_history.data.history.append(history)
+		self.upload_history.save()
+
+		return url
+
+	def _handle_directory_upload(self, dir_path: Path, save_path: str, upload_method: Callable, method: Literal["pgaot", "codemao"], *, recursive: bool) -> dict[str, str | None]:
+		"""处理整个文件夹的上传流程"""
+		results = {}
+		pattern = "**/*" if recursive else "*"
+
+		for child_file in dir_path.rglob(pattern):
+			if child_file.is_file():
+				try:
+					# 检查文件大小
+					file_size = child_file.stat().st_size
+					if file_size > MAX_SIZE_BYTES:
+						size_mb = file_size / 1024 / 1024
+						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+						results[str(child_file)] = None
+						continue
+
+					# 计算保存路径
+					relative_path = child_file.relative_to(dir_path)
+					child_save_path = str(Path(save_path) / relative_path.parent)
+
+					# 执行上传
+					url = upload_method(child_file, child_save_path)
+
+					# 记录上传历史
+					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+					history = data.UploadHistory(
+						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp()
+					)
+					self.upload_history.data.history.append(history)
+
+					results[str(child_file)] = url
+				except Exception as e:
+					results[str(child_file)] = None
+					print(f"上传 {child_file} 失败: {e}")
+
+		# 保存历史记录
+		self.upload_history.save()
+		return results
 
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
 		"""
@@ -1480,10 +1498,8 @@ class Motion(ClassUnion):
 		# 	with requests.get(url, headers=headers, stream=True, allow_redirects=True, timeout=timeout) as response:
 		# 		if response.status_code != 200:
 		# 			return False
-
 		# 		# 尝试读取1字节验证内容非空
 		# 		return bool(next(response.iter_content(chunk_size=1), None))
-
 		# except (RequestException, StopIteration):
 		# 	return False
 
