@@ -1486,16 +1486,22 @@ class Motion(ClassUnion):
 	def _validate_url(self, url: str) -> bool:
 		"""
 		验证URL链接是否有效
-		使用HEAD请求检查状态码和内容长度,必要时使用GET请求验证
+		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
 		"""
+
 		response = self.acquire.send_request(endpoint=url, method="HEAD", timeout=5)
+		if response.status_code == acquire.HTTPSTATUS.OK.value:
+			content_length = response.headers.get("Content-Length")
+			if content_length and int(content_length) > 0:
+				return True
+
+		response = self.acquire.send_request(endpoint=url, method="GET", stream=True, timeout=5)
 		if response.status_code != acquire.HTTPSTATUS.OK.value:
 			return False
-		content_length = response.headers.get("Content-Length")
-		return bool(content_length and int(content_length) > 0)
+		return bool(next(response.iter_content(chunk_size=1)))
 		# try:
-		# 	# 当HEAD不可用时使用GET请求(流式读取少量数据)
-		# 	with requests.get(url, headers=headers, stream=True, allow_redirects=True, timeout=timeout) as response:
+		# 	# 流式读取少量数据验证
+		# 	with requests.get(url, headers=self.headers, stream=True, allow_redirects=True, timeout=5) as response:
 		# 		if response.status_code != 200:
 		# 			return False
 		# 		# 尝试读取1字节验证内容非空
