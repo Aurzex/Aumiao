@@ -108,12 +108,6 @@ class AuthManager:
 
 	# 返回完整cookie
 	def get_auth_details(self, token: str) -> dict[str, Any]:
-		# response = self.acquire.send_request(
-		# 	endpoint="https://shequ.codemao.cn/",
-		# 	method="GET",
-		# )
-		# aliyungf_tc = response.cookies.get_dict()["aliyungf_tc"]
-		# 上面这句会自己生成
 		# uuid_ca = uuid.uuid1()
 		# token_ca = {"authorization": token, "__ca_uid_key__": str(uuid_ca)}
 		# 无上面这两句会缺少__ca_uid_key__

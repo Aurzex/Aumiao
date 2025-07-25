@@ -719,9 +719,10 @@ class Motion(ClassUnion):
 
 			timestamp = self.tool.TimeUtils().current_timestamp(13)
 			identity, password = input_password()
-			captcha, cookies = input_captcha(timestamp=timestamp)
+			captcha, _cookies = input_captcha(timestamp=timestamp)
 			while True:
-				self.acquire.update_cookies(cookies)
+				# self.acquire.update_cookies(cookies)
+				# 这里好像也是一个坑,虽然加了注释之后测试切换edu举报也没有用
 				response = self.whale_routine.authenticate_user(username=identity, password=password, key=timestamp, code=captcha)
 				if "token" in response:
 					self.whale_routine.configure_authentication_token(response["token"])
@@ -733,7 +734,7 @@ class Motion(ClassUnion):
 					elif response["error_code"] == "Captcha-Error@Community-Admin":
 						pass
 					timestamp = self.tool.TimeUtils().current_timestamp(13)
-					captcha, cookies = input_captcha(timestamp=timestamp)
+					captcha, _cookies = input_captcha(timestamp=timestamp)
 
 	# 处理举报
 	# 需要风纪权限
@@ -910,9 +911,9 @@ class Motion(ClassUnion):
 		# 数据收集
 		all_records: list[ReportRecord] = []
 		for report_list, report_type in [
-			(self.whale_obtain.fetch_comment_reports_generator(source_type="ALL", status="TOBEDONE", limit=None), "comment"),
-			(self.whale_obtain.fetch_post_reports_generator(status="TOBEDONE", limit=None), "post"),
-			(self.whale_obtain.fetch_discussion_reports_generator(status="TOBEDONE", limit=None), "discussion"),
+			(self.whale_obtain.fetch_comment_reports_generator(source_type="ALL", status="TOBEDONE", limit=2000), "comment"),
+			(self.whale_obtain.fetch_post_reports_generator(status="TOBEDONE", limit=2000), "post"),
+			(self.whale_obtain.fetch_discussion_reports_generator(status="TOBEDONE", limit=2000), "discussion"),
 		]:
 			for item in report_list:
 				cfg = get_type_config(report_type, item)
@@ -1079,12 +1080,11 @@ class Motion(ClassUnion):
 						return
 					print("切换教育账号")
 					sleep(5)
-					self.community_login.authenticate_with_password(
+					self.community_login.authenticate_with_token(
 						identity=current_account[0],
 						password=current_account[1],
 						status="edu",
 					)
-					sleep(5)
 					report_counter = 0
 
 				# 解析评论信息
@@ -1097,9 +1097,7 @@ class Motion(ClassUnion):
 					text=comment_id,
 					candidates=violations,
 				)
-				self.community_obtain.fetch_replies(types="COMMENT_REPLY")
-				self.community_obtain.fetch_message_count(method="web")
-				self.community_obtain.fetch_community_status(types="WEB_FORUM_STATUS")
+
 				# 执行举报
 				if self.report_work(
 					source=cast("Literal['forum', 'work', 'shop']", source_map[source_type]),
@@ -1140,7 +1138,7 @@ class Motion(ClassUnion):
 		# 7: 无意义刷屏; 8: 不良信息
 		# 0: 自定义
 
-		reason_content = self.community_obtain.fetch_report_reasons()["items"][reason_id]["content"]
+		# reason_content = self.community_obtain.fetch_report_reasons()["items"][reason_id]["content"]
 		match source:
 			case "work":
 				return self.work_motion.report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
