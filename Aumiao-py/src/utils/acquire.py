@@ -60,6 +60,7 @@ class CodeMaoClient:
 		LOG_DIR.mkdir(parents=True, exist_ok=True)
 		self._config = data.SettingManager().data
 		self._default_session = Session()  # 默认会话用于非教育账号
+		self._default_session.trust_env = False
 		self._file = file.CodeMaoFile()
 		self._identity: str | None = None
 		self._session = self._default_session  # 当前活跃会话
@@ -73,10 +74,26 @@ class CodeMaoClient:
 			"blank": Session(),
 			"edu": None,
 		}
+		# 初始化所有会话为无Cookie状态
+		self._init_sessions()
 		# 当前状态
 		self._session = self._sessions["blank"]
 		self._identity = "blank"
 		self.log_request: bool = data.SettingManager().data.PARAMETER.log
+
+	def _init_sessions(self) -> None:
+		"""初始化所有会话,禁用自动Cookie处理"""
+		for session in self._sessions.values():
+			if session:
+				session.trust_env = False
+				# 禁用会话的Cookie自动处理
+				session.cookies = RequestsCookieJar()  # 使用空CookieJar
+				# 移除可能的Cookie相关适配器
+				session.adapters.clear()
+				# 添加自定义适配器,确保不保存Cookie
+				adapter = HTTPAdapter()
+				session.mount("http://", adapter)
+				session.mount("https://", adapter)
 
 	def send_request(
 		self,
@@ -94,32 +111,38 @@ class CodeMaoClient:
 		log: bool = True,
 	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
-		merged_headers = {**self.headers, **(headers or {})}
+		base_headers = dict(self._session.headers)  # 包含账户token
 
-		# 当有文件上传时,移除 Content-Type 头,让 requests 自动生成正确的 multipart 边界
+		# 优先级:传入headers > 会话headers > 全局headers
+		merged_headers = {
+			**self.headers,  # 全局默认头
+			**base_headers,  # 当前会话头.含账户token
+			**(headers or {}),  # 本次请求临时头.最高优先级
+		}
+		# 强制移除Cookie头
+		merged_headers.pop("Cookie", None)
+		# 当有文件上传时,移除 Content-Type 头
 		if files is not None:
 			for header_to_remove in ["Content-Type", "Content-Length"]:
 				merged_headers.pop(header_to_remove, None)
-
 		log = bool(self.log_request and log)
+		# 强制清除会话中的Cookie(关键修复2:防止会话自动添加)
+		self._session.cookies.clear()
 
 		for attempt in range(retries):
 			try:
-				# 根据是否有文件选择不同的数据传递方式
 				if files is not None:
-					# 文件上传时,使用 data 而不是 json
 					response = self._session.request(
 						method=method,
 						url=url,
 						headers=merged_headers,
 						params=params,
-						data=payload,  # 使用 data 而不是 json
+						data=payload,
 						files=files,
 						timeout=timeout,
 						stream=stream,
 					)
 				else:
-					# 普通请求使用 json
 					response = self._session.request(
 						method=method,
 						url=url,
@@ -136,9 +159,7 @@ class CodeMaoClient:
 				response.raise_for_status()
 
 			except HTTPError as err:
-				# 记录所有HTTP错误
 				self._log_http_error(err.response, attempt, retries)
-
 				print(f"HTTP Error {type(err).__name__} - {err}")
 				sleep(2**attempt * backoff_factor)
 				if attempt == retries - 1:
@@ -334,58 +355,40 @@ class CodeMaoClient:
 		"""改进版的会话切换方法,确保完全隔离会话状态"""
 		# 清除前一会话状态
 		self._clean_session()
-
-		# 教育账户特殊处理 - 总是创建全新会话
 		if identity == "edu":
-			# 关闭并移除现有edu会话
 			if self._sessions["edu"]:
 				self._sessions["edu"].close()
 				del self._sessions["edu"]
-
-			# 创建全新的edu会话
 			new_session = Session()
-			# 配置连接池限制
 			adapter = HTTPAdapter(pool_connections=1, pool_maxsize=1, max_retries=0)
 			new_session.mount("http://", adapter)
 			new_session.mount("https://", adapter)
-
 			new_session.headers.update(self._create_headers())
 			new_session.headers["Authorization"] = f"Bearer {token}"
-			# 确保清除所有可能的残留cookies
-			new_session.cookies.clear()
+			new_session.cookies.clear()  # 确保清除Cookie
 			self._sessions["edu"] = new_session
 			self._session = new_session
 		else:
-			# 对于非教育账户,重用会话但彻底清理
 			self._session = self._sessions[identity]
-			# 彻底清理会话状态
 			self._clean_session()
-			# 设置新token
 			self._session.headers["Authorization"] = f"Bearer {token}"
-			# 确保清除所有cookies
-			self._session.cookies.clear()
+			self._session.cookies.clear()  # 确保清除Cookie
 
 		self._identity = identity
 		print(f"切换到 {identity} | 会话ID: {id(self._session)} | Token: {token[:10]}...")
-
-		# 更新token存储
 		self._update_token_storage(token, identity)
 
 	def _clean_session(self) -> None:
 		"""更彻底的会话清理方法"""
 		if not self._session:
 			return
-
-		# 清除所有headers
 		headers_to_keep = set(self._config.PROGRAM.HEADERS.keys()) - {"Authorization", "Cookie"}
 		new_headers = {k: v for k, v in self._config.PROGRAM.HEADERS.items() if k in headers_to_keep}
 		self._session.headers.clear()
 		self._session.headers.update(new_headers)
+		self._session.cookies = RequestsCookieJar()  # 替换为全新的空CookieJar
 
-		# 更彻底的cookies清理
-		self._session.cookies.clear()
-
-		# 清除可能的连接池
+		# 清除连接池
 		if hasattr(self._session, "adapters"):
 			for adapter in self._session.adapters.values():
 				adapter.close()
@@ -393,42 +396,19 @@ class CodeMaoClient:
 	def _create_headers(self) -> dict:
 		"""创建完全干净的请求头,排除敏感信息"""
 		clean_headers = self._config.PROGRAM.HEADERS.copy()
-
-		# 移除可能干扰的headers
 		for header in ["Authorization", "Cookie", "X-Identity", "X-User-Id"]:
 			if header in clean_headers:
 				del clean_headers[header]
-
 		return clean_headers
 
 	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
-		"""更安全的cookie更新方法
-
-		Args:
-			cookies: 可以是 RequestsCookieJar、字典或字符串格式的cookie
-
-		Raises:
-			TypeError: 当传入不支持的cookie类型时
-			ValueError: 当cookie格式无效时
-		"""  # noqa: DOC502
-		# 完全清除现有cookies
+		"""更安全的cookie更新方法"""
+		# 仅在明确需要时使用,默认禁用
 		self._session.cookies.clear()
-
 		if "Cookie" in self._session.headers:
 			del self._session.headers["Cookie"]
 
 		def _to_cookie_str(cookie: RequestsCookieJar | dict | str) -> str:
-			"""将各种cookie格式转换为字符串
-
-			Args:
-				cookie: 要转换的cookie对象
-
-			Returns:
-				格式化后的cookie字符串
-
-			Raises:
-				TypeError: 当传入不支持的cookie类型时
-			"""
 			if isinstance(cookie, RequestsCookieJar):
 				return "; ".join(f"{k}={v}" for k, v in cookie.get_dict().items())
 			if isinstance(cookie, dict):
@@ -441,7 +421,6 @@ class CodeMaoClient:
 		try:
 			cookie_str = _to_cookie_str(cookies)
 			if cookie_str:
-				# 同时设置headers和cookies对象
 				self._session.headers["Cookie"] = cookie_str
 				cookie_obj = SimpleCookie()
 				cookie_obj.load(cookie_str)
