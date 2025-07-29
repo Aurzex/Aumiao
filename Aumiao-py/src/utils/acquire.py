@@ -490,13 +490,11 @@ class FileUploader:
 
 	def upload_via_codemao(self, file_path: Path, save_path: str = "aumiao") -> str:
 		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
-		timestamp = tool.TimeUtils().current_timestamp()
-		unique_name = f"{save_path}/{timestamp}{file_path.name}"
+		unique_name = f"{save_path}/{file_path.name}"
 		# FIX: 移除默认Content-Type头,解决七牛云上传400错误
 		# 原因:会话级默认头会覆盖multipart/form-data设置
 		# 方案:初始化时不设置Content-Type,由requests自动处理
 		token_info = self.get_codemao_token(file_path=unique_name)
-
 		with file_path.open("rb") as file_obj:
 			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
 			data = {
@@ -542,4 +540,15 @@ class FileUploader:
 			"file_path": data["tokens"][0]["file_path"],
 			"upload_url": data["upload_url"],
 			"pic_host": data["bucket_url"],
+		}
+
+	def get_codegame_token(self, prefix: str = "aumiao") -> dict:
+		params = {"prefix": prefix, "bucket": "static"}
+		response = self.client.send_request(endpoint="https://oversea-api.code.game/tiger/kitten/cdn/token/1", method="GET", params=params)
+		data = response.json()
+		return {
+			"token": data["data"][0]["token"],
+			"file_path": data["data"][0]["filename"],
+			"pic_host": data["bucket_url"],
+			"upload_url": "https://upload.qiniup.com",
 		}

@@ -9,11 +9,6 @@ class DataFetcher:
 	def __init__(self) -> None:
 		self.acquire = acquire.CodeMaoClient()
 
-	def get_upload_token_qiniu(self, prefix: str = "aumiao") -> dict:
-		params = {"prefix": prefix, "bucket": "static"}
-		response = self.acquire.send_request(endpoint="https://oversea-api.code.game/tiger/kitten/cdn/token", method="GET", params=params)
-		return response.json()
-
 	def get_account_tiger(self) -> dict:
 		response = self.acquire.send_request(endpoint="https://oversea-api.code.game/tiger/accounts", method="GET")
 		return response.json()
