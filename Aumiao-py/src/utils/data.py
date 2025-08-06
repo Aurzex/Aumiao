@@ -105,7 +105,7 @@ class Program:
 class UploadHistory:
 	file_name: str = ""
 	file_size: str = ""
-	method: Literal["codemao", "pgaot"] = "pgaot"
+	method: Literal["codemao", "pgaot", "codegame"] = "pgaot"
 	save_url: str = ""
 	upload_time: int = 0
 

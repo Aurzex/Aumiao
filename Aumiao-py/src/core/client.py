@@ -1284,7 +1284,7 @@ class Motion(ClassUnion):
 
 	def upload_file(
 		self,
-		method: Literal["pgaot", "codemao"],
+		method: Literal["pgaot", "codemao", "codegame"],
 		file_path: Path,
 		save_path: str = "aumiao",
 		*,
@@ -1294,7 +1294,7 @@ class Motion(ClassUnion):
 		上传文件或文件夹
 
 		Args:
-			method: 上传方法 ("pgaot" 或 "codemao")
+			method: 上传方法 ("pgaot", "codemao" 或 "codegame")
 			file_path: 要上传的文件或文件夹路径
 			save_path: 保存路径 (默认为 "aumiao")
 			recursive: 是否递归上传子文件夹中的文件 (默认为 True)
@@ -1304,25 +1304,25 @@ class Motion(ClassUnion):
 			- 如果是文件夹: 返回字典 {文件路径: 上传URL或None}
 		"""
 		uploader = acquire.FileUploader()
-		method_name = f"upload_via_{method}"
-		if not hasattr(uploader, method_name):
-			return None if file_path.is_file() else {}
-		upload_method = getattr(uploader, method_name)
+
 		if file_path.is_file():
-			return self._handle_file_upload(file_path=file_path, save_path=save_path, upload_method=upload_method, method=method)
+			return self._handle_file_upload(file_path=file_path, save_path=save_path, method=method, uploader=uploader)
 		if file_path.is_dir():
-			return self._handle_directory_upload(dir_path=file_path, save_path=save_path, upload_method=upload_method, method=method, recursive=recursive)
+			return self._handle_directory_upload(dir_path=file_path, save_path=save_path, method=method, uploader=uploader, recursive=recursive)
 
 		return None
 
-	def _handle_file_upload(self, file_path: Path, save_path: str, upload_method: Callable, method: Literal["pgaot", "codemao"]) -> str | None:
+	def _handle_file_upload(self, file_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader) -> str | None:
 		"""处理单个文件的上传流程"""
 		file_size = file_path.stat().st_size
 		if file_size > MAX_SIZE_BYTES:
 			size_mb = file_size / 1024 / 1024
 			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
 			return None
-		url = upload_method(file_path, save_path)
+
+		# 使用重构后的统一上传接口
+		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
+
 		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
 		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
 		self.upload_history.data.history.append(history)
@@ -1330,7 +1330,9 @@ class Motion(ClassUnion):
 
 		return url
 
-	def _handle_directory_upload(self, dir_path: Path, save_path: str, upload_method: Callable, method: Literal["pgaot", "codemao"], *, recursive: bool) -> dict[str, str | None]:
+	def _handle_directory_upload(
+		self, dir_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader, *, recursive: bool
+	) -> dict[str, str | None]:
 		"""处理整个文件夹的上传流程"""
 		results = {}
 		pattern = "**/*" if recursive else "*"
@@ -1350,8 +1352,8 @@ class Motion(ClassUnion):
 					relative_path = child_file.relative_to(dir_path)
 					child_save_path = str(Path(save_path) / relative_path.parent)
 
-					# 执行上传
-					url = upload_method(child_file, child_save_path)
+					# 使用重构后的统一上传接口
+					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
 
 					# 记录上传历史
 					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)

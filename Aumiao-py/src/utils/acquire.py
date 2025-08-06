@@ -474,10 +474,31 @@ class FileUploader:
 	def __init__(self) -> None:
 		self.client = CodeMaoClient()
 
-	def upload_via_pgaot(self, file_path: Path, save_path: str = "aumiao") -> str:
-		"""直接上传到Pgaot服务器(使用默认文件类型)"""
+	def upload(self, file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str = "aumiao") -> str:
+		"""
+		统一文件上传接口
+
+		参数:
+			file_path: 文件路径
+			method: 上传方式 (pgaot/codegame/codemao)
+			save_path: 存储路径前缀
+
+		返回:
+			文件完整URL
+		"""
+		if method == "pgaot":
+			return self._upload_via_pgaot(file_path, save_path)
+		if method == "codegame":
+			return self._upload_via_codegame(file_path, save_path)
+		if method == "codemao":
+			return self._upload_via_codemao(file_path, save_path)
+		msg = f"Unsupported upload method: {method}"
+		raise ValueError(msg)
+
+	def _upload_via_pgaot(self, file_path: Path, save_path: str) -> str:
+		"""Pgaot服务器上传"""
 		with file_path.open("rb") as file_obj:
-			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			files = {"file": (file_path.name, file_obj)}
 			data = {"path": save_path}
 			response = self.client.send_request(
 				endpoint="https://api.pgaot.com/user/up_cat_file",
@@ -488,15 +509,32 @@ class FileUploader:
 			)
 		return response.json()["url"]
 
-	def upload_via_codemao(self, file_path: Path, save_path: str = "aumiao") -> str:
-		"""通过编程猫接口上传到七牛云CDN(使用默认文件类型)"""
-		unique_name = f"{save_path}/{file_path.name}"
-		# FIX: 移除默认Content-Type头,解决七牛云上传400错误
-		# 原因:会话级默认头会覆盖multipart/form-data设置
-		# 方案:初始化时不设置Content-Type,由requests自动处理
-		token_info = self.get_codemao_token(file_path=unique_name)
+	def _upload_via_codegame(self, file_path: Path, save_path: str) -> str:
+		"""七牛云上传(code.game)"""
+		token_info = self._get_codegame_token(prefix=save_path)
 		with file_path.open("rb") as file_obj:
-			files = {"file": (file_path.name, file_obj, "application/octet-stream")}
+			files = {"file": (file_path.name, file_obj)}
+			data = {
+				"token": token_info["token"],
+				"key": token_info["file_path"],
+				"fname": "avatar",
+			}
+			response = self.client.send_request(
+				endpoint=token_info["upload_url"],
+				method="POST",
+				files=files,
+				payload=data,
+				timeout=120,
+			)
+		result = response.json()
+		return f"{token_info['pic_host']}/{result['key']}"
+
+	def _upload_via_codemao(self, file_path: Path, save_path: str) -> str:
+		"""七牛云上传(codemao)"""
+		unique_name = f"{save_path}/{file_path.name}"
+		token_info = self._get_codemao_token(file_path=unique_name)
+		with file_path.open("rb") as file_obj:
+			files = {"file": (file_path.name, file_obj)}
 			data = {
 				"token": token_info["token"],
 				"key": token_info["file_path"],
@@ -509,31 +547,23 @@ class FileUploader:
 				payload=data,
 				timeout=120,
 			)
-
 		return token_info["pic_host"] + token_info["file_path"]
 
-	def get_codemao_token(
-		self,
-		file_path: str = "aumiao",
-		project_name: Literal["community_frontend", "nemo_android_ios"] = "community_frontend",
-		cdn_name: str = "qiniu",
-	) -> dict:
-		"""获取七牛云上传凭证"""
+	def _get_codemao_token(self, file_path: str, **kwargs: ...) -> dict:
+		"""获取codemao上传凭证(私有)"""
 		params = {
-			"projectName": project_name,
+			"projectName": kwargs.get("project_name", "community_frontend"),
 			"filePaths": file_path,
 			"filePath": file_path,
 			"tokensCount": 1,
 			"fileSign": "p1",
-			"cdnName": cdn_name,
+			"cdnName": kwargs.get("cdn_name", "qiniu"),
 		}
-
 		response = self.client.send_request(
 			endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
 			method="GET",
 			params=params,
 		)
-
 		data = response.json()
 		return {
 			"token": data["tokens"][0]["token"],
@@ -542,7 +572,8 @@ class FileUploader:
 			"pic_host": data["bucket_url"],
 		}
 
-	def get_codegame_token(self, prefix: str = "aumiao") -> dict:
+	def _get_codegame_token(self, prefix: str) -> dict:
+		"""获取code.game上传凭证(私有)"""
 		params = {"prefix": prefix, "bucket": "static"}
 		response = self.client.send_request(endpoint="https://oversea-api.code.game/tiger/kitten/cdn/token/1", method="GET", params=params)
 		data = response.json()
