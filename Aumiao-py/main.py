@@ -273,11 +273,12 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 	"""上传文件"""
 	print_header("上传文件")
 	print(f"{COLOR_CODES['COMMENT']}上传方法说明: {COLOR_CODES['RESET']}")
-	print(f"{COLOR_CODES['COMMENT']}- codemao: 上传到static域名 (需要登录){COLOR_CODES['RESET']}")
-	print(f"{COLOR_CODES['COMMENT']}- pgaot: 上传到bcmcdn域名{COLOR_CODES['RESET']}")  # cSpell:ignore bcmcdn
+	print(f"{COLOR_CODES['COMMENT']}- codemao: 上传到bcmcdn域名 (需要登录){COLOR_CODES['RESET']}")
+	print(f"{COLOR_CODES['COMMENT']}- codegame: 上传到static域名(下载后需要自己补充文件类型){COLOR_CODES['RESET']}")
+	print(f"{COLOR_CODES['COMMENT']}- pgaot: 上传到static域名{COLOR_CODES['RESET']}")  # cSpell:ignore bcmcdn
 
 	try:
-		method = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入方法 (pgaot/codemao): {COLOR_CODES['RESET']}", {"pgaot", "codemao"})
+		method = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入方法 (pgaot/codemao/codegame): {COLOR_CODES['RESET']}", {"pgaot", "codemao", "codegame"})
 
 		file_path = Path(input(f"{COLOR_CODES['PROMPT']}↳ 请输入文件或文件夹路径: {COLOR_CODES['RESET']}"))
 
@@ -285,7 +286,7 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 			print(f"{COLOR_CODES['ERROR']}文件或路径不存在{COLOR_CODES['RESET']}")
 			return
 
-		method = cast("Literal['pgaot', 'codemao']", method)
+		method = cast("Literal['pgaot', 'codemao','codegame']", method)
 		client.Motion().upload_file(method=method, file_path=file_path)
 		print(f"{COLOR_CODES['SUCCESS']}文件上传成功{COLOR_CODES['RESET']}")
 	except Exception:
