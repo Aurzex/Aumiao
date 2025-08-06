@@ -7,14 +7,13 @@ from functools import partial
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 
-# 导入项目模块(请根据实际项目结构调整)
 from src import client, community, user, whale
 
 # 常量定义
-MAX_MENU_KEY_LENGTH = 2  # 替换魔法值2,解决PLR2004
+MAX_MENU_KEY_LENGTH = 2
 T = TypeVar("T")
+ADMIN_USER_ID = "12770114"
 
-# 初始化日志(使用logger实例而非root logger,解决LOG015)
 logger = logging.getLogger(__name__)
 logging.basicConfig(
 	filename="app.log",
@@ -43,11 +42,19 @@ class MenuOption:
 	"""菜单选项类"""
 
 	name: str
-	handler: Callable
+	handler: Callable[[], None]  # 更精确的类型注解
 	require_auth: bool = False
+	visible: bool = True  # 控制是否显示在菜单中
 
 
-T = TypeVar("T")
+def color_text(text: str, color_name: str) -> str:
+	"""为文本添加颜色"""
+	return f"{COLOR_CODES[color_name]}{text}{COLOR_CODES['RESET']}"
+
+
+def prompt_input(text: str, color: str = "PROMPT") -> str:
+	"""统一的输入提示函数"""
+	return input(color_text(f"↳ {text}: ", color))
 
 
 def get_separator() -> str:
@@ -74,31 +81,57 @@ def enable_vt_mode() -> None:
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 		except OSError:
 			logger.exception("启用VT模式失败")
-			print(f"{COLOR_CODES['ERROR']}警告: 无法启用虚拟终端模式,颜色显示可能不正常{COLOR_CODES['RESET']}")
+			print(color_text("警告: 无法启用虚拟终端模式,颜色显示可能不正常", "ERROR"))
 
 
 def get_valid_input(
 	prompt: str,
-	valid_options: set[T],
-	cast_type: Callable[[str], T] = str,  # 明确类型转换函数的注解
+	valid_options: set[T] | range | None = None,  # 支持范围验证
+	cast_type: Callable[[str], T] = str,
+	validator: Callable[[T], bool] | None = None,  # 自定义验证函数
 ) -> T:
-	"""获取有效输入并进行类型转换验证"""
+	"""获取有效输入并进行类型转换验证.支持范围和自定义验证"""
 	while True:
 		try:
-			value_str = input(prompt)
+			value_str = prompt_input(prompt)
 			# 进行类型转换
 			value = cast_type(value_str)
 
 			# 检查是否在有效选项中
-			if value in valid_options:
-				return value
+			if valid_options is not None:
+				if isinstance(valid_options, range):
+					if value not in valid_options:
+						print(color_text(f"输入超出范围.有效范围: [{valid_options.start}-{valid_options.stop - 1}]", "ERROR"))
+						continue
+				elif value not in valid_options:
+					print(color_text(f"无效输入.请重试。有效选项: {valid_options}", "ERROR"))
+					continue
 
-			print(f"{COLOR_CODES['ERROR']}无效输入,请重试。有效选项: {valid_options}{COLOR_CODES['RESET']}")
-
+			# 执行自定义验证
+			if validator and not validator(value):
+				print(color_text("输入不符合要求", "ERROR"))
+				continue
 		except ValueError:
-			print(f"{COLOR_CODES['ERROR']}格式错误,请输入{cast_type.__name__}类型的值{COLOR_CODES['RESET']}")
+			print(color_text(f"格式错误,请输入{cast_type.__name__}类型的值", "ERROR"))
 		except Exception as e:
-			print(f"{COLOR_CODES['ERROR']}发生错误: {e!s}{COLOR_CODES['RESET']}")
+			print(color_text(f"发生错误: {e!s}", "ERROR"))
+		else:
+			return value
+
+
+def handle_errors(func: Callable) -> Callable:
+	"""统一错误处理装饰器"""
+
+	def wrapper(*args: ..., **kwargs: ...) -> object | None:
+		try:
+			return func(*args, **kwargs)
+		except ValueError as ve:
+			print(color_text(f"输入错误: {ve}", "ERROR"))
+		except Exception as e:
+			logger.exception(f"{func.__name__} 执行失败")  # noqa: G004
+			print(color_text(f"操作失败: {e}", "ERROR"))
+
+	return wrapper
 
 
 class AccountDataManager:
@@ -118,37 +151,42 @@ class AccountDataManager:
 		self.account_data = {}
 		self.is_logged_in = False
 
-	def get_account_id(self) -> int | None:
+	def get_account_id(self) -> str | None:
 		"""获取账户ID"""
 		return self.account_data.get("ACCOUNT_DATA", {}).get("id")
 
 
+def print_account_info(account_data: dict) -> None:
+	"""显示账户详细信息"""
+	info = account_data.get("ACCOUNT_DATA", {})
+	print(color_text(f"登录成功! 欢迎 {info.get('nickname', '未知用户')}", "SUCCESS"))
+	print(color_text(f"用户ID: {info.get('id', 'N/A')}", "COMMENT"))
+	print(color_text(f"创作等级: {info.get('author_level', 'N/A')}", "COMMENT"))
+
+
+@handle_errors
 def login(account_data_manager: AccountDataManager) -> None:
 	"""用户登录处理"""
 	print_header("用户登录")
-	identity = input(f"{COLOR_CODES['PROMPT']}↳ 请输入用户名: {COLOR_CODES['RESET']}")
-	password = input(f"{COLOR_CODES['PROMPT']}↳ 请输入密码: {COLOR_CODES['RESET']}")
+	identity = prompt_input("请输入用户名")
+	password = prompt_input("请输入密码")
 
-	try:
-		community.AuthManager().authenticate_with_token(identity=identity, password=password)
-		data_ = user.UserDataFetcher().fetch_account_details()
+	community.AuthManager().authenticate_with_token(identity=identity, password=password)
+	data_ = user.UserDataFetcher().fetch_account_details()
 
-		account_data = {
-			"ACCOUNT_DATA": {
-				"identity": identity,
-				"password": "******",
-				"id": data_["id"],
-				"nickname": data_["nickname"],
-				"create_time": data_["create_time"],
-				"description": data_["description"],
-				"author_level": data_["author_level"],
-			},
-		}
-		account_data_manager.update(account_data)
-		print(f"{COLOR_CODES['SUCCESS']}登录成功! 欢迎 {data_['nickname']}{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("登录失败")
-		print(f"{COLOR_CODES['ERROR']}登录失败,请检查账号密码{COLOR_CODES['RESET']}")
+	account_data = {
+		"ACCOUNT_DATA": {
+			"identity": identity,
+			"password": "******",
+			"id": data_["id"],
+			"nickname": data_["nickname"],
+			"create_time": data_["create_time"],
+			"description": data_["description"],
+			"author_level": data_["author_level"],
+		},
+	}
+	account_data_manager.update(account_data)
+	print_account_info(account_data)
 
 
 # 修复装饰器类型标注,移除Any类型
@@ -157,193 +195,195 @@ def require_login(func: Callable[[AccountDataManager], None]) -> Callable[[Accou
 
 	def wrapper(account_data_manager: AccountDataManager) -> None:
 		if not account_data_manager.is_logged_in:
-			print(f"{COLOR_CODES['ERROR']}请先登录!{COLOR_CODES['RESET']}")
+			print(color_text("请先登录!", "ERROR"))
 			return None
 		return func(account_data_manager)
 
 	return wrapper
 
 
+@handle_errors
 @require_login
-def clear_comments(_account_data_manager: AccountDataManager) -> None:
+def clear_comments(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""清除评论"""
 	print_header("清除评论")
-	source = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入来源类型 (work/post): {COLOR_CODES['RESET']}", {"work", "post"})
-	action_type = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入操作类型 (ads/duplicates/blacklist): {COLOR_CODES['RESET']}", {"ads", "duplicates", "blacklist"})
+	source = get_valid_input("请输入来源类型 (work/post)", {"work", "post"})
+	action_type = get_valid_input("请输入操作类型 (ads/duplicates/blacklist)", {"ads", "duplicates", "blacklist"})
 
 	source = cast("Literal['work', 'post']", source)
 	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
 
-	try:
-		client.Motion().clear_comments(source=source, action_type=action_type)
-		print(f"{COLOR_CODES['SUCCESS']}已成功清除 {source} 的 {action_type} 评论{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("清除评论失败")
-		print(f"{COLOR_CODES['ERROR']}清除评论失败{COLOR_CODES['RESET']}")
+	client.Motion().clear_comments(source=source, action_type=action_type)
+	print(color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def clear_red_point(_account_data_manager: AccountDataManager) -> None:
+def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""清除红点提醒"""
 	print_header("清除红点提醒")
-	method = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入方法 (nemo/web): {COLOR_CODES['RESET']}", {"nemo", "web"})
+	method = get_valid_input("请输入方法 (nemo/web)", {"nemo", "web"})
 
 	method = cast("Literal['nemo', 'web']", method)
 
-	try:
-		client.Motion().clear_red_point(method=method)
-		print(f"{COLOR_CODES['SUCCESS']}已成功清除 {method} 红点提醒{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("清除红点失败")
-		print(f"{COLOR_CODES['ERROR']}清除红点失败{COLOR_CODES['RESET']}")
+	client.Motion().clear_red_point(method=method)
+	print(color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def reply_work(_account_data_manager: AccountDataManager) -> None:
+def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""自动回复作品"""
 	print_header("自动回复")
-	try:
-		client.Motion().reply_work()
-		print(f"{COLOR_CODES['SUCCESS']}已成功执行自动回复{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("自动回复失败")
-		print(f"{COLOR_CODES['ERROR']}自动回复失败{COLOR_CODES['RESET']}")
+	client.Motion().reply_work()
+	print(color_text("已成功执行自动回复", "SUCCESS"))
 
 
-def handle_report(_account_data_manager: AccountDataManager) -> None:
+@handle_errors
+def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""处理举报"""
 	print_header("处理举报")
-	try:
-		client.Motion().judgement_login()
-		judgment_data = whale.AuthManager().fetch_user_dashboard_data()
+	client.Motion().judgement_login()
+	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
 
-		print(f"{COLOR_CODES['SUCCESS']}登录成功! 欢迎 {judgment_data['admin']['username']}{COLOR_CODES['RESET']}")
-		admin_id: int = judgment_data["admin"]["id"]
+	print(color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
+	admin_id: int = judgment_data["admin"]["id"]
 
-		client.Motion().handle_report(admin_id=admin_id)
-		print(f"{COLOR_CODES['SUCCESS']}已成功处理举报{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("处理举报失败")
-		print(f"{COLOR_CODES['ERROR']}处理举报失败{COLOR_CODES['RESET']}")
+	client.Motion().handle_report(admin_id=admin_id)
+	print(color_text("已成功处理举报", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def check_account_status(_account_data_manager: AccountDataManager) -> None:
+def check_account_status(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""检查账户状态"""
 	print_header("账户状态查询")
-	try:
-		status = client.Motion().get_account_status()
-		print(f"{COLOR_CODES['STATUS']}当前账户状态: {status}{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("查询账户状态失败")
-		print(f"{COLOR_CODES['ERROR']}查询账户状态失败{COLOR_CODES['RESET']}")
+	status = client.Motion().get_account_status()
+	print(color_text(f"当前账户状态: {status}", "STATUS"))
 
 
-def download_fiction(_account_data_manager: AccountDataManager) -> None:
+@handle_errors
+def download_fiction(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""下载小说"""
 	print_header("下载小说")
-	try:
-		fiction_id = int(input(f"{COLOR_CODES['PROMPT']}↳ 请输入小说ID: {COLOR_CODES['RESET']}"))
-		client.Motion().download_fiction(fiction_id=fiction_id)
-		print(f"{COLOR_CODES['SUCCESS']}小说下载完成{COLOR_CODES['RESET']}")
-	except ValueError:
-		print(f"{COLOR_CODES['ERROR']}请输入有效的数字ID{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("下载小说失败")
-		print(f"{COLOR_CODES['ERROR']}下载小说失败{COLOR_CODES['RESET']}")
+	fiction_id = get_valid_input(
+		"请输入小说ID",
+		cast_type=int,
+		validator=lambda x: x > 0,  # 确保ID为正数
+	)
+	client.Motion().download_fiction(fiction_id=fiction_id)
+	print(color_text("小说下载完成", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def generate_nemo_code(_account_data_manager: AccountDataManager) -> None:
+def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""生成喵口令"""
 	print_header("生成喵口令")
-	try:
-		work_id = int(input(f"{COLOR_CODES['PROMPT']}↳ 请输入作品编号: {COLOR_CODES['RESET']}"))
-		client.Motion().generate_nemo_code(work_id=work_id)
-		print(f"{COLOR_CODES['SUCCESS']}生成完成{COLOR_CODES['RESET']}")
-	except ValueError:
-		print(f"{COLOR_CODES['ERROR']}请输入有效的数字ID{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("生成喵口令失败")
-		print(f"{COLOR_CODES['ERROR']}生成喵口令失败{COLOR_CODES['RESET']}")
+	work_id = get_valid_input(
+		"请输入作品编号",
+		cast_type=int,
+		validator=lambda x: x > 0,  # 确保ID为正数
+	)
+	client.Motion().generate_nemo_code(work_id=work_id)
+	print(color_text("生成完成", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def upload_files(_account_data_manager: AccountDataManager) -> None:
+def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传文件"""
 	print_header("上传文件")
-	print(f"{COLOR_CODES['COMMENT']}上传方法说明: {COLOR_CODES['RESET']}")
-	print(f"{COLOR_CODES['COMMENT']}- codemao: 上传到bcmcdn域名 (需要登录){COLOR_CODES['RESET']}")
-	print(f"{COLOR_CODES['COMMENT']}- codegame: 上传到static域名(下载后需要自己补充文件类型){COLOR_CODES['RESET']}")
-	print(f"{COLOR_CODES['COMMENT']}- pgaot: 上传到static域名{COLOR_CODES['RESET']}")  # cSpell:ignore bcmcdn
+	print(color_text("上传方法说明: ", "COMMENT"))
+	print(color_text("- codemao: 上传到bcmcdn域名 (需要登录)", "COMMENT"))
+	print(color_text("- codegame: 上传到static域名(下载后需要自己补充文件类型)", "COMMENT"))
+	print(color_text("- pgaot: 上传到static域名", "COMMENT"))  # cSpell:ignore bcmcdn
 
-	try:
-		method = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入方法 (pgaot/codemao/codegame): {COLOR_CODES['RESET']}", {"pgaot", "codemao", "codegame"})
+	method = get_valid_input("请输入方法 (pgaot/codemao/codegame)", {"pgaot", "codemao", "codegame"})
 
-		file_path = Path(input(f"{COLOR_CODES['PROMPT']}↳ 请输入文件或文件夹路径: {COLOR_CODES['RESET']}"))
+	file_path_str = prompt_input("请输入文件或文件夹路径")
+	file_path = Path(file_path_str.strip())
 
-		if not file_path.exists():
-			print(f"{COLOR_CODES['ERROR']}文件或路径不存在{COLOR_CODES['RESET']}")
-			return
+	if file_path.exists():
+		file_path = file_path.resolve()  # 解析为绝对路径
+		print(color_text(f"使用路径: {file_path}", "COMMENT"))
+	else:
+		print(color_text("文件或路径不存在", "ERROR"))
+		return
 
-		method = cast("Literal['pgaot', 'codemao','codegame']", method)
-		client.Motion().upload_file(method=method, file_path=file_path)
-		print(f"{COLOR_CODES['SUCCESS']}文件上传成功{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("文件上传失败")
-		print(f"{COLOR_CODES['ERROR']}文件上传失败{COLOR_CODES['RESET']}")
+	method = cast("Literal['pgaot', 'codemao','codegame']", method)
+	client.Motion().upload_file(method=method, file_path=file_path)
+	print(color_text("文件上传成功", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def logout(_account_data_manager: AccountDataManager) -> None:
+def logout(account_data_manager: AccountDataManager) -> None:
 	"""用户登出"""
 	print_header("账户登出")
-	method = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 请输入方法 (web): {COLOR_CODES['RESET']}", {"web"})
+	method = get_valid_input("请输入方法 (web)", {"web"})
 
 	method = cast("Literal['web']", method)
 
-	try:
-		community.AuthManager().logout(method)
-		_account_data_manager.clear()
-		print(f"{COLOR_CODES['SUCCESS']}已成功登出账户{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("登出失败")
-		print(f"{COLOR_CODES['ERROR']}登出失败{COLOR_CODES['RESET']}")
+	community.AuthManager().logout(method)
+	account_data_manager.clear()
+	print(color_text("已成功登出账户", "SUCCESS"))
 
 
+@handle_errors
 @require_login
-def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
-	"""处理隐藏功能"""
+def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
+	"""处理隐藏功能.仅管理员可访问"""
+	# 更安全的隐藏功能访问控制
+	if account_data_manager.get_account_id() != ADMIN_USER_ID:
+		print(color_text("权限不足! 只有管理员可以访问隐藏功能", "ERROR"))
+		return
+
 	print_header("隐藏功能")
-	print(f"{COLOR_CODES['COMMENT']}1. 自动点赞")
-	print(f"{COLOR_CODES['COMMENT']}2. 学生管理")
-	print(f"{COLOR_CODES['COMMENT']}3. 账号提权{COLOR_CODES['RESET']}")
+	print(color_text("1. 自动点赞", "COMMENT"))
+	print(color_text("2. 学生管理", "COMMENT"))
+	print(color_text("3. 账号提权", "COMMENT"))
 
-	try:
-		sub_choice = input(f"{COLOR_CODES['PROMPT']}↳ 操作选择: {COLOR_CODES['RESET']}")
+	sub_choice = get_valid_input("操作选择", valid_options={"1", "2", "3"})
 
-		if sub_choice == "1":
-			user_id = int(input(f"{COLOR_CODES['PROMPT']}↳ 训练师ID: {COLOR_CODES['RESET']}"))
-			client.Motion().chiaroscuro_chronicles(user_id=user_id)
-			print(f"{COLOR_CODES['SUCCESS']}自动点赞完成{COLOR_CODES['RESET']}")
-		elif sub_choice == "2":
-			mode = get_valid_input(f"{COLOR_CODES['PROMPT']}↳ 模式 (delete/create): {COLOR_CODES['RESET']}", {"delete", "create"})
-			# 显式转换为Literal类型,解决类型不匹配问题
-			mode = cast("Literal['delete', 'create']", mode)
-			limit = int(input(f"{COLOR_CODES['PROMPT']}↳ 数量: {COLOR_CODES['RESET']}"))
-			client.Motion().batch_handle_account(method=mode, limit=limit)
-			print(f"{COLOR_CODES['SUCCESS']}学生管理完成{COLOR_CODES['RESET']}")
-		elif sub_choice == "3":
-			real_name = input(f"{COLOR_CODES['PROMPT']}↳ 输入姓名: {COLOR_CODES['RESET']}")
-			client.Motion().celestial_maiden_chronicles(real_name=real_name)
-			print(f"{COLOR_CODES['SUCCESS']}账号提权完成{COLOR_CODES['RESET']}")
-		else:
-			print(f"{COLOR_CODES['ERROR']}无效选择{COLOR_CODES['RESET']}")
-	except ValueError:
-		print(f"{COLOR_CODES['ERROR']}请输入有效的数字{COLOR_CODES['RESET']}")
-	except Exception:
-		logger.exception("隐藏功能执行失败")
-		print(f"{COLOR_CODES['ERROR']}隐藏功能执行失败{COLOR_CODES['RESET']}")
+	if sub_choice == "1":
+		user_id = get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
+		client.Motion().chiaroscuro_chronicles(user_id=user_id)
+		print(color_text("自动点赞完成", "SUCCESS"))
+	elif sub_choice == "2":
+		mode = get_valid_input("模式 (delete/create)", {"delete", "create"})
+		# 显式转换为Literal类型,解决类型不匹配问题
+		mode = cast("Literal['delete', 'create']", mode)
+		limit = get_valid_input(
+			"数量",
+			cast_type=int,
+			valid_options=range(1, 101),  # 限制1-100的范围
+			validator=lambda x: x > 0,
+		)
+		client.Motion().batch_handle_account(method=mode, limit=limit)
+		print(color_text("学生管理完成", "SUCCESS"))
+	elif sub_choice == "3":
+		real_name = prompt_input("输入姓名")
+		client.Motion().celestial_maiden_chronicles(real_name=real_name)
+		print(color_text("账号提权完成", "SUCCESS"))
+
+
+def exit_program(_account_data_manager: AccountDataManager) -> None:
+	"""退出程序"""
+	print(color_text("感谢使用, 再见!", "SUCCESS"))
+	sys.exit(0)
+
+
+def display_menu(menu_options: dict[str, MenuOption], account_data_manager: AccountDataManager) -> None:
+	"""显示菜单.根据登录状态和可见性控制显示"""
+	print_header("主菜单")
+	for key, option in menu_options.items():
+		if not option.visible:
+			continue
+		color = COLOR_CODES["MENU_ITEM"]
+		if option.require_auth and not account_data_manager.is_logged_in:
+			color = COLOR_CODES["COMMENT"]
+		print(f"{color}{key.rjust(MAX_MENU_KEY_LENGTH)}. {option.name}{COLOR_CODES['RESET']}")
 
 
 def main() -> None:
@@ -364,53 +404,44 @@ def main() -> None:
 		"8": MenuOption(name="下载小说", handler=partial(download_fiction, account_data_manager), require_auth=False),
 		"9": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
 		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
-		"11": MenuOption(name="退出系统", handler=lambda: print(f"\n{COLOR_CODES['SUCCESS']}感谢使用, 再见!{COLOR_CODES['RESET']}"), require_auth=False),
-		"1106": MenuOption(name="隐藏功能", handler=partial(handle_hidden_features, account_data_manager), require_auth=True),
+		"11": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
+		"1106": MenuOption(
+			name="隐藏功能",
+			handler=partial(handle_hidden_features, account_data_manager),
+			require_auth=True,
+			visible=False,  # 可以根据需要设置为False完全隐藏
+		),
 	}
 
 	while True:
-		print_header("主菜单")
+		display_menu(menu_options, account_data_manager)
 
-		for key, option in menu_options.items():
-			if key.isdigit() and len(key) <= MAX_MENU_KEY_LENGTH:
-				color = COLOR_CODES["MENU_ITEM"]
-				if option.require_auth and not account_data_manager.is_logged_in:
-					color = COLOR_CODES["COMMENT"]
-				print(f"{color}{key}. {option.name}{COLOR_CODES['RESET']}")
-
-		choice = input(f"\n{COLOR_CODES['PROMPT']}↳ 请输入操作编号 (1-11): {COLOR_CODES['RESET']}")
+		choice = prompt_input("请输入操作编号 (1-11)")
 
 		if choice in menu_options:
 			option = menu_options[choice]
 
 			if option.require_auth and not account_data_manager.is_logged_in:
-				print(f"{COLOR_CODES['ERROR']}该操作需要登录!{COLOR_CODES['RESET']}")
-				if input(f"{COLOR_CODES['PROMPT']}是否立即登录? (y/n): {COLOR_CODES['RESET']}".lower()) == "y":
+				print(color_text("该操作需要登录!", "ERROR"))
+				if prompt_input("是否立即登录? (y/n)").lower() == "y":
 					login(account_data_manager)
 				else:
 					continue
 
-			try:
-				option.handler()
-			except Exception:
-				logger.exception("菜单操作失败")
-				print(f"{COLOR_CODES['ERROR']}操作失败{COLOR_CODES['RESET']}")
-
-			if choice == "11":
-				break
+			option.handler()
 		else:
-			print(f"{COLOR_CODES['ERROR']}无效的输入, 请重新选择{COLOR_CODES['RESET']}")
+			print(color_text("无效的输入, 请重新选择", "ERROR"))
 
-		input(f"\n{COLOR_CODES['PROMPT']}⏎ 按回车键继续...{COLOR_CODES['RESET']}")
+		input(f"\n{color_text('⏎ 按回车键继续...', 'PROMPT')}")
 
 
 if __name__ == "__main__":
 	try:
 		main()
 	except KeyboardInterrupt:
-		print(f"\n{COLOR_CODES['ERROR']}程序被用户中断{COLOR_CODES['RESET']}")
+		print(f"\n{color_text('程序被用户中断', 'ERROR')}")
 	except Exception:
 		logger.exception("程序发生未处理异常")
-		print(f"\n{COLOR_CODES['ERROR']}程序发生错误{COLOR_CODES['RESET']}")
+		print(f"\n{color_text('程序发生错误', 'ERROR')}")
 	finally:
-		input(f"\n{COLOR_CODES['PROMPT']}⏎ 按回车键退出程序{COLOR_CODES['RESET']}")
+		input(f"\n{color_text('⏎ 按回车键退出程序', 'PROMPT')}")
