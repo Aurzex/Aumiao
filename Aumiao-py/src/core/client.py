@@ -166,6 +166,8 @@ class Obtain(ClassUnion):
 			"post": (self.forum_obtain.fetch_post_replies_generator, "post_id", "user"),
 			"shop": (self.shop_obtain.fetch_workshop_discussions, "shop_id", "reply_user"),
 		}
+		self.math_utils = self.tool.MathUtils()
+		self.data_processor = self.tool.DataProcessor()
 
 	def get_new_replies(
 		self,
@@ -195,7 +197,7 @@ class Obtain(ClassUnion):
 		replies = []
 
 		while remaining > 0:
-			current_limit = self.tool.MathUtils().clamp(remaining, 5, 200)
+			current_limit = self.math_utils.clamp(remaining, 5, 200)
 			try:
 				response = self.community_obtain.fetch_replies(
 					types=type_item,
@@ -203,8 +205,8 @@ class Obtain(ClassUnion):
 					offset=offset,
 				)
 				batch = response.get("items", [])
-				replies.extend(batch[:remaining])
-				actual_count = len(batch[:remaining])
+				actual_count = min(len(batch), remaining)
+				replies.extend(batch[:actual_count])
 				remaining -= actual_count
 				offset += current_limit
 
@@ -260,13 +262,17 @@ class Obtain(ClassUnion):
 
 		method_func, id_key, user_field = self.source_map[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
+		reply_cache = {}
 
 		def extract_reply_user(reply: dict) -> int:
 			return reply[user_field]["id"]
 
-		def generate_replies(comment: dict) -> Generator[dict[Any, Any] | Any, Any]:
+		def generate_replies(comment: dict) -> Generator:
 			if source == "post":
-				yield from self.forum_obtain.fetch_reply_comments_generator(reply_id=comment["id"], limit=None)
+				# 缓存未命中时请求数据
+				if comment["id"] not in reply_cache:
+					reply_cache[comment["id"]] = list(self.forum_obtain.fetch_reply_comments_generator(reply_id=comment["id"], limit=None))
+				yield from reply_cache[comment["id"]]
 			else:
 				yield from comment.get("replies", {}).get("items", [])
 
@@ -275,23 +281,21 @@ class Obtain(ClassUnion):
 			for comment in comments:
 				user_ids.append(comment["user"]["id"])
 				user_ids.extend(extract_reply_user(reply) for reply in generate_replies(comment))
-			return self.tool.DataProcessor().deduplicate(user_ids)
+			return self.data_processor.deduplicate(user_ids)
 
 		def process_comment_id() -> list:
 			comment_ids = []
 			for comment in comments:
 				comment_ids.append(str(comment["id"]))
 				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in generate_replies(comment))
-			return self.tool.DataProcessor().deduplicate(comment_ids)
+			return self.data_processor.deduplicate(comment_ids)
 
 		def process_detailed() -> list[dict]:
 			return [
 				{
 					"user_id": item["user"]["id"],
 					"nickname": item["user"]["nickname"],
-					"id": item["id"],
-					"content": item["content"],
-					"created_at": item["created_at"],
+					**{k: item[k] for k in ("id", "content", "created_at")},
 					"is_top": item.get("is_top", False),
 					"replies": [
 						{
@@ -306,16 +310,6 @@ class Obtain(ClassUnion):
 				}
 				for item in comments
 			]
-
-		method_handlers = {
-			"user_id": process_user_id,
-			"comment_id": process_comment_id,
-			"comments": process_detailed,
-		}
-
-		if method not in method_handlers:
-			msg = f"无效方法: {method}"
-			raise ValueError(msg)
 
 		method_handlers = {
 			"user_id": process_user_id,
