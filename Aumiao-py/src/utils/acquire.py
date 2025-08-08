@@ -17,7 +17,7 @@ from . import data, file, tool
 from .decorator import singleton
 
 DICT_ITEM = 2
-LOG_DIR: Path = data.CURRENT_DIR / ".log"
+LOG_DIR: Path = data.CURRENT_DIR / "logs"
 ERROR_LOG_PATH = LOG_DIR / f"errors_{tool.TimeUtils().current_timestamp()}.txt"
 LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 MAX_CHARACTER = 100
