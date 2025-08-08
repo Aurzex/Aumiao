@@ -15,20 +15,20 @@ CAPTCHA_DIR.mkdir(parents=True, exist_ok=True)
 @singleton
 class AuthManager:
 	def __init__(self) -> None:
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 		self._captcha_img_path = CAPTCHA_DIR / f"{tool.TimeUtils().current_timestamp()}.jpg"
 
 	def authenticate_user(self, username: str, password: str, key: int, code: str) -> dict:
 		payload = {"username": username, "password": password, "key": key, "code": code}
-		response = self.acquire.send_request(endpoint="https://api-whale.codemao.cn/admins/login", method="POST", payload=payload)
+		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/login", method="POST", payload=payload)
 		return response.json()
 
 	def terminate_session(self) -> bool:
-		response = self.acquire.send_request(endpoint="https://api-whale.codemao.cn/admins/logout", method="DELETE")
+		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/logout", method="DELETE")
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
 	def fetch_verification_captcha(self, timestamp: int) -> RequestsCookieJar:
-		response = self.acquire.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
+		response = self._client.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
 		if response.status_code == HTTPSTATUS.OK.value:
 			file.CodeMaoFile().file_write(path=self._captcha_img_path, content=response.content, method="wb")
 			print(f"请到 {CAPTCHA_DIR} 查看验证码")
@@ -37,19 +37,19 @@ class AuthManager:
 		return response.cookies
 
 	def fetch_user_dashboard_data(self) -> dict:
-		response = self.acquire.send_request(endpoint="https://api-whale.codemao.cn/admins/info", method="GET")
+		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/info", method="GET")
 		return response.json()
 
 	def configure_authentication_token(self, token: str) -> None:
-		self.acquire.switch_account(token, "judgement")
+		self._client.switch_account(token, "judgement")
 
 
 @singleton
 class ReportFetcher:
 	def __init__(self) -> None:
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
-	def fetch_work_reports_generator(
+	def fetch_work_reports_gen(
 		self,
 		report_type: Literal["KITTEN", "BOX2", "ALL"],
 		status: Literal["TOBEDONE", "DONE", "ALL"],
@@ -59,9 +59,9 @@ class ReportFetcher:
 		offset: int = 0,
 	) -> Generator[dict]:
 		params = {"type": report_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
-		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
+		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
-	def fetch_comment_reports_generator(
+	def fetch_comment_reports_gen(
 		self,
 		source_type: Literal["ALL", "KITTEN", "BOX2", "FICTION", "COMIC", "WORK_SUBJECT"],
 		status: Literal["TOBEDONE", "DONE", "ALL"],
@@ -71,9 +71,9 @@ class ReportFetcher:
 		offset: int = 0,
 	) -> Generator[dict]:
 		params = {"source": source_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
-		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
+		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
 
-	def fetch_post_reports_generator(
+	def fetch_post_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
 		filter_type: Literal["post_id"] | None = None,
@@ -82,9 +82,9 @@ class ReportFetcher:
 		offset: int = 0,
 	) -> Generator[dict]:
 		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
-		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
+		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
-	def fetch_discussion_reports_generator(
+	def fetch_discussion_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
 		filter_type: Literal["post_id"] | None = None,
@@ -93,39 +93,39 @@ class ReportFetcher:
 		offset: int = 0,
 	) -> Generator[dict]:
 		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
-		return self.acquire.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
+		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
 
 
 class ReportHandler:
 	def __init__(self) -> None:
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
-	def process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
-		response = self.acquire.send_request(
+	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
-		response = self.acquire.send_request(
+	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/discussions/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
-		response = self.acquire.send_request(
+	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/comments/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD"]) -> bool:
-		response = self.acquire.send_request(
+	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD"]) -> bool:
+		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/works/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},

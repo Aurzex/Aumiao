@@ -7,7 +7,7 @@ from src.utils.decorator import singleton
 class CookieManager:
 	# 初始化函数,创建一个CodeMaoClient对象
 	def __init__(self) -> None:
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
 	# 应用Cookie
 	def apply_cookie(self, cookies: str) -> bool:
@@ -21,5 +21,5 @@ class CookieManager:
 			如果Cookie应用成功返回True,否则返回False
 		"""
 		payload = {"cookie": cookies, "do": "apply"}
-		response = self.acquire.send_request(endpoint="https://shequ.pgaot.com/?mod=bcmcookieout", method="POST", payload=payload)
+		response = self._client.send_request(endpoint="https://shequ.pgaot.com/?mod=bcmcookieout", method="POST", payload=payload)
 		return response.status_code == HTTPSTATUS.OK.value

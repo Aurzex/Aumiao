@@ -235,7 +235,7 @@ def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: 
 def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""自动回复作品"""
 	print_header("自动回复")
-	client.Motion().reply_work()
+	client.Motion().execute_auto_reply_work()
 	print(color_text("已成功执行自动回复", "SUCCESS"))
 
 
@@ -243,13 +243,13 @@ def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG00
 def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""处理举报"""
 	print_header("处理举报")
-	client.Motion().judgement_login()
+	client.Motion().execute_judgement_login()
 	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
 
 	print(color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
 
-	client.Motion().handle_report(admin_id=admin_id)
+	client.Motion().execute_handle_report(admin_id=admin_id)
 	print(color_text("已成功处理举报", "SUCCESS"))
 
 
@@ -271,7 +271,7 @@ def download_fiction(account_data_manager: AccountDataManager) -> None:  # noqa:
 		cast_type=int,
 		validator=lambda x: x > 0,  # 确保ID为正数
 	)
-	client.Motion().download_fiction(fiction_id=fiction_id)
+	client.Motion().execute_download_fiction(fiction_id=fiction_id)
 	print(color_text("小说下载完成", "SUCCESS"))
 
 
@@ -325,7 +325,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 
 	method = cast("Literal['web']", method)
 
-	community.AuthManager().logout(method)
+	community.AuthManager().execute_logout(method)
 	account_data_manager.clear()
 	print(color_text("已成功登出账户", "SUCCESS"))
 
@@ -348,7 +348,7 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 
 	if sub_choice == "1":
 		user_id = get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
-		client.Motion().chiaroscuro_chronicles(user_id=user_id)
+		client.Motion().execute_chiaroscuro_chronicles(user_id=user_id)
 		print(color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = get_valid_input("模式 (delete/create)", {"delete", "create"})
@@ -360,11 +360,11 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 			valid_options=range(1, 101),  # 限制1-100的范围
 			validator=lambda x: x > 0,
 		)
-		client.Motion().batch_handle_account(method=mode, limit=limit)
+		client.Motion().execute_batch_handle_account(method=mode, limit=limit)
 		print(color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
 		real_name = prompt_input("输入姓名")
-		client.Motion().celestial_maiden_chronicles(real_name=real_name)
+		client.Motion().execute_celestial_maiden_chronicles(real_name=real_name)
 		print(color_text("账号提权完成", "SUCCESS"))
 
 
