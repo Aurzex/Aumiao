@@ -1477,3 +1477,23 @@ class Motion(ClassUnion):
 		if response.status_code != HTTPSTATUS.OK.value:
 			return False
 		return bool(next(response.iter_content(chunk_size=1)))
+
+	def integrate_work_data(self, limit: int) -> list[dict[str, Any]]:
+		data_sources = [(self.work_obtain.fetch_new_works_nemo(types="original", limit=limit), "nemo"), (self.work_obtain.fetch_new_works_web(limit=limit), "web")]
+		field_mapping = {
+			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
+			"web": {"work_id": "work_id", "work_name": "work_name", "user_name": "nickname", "user_id": "user_id", "like_count": "likes_count", "updated_at": "updated_at"},
+		}
+
+		integrated_data = []
+		for source_data, source in data_sources:
+			if not isinstance(source_data, dict) or "items" not in source_data:
+				continue
+
+			mapping = field_mapping[source]
+			for item in source_data["items"]:
+				# 使用字典推导式一次性完成字段映射
+				work_info = {target: item.get(source_field) for target, source_field in mapping.items()}
+				integrated_data.append(work_info)
+
+		return integrated_data
