@@ -782,7 +782,7 @@ class WorkDataFetcher:
 		)
 		return response.json()
 
-	def fetch_new_works_web(self, limit: int, offset: int = 0, *, origin: bool = False) -> dict:
+	def fetch_new_works_web(self, limit: int = 15, offset: int = 0, *, origin: bool = False) -> dict:
 		"""
 		获取Web端最新作品
 		Args:

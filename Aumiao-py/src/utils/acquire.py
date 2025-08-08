@@ -187,7 +187,6 @@ class CodeMaoClient:
 		"""
 		记录HTTP错误的详细信息
 		"""
-
 		try:
 			# 提取请求信息
 			request_info = {
