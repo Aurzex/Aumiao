@@ -6,14 +6,14 @@ from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
 
 # 定义HTTP方法选择类型
-select = Literal["POST", "DELETE"]
+SelectMethod = Literal["POST", "DELETE"]
 
 
 @singleton
 class WorkManager:
 	def __init__(self) -> None:
 		"""初始化作品管理类,创建CodeMaoClient实例"""
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
 	def create_kitten_work(
 		self,
@@ -51,14 +51,14 @@ class WorkManager:
 			"save_type": save_type,
 		}
 
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/kitten/r2/work",
 			method="POST",
 			payload=data,
 		)
 		return response.json()
 
-	def publish_kitten_work(
+	def execute_publish_kitten_work(
 		self,
 		work_id: int,
 		name: str,
@@ -107,7 +107,7 @@ class WorkManager:
 			"cover_type": cover_type,
 			"user_labels": user_labels,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/kitten/r2/work/{work_id}/publish",
 			method="PUT",
 			payload=data,
@@ -158,14 +158,14 @@ class WorkManager:
 			"n_blocks": n_blocks,
 			"n_roles": n_roles,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/neko/works",
 			method="POST",
 			payload=data,
 		)
 		return response.json()
 
-	def publish_kn_work(
+	def execute_publish_kn_work(
 		self,
 		work_id: int,
 		name: str,
@@ -208,14 +208,14 @@ class WorkManager:
 			"bcm_version": bcm_version,
 			"cover_url": cover_url,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/community/work/publish/{work_id}",
 			method="POST",
 			payload=data,
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def manage_follow(self, user_id: int, method: select = "POST") -> bool:
+	def execute_toggle_follow(self, user_id: int, method: SelectMethod = "POST") -> bool:
 		"""
 		关注或取消关注用户
 		Args:
@@ -224,14 +224,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/nemo/v2/user/{user_id}/follow",
 			method=method,
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def manage_collection(self, work_id: int, method: select = "POST") -> bool:
+	def execute_toggle_collection(self, work_id: int, method: SelectMethod = "POST") -> bool:
 		"""
 		收藏或取消收藏作品
 		Args:
@@ -240,14 +240,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/nemo/v2/works/{work_id}/collection",
 			method=method,
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def manage_like(self, work_id: int, method: select = "POST") -> bool:
+	def execute_toggle_like(self, work_id: int, method: SelectMethod = "POST") -> bool:
 		"""
 		点赞或取消点赞作品
 		Args:
@@ -256,14 +256,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/nemo/v2/works/{work_id}/like",
 			method=method,
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def share_work(self, work_id: int) -> bool:
+	def execute_share_work(self, work_id: int) -> bool:
 		"""
 		分享作品
 		Args:
@@ -271,14 +271,14 @@ class WorkManager:
 		Returns:
 			分享是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/nemo/v2/works/{work_id}/share",
 			method="POST",
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def add_comment(self, work_id: int, comment: str, emoji: str | None = None, *, return_data: bool = False) -> bool | dict:
+	def create_work_comment(self, work_id: int, comment: str, emoji: str | None = None, *, return_data: bool = False) -> bool | dict:
 		"""
 		添加作品评论
 		Args:
@@ -289,7 +289,7 @@ class WorkManager:
 		Returns:
 			操作结果(成功状态或完整响应数据)
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment",
 			method="POST",
 			payload={
@@ -299,7 +299,7 @@ class WorkManager:
 		)
 		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
 
-	def reply_to_comment(
+	def create_comment_reply(
 		self,
 		comment: str,
 		work_id: int,
@@ -320,7 +320,7 @@ class WorkManager:
 			操作结果(成功状态或完整响应数据)
 		"""
 		data = {"parent_id": parent_id, "content": comment}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/reply",
 			method="POST",
 			payload=data,
@@ -336,13 +336,13 @@ class WorkManager:
 		Returns:
 			删除是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}",
 			method="DELETE",
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def report_work(self, describe: str, reason: str, work_id: int) -> bool:
+	def execute_report_work(self, describe: str, reason: str, work_id: int) -> bool:
 		"""
 		举报作品
 		Args:
@@ -357,10 +357,10 @@ class WorkManager:
 			"report_reason": reason,
 			"report_describe": describe,
 		}
-		response = self.acquire.send_request(endpoint="/nemo/v2/report/work", method="POST", payload=data)
+		response = self._client.send_request(endpoint="/nemo/v2/report/work", method="POST", payload=data)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def manage_comment_pin(
+	def execute_toggle_comment_pin(
 		self,
 		method: Literal["PUT", "DELETE"],
 		work_id: int,
@@ -378,10 +378,10 @@ class WorkManager:
 		Returns:
 			操作结果(成功状态或完整响应数据)
 		"""
-		response = self.acquire.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
+		response = self._client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
 		return response.json() if return_data else response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def like_comment(self, work_id: int, comment_id: int, method: select = "POST") -> bool:
+	def execute_toggle_comment_like(self, work_id: int, comment_id: int, method: SelectMethod = "POST") -> bool:
 		"""
 		点赞或取消点赞评论
 		Args:
@@ -391,14 +391,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/liked",
 			method=method,
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.CREATED.value
 
-	def report_comment(self, work_id: int, comment_id: int, reason: str) -> bool:
+	def execute_report_comment(self, work_id: int, comment_id: int, reason: str) -> bool:
 		"""
 		举报作品评论
 		Args:
@@ -412,14 +412,14 @@ class WorkManager:
 			"comment_id": comment_id,
 			"report_reason": reason,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment/report",
 			method="POST",
 			payload=data,
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def enable_collaboration(self, work_id: int) -> bool:
+	def execute_enable_collaboration(self, work_id: int) -> bool:
 		"""
 		启用作品协作功能
 		Args:
@@ -427,14 +427,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/{work_id}",
 			method="POST",
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def delete_draft_kitten(self, work_id: int) -> bool:
+	def delete_kitten_draft(self, work_id: int) -> bool:
 		"""
 		删除未发布的Kitten作品草稿
 		Args:
@@ -442,13 +442,13 @@ class WorkManager:
 		Returns:
 			删除是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/kitten/common/work/{work_id}/temporarily",
 			method="DELETE",
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def delete_draft_kn(self, work_id: int, force: Literal[1, 2]) -> bool:
+	def delete_kn_draft(self, work_id: int, force: Literal[1, 2]) -> bool:
 		"""
 		删除未发布的KN作品草稿
 		Args:
@@ -458,14 +458,14 @@ class WorkManager:
 			删除是否成功
 		"""
 		params = {"force": force}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/works/{work_id}",
 			method="DELETE",
 			params=params,
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def unpublish_work(self, work_id: int) -> bool:
+	def execute_unpublish_work(self, work_id: int) -> bool:
 		"""
 		取消发布作品
 		Args:
@@ -473,14 +473,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/tiger/work/{work_id}/unpublish",
 			method="PATCH",
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def unpublish_work_web(self, work_id: int) -> bool:
+	def execute_unpublish_work_web(self, work_id: int) -> bool:
 		"""
 		通过Web端取消发布作品
 		Args:
@@ -488,14 +488,14 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/web/works/r2/unpublish/{work_id}",
 			method="PUT",
 			payload={},
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def unpublish_kn_work(self, work_id: int) -> bool:
+	def execute_unpublish_kn_work(self, work_id: int) -> bool:
 		"""
 		取消发布KN作品
 		Args:
@@ -503,37 +503,37 @@ class WorkManager:
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/community/work/unpublish/{work_id}",
 			method="PUT",
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def empty_kitten_trash(self) -> bool:
+	def execute_empty_kitten_trash(self) -> bool:
 		"""
 		清空Kitten作品回收站
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/work/user/works/permanently",
 			method="DELETE",
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def empty_kn_trash(self) -> bool:
+	def execute_empty_kn_trash(self) -> bool:
 		"""
 		清空KN作品回收站
 		Returns:
 			操作是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/neko/works/permanently",
 			method="DELETE",
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def rename_work(
+	def update_work_name(
 		self,
 		work_id: int,
 		name: str,
@@ -551,7 +551,7 @@ class WorkManager:
 		Returns:
 			重命名是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/tiger/work/works/{work_id}/rename",
 			method="PATCH",
 			params={"is_check_name": is_check_name, "name": name, "work_type": work_type},
@@ -563,9 +563,9 @@ class WorkManager:
 class WorkDataFetcher:
 	def __init__(self) -> None:
 		"""初始化作品数据获取类"""
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
-	def fetch_work_comments_generator(self, work_id: int, limit: int = 15) -> Generator:
+	def fetch_work_comments_gen(self, work_id: int, limit: int = 15) -> Generator:
 		"""
 		获取作品评论生成器
 		Args:
@@ -575,7 +575,7 @@ class WorkDataFetcher:
 			评论数据生成器
 		"""
 		params = {"limit": 15, "offset": 0}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comments",
 			params=params,
 			total_key="page_total",
@@ -590,7 +590,7 @@ class WorkDataFetcher:
 		Returns:
 			作品详细信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}",
 			method="GET",
 		)
@@ -604,7 +604,7 @@ class WorkDataFetcher:
 		Returns:
 			Kitten作品详细信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/kitten/work/detail/{work_id}",
 			method="GET",
 		)
@@ -618,7 +618,7 @@ class WorkDataFetcher:
 		Returns:
 			KN作品详细信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/works/{work_id}",
 			method="GET",
 		)
@@ -632,7 +632,7 @@ class WorkDataFetcher:
 		Returns:
 			发布状态信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/community/work/detail/{work_id}",
 			method="GET",
 		)
@@ -646,7 +646,7 @@ class WorkDataFetcher:
 		Returns:
 			作品状态信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/works/status/{work_id}",
 			method="GET",
 		)
@@ -660,7 +660,7 @@ class WorkDataFetcher:
 		Returns:
 			推荐作品信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/nemo/v2/works/web/{work_id}/recommended",
 			method="GET",
 		)
@@ -675,7 +675,7 @@ class WorkDataFetcher:
 			推荐作品信息字典
 		"""
 		params = {"work_id": work_id}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/v3/work-details/recommended/list",
 			method="GET",
 			params=params,
@@ -690,7 +690,7 @@ class WorkDataFetcher:
 		Returns:
 			作品元数据字典
 		"""
-		response = self.acquire.send_request(endpoint=f"/api/work/info/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"/api/work/info/{work_id}", method="GET")
 		return response.json()
 
 	def fetch_work_tags(self, work_id: int) -> dict:
@@ -702,7 +702,7 @@ class WorkDataFetcher:
 			作品标签信息字典
 		"""
 		params = {"work_id": work_id}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/work-details/work-labels",
 			method="GET",
 			params=params,
@@ -715,7 +715,7 @@ class WorkDataFetcher:
 		Returns:
 			Kitten标签列表字典
 		"""
-		response = self.acquire.send_request(endpoint="https://api-creation.codemao.cn/kitten/work/labels", method="GET")
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/kitten/work/labels", method="GET")
 		return response.json()
 
 	def fetch_kitten_default_covers(self) -> dict:
@@ -724,7 +724,7 @@ class WorkDataFetcher:
 		Returns:
 			默认封面列表字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/kitten/work/cover/defaultCovers",
 			method="GET",
 		)
@@ -738,7 +738,7 @@ class WorkDataFetcher:
 		Returns:
 			最近封面列表字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/kitten/work/cover/{work_id}/recentCovers",
 			method="GET",
 		)
@@ -754,7 +754,7 @@ class WorkDataFetcher:
 			验证结果字典
 		"""
 		params = {"name": name, "work_id": work_id}
-		response = self.acquire.send_request(endpoint="/tiger/work/checkname", method="GET", params=params)
+		response = self._client.send_request(endpoint="/tiger/work/checkname", method="GET", params=params)
 		return response.json()
 
 	def fetch_author_portfolio(self, user_id: str) -> dict:
@@ -765,7 +765,7 @@ class WorkDataFetcher:
 		Returns:
 			作者作品集字典
 		"""
-		response = self.acquire.send_request(endpoint=f"/web/works/users/{user_id}", method="GET")
+		response = self._client.send_request(endpoint=f"/web/works/users/{user_id}", method="GET")
 		return response.json()
 
 	def fetch_work_source_code(self, work_id: int) -> dict:
@@ -776,7 +776,7 @@ class WorkDataFetcher:
 		Returns:
 			源代码信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/source/public",
 			method="GET",
 		)
@@ -794,7 +794,7 @@ class WorkDataFetcher:
 		"""
 		extra_params = {"work_origin_type": "ORIGINAL_WORK"} if origin else {}
 		params = {**extra_params, "limit": limit, "offset": offset}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/pc/discover/newest-work",
 			method="GET",
 			params=params,
@@ -813,7 +813,7 @@ class WorkDataFetcher:
 		"""
 		extra_params = {"subject_id": subject_id} if subject_id else {}
 		params = {**extra_params, "limit": limit, "offset": offset}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/pc/discover/subject-work",
 			method="GET",
 			params=params,
@@ -826,7 +826,7 @@ class WorkDataFetcher:
 		Returns:
 			发现页作品列表字典
 		"""
-		response = self.acquire.send_request(endpoint="/creation-tools/v1/home/discover", method="GET")
+		response = self._client.send_request(endpoint="/creation-tools/v1/home/discover", method="GET")
 		return response.json()
 
 	def fetch_new_works_nemo(
@@ -845,7 +845,7 @@ class WorkDataFetcher:
 			最新作品列表字典
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self.acquire.send_request(endpoint=f"/nemo/v3/newest/work/{types}/list", method="GET", params=params)
+		response = self._client.send_request(endpoint=f"/nemo/v3/newest/work/{types}/list", method="GET", params=params)
 		return response.json()
 
 	def fetch_random_subjects(self) -> list[int]:
@@ -854,7 +854,7 @@ class WorkDataFetcher:
 		Returns:
 			主题ID列表
 		"""
-		response = self.acquire.send_request(endpoint="/nemo/v3/work-subject/random", method="GET")
+		response = self._client.send_request(endpoint="/nemo/v3/work-subject/random", method="GET")
 		return response.json()
 
 	def fetch_subject_details(self, ids: int) -> dict:
@@ -865,7 +865,7 @@ class WorkDataFetcher:
 		Returns:
 			主题信息字典
 		"""
-		response = self.acquire.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/info", method="GET")
+		response = self._client.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/info", method="GET")
 		return response.json()
 
 	def fetch_subject_works(self, ids: int, limit: int = 15, offset: int = 0) -> dict:
@@ -879,7 +879,7 @@ class WorkDataFetcher:
 			主题作品列表字典
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self.acquire.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/works", method="GET", params=params)
+		response = self._client.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/works", method="GET", params=params)
 		return response.json()
 
 	def fetch_all_subject_works(self, limit: int = 15, offset: int = 0) -> dict:
@@ -892,7 +892,7 @@ class WorkDataFetcher:
 			主题作品列表字典
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self.acquire.send_request(endpoint="/nemo/v3/work-subject/home", method="GET", params=params)
+		response = self._client.send_request(endpoint="/nemo/v3/work-subject/home", method="GET", params=params)
 		return response.json()
 
 	def manage_collaboration_code(self, work_id: int, method: Literal["GET", "DELETE"] = "GET") -> dict:
@@ -904,13 +904,13 @@ class WorkDataFetcher:
 		Returns:
 			协作信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/collaborator/code/{work_id}",
 			method=method,
 		)
 		return response.json()
 
-	def fetch_collaborators_generator(self, work_id: int, limit: int | None = 100) -> Generator[dict]:
+	def fetch_collaborators_gen(self, work_id: int, limit: int | None = 100) -> Generator[dict]:
 		"""
 		获取协作者列表生成器
 		Args:
@@ -920,7 +920,7 @@ class WorkDataFetcher:
 			协作者列表生成器
 		"""
 		params = {"current_page": 1, "page_size": 100}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/collaborator/{work_id}",
 			params=params,
 			total_key="data.total",
@@ -938,7 +938,7 @@ class WorkDataFetcher:
 		Returns:
 			协作状态字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/collaboration/user/{work_id}",
 			method="GET",
 		)
@@ -952,7 +952,7 @@ class WorkDataFetcher:
 		Returns:
 			谱系信息字典
 		"""
-		response = self.acquire.send_request(endpoint=f"/tiger/work/tree/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"/tiger/work/tree/{work_id}", method="GET")
 		return response.json()
 
 	def fetch_work_lineage_nemo(self, work_id: int) -> dict:
@@ -963,7 +963,7 @@ class WorkDataFetcher:
 		Returns:
 			谱系信息字典
 		"""
-		response = self.acquire.send_request(endpoint=f"/nemo/v2/works/root/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"/nemo/v2/works/root/{work_id}", method="GET")
 		return response.json()
 
 	def fetch_kn_work_versions(self, work_id: int) -> dict:
@@ -974,13 +974,13 @@ class WorkDataFetcher:
 		Returns:
 			版本历史字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/works/archive/{work_id}",
 			method="GET",
 		)
 		return response.json()
 
-	def fetch_kitten_trash_generator(self, version_no: Literal["KITTEN_V3", "KITTEN_V4"], work_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
+	def fetch_kitten_trash_gen(self, version_no: Literal["KITTEN_V3", "KITTEN_V4"], work_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取Kitten回收站作品生成器
 		Args:
@@ -996,13 +996,13 @@ class WorkDataFetcher:
 			"version_no": version_no,
 			"work_status": work_status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/tiger/work/recycle/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_wood_trash_generator(self, language_type: int = 0, work_status: str = "CYCLED", published_status: str = "undefined", limit: int | None = 30) -> Generator[dict]:
+	def fetch_wood_trash_gen(self, language_type: int = 0, work_status: str = "CYCLED", published_status: str = "undefined", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取海龟编辑器回收站作品生成器
 		Args:
@@ -1020,13 +1020,13 @@ class WorkDataFetcher:
 			"work_status": work_status,
 			"published_status": published_status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/wood/comm/work/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_box_trash_generator(self, work_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
+	def fetch_box_trash_gen(self, work_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取代码岛回收站作品生成器
 		Args:
@@ -1040,13 +1040,13 @@ class WorkDataFetcher:
 			"offset": 0,
 			"work_status": work_status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/box/v2/work/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_fiction_trash_generator(self, fiction_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
+	def fetch_fiction_trash_gen(self, fiction_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取小说回收站生成器
 		Args:
@@ -1060,13 +1060,13 @@ class WorkDataFetcher:
 			"offset": 0,
 			"fiction_status": fiction_status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/web/fanfic/my/new",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_kn_trash_generator(self, name: str = "", work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
+	def fetch_kn_trash_gen(self, name: str = "", work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
 		获取KN回收站作品生成器
 		Args:
@@ -1083,13 +1083,13 @@ class WorkDataFetcher:
 			"status": -99,
 			"work_business_classify": work_business_classify,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/v2/list/user",
 			params=params,
 			limit=limit,
 		)
 
-	def search_kn_works_generator(self, name: str, status: int = 1, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
+	def search_kn_works_gen(self, name: str, status: int = 1, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
 		搜索KN作品生成器
 		Args:
@@ -1107,13 +1107,13 @@ class WorkDataFetcher:
 			"status": status,
 			"work_business_classify": work_business_classify,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/v2/list/user",
 			params=params,
 			limit=limit,
 		)
 
-	def search_published_kn_works_generator(self, name: str, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
+	def search_published_kn_works_gen(self, name: str, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
 		搜索已发布KN作品生成器
 		Args:
@@ -1129,7 +1129,7 @@ class WorkDataFetcher:
 			"offset": 0,
 			"work_business_classify": work_business_classify,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/list/user/published",
 			params=params,
 			limit=limit,
@@ -1143,7 +1143,7 @@ class WorkDataFetcher:
 		Returns:
 			变量列表字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"https://socketcv.codemao.cn/neko/cv/list/variables/{work_id}",
 			method="GET",
 		)
@@ -1168,7 +1168,7 @@ class WorkDataFetcher:
 			"limit": limit,
 			"offset": offset,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/neko/package/list",
 			method="GET",
 			params=params,
@@ -1188,7 +1188,7 @@ class WorkDataFetcher:
 			"limit": limit,
 			"offset": offset,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/v3/work/dynamic",
 			method="GET",
 			params=params,
@@ -1201,7 +1201,7 @@ class WorkDataFetcher:
 		Returns:
 			推荐用户字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/v3/dynamic/focus/user/recommend",
 			method="GET",
 		)
@@ -1222,7 +1222,7 @@ class WorkDataFetcher:
 			"offset": offset,
 			"limit": limit,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/community/work/name/search",
 			method="GET",
 			params=params,
@@ -1244,7 +1244,7 @@ class WorkDataFetcher:
 			"offset": offset,
 			"limit": limit,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/v2/work/name/search",
 			method="GET",
 			params=params,

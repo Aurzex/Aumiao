@@ -10,12 +10,12 @@ from src.utils.decorator import singleton
 class UserDataFetcher:
 	def __init__(self) -> None:
 		"""初始化用户数据获取类"""
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
 	# BUG 貌似api不起作用
 	# 获取账户信息(简略)
 	# def get_data_info(self) -> dict:
-	# 	response = self.acquire.send_request(
+	# 	response = self._client.send_request(
 	# 		method="GET",
 	# 		endpoint="/web/user/info",
 	# 	)
@@ -29,7 +29,7 @@ class UserDataFetcher:
 		Returns:
 			用户详细信息字典
 		"""
-		response = self.acquire.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
+		response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
 		return response.json()
 
 	def fetch_user_honors(self, user_id: str) -> dict:
@@ -41,7 +41,7 @@ class UserDataFetcher:
 			用户荣誉信息字典
 		"""
 		params = {"user_id": user_id}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/user/center/honor",
 			method="GET",
 			params=params,
@@ -57,7 +57,7 @@ class UserDataFetcher:
 			用户业务数据字典
 		"""
 		params = {"user_id": user_id}
-		response = self.acquire.send_request(endpoint="/nemo/v2/works/business/total", method="GET", params=params)
+		response = self._client.send_request(endpoint="/nemo/v2/works/business/total", method="GET", params=params)
 		return response.json()
 
 	def fetch_basic_user_info(self, user_id: str) -> dict:
@@ -69,7 +69,7 @@ class UserDataFetcher:
 			用户基本信息字典
 		"""
 		params = {"user_id": user_id}
-		response = self.acquire.send_request(method="GET", endpoint="/nemo/v2/user/dynamic/info", params=params)
+		response = self._client.send_request(method="GET", endpoint="/nemo/v2/user/dynamic/info", params=params)
 		return response.json()
 
 	def fetch_account_details(self) -> dict:
@@ -78,7 +78,7 @@ class UserDataFetcher:
 		Returns:
 			账号详细信息字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			method="GET",
 			endpoint="/web/users/details",
 		)
@@ -92,7 +92,7 @@ class UserDataFetcher:
 		Returns:
 			平台账号资料字典
 		"""
-		response = self.acquire.send_request(method="GET", endpoint=f"/tiger/v3/{method}/accounts/profile")
+		response = self._client.send_request(method="GET", endpoint=f"/tiger/v3/{method}/accounts/profile")
 		return response.json()
 
 	def fetch_privacy_settings(self) -> dict:
@@ -101,7 +101,7 @@ class UserDataFetcher:
 		Returns:
 			隐私设置字典
 		"""
-		response = self.acquire.send_request(method="GET", endpoint="/tiger/v3/web/accounts/privacy")
+		response = self._client.send_request(method="GET", endpoint="/tiger/v3/web/accounts/privacy")
 		return response.json()
 
 	def fetch_tiger_account_info(self) -> dict:
@@ -110,7 +110,7 @@ class UserDataFetcher:
 		Returns:
 			Tiger账号信息字典
 		"""
-		response = self.acquire.send_request(endpoint="/tiger/user", method="GET")
+		response = self._client.send_request(endpoint="/tiger/user", method="GET")
 		return response.json()
 
 	def fetch_user_scores(self) -> dict:
@@ -119,7 +119,7 @@ class UserDataFetcher:
 		Returns:
 			用户评分数据字典
 		"""
-		response = self.acquire.send_request(endpoint="/nemo/v3/user/grade/details", method="GET")
+		response = self._client.send_request(endpoint="/nemo/v3/user/grade/details", method="GET")
 		return response.json()
 
 	def fetch_user_level(self) -> dict:
@@ -128,7 +128,7 @@ class UserDataFetcher:
 		Returns:
 			用户等级信息字典
 		"""
-		response = self.acquire.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
+		response = self._client.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
 		return response.json()
 
 	# 可能会返回{"code":6404,"msg":"未绑定手机号"},从而可以检测是否绑定手机号
@@ -138,10 +138,10 @@ class UserDataFetcher:
 		Returns:
 			课程账号信息字典
 		"""
-		response = self.acquire.send_request(endpoint="/api/v2/pc/lesson/user/info", method="GET")
+		response = self._client.send_request(endpoint="/api/v2/pc/lesson/user/info", method="GET")
 		return response.json()
 
-	def fetch_user_works_web_generator(self, user_id: str, types: Literal["newest", "hot"] = "newest", limit: int | None = 5) -> Generator[dict]:
+	def fetch_user_works_web_gen(self, user_id: str, types: Literal["newest", "hot"] = "newest", limit: int | None = 5) -> Generator[dict]:
 		"""
 		获取用户作品列表生成器(Web端)
 		Args:
@@ -157,7 +157,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 5,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/creation-tools/v2/user/center/work-list",
 			params=params,
 			total_key="total",
@@ -181,7 +181,7 @@ class UserDataFetcher:
 			"page": page,
 			"limit": limit,
 		}
-		response = self.acquire.send_request(endpoint="tiger/nemo/user/works/search", method="GET", params=params)
+		response = self._client.send_request(endpoint="tiger/nemo/user/works/search", method="GET", params=params)
 		return response.json()
 
 	def fetch_cloud_works(self, types: Literal["nemo", "kitten"], limit: int = 10, offset: int = 0) -> dict:
@@ -196,10 +196,10 @@ class UserDataFetcher:
 		"""
 		work_type = 8 if types == "nemo" else 1
 		params = {"limit": limit, "offset": offset, "work_type": work_type}
-		response = self.acquire.send_request(endpoint="/creation-tools/v1/works/list/user", params=params, method="GET")
+		response = self._client.send_request(endpoint="/creation-tools/v1/works/list/user", params=params, method="GET")
 		return response.json()
 
-	def fetch_published_nemo_works_generator(self, method: Literal["published"], limit: int | None = 15) -> Generator[dict]:
+	def fetch_published_nemo_works_gen(self, method: Literal["published"], limit: int | None = 15) -> Generator[dict]:
 		"""
 		获取用户已发布Nemo作品生成器
 		Args:
@@ -209,13 +209,13 @@ class UserDataFetcher:
 			作品生成器
 		"""
 		params = {"limit": 15, "offset": 0}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint=f"/nemo/v2/works/list/user/{method}",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_kn_works_generator(
+	def fetch_kn_works_gen(
 		self,
 		method: Literal["published", "total"],
 		extra_params: (
@@ -240,9 +240,9 @@ class UserDataFetcher:
 		params = {"offset": 0, "limit": 15}
 		params = cast("dict", params)
 		params.update(extra_params or {})
-		return self.acquire.fetch_data(endpoint=url, params=params, limit=limit)
+		return self._client.fetch_data(endpoint=url, params=params, limit=limit)
 
-	def fetch_kitten_works_generator(
+	def fetch_kitten_works_gen(
 		self,
 		version: Literal["KITTEN_V4", "KITTEN_V3"],
 		status: Literal["PUBLISHED", "UNPUBLISHED", "all"],
@@ -266,13 +266,13 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/kitten/common/work/list2",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_nemo_works_generator(self, status: Literal["PUBLISHED", "UNPUBLISHED", "all"], limit: int | None = 30) -> Generator[dict]:
+	def fetch_nemo_works_gen(self, status: Literal["PUBLISHED", "UNPUBLISHED", "all"], limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取用户Nemo作品生成器
 		Args:
@@ -282,13 +282,13 @@ class UserDataFetcher:
 			Nemo作品生成器
 		"""
 		params = {"offset": 0, "limit": 30, "published_status": status}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/creation-tools/v1/works/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_wood_works_generator(
+	def fetch_wood_works_gen(
 		self,
 		status: Literal["PUBLISHED", "UNPUBLISHED"],
 		language_type: int = 0,
@@ -312,13 +312,13 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/wood/comm/work/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_box_works_generator(self, status: Literal["all", "PUBLISHED", "UNPUBLISHED"], work_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
+	def fetch_box_works_gen(self, status: Literal["all", "PUBLISHED", "UNPUBLISHED"], work_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取用户Box作品生成器
 		Args:
@@ -334,13 +334,13 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/box/v2/work/list",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_fanfics_generator(self, fiction_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
+	def fetch_fanfics_gen(self, fiction_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取用户小说生成器
 		Args:
@@ -350,13 +350,13 @@ class UserDataFetcher:
 			小说生成器
 		"""
 		params = {"offset": 0, "limit": 30, "fiction_status": fiction_status}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/web/fanfic/my/new",
 			params=params,
 			limit=limit,
 		)
 
-	def fetch_coco_works_generator(self, status: int = 1, *, published: bool = True, limit: int | None = 30) -> Generator[dict]:
+	def fetch_coco_works_gen(self, status: int = 1, *, published: bool = True, limit: int | None = 30) -> Generator[dict]:
 		"""
 		获取用户Coco作品生成器
 		Args:
@@ -372,7 +372,7 @@ class UserDataFetcher:
 			"status": status,
 			"published": published,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="https://api-creation.codemao.cn/coconut/web/work/list",
 			params=params,
 			data_key="data.items",
@@ -380,7 +380,7 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_followers_generator(self, user_id: str, limit: int = 15) -> Generator[dict]:
+	def fetch_followers_gen(self, user_id: str, limit: int = 15) -> Generator[dict]:
 		"""
 		获取用户粉丝列表生成器
 		Args:
@@ -394,14 +394,14 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 15,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/creation-tools/v1/user/fans",
 			params=params,
 			total_key="total",
 			limit=limit,
 		)
 
-	def fetch_following_generator(self, user_id: str, limit: int = 15) -> Generator[dict]:
+	def fetch_following_gen(self, user_id: str, limit: int = 15) -> Generator[dict]:
 		"""
 		获取用户关注列表生成器
 		Args:
@@ -415,14 +415,14 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 15,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/creation-tools/v1/user/followers",
 			params=params,
 			total_key="total",
 			limit=limit,
 		)
 
-	def fetch_collections_generator(self, user_id: str, limit: int = 5) -> Generator[dict]:
+	def fetch_collections_gen(self, user_id: str, limit: int = 5) -> Generator[dict]:
 		"""
 		获取用户收藏作品生成器
 		Args:
@@ -436,7 +436,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 5,
 		}
-		return self.acquire.fetch_data(
+		return self._client.fetch_data(
 			endpoint="/creation-tools/v1/user/center/collect/list",
 			params=params,
 			total_key="total",
@@ -449,7 +449,7 @@ class UserDataFetcher:
 		Returns:
 			头像框列表字典
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/user/avatar-frame/list",
 			method="GET",
 		)
@@ -461,7 +461,7 @@ class UserDataFetcher:
 		Returns:
 			新用户状态字典
 		"""
-		response = self.acquire.send_request(endpoint="https://api-creation.codemao.cn/neko/works/isNewUser", method="GET")
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/isNewUser", method="GET")
 		return response.json()
 
 
@@ -469,7 +469,7 @@ class UserDataFetcher:
 class UserManager:
 	def __init__(self) -> None:
 		"""初始化用户管理类"""
-		self.acquire = acquire.CodeMaoClient()
+		self._client = acquire.CodeMaoClient()
 
 	def update_status(self, doing: str) -> bool:
 		"""
@@ -479,10 +479,10 @@ class UserManager:
 		Returns:
 			更新是否成功
 		"""
-		response = self.acquire.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload={"doing": doing})
+		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload={"doing": doing})
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def change_username(self, username: str) -> bool:
+	def update_username(self, username: str) -> bool:
 		"""
 		更改用户名(实验性功能)
 		Args:
@@ -492,14 +492,14 @@ class UserManager:
 		"""
 		msg = "此为实验性功能"
 		raise ValueError(msg)
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/username",
 			method="PATCH",
 			payload={"username": username},
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def verify_phone_number(self, phone_num: int) -> dict:
+	def validate_phone_number(self, phone_num: int) -> dict:
 		"""
 		验证手机号码
 		Args:
@@ -508,10 +508,10 @@ class UserManager:
 			验证结果字典
 		"""
 		params = {"phone_number": phone_num}
-		response = self.acquire.send_request(endpoint="/web/users/phone_number/is_consistent", method="GET", params=params)
+		response = self._client.send_request(endpoint="/web/users/phone_number/is_consistent", method="GET", params=params)
 		return response.json()
 
-	def change_password(self, old_password: str, new_password: str) -> bool:
+	def update_password(self, old_password: str, new_password: str) -> bool:
 		"""
 		修改密码
 		Args:
@@ -525,14 +525,14 @@ class UserManager:
 			"password": new_password,
 			"confirm_password": new_password,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/password",
 			method="PATCH",
 			payload=data,
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def request_phone_change_verification(self, old_phonenum: int, new_phonenum: int) -> bool:
+	def execute_request_phone_change_verification(self, old_phonenum: int, new_phonenum: int) -> bool:
 		"""
 		请求更换手机号验证码
 		Args:
@@ -542,7 +542,7 @@ class UserManager:
 			请求是否成功
 		"""
 		data = {"phone_number": new_phonenum, "old_phone_number": old_phonenum}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/captcha/phone/change",
 			method="POST",
 			payload=data,
@@ -559,7 +559,7 @@ class UserManager:
 			更新是否成功
 		"""
 		data = {"phone_number": phonenum, "captcha": captcha}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/phone/change",
 			method="PATCH",
 			payload=data,
@@ -579,22 +579,22 @@ class UserManager:
 		if not data:
 			msg = "至少需要传入一个参数"
 			raise ValueError(msg)
-		response = self.acquire.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
+		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def remove_avatar_frame(self) -> bool:
+	def delete_avatar_frame(self) -> bool:
 		"""
 		移除头像框
 		Returns:
 			移除是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/creation-tools/v1/user/avatar-frame/cancel",
 			method="PUT",
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
-	def apply_avatar_frame(self, frame_id: Literal[2, 3, 4]) -> bool:
+	def execute_apply_avatar_frame(self, frame_id: Literal[2, 3, 4]) -> bool:
 		"""
 		应用头像框
 		Args:
@@ -602,7 +602,7 @@ class UserManager:
 		Returns:
 			应用是否成功
 		"""
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/user/avatar-frame/{frame_id}",
 			method="PUT",
 		)
@@ -640,7 +640,7 @@ class UserManager:
 			"qq": qq,
 			"sex": sex,
 		}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/info",
 			method="PATCH",
 			payload=data,
@@ -660,7 +660,7 @@ class UserManager:
 			更新是否成功
 		"""
 		data = {"preview": cover_url}
-		response = self.acquire.send_request(
+		response = self._client.send_request(
 			endpoint="/nemo/v2/user/preview",
 			method="POST",
 			payload=data,
