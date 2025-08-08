@@ -138,7 +138,7 @@ jobs:
           script-name: ./Aumiao-py/main.py
           show-progress: true
           windows-console-mode: force
-          windows-icon-from-ico: "./Aumiao-py/src/project/favicon.ico"
+          windows-icon-from-ico: "./Aumiao-py/resource/icons/favicon.ico"
 
       - name: Run recover.py
         shell: pwsh
