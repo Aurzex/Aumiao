@@ -8,6 +8,7 @@ from pathlib import Path
 from random import choice, randint
 from time import sleep
 from typing import Any, ClassVar, Literal, TypedDict, cast, overload
+from urllib.parse import urlparse
 
 from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
@@ -1424,28 +1425,22 @@ class Motion(ClassUnion):
 		print(f"\n上传历史记录(第{page}/{max_page}页):")
 		print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
 		print("-" * 85)
-
 		for i, record in enumerate(page_data, start + 1):
-			# 格式化上传时间
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
 				upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
 			formatted_time = str(upload_time)[:19]
-
-			# 处理文件名
 			file_name = record.file_name.replace("\\", "/")[:25]
-
-			# 简化URL并添加类型标识
 			url = record.save_url.replace("\\", "/")
 			url_type = "[other]"
 			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
-
-			if "static.codemao.cn" in url:
-				# 处理static.codemao.cn域名
+			parsed_url = urlparse(url)
+			host = parsed_url.hostname
+			if host == "static.codemao.cn":
 				cn_index = url.find(".cn")
 				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
 				url_type = "[static]"
-			elif "cdn-community.bcmcdn.com" in url:
+			elif host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):
 				com_index = url.find(".com")
 				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
 				url_type = "[cdn]"
