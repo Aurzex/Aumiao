@@ -223,7 +223,7 @@ class Obtain(ClassUnion):
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: str,
+		source: Literal["work", "post", "shop"],
 		method: Literal["user_id", "comment_id"],
 		max_limit: int | None = 200,
 	) -> list[str]: ...
@@ -232,7 +232,7 @@ class Obtain(ClassUnion):
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: str,
+		source: Literal["work", "post", "shop"],
 		method: Literal["comments"],
 		max_limit: int | None = 200,
 	) -> list[dict]: ...
@@ -241,7 +241,7 @@ class Obtain(ClassUnion):
 	def get_comments_detail_new(
 		self,
 		com_id: int,
-		source: str,
+		source: Literal["work", "post", "shop"],
 		method: str = "user_id",
 		max_limit: int | None = 200,
 	) -> list[dict] | list[str]:
@@ -323,6 +323,23 @@ class Obtain(ClassUnion):
 			raise ValueError(msg)
 
 		return method_handlers[method]()
+
+	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
+		per_source_limit = limit // 2
+		data_sources = [
+			(self.work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
+			(self.work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
+		]
+		field_mapping = {
+			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
+			"web": {"work_id": "work_id", "work_name": "work_name", "user_name": "nickname", "user_id": "user_id", "like_count": "likes_count", "updated_at": "updated_at"},
+		}
+		for source_data, source in data_sources:
+			if not isinstance(source_data, dict) or "items" not in source_data:
+				continue
+			mapping = field_mapping[source]
+			for item in source_data["items"]:
+				yield {target: item.get(source_field) for target, source_field in mapping.items()}
 
 
 @decorator.singleton
@@ -1478,22 +1495,28 @@ class Motion(ClassUnion):
 			return False
 		return bool(next(response.iter_content(chunk_size=1)))
 
-	def integrate_work_data(self, limit: int) -> list[dict[str, Any]]:
-		data_sources = [(self.work_obtain.fetch_new_works_nemo(types="original", limit=limit), "nemo"), (self.work_obtain.fetch_new_works_web(limit=limit), "web")]
-		field_mapping = {
-			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
-			"web": {"work_id": "work_id", "work_name": "work_name", "user_name": "nickname", "user_id": "user_id", "like_count": "likes_count", "updated_at": "updated_at"},
-		}
-
-		integrated_data = []
-		for source_data, source in data_sources:
-			if not isinstance(source_data, dict) or "items" not in source_data:
+	def collect_work_comments(self, limit: int) -> dict[str, list[str]]:
+		works = Obtain().integrate_work_data(limit=limit)
+		comments = []
+		for single_work in works:
+			work_comments = Obtain().get_comments_detail_new(
+				com_id=single_work["work_id"],
+				source="work",
+				method="comments",
+				max_limit=20
+			)
+			comments.extend(work_comments)
+		filtered_comments = self.tool.DataProcessor().filter_data(
+			data=comments,
+			include=["user_id", "content"]
+		)
+		filtered_comments = cast("list[dict]", filtered_comments)
+		user_comments = {}
+		for comment in filtered_comments:
+			user_id = comment.get("user_id")
+			content = comment.get("content")
+			if user_id is None or content is None:
 				continue
-
-			mapping = field_mapping[source]
-			for item in source_data["items"]:
-				# 使用字典推导式一次性完成字段映射
-				work_info = {target: item.get(source_field) for target, source_field in mapping.items()}
-				integrated_data.append(work_info)
-
-		return integrated_data
+			user_id_str = str(user_id)
+			user_comments.setdefault(user_id_str, []).append(content)
+		return user_comments
