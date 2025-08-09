@@ -1494,17 +1494,9 @@ class Motion(ClassUnion):
 		works = Obtain().integrate_work_data(limit=limit)
 		comments = []
 		for single_work in works:
-			work_comments = Obtain().get_comments_detail_new(
-				com_id=single_work["work_id"],
-				source="work",
-				method="comments",
-				max_limit=20
-			)
+			work_comments = Obtain().get_comments_detail_new(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
 			comments.extend(work_comments)
-		filtered_comments = self.tool.DataProcessor().filter_data(
-			data=comments,
-			include=["user_id", "content"]
-		)
+		filtered_comments = self.tool.DataProcessor().filter_data(data=comments, include=["user_id", "content"])
 		filtered_comments = cast("list[dict]", filtered_comments)
 		user_comments = {}
 		for comment in filtered_comments:
