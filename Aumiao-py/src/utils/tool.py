@@ -3,14 +3,18 @@ from __future__ import annotations
 import random
 import re
 import time
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Generator as ABCGenerator
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from html import unescape
-from typing import Literal, TypeGuard, TypeVar, overload
+from typing import Any, Literal, TypeGuard, TypeVar, overload
 
-DataObject = dict | list[dict] | Generator[dict, object]
 T = TypeVar("T")
 FILE_SIZE: int = 1024
+
+# 类型别名定义
+DataDict = dict[str, Any]
+type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
 
 
 @staticmethod
@@ -26,7 +30,7 @@ def is_dataclass_instance[T](obj: T) -> TypeGuard[T]:
 	Example:
 		>>> @dataclass
 		... class User:
-		...     name: str
+		...	 name: str
 		>>> is_dataclass_instance(User("Alice"))  # False(类本身)
 		>>> is_dataclass_instance(User("Alice"))  # True(实例)
 	"""
@@ -161,32 +165,56 @@ class DataProcessor:
 
 		Args:
 			data: 输入数据(字典/列表/生成器)
-			include: 需要包含的字段列表
-			exclude: 需要排除的字段列表
+			include: 需要包含的字段列表(空列表表示包含所有字段)
+			exclude: 需要排除的字段列表(空列表表示不排除任何字段)
 
 		Returns:
-			过滤后的数据(保持原始结构)
+			过滤后的数据(保持原始数据结构)
 
 		Raises:
 			ValueError: 同时指定include和exclude
+			TypeError: 不支持的数据类型
 
 		Example:
 			>>> data = {"name": "Alice", "age": 30, "email": "alice@example.com"}
 			>>> DataProcessor.filter_data(data, include=["name", "age"])
 			{'name': 'Alice', 'age': 30}
+
+			# 空列表处理示例
+			>>> DataProcessor.filter_data(data, include=[])  # 返回空字典
+			{}
+			>>> DataProcessor.filter_data(data, exclude=[])  # 返回所有字段
+			{'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
 		"""
-		if include and exclude:
+		if include is not None and exclude is not None:
 			msg = "不能同时指定包含和排除字段"
 			raise ValueError(msg)
 
-		def _filter(item: dict) -> dict:
-			return {k: v for k, v in item.items() if (include and k in include) or (exclude and k not in exclude) or (not include and not exclude)}
+		# 优化后的过滤函数
+		def _filter(item: DataDict) -> DataDict:
+			if include is not None:
+				# 显式处理 include 列表(空列表表示无字段)
+				return {k: v for k, v in item.items() if k in include}
+			if exclude is not None:
+				# 显式处理 exclude 列表(空列表表示无排除)
+				return {k: v for k, v in item.items() if k not in exclude}
+			return item  # 无过滤条件时返回原始数据
+
+			# 根据数据类型进行分发处理
 
 		if isinstance(data, dict):
 			return _filter(data)
-		if isinstance(data, (list, Generator)):
-			return type(data)(_filter(item) for item in data)  # type: ignore  # noqa: PGH003
-		msg = f"不支持的数据类型: {type(data)}"
+
+		if isinstance(data, list):
+			return [_filter(item) for item in data]
+
+		if isinstance(data, ABCGenerator):
+			# 保持生成器特性(惰性求值)
+			return (_filter(item) for item in data)
+		# if isinstance(data, Iterable):
+		# 		# 扩展支持任意可迭代对象
+		# 		return (_filter(item) for item in data)
+		msg = f"不支持的数据类型: {type(data).__name__}"
 		raise TypeError(msg)
 
 	@classmethod
@@ -259,7 +287,7 @@ class DataConverter:
 		Example:
 			>>> @dataclass
 			... class User:
-			...     name: str
+			...	 name: str
 			>>> DataConverter.to_serializable(User("Alice"))
 			{'name': 'Alice'}
 		"""
