@@ -62,7 +62,7 @@ class CodeMaoData:
 class Parameter:
 	all_read_type: list[ReadType] = field(default_factory=list)
 	cookie_check_url: str = ""
-	log: bool = True
+	log: bool = False
 	password_login_method: str = ""
 	report_work_max: int = 0
 	spam_del_max: int = 0
