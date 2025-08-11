@@ -291,6 +291,14 @@ def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noq
 
 
 @handle_errors
+def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+	"""上传历史"""
+	print_header("上传历史")
+	client.Motion().print_upload_history()
+	print(color_text("查看完成", "SUCCESS"))
+
+
+@handle_errors
 @require_login
 def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传文件"""
@@ -404,7 +412,8 @@ def main() -> None:
 		"8": MenuOption(name="下载小说", handler=partial(download_fiction, account_data_manager), require_auth=False),
 		"9": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
 		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
-		"11": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
+		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
+		"12": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
 		"1106": MenuOption(
 			name="隐藏功能",
 			handler=partial(handle_hidden_features, account_data_manager),
@@ -416,7 +425,7 @@ def main() -> None:
 	while True:
 		display_menu(menu_options, account_data_manager)
 
-		choice = prompt_input("请输入操作编号 (1-11)")
+		choice = prompt_input("请输入操作编号 (1-12)")
 
 		if choice in menu_options:
 			option = menu_options[choice]
