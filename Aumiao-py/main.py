@@ -336,7 +336,6 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
 	# 更安全的隐藏功能访问控制
 	if account_data_manager.get_account_id() != ADMIN_USER_ID:
-		print(color_text("权限不足! 只有管理员可以访问隐藏功能", "ERROR"))
 		return
 
 	print_header("隐藏功能")
