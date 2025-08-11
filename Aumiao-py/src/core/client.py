@@ -552,7 +552,7 @@ class Motion(ClassUnion):
 
 		config = method_config[method]
 		page_size = 200
-		params = {"limit": page_size, "offset": 0}
+		params: dict[str, int | str] = {"limit": page_size, "offset": 0}
 
 		def is_all_cleared(counts: dict) -> bool:
 			if method == "web":
@@ -562,6 +562,7 @@ class Motion(ClassUnion):
 		def send_batch_requests() -> bool:
 			responses = {}
 			for msg_type in config["message_types"]:
+				config["endpoint"] = cast("str", config["endpoint"])
 				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
 
 				request_params = params.copy()
@@ -581,7 +582,7 @@ class Motion(ClassUnion):
 
 				if not send_batch_requests():
 					return False
-
+				params["offset"] = cast("int", params["offset"])
 				params["offset"] += page_size
 
 		except Exception as e:
@@ -671,7 +672,7 @@ class Motion(ClassUnion):
 				)
 
 				(self.work_motion.create_comment_reply if source_type == "work" else self.forum_motion.create_comment_reply)(
-					**params
+					**params  # pyright: ignore[reportArgumentType]
 				)  # 优化方法名:reply_to_comment→create_comment_reply
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
 
