@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Literal, TypeVar, cast
 
 from src import client, community, user, whale
+from src.utils import tool
 
 # 常量定义
 MAX_MENU_KEY_LENGTH = 2
 T = TypeVar("T")
-ADMIN_USER_ID = "12770114"
+AUI = "jkslnlkqrljojqlkrlkqqljpjqrkqs"  # cSpell:ignore jkslnlkqrljojqlkrlkqqljpjqrkqs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -335,7 +336,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
 	# 更安全的隐藏功能访问控制
-	if account_data_manager.get_account_id() != ADMIN_USER_ID:
+	if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
 		return
 
 	print_header("隐藏功能")
