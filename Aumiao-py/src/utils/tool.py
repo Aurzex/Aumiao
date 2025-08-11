@@ -7,7 +7,7 @@ from collections.abc import Generator as ABCGenerator
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from html import unescape
-from typing import Any, Literal, TypeGuard, TypeVar, overload
+from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
 
 T = TypeVar("T")
 FILE_SIZE: int = 1024
@@ -864,3 +864,98 @@ class EduDataGenerator:
 		sequence = f"{random.randint(1, 999999):06d}"
 		# 组合所有部分
 		return f"{year}{province}{agency}{teacher_type}{gender_code}{sequence}"
+
+
+class Encrypt:
+	def __init__(self) -> None:
+		self.MAPPING = "jklmnopqrst"  # cSpell:ignore jklmnopqrst
+		self.REVERSE_MAPPING = {char: str(i) for i, char in enumerate(self.MAPPING)}
+		self.KEY = 0x7F
+
+	def encrypt(self, data: int | str | list[int | str]) -> LiteralString:
+		if isinstance(data, int):
+			str_data = f"i{data}"
+		elif isinstance(data, str):
+			str_data = f"s{data}"
+		elif isinstance(data, list):
+			list_str = ",".join(f"i{item}" if isinstance(item, int) else f"s{item}" for item in data)
+			str_data = f"l{list_str}"
+		else:
+			msg = f"不支持的类型: {type(data)}"
+			raise TypeError(msg)
+
+		return self._encrypt_string(str_data)
+
+	def decrypt(self, cipher: str) -> int | LiteralString | list[int | Any]:
+		decrypted_str = self._decrypt_string(cipher)
+		marker = decrypted_str[0]
+		data_str = decrypted_str[1:]
+		if marker == "i":
+			return int(data_str)
+		if marker == "s":
+			return data_str
+		if marker == "l":
+			items = []
+			current = ""
+			in_escape = False
+			for char in data_str:
+				if char == "\\" and not in_escape:
+					in_escape = True
+				elif char == "," and not in_escape:
+					items.append(current)
+					current = ""
+				else:
+					current += char
+					in_escape = False
+			if current:
+				items.append(current)
+
+			# 递归解密元素
+			return [int(item[1:]) if item[0] == "i" else item[1:] for item in items]
+		msg = f"未知的类型标记: {marker}"
+		raise ValueError(msg)
+
+	def _encrypt_string(self, s: str) -> LiteralString:
+		result = []
+		for i, char in enumerate(s):
+			idx = i % 4
+			char_val = ord(char)
+			if idx == 0:
+				val = char_val ^ self.KEY
+			elif idx == 1:
+				val = (char_val + self.KEY) % 256
+			elif idx == 2:  # noqa: PLR2004
+				val = (char_val - self.KEY) % 256
+			else:
+				val = ~char_val & 0xFF
+			result.extend(self.MAPPING[int(d) % 10] for d in str(val))
+
+		return "".join(result)
+
+	def _decrypt_string(self, cipher: str) -> LiteralString:
+		digits = "".join(self.REVERSE_MAPPING[char] for char in cipher)
+		parts = []
+		i = 0
+		while i < len(digits):
+			for length in range(3, 0, -1):
+				if i + length <= len(digits):
+					num_str = digits[i : i + length]
+					if num_str.isdigit() and 0 <= int(num_str) <= 255:  # noqa: PLR2004
+						parts.append(int(num_str))
+						i += length
+						break
+			else:
+				i += 1
+		result = []
+		for i, val in enumerate(parts):
+			idx = i % 4
+			if idx == 0:
+				result.append(chr(val ^ self.KEY))
+			elif idx == 1:
+				result.append(chr((val - self.KEY) % 256))
+			elif idx == 2:  # noqa: PLR2004
+				result.append(chr((val + self.KEY) % 256))
+			else:
+				result.append(chr(~val & 0xFF))
+
+		return "".join(result)
