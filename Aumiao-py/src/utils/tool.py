@@ -909,8 +909,6 @@ class Encrypt:
 					in_escape = False
 			if current:
 				items.append(current)
-
-			# 递归解密元素
 			return [int(item[1:]) if item[0] == "i" else item[1:] for item in items]
 		msg = f"未知的类型标记: {marker}"
 		raise ValueError(msg)
@@ -928,22 +926,23 @@ class Encrypt:
 				val = (char_val - self.KEY) % 256
 			else:
 				val = ~char_val & 0xFF
-			result.extend(self.MAPPING[int(d) % 10] for d in str(val))
-
+			val_str = f"{val:03d}"
+			result.extend(self.MAPPING[int(d) % 10] for d in val_str)
 		return "".join(result)
 
 	def _decrypt_string(self, cipher: str) -> LiteralString:
 		digits = "".join(self.REVERSE_MAPPING[char] for char in cipher)
 		parts = []
 		i = 0
-		while i < len(digits):
-			for length in range(3, 0, -1):
-				if i + length <= len(digits):
-					num_str = digits[i : i + length]
-					if num_str.isdigit() and 0 <= int(num_str) <= 255:  # noqa: PLR2004
-						parts.append(int(num_str))
-						i += length
-						break
+		while i + 3 <= len(digits):
+			num_str = digits[i : i + 3]
+			if num_str.isdigit():
+				val = int(num_str)
+				if 0 <= val <= 255:  # noqa: PLR2004
+					parts.append(val)
+					i += 3
+				else:
+					i += 1
 			else:
 				i += 1
 		result = []
@@ -957,5 +956,4 @@ class Encrypt:
 				result.append(chr((val + self.KEY) % 256))
 			else:
 				result.append(chr(~val & 0xFF))
-
 		return "".join(result)
