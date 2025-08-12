@@ -13,8 +13,8 @@ from requests.exceptions import ConnectionError as ReqConnectionError
 from requests.exceptions import HTTPError, RequestException, Timeout
 from requests.sessions import Session
 
-from . import data, file, tool
-from .decorator import singleton
+from src.utils import data, file, tool
+from src.utils.decorator import singleton
 
 DICT_ITEM = 2
 LOG_DIR: Path = data.CURRENT_DIR / "logs"
@@ -51,6 +51,7 @@ class PaginationConfig(TypedDict, total=False):
 
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD"]
 FetchMethod = Literal["GET", "POST"]
+EXTRA_HEADERS: dict[str, str] = {"access-token": "0"}
 
 
 @singleton
@@ -63,7 +64,7 @@ class CodeMaoClient:
 		self._default_session.trust_env = False
 		self._file = file.CodeMaoFile()
 		self._identity: str | None = None
-		self._session = self._default_session  # 当前活跃会话
+		self._session: Session = self._default_session  # 当前活跃会话
 		self.base_url = "https://api.codemao.cn"
 		self.headers: dict[str, str] = self._config.PROGRAM.HEADERS.copy()
 		self.token = Token()
@@ -77,7 +78,7 @@ class CodeMaoClient:
 		# 初始化所有会话为无Cookie状态
 		self._init_sessions()
 		# 当前状态
-		self._session = self._sessions["blank"]
+		self._session = cast("Session", self._sessions["blank"])
 		self._identity = "blank"
 		self.log_request: bool = data.SettingManager().data.PARAMETER.log
 
@@ -116,6 +117,7 @@ class CodeMaoClient:
 		# 优先级:传入headers > 会话headers > 全局headers
 		merged_headers = {
 			**self.headers,  # 全局默认头
+			**EXTRA_HEADERS,  # 额外请求头
 			**base_headers,  # 当前会话头.含账户token
 			**(headers or {}),  # 本次请求临时头.最高优先级
 		}
@@ -368,7 +370,7 @@ class CodeMaoClient:
 			self._sessions["edu"] = new_session
 			self._session = new_session
 		else:
-			self._session = self._sessions[identity]
+			self._session = cast("Session", self._sessions[identity])
 			self._clean_session()
 			self._session.headers["Authorization"] = f"Bearer {token}"
 			self._session.cookies.clear()  # 确保清除Cookie
