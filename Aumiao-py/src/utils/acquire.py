@@ -294,7 +294,7 @@ class CodeMaoClient:
 		yielded_count = 0
 
 		# 处理初始请求
-		initial_response = self.send_request(endpoint, fetch_method, base_params, payload)
+		initial_response: Response = self.send_request(endpoint, fetch_method, base_params, payload)
 		if not initial_response:
 			return
 
@@ -303,9 +303,9 @@ class CodeMaoClient:
 		total_items = int(cast("int", self.tool.DataProcessor().get_nested_value(initial_data, total_key)))
 
 		# 安全获取分页参数配置
-		amount_key = config_.get("amount_key", "limit")
-		page_size_key = config_.get("response_amount_key", "limit")
-		offset_param_key = config_.get("offset_key", "offset")
+		amount_key: Literal["limit", "page_size", "current_page"] = config_.get("amount_key", "limit")
+		page_size_key: Literal["limit", "page_size"] = config_.get("response_amount_key", "limit")
+		offset_param_key: Literal["offset", "page", "current_page"] = config_.get("offset_key", "offset")
 
 		# 计算每页数量
 		items_per_page = base_params.get(
@@ -383,8 +383,8 @@ class CodeMaoClient:
 		"""更彻底的会话清理方法"""
 		if not self._session:
 			return
-		headers_to_keep = set(self._config.PROGRAM.HEADERS.keys()) - {"Authorization", "Cookie"}
-		new_headers = {k: v for k, v in self._config.PROGRAM.HEADERS.items() if k in headers_to_keep}
+		headers_to_keep: set[str] = set(self._config.PROGRAM.HEADERS.keys()) - {"Authorization", "Cookie"}
+		new_headers: dict[str, str] = {k: v for k, v in self._config.PROGRAM.HEADERS.items() if k in headers_to_keep}
 		self._session.headers.clear()
 		self._session.headers.update(new_headers)
 		self._session.cookies = RequestsCookieJar()  # 替换为全新的空CookieJar
