@@ -1053,7 +1053,6 @@ class Motion(ClassUnion):
 		if input("是否自动举报违规评论? (Y/N) ").upper() != "Y":
 			print("操作已取消")
 			return
-
 		try:
 			self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
 			account_pool = self._switch_edu_account(limit=20)
