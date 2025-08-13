@@ -855,7 +855,8 @@ class Motion(ClassUnion):
 				print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
 			print(f"\n{'=' * 50}")
 			print(f"举报ID: {item['id']}")
-			print(f"举报内容: {item[cfg['content_field']]}")
+			print(f"举报类型 {record['report_type']}")
+			print(f"举报内容: {self.tool.DataConverter().html_to_text(item[cfg['content_field']])}")
 			print(f"所属板块: {item.get('board_name', item.get(cfg.get('source_name_field', ''), ''))}")
 			cfg_user_field = cfg["user_field"]
 			if report_type == "post":
@@ -937,7 +938,6 @@ class Motion(ClassUnion):
 			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
 			post_id = item[cfg["source_id_field"]]  # 获取实际的帖子ID数值
 			content = self.forum_obtain.fetch_posts_details(post_ids=int(post_id))["items"][0]["content"]
-			print(content)
 			print(self.tool.DataConverter().html_to_text(content))
 		elif report_type == "discussion":
 			print(f"所属帖子标题: {item['post_title']}")
