@@ -268,12 +268,13 @@ class DataConverter:
 		*,
 		replace_images: bool = True,  # 是否替换图片标签
 		img_format: str = "[图片链接: {src}]",  # 图片替换格式
-		merge_empty_lines: bool = False,  # 是否合并连续空行
+		merge_empty_lines: bool = True,  # 是否合并连续空行
 		unescape_entities: bool = True,  # 是否解码HTML实体
 		keep_line_breaks: bool = True,  # 是否保留段落换行
 	) -> str:
 		"""
 		将HTML转换为可配置的纯文本
+
 		:param html_content: 输入的HTML内容
 		:param replace_images: 是否将图片替换为指定格式 (默认True)
 		:param img_format: 图片替换格式,可用{src}占位符 (默认"[图片链接: {src}]")
@@ -282,42 +283,41 @@ class DataConverter:
 		:param keep_line_breaks: 是否保留原始段落换行 (默认True)
 		:return: 格式化后的纯文本
 		"""
-		# 提取可能存在的嵌套外层<p>
-		outer_match = re.match(r"<p\b[^>]*>(.*)</p>", html_content, re.DOTALL)
-		inner_content = outer_match.group(1).strip() if outer_match else html_content
-		# 修正段落提取逻辑
-		paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", inner_content, re.DOTALL)
-		# 新增:处理无段落情况
-		if not paragraphs:
-			paragraphs = [inner_content]
+		# 处理段落和div块
+		blocks = re.findall(r"<(?:div|p)\b[^>]*>(.*?)</(?:div|p)>", html_content, flags=re.DOTALL | re.IGNORECASE)
+		if not blocks:
+			blocks = [html_content]
 		processed = []
-		for content in paragraphs:
-			# 图片标签处理
+		for block in blocks:
+			# 图片处理
 			if replace_images:
 
 				def replace_img(match: re.Match) -> str:
 					src = next((g for g in match.groups()[1:] if g), "")
 					return img_format.format(src=unescape(src)) if src else img_format.format(src="")
 
-				content = re.sub(  # noqa: PLW2901
+				block = re.sub(  # noqa: PLW2901
 					r'<img\b[^>]*?src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))[^>]*>',
 					replace_img,
-					content,
+					block,
 					flags=re.IGNORECASE,
 				)
-			# 移除所有HTML标签
-			text = re.sub(r"<.*?>", "", content, flags=re.DOTALL)
-			# HTML实体解码
+			# 保留颜色标签内容(特殊处理)
+			block = re.sub(r"<span[^>]*>|</span>", "", block)  # noqa: PLW2901
+			# 转换HTML实体(保留&nbsp;)
 			if unescape_entities:
-				text = unescape(text)
-			# 清理空白并保留空行标记
-			text = text.strip()
-			processed.append(text if keep_line_breaks else text.replace("\n", " "))
-		# 构建最终结果
-		result = "\n".join(processed)
-		# 空行合并处理
+				block = unescape(block)  # noqa: PLW2901
+				block = block.replace("&nbsp;", " ")  # 单独处理空格实体  # noqa: PLW2901
+			# 移除其他HTML标签但保留内容
+			text = re.sub(r"<[^>]+>", "", block)
+			# 保留原始换行结构
+			if not keep_line_breaks:
+				text = text.replace("\n", " ")
+			processed.append(text)
+		# 构建结果并处理空行
+		result = "\n\n".join(processed)
 		if merge_empty_lines:
-			result = re.sub(r"\n{2,}", "\n", result)
+			result = re.sub(r"\n{3,}", "\n\n", result)
 		return result.strip()
 
 	@staticmethod
