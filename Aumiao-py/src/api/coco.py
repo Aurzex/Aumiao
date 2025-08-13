@@ -23,10 +23,8 @@ class CoconutDataClient:
 	# 获取自定义控件列表
 	def fetch_custom_widgets(self, limit: int | None = 100) -> Generator[dict]:
 		"""获取Coconut平台的自定义控件列表
-
 		Args:
 			limit: 限制返回的控件数量,None表示获取全部
-
 		Returns:
 			生成器,每次生成一个控件信息字典
 		"""

@@ -13,10 +13,8 @@ class CookieManager:
 	def apply_cookie(self, cookies: str) -> bool:
 		"""
 		将提供的Cookie应用到系统中
-
 		Args:
 			cookies: 需要应用的Cookie字符串
-
 		Returns:
 			如果Cookie应用成功返回True,否则返回False
 		"""

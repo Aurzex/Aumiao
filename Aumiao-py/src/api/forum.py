@@ -154,7 +154,6 @@ class ForumActionHandler:
 	) -> dict | bool:
 		# 构造请求数据
 		data = {"content": content}
-
 		response = self._client.send_request(
 			endpoint=f"/web/forums/posts/{post_id}/replies",
 			method="POST",
@@ -167,7 +166,6 @@ class ForumActionHandler:
 	def create_comment_reply(self, reply_id: int, parent_id: int, content: str, *, return_data: bool = False) -> dict | bool:
 		# 构造请求数据
 		data = {"content": content, "parent_id": parent_id}
-
 		response = self._client.send_request(endpoint=f"/web/forums/replies/{reply_id}/comments", method="POST", payload=data)
 		# 返回响应数据或状态码
 		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
@@ -182,7 +180,6 @@ class ForumActionHandler:
 		# 每个回帖都有唯一id
 		method = "PUT" if action == "like" else "DELETE"
 		params = {"source": item_type.upper()}
-
 		response = self._client.send_request(
 			endpoint=f"/web/forums/comments/{item_id}/liked",
 			method=method,
@@ -201,7 +198,6 @@ class ForumActionHandler:
 		*,
 		return_data: Literal[False],
 	) -> bool: ...
-
 	@overload
 	def report_item(
 		self,
@@ -212,7 +208,6 @@ class ForumActionHandler:
 		*,
 		return_data: Literal[True],
 	) -> dict: ...
-
 	# 举报某个回帖或评论
 	def report_item(
 		self,
@@ -230,7 +225,6 @@ class ForumActionHandler:
 			"discussion_id": item_id,
 			"source": item_type.upper(),
 		}
-
 		response = self._client.send_request(
 			endpoint="/web/reports/posts/discussions",
 			method="POST",
@@ -254,7 +248,6 @@ class ForumActionHandler:
 			"description": description,
 			"post_id": post_id,
 		}
-
 		response = self._client.send_request(
 			endpoint="/web/reports/posts",
 			method="POST",
@@ -266,7 +259,6 @@ class ForumActionHandler:
 	# 删除某个回帖或评论或帖子
 	def delete_item(self, item_id: int, item_type: Literal["reply", "comment", "post"]) -> bool:
 		endpoint_map = {"reply": f"/web/forums/replies/{item_id}", "comment": f"/web/forums/comments/{item_id}", "post": f"/web/forums/posts/{item_id}"}
-
 		response = self._client.send_request(
 			endpoint=endpoint_map[item_type],
 			method="DELETE",
@@ -297,7 +289,6 @@ class ForumActionHandler:
 	) -> dict | bool:
 		# board_id类型可从get_post_categories()获取
 		data = {"title": title, "content": content}
-
 		if target_type == "board":
 			if board_id is None:
 				msg = "board_id is required when target_type is 'board'"
@@ -311,7 +302,6 @@ class ForumActionHandler:
 		else:
 			msg = f"Invalid target_type: {target_type}"
 			raise ValueError(msg)
-
 		response = self._client.send_request(
 			endpoint=endpoint,
 			method="POST",

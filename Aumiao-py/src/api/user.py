@@ -19,7 +19,6 @@ class UserDataFetcher:
 	# 		method="GET",
 	# 		endpoint="/web/user/info",
 	# 	)
-
 	# 	return response.json()
 	def fetch_user_profile(self, user_id: str) -> dict:
 		"""

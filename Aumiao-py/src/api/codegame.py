@@ -31,13 +31,11 @@ class UserActionHandler:
 	def register_with_email(self, email: str, password: str, pid: str = "LHnQoPMr", language: Literal["en"] = "en") -> bool:
 		"""
 		通过邮箱注册账号
-
 		Args:
 			email: 用户邮箱
 			password: 账号密码
 			pid: 产品ID,默认"LHnQoPMr"
 			language: 语言,目前仅支持"en"
-
 		Returns:
 			注册成功返回True,否则返回False
 		"""
@@ -48,12 +46,10 @@ class UserActionHandler:
 	def authenticate_with_credentials(self, identity: str, password: str, pid: str = "LHnQoPMr") -> bool:
 		"""
 		使用账号密码登录
-
 		Args:
 			identity: 身份标识(邮箱或用户名)
 			password: 账号密码
 			pid: 产品ID,默认"LHnQoPMr"
-
 		Returns:
 			登录成功返回True,否则返回False
 		"""
