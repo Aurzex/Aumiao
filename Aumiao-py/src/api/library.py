@@ -87,7 +87,7 @@ class NovelDataFetcher:
 	# 获取小说章节信息
 	def fetch_chapter_details(self, chapter_id: int) -> dict:
 		response = self._client.send_request(
-			endpoint=f"/api/fanfic/section/{chapter_id}",
+			endpoint=f"/web/fanfic/section/{chapter_id}",
 			method="GET",
 		)
 		return response.json()
@@ -111,6 +111,47 @@ class NovelDataFetcher:
 			endpoint="/api/fanfic/list/search",
 			method="GET",
 			params=params,
+		)
+		return response.json()
+
+	# 获取小说的所有章节
+	def fetch_all_chapters(self, novel_id: int) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/{novel_id}/sections",
+			method="GET",
+		)
+		return response.json()
+
+	# 获取我的小说
+	def fetch_my_novels(self) -> dict:
+		response = self._client.send_request(
+			endpoint="/web/fanfic/my",
+			method="GET",
+		)
+		return response.json()
+
+	# 获取已删除的章节
+	def fetch_deleted_chapters(self) -> dict:
+		response = self._client.send_request(
+			endpoint="/web/fanfic/section/deleted",
+			method="GET",
+		)
+		return response.json()
+
+	# 创建小说
+	def create_novel(self, content: dict) -> dict:
+		response = self._client.send_request(
+			endpoint="/web/fanfic",
+			method="POST",
+			payload=content,
+		)
+		return response.json()
+
+	# 删除小说
+	def delete_novel(self, novel_id: int) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/{novel_id}",
+			method="DELETE",
 		)
 		return response.json()
 
@@ -161,6 +202,49 @@ class NovelActionHandler:
 		)
 		# 如果return_data为True,则返回response的json数据,否则返回返回response的状态码
 		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+
+	# 更新章节
+	def update_chapter(self, chapter_id: int, content: dict) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/section/{chapter_id}",
+			method="PUT",
+			payload=content,
+		)
+		return response.json()
+
+	# 发布章节
+	def publish_chapter(self, chapter_id: int) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/section/{chapter_id}/publish",
+			method="PUT",
+		)
+		return response.json()
+
+	# 更新小说
+	def update_novel(self, novel_id: int, content: dict) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/{novel_id}",
+			method="PUT",
+			payload=content,
+		)
+		return response.json()
+
+	# 创建小说
+	def create_novel(self, content: dict) -> dict:
+		response = self._client.send_request(
+			endpoint="/web/fanfic",
+			method="POST",
+			payload=content,
+		)
+		return response.json()
+
+	# 删除小说
+	def delete_novel(self, novel_id: int) -> dict:
+		response = self._client.send_request(
+			endpoint=f"/web/fanfic/{novel_id}",
+			method="DELETE",
+		)
+		return response.json()
 
 
 @singleton
