@@ -273,7 +273,7 @@ class CodeMaoClient:
 			数据条目
 		Raises:
 			ValueError: 无效分页配置或参数错误
-		"""
+		"""  # noqa: DOC402
 		# 合并分页配置参数
 		config_: PaginationConfig = {
 			"amount_key": "limit",
