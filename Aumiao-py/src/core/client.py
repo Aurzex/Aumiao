@@ -68,7 +68,8 @@ class Union:
 		self.file = file.CodeMaoFile()
 		self.forum_motion = forum.ForumActionHandler()
 		self.forum_obtain = forum.ForumDataFetcher()
-		self.library_obtain = library.NovelDataFetcher()
+		self.novel_obtain = library.NovelDataFetcher()
+		self.novel_motion = library.NovelActionHandler()
 		self.setting = data.SettingManager().data
 		self.shop_motion = shop.WorkshopActionHandler()
 		self.shop_obtain = shop.WorkshopDataFetcher()
@@ -612,6 +613,12 @@ class Motion(ClassUnion):
 			self.work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 			self.work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 
+	def like_my_novel(self) -> None:
+		novel_list = self.novel_obtain.fetch_my_novels()
+		for item in novel_list:
+			item["id"] = cast("int", item["id"])
+			self.novel_motion.execute_toggle_novel_favorite(item["id"])
+
 	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
 		formatted_answers = {
@@ -776,7 +783,7 @@ class Motion(ClassUnion):
 			_create_students(actual_limit)
 
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
-		details = self.library_obtain.fetch_novel_details(fiction_id)
+		details = self.novel_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
 		print(f"正在下载: {info['title']}-{info['nickname']}")
 		print(f"简介: {info['introduction']}")
@@ -789,7 +796,7 @@ class Motion(ClassUnion):
 			section_id = section["id"]
 			section_title = section["title"]
 			section_path = fiction_dir / f"{section_title}.txt"
-			content = self.library_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
+			content = self.novel_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
 			formatted_content = self.tool.DataConverter().html_to_text(content, merge_empty_lines=True)
 			self.file.file_write(path=section_path, content=formatted_content)
 
