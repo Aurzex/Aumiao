@@ -37,7 +37,7 @@ class Token:
 			if field_meta.get("track", False):
 				old_value = getattr(self, name)
 				if old_value != value:
-					print(f"属性 '{name}' 已修改: {old_value!r} → {value!r}")
+					print(f"属性 '{name}' 已修改: {old_value[:10]!r}... → {value[:10]!r}... ")
 		super().__setattr__(name, value)
 
 
