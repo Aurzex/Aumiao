@@ -183,7 +183,7 @@ class CommentProcessor:
 		self,
 		comments: list[dict[str, Any]],
 		item_id: int,
-		_title: str,  # 预留参数,保持策略接口一致性
+		title: str,  # 预留参数,保持策略接口一致性  # noqa: ARG002
 		params: dict[str, Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
@@ -1102,7 +1102,7 @@ class Motion(ClassUnion):
 		return user_comments
 
 
-class ReportHandler(Union):
+class ReportHandler(ClassUnion):
 	"""举报处理核心类,封装举报处理全流程"""
 
 	def __init__(self) -> None:
