@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from http.cookies import SimpleCookie
 from pathlib import Path
@@ -23,12 +23,22 @@ LOG_FILE_PATH: Path = LOG_DIR / f"{tool.TimeUtils().current_timestamp()}.txt"
 MAX_CHARACTER = 100
 
 
+@singleton
 @dataclass
 class Token:
-	average: str = ""
-	edu: str = ""
-	judgement: str = ""
-	blank: str = ""
+	average: str = field(default="", metadata={"track": True})
+	edu: str = field(default="", metadata={"track": True})
+	judgement: str = field(default="", metadata={"track": True})
+	blank: str = field(default="", metadata={"track": True})
+
+	def __setattr__(self, name: str, value: ...) -> None:
+		if hasattr(self, name) and hasattr(self.__class__, name):
+			field_meta = self.__dataclass_fields__[name].metadata
+			if field_meta.get("track", False):
+				old_value = getattr(self, name)
+				if old_value != value:
+					print(f"属性 '{name}' 已修改: {old_value!r} → {value!r}")
+		super().__setattr__(name, value)
 
 
 class HTTPSTATUS(Enum):
@@ -113,7 +123,6 @@ class CodeMaoClient:
 	) -> Response:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		base_headers = dict(self._session.headers)  # 包含账户token
-
 		# 优先级:传入headers > 会话headers > 全局headers
 		merged_headers = {
 			**self.headers,  # 全局默认头
@@ -130,7 +139,6 @@ class CodeMaoClient:
 		log = bool(self.log_request and log)
 		# 强制清除会话中的Cookie(关键修复2:防止会话自动添加)
 		self._session.cookies.clear()
-
 		for attempt in range(retries):
 			try:
 				if files is not None:
@@ -153,13 +161,10 @@ class CodeMaoClient:
 						json=payload,
 						timeout=timeout,
 					)
-
 				if log:
 					print("=" * 82)
 					print(f"Request {method} {url} {response.status_code}")
-
 				response.raise_for_status()
-
 			except HTTPError as err:
 				self._log_http_error(err.response, attempt, retries)
 				print(f"HTTP Error {type(err).__name__} - {err}")
@@ -182,7 +187,6 @@ class CodeMaoClient:
 				if log:
 					self._log_request(response)
 				return response
-
 		return cast("Response", None)
 
 	def _log_http_error(self, response: Response, attempt: int, max_attempts: int) -> None:
@@ -197,20 +201,17 @@ class CodeMaoClient:
 				"headers": dict(response.request.headers),
 				"body": response.request.body[:1000] if response.request.body else None,
 			}
-
 			# 提取响应信息,安全处理可能不存在的键
 			response_info = {
 				"status_code": response.status_code,
 				"headers": dict(response.headers),
 				"text": response.text[:1000] if response.text else None,
 			}
-
 			# 尝试解析JSON响应,避免因解析失败导致日志记录中断
 			try:
 				response_info["json"] = response.json()
 			except Exception:
 				response_info["json"] = "Failed to parse JSON"
-
 			# 提取额外的上下文信息
 			context_info = {
 				"attempt": attempt + 1,
@@ -218,7 +219,6 @@ class CodeMaoClient:
 				"session_identity": self._identity,
 				"timestamp": tool.TimeUtils().format_timestamp(),
 			}
-
 			# 构建完整的日志条目
 			log_entry = (
 				f"{'=' * 80}\n"
@@ -238,13 +238,10 @@ class CodeMaoClient:
 				f"  JSON: {response_info['json']}\n"
 				f"{'=' * 80}\n\n"
 			)
-
 			# 写入日志文件
 			self._file.file_write(path=ERROR_LOG_PATH, content=log_entry, method="a")
-
 			# 同时在控制台输出简要信息
 			print(f"[ERROR] HTTP {response.status_code} - Logged to {ERROR_LOG_PATH}")
-
 		except Exception as e:
 			# 确保日志记录过程中不会引发新的异常
 			print(f"Failed to log HTTP error: {e}")
@@ -262,7 +259,6 @@ class CodeMaoClient:
 		config: PaginationConfig | None = None,
 	) -> Generator[dict]:
 		"""获取分页API数据
-
 		Args:
 			endpoint: API端点地址
 			params: 基础请求参数
@@ -273,10 +269,8 @@ class CodeMaoClient:
 			data_key: 数据列表键名
 			pagination_method: 分页方式 (offset/page)
 			config: 分页参数配置
-
 		Yields:
 			数据条目
-
 		Raises:
 			ValueError: 无效分页配置或参数错误
 		"""
@@ -288,25 +282,20 @@ class CodeMaoClient:
 			"response_offset_key": "offset",
 			**(config or {}),
 		}
-
 		# 参数副本避免污染原始参数
 		base_params = params.copy()
 		yielded_count = 0
-
 		# 处理初始请求
 		initial_response: Response = self.send_request(endpoint, fetch_method, base_params, payload)
 		if not initial_response:
 			return
-
 		initial_data = initial_response.json()
 		first_page = cast("list[dict]", self.tool.DataProcessor().get_nested_value(initial_data, data_key))
 		total_items = int(cast("int", self.tool.DataProcessor().get_nested_value(initial_data, total_key)))
-
 		# 安全获取分页参数配置
 		amount_key: Literal["limit", "page_size", "current_page"] = config_.get("amount_key", "limit")
 		page_size_key: Literal["limit", "page_size"] = config_.get("response_amount_key", "limit")
 		offset_param_key: Literal["offset", "page", "current_page"] = config_.get("offset_key", "offset")
-
 		# 计算每页数量
 		items_per_page = base_params.get(
 			amount_key,
@@ -315,21 +304,17 @@ class CodeMaoClient:
 		if items_per_page <= 0:
 			msg = f"无效的每页数量: {items_per_page}"
 			raise ValueError(msg)
-
 		# 处理首屏数据
 		for item in first_page:
 			yield item
 			yielded_count += 1
 			if limit and yielded_count >= limit:
 				return
-
 		# 计算总页数
 		total_pages = (total_items + items_per_page - 1) // items_per_page
-
 		# 分页请求循环
 		for current_page in range(1, total_pages):
 			page_params = base_params.copy()
-
 			# 设置分页参数
 			if pagination_method == "offset":
 				page_params[offset_param_key] = current_page * items_per_page
@@ -338,12 +323,10 @@ class CodeMaoClient:
 			else:
 				msg = f"不支持的分页方式: {pagination_method}"
 				raise ValueError(msg)
-
 			# 发送分页请求
 			page_response = self.send_request(endpoint, fetch_method, page_params, payload)
 			if not page_response:
 				continue
-
 			# 处理分页数据
 			page_data = cast("list[dict]", self.tool.DataProcessor().get_nested_value(page_response.json(), data_key))
 			for item in page_data:
@@ -374,7 +357,6 @@ class CodeMaoClient:
 			self._clean_session()
 			self._session.headers["Authorization"] = f"Bearer {token}"
 			self._session.cookies.clear()  # 确保清除Cookie
-
 		self._identity = identity
 		print(f"切换到 {identity} | 会话ID: {id(self._session)} | Token: {token[:10]}...")
 		self._update_token_storage(token, identity)
@@ -388,7 +370,6 @@ class CodeMaoClient:
 		self._session.headers.clear()
 		self._session.headers.update(new_headers)
 		self._session.cookies = RequestsCookieJar()  # 替换为全新的空CookieJar
-
 		# 清除连接池
 		if hasattr(self._session, "adapters"):
 			for adapter in self._session.adapters.values():
@@ -478,12 +459,10 @@ class FileUploader:
 	def upload(self, file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str = "aumiao") -> str:
 		"""
 		统一文件上传接口
-
 		参数:
 			file_path: 文件路径
 			method: 上传方式 (pgaot/codegame/codemao)
 			save_path: 存储路径前缀
-
 		返回:
 			文件完整URL
 		"""

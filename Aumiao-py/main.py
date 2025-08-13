@@ -14,14 +14,12 @@ from src.utils import tool
 MAX_MENU_KEY_LENGTH = 2
 T = TypeVar("T")
 AUI = "jkslnlkqrljojqlkrlkqqljpjqrkqs"  # cSpell:ignore jkslnlkqrljojqlkrlkqqljpjqrkqs
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(
 	filename="app.log",
 	level=logging.ERROR,
 	format="%(asctime)s - %(levelname)s - %(message)s",  # cSpell:ignore levelname
 )
-
 # 颜色常量
 COLOR_CODES = {
 	"COMMENT": "\033[38;5;245m",  # 辅助说明
@@ -33,7 +31,6 @@ COLOR_CODES = {
 	"STATUS": "\033[38;5;228m",  # 状态信息
 	"SUCCESS": "\033[38;5;114m",  # 成功提示
 }
-
 # 延迟加载分隔符
 SEPARATOR: str | None = None
 
@@ -97,7 +94,6 @@ def get_valid_input(
 			value_str = prompt_input(prompt)
 			# 进行类型转换
 			value = cast_type(value_str)
-
 			# 检查是否在有效选项中
 			if valid_options is not None:
 				if isinstance(valid_options, range):
@@ -107,7 +103,6 @@ def get_valid_input(
 				elif value not in valid_options:
 					print(color_text(f"无效输入.请重试。有效选项: {valid_options}", "ERROR"))
 					continue
-
 			# 执行自定义验证
 			if validator and not validator(value):
 				print(color_text("输入不符合要求", "ERROR"))
@@ -171,10 +166,8 @@ def login(account_data_manager: AccountDataManager) -> None:
 	print_header("用户登录")
 	identity = prompt_input("请输入用户名")
 	password = prompt_input("请输入密码")
-
 	community.AuthManager().authenticate_with_token(identity=identity, password=password)
 	data_ = user.UserDataFetcher().fetch_account_details()
-
 	account_data = {
 		"ACCOUNT_DATA": {
 			"identity": identity,
@@ -210,10 +203,8 @@ def clear_comments(account_data_manager: AccountDataManager) -> None:  # noqa: A
 	print_header("清除评论")
 	source = get_valid_input("请输入来源类型 (work/post)", {"work", "post"})
 	action_type = get_valid_input("请输入操作类型 (ads/duplicates/blacklist)", {"ads", "duplicates", "blacklist"})
-
 	source = cast("Literal['work', 'post']", source)
 	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
-
 	client.Motion().clear_comments(source=source, action_type=action_type)
 	print(color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
 
@@ -224,9 +215,7 @@ def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: 
 	"""清除红点提醒"""
 	print_header("清除红点提醒")
 	method = get_valid_input("请输入方法 (nemo/web)", {"nemo", "web"})
-
 	method = cast("Literal['nemo', 'web']", method)
-
 	client.Motion().clear_red_point(method=method)
 	print(color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
 
@@ -246,10 +235,8 @@ def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 	print_header("处理举报")
 	client.ReportHandler().execute_judgement_login()
 	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
-
 	print(color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-
 	client.ReportHandler().execute_handle_report(admin_id=admin_id)
 	print(color_text("已成功处理举报", "SUCCESS"))
 
@@ -307,19 +294,15 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 	print(color_text("- codemao: 上传到bcmcdn域名 (需要登录)", "COMMENT"))
 	print(color_text("- codegame: 上传到static域名(下载后需要自己补充文件类型)", "COMMENT"))
 	print(color_text("- pgaot: 上传到static域名", "COMMENT"))  # cSpell:ignore bcmcdn
-
 	method = get_valid_input("请输入方法 (pgaot/codemao/codegame)", {"pgaot", "codemao", "codegame"})
-
 	file_path_str = prompt_input("请输入文件或文件夹路径")
 	file_path = Path(file_path_str.strip())
-
 	if file_path.exists():
 		file_path = file_path.resolve()  # 解析为绝对路径
 		print(color_text(f"使用路径: {file_path}", "COMMENT"))
 	else:
 		print(color_text("文件或路径不存在", "ERROR"))
 		return
-
 	method = cast("Literal['pgaot', 'codemao','codegame']", method)
 	client.Motion().upload_file(method=method, file_path=file_path)
 	print(color_text("文件上传成功", "SUCCESS"))
@@ -331,9 +314,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 	"""用户登出"""
 	print_header("账户登出")
 	method = get_valid_input("请输入方法 (web)", {"web"})
-
 	method = cast("Literal['web']", method)
-
 	community.AuthManager().execute_logout(method)
 	account_data_manager.clear()
 	print(color_text("已成功登出账户", "SUCCESS"))
@@ -345,14 +326,11 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
 	if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
 		return
-
 	print_header("隐藏功能")
 	print(color_text("1. 自动点赞", "COMMENT"))
 	print(color_text("2. 学生管理", "COMMENT"))
 	print(color_text("3. 账号提权", "COMMENT"))
-
 	sub_choice = get_valid_input("操作选择", valid_options={"1", "2", "3"})
-
 	if sub_choice == "1":
 		user_id = get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
 		client.Motion().execute_chiaroscuro_chronicles(user_id=user_id)
@@ -396,10 +374,8 @@ def display_menu(menu_options: dict[str, MenuOption], account_data_manager: Acco
 def main() -> None:
 	"""主程序入口"""
 	enable_vt_mode()
-
 	client.Index().index()
 	account_data_manager = AccountDataManager()
-
 	menu_options = {
 		"1": MenuOption(name="用户登录", handler=partial(login, account_data_manager), require_auth=False),
 		"2": MenuOption(name="清除评论", handler=partial(clear_comments, account_data_manager), require_auth=True),
@@ -420,26 +396,20 @@ def main() -> None:
 			visible=False,  # 可以根据需要设置为False完全隐藏
 		),
 	}
-
 	while True:
 		display_menu(menu_options, account_data_manager)
-
 		choice = prompt_input("请输入操作编号 (1-12)")
-
 		if choice in menu_options:
 			option = menu_options[choice]
-
 			if option.require_auth and not account_data_manager.is_logged_in:
 				print(color_text("该操作需要登录!", "ERROR"))
 				if prompt_input("是否立即登录? (y/n)").lower() == "y":
 					login(account_data_manager)
 				else:
 					continue
-
 			option.handler()
 		else:
 			print(color_text("无效的输入, 请重新选择", "ERROR"))
-
 		input(f"\n{color_text('⏎ 按回车键继续...', 'PROMPT')}")
 
 
@@ -453,7 +423,6 @@ if __name__ == "__main__":
 		print(f"\n{color_text('程序发生错误', 'ERROR')}")
 	finally:
 		input(f"\n{color_text('⏎ 按回车键退出程序', 'PROMPT')}")
-
 # "POST_COMMENT",
 # "POST_COMMENT_DELETE_FEEDBACK",
 # "POST_DELETE_FEEDBACK",
