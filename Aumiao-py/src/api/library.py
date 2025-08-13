@@ -121,7 +121,7 @@ class NovelDataFetcher:
 		return response.json()
 
 	# 获取我的小说
-	def fetch_my_novels(self, limit: int = 200, page: int = 1) -> dict:
+	def fetch_my_novels(self, limit: int = 200, page: int = 1) -> list:
 		params = {"amount_items": limit, "page_number": page}
 		response = self._client.send_request(endpoint="/web/fanfic/my", method="GET", params=params)
 		return response.json()
@@ -140,7 +140,7 @@ class NovelActionHandler:
 		self._client = acquire.CodeMaoClient()
 
 	# 收藏/取消收藏小说
-	def execute_toggle_novel_favorite(self, novel_id: int, *, favorite: bool) -> dict:
+	def execute_toggle_novel_favorite(self, novel_id: int, *, favorite: bool = True) -> dict:
 		method = "POST" if favorite else "DELETE"
 		response = self._client.send_request(
 			endpoint=f"/web/fanfic/collect/{novel_id}",
@@ -161,7 +161,7 @@ class NovelActionHandler:
 		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
 
 	# 点赞/取消点赞小说评论
-	def execute_toggle_comment_like(self, comment_id: int, *, like: bool, return_data: bool = False) -> bool | dict:
+	def execute_toggle_comment_like(self, comment_id: int, *, like: bool = True, return_data: bool = False) -> bool | dict:
 		# 发送请求,点赞赞或取消点赞小说评论
 		method = "POST" if like else "DELETE"
 		response = self._client.send_request(
