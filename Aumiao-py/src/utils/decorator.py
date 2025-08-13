@@ -24,8 +24,8 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 	if retries < 1 or delay <= 0:
 		msg = "Are you high, mate?"
 		raise ValueError(msg)
-
 	# 定义装饰器函数
+
 	def decorator(func: Callable) -> Callable:
 		# 使用wraps装饰器,保留原函数的元信息
 		@wraps(func)
@@ -83,8 +83,8 @@ def generator(chunk_size: int = 1000) -> Callable:
 def lazy_property(func: Callable) -> ...:
 	# 定义一个属性名,用于存储函数的返回值
 	attr_name = "_lazy_" + func.__name__
-
 	# 定义一个装饰器,用于将函数转换为属性
+
 	@property
 	@wraps(func)
 	def wrapper(self) -> object:  # noqa: ANN001

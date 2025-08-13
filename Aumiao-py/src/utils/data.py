@@ -6,23 +6,20 @@ from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass,
 from pathlib import Path
 from typing import Any, Generic, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
 
-from . import decorator
+from src.utils import decorator
 
 # 改进的类型定义
 T = TypeVar("T")
 DataclassInstance = Any  # 类型别名
-
 # 路径处理改进
 CURRENT_DIR = Path.cwd()
 DATA_DIR = Path(os.getenv("APP_DATA_DIR", CURRENT_DIR / "data"))
-
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
 DATA_FILE_PATH = DATA_DIR / "data.json"
 HISTORY_FILE_PATH = DATA_DIR / "history.json"
 SETTING_FILE_PATH = DATA_DIR / "setting.json"
 # 确保数据目录存在
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 # 定义Literal类型别名
 ReadType = Literal["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"]
 
@@ -151,18 +148,14 @@ def dict_to_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:  # noqa: P
 	if not (is_dataclass(cls) and isinstance(cls, type)):
 		msg = f"{cls.__name__} must be a dataclass type"
 		raise ValueError(msg)
-
 	field_types = get_type_hints(cls)
 	kwargs = {}
-
 	for field_name, field_type in field_types.items():
 		if field_name not in data:
 			continue
-
 		value = data[field_name]
 		origin_type = get_origin(field_type)
 		type_args = get_args(field_type)
-
 		# 特殊处理Literal类型
 		if get_origin(field_type) is Literal:
 			try:
@@ -172,7 +165,6 @@ def dict_to_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:  # noqa: P
 				value = get_args(field_type)[0] if get_args(field_type) else None
 			kwargs[field_name] = value
 			continue
-
 		# 处理嵌套数据类 - 添加类型断言
 		if isinstance(field_type, type) and is_dataclass(field_type):
 			kwargs[field_name] = dict_to_dataclass(field_type, value)
@@ -210,7 +202,6 @@ def dict_to_dataclass[T](cls: type[T], data: Mapping[str, Any]) -> T:  # noqa: P
 				kwargs[field_name] = field_type(value)
 			except (TypeError, ValueError):
 				kwargs[field_name] = value
-
 	return cls(**kwargs)
 
 
@@ -221,10 +212,8 @@ def load_json_file[T](path: Path, data_class: type[T]) -> T:
 	try:
 		if not path.exists():
 			return data_class()
-
 		with path.open(encoding="utf-8") as f:
 			data = json.load(f)
-
 			# 预处理Literal类型字段
 			if hasattr(data_class, "__annotations__"):
 				for field_name, field_type in get_type_hints(data_class).items():
@@ -232,7 +221,6 @@ def load_json_file[T](path: Path, data_class: type[T]) -> T:
 						valid_values = get_args(field_type)
 						if data[field_name] not in valid_values:
 							data[field_name] = valid_values[0] if valid_values else None
-
 			return dict_to_dataclass(data_class, data)
 	except (json.JSONDecodeError, ValueError) as e:
 		print(f"Error loading {path.name}: {e!s}")
@@ -280,23 +268,19 @@ class BaseManager(Generic[T]):  # noqa: UP046 # 此处修改规范nuitka编译�
 			if not hasattr(self.data, key):
 				continue
 			current = getattr(self.data, key)
-
 			# 确保处理的是数据类实例而不是类型
 			if current is not None and is_dataclass(current) and not isinstance(current, type):
 				if not isinstance(value, dict):
 					msg = f"Expected dict for {key}, got {type(value).__name__}"
 					raise TypeError(msg)
-
 				# 创建有效字段的字典
 				valid_fields = {f.name for f in fields(current)}
 				filtered_value = {k: v for k, v in value.items() if k in valid_fields}
-
 				# 使用 replace 更新实例 - 添加类型断言
 				updated_value = replace(cast("DataclassInstance", current), **filtered_value)
 				setattr(self.data, key, updated_value)
 			else:
 				setattr(self.data, key, value)
-
 		self.save()
 
 	def reset(self, *fields_to_reset: str) -> None:

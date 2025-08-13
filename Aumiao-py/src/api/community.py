@@ -12,14 +12,11 @@ from src.utils.decorator import singleton
 class AuthManager:
 	"""
 	概述:用户登录
-
 	参数:
-
 	`identity (str)`: 用户身份标识。
 	`password (str)`: 用户密码。
 	`pid (str = "65edCTyg")`: 请求的 PID,用于标识请求来源。
 	返回值:
-
 	str | None: 函数返回一个字符串,表示登录请求的响应结果。如果请求失败,则返回 None。
 	"""
 
@@ -39,17 +36,14 @@ class AuthManager:
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
 		# cookies = utils.dict_from_cookiejar(response.cookies)
-
 		#   soup = BeautifulSoup(
 		#       send_request("https://shequ.codemao.cn", "GET").text,
 		#       "html.parser",
 		#   )
 		#   见https://api.docs.codemao.work/user/login?id=pid
 		#   pid = loads(soup.find_all("script")[0].string.split("=")[1])["pid"]
-
 		# 发送登录请求
 		self._client.switch_account(token="", identity="blank")  # 切换账号
-
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/login",
 			method="POST",
@@ -59,7 +53,6 @@ class AuthManager:
 				"pid": pid,
 			},
 		)
-
 		# 更新cookies
 		# if save_status:
 		# 	self._client.update_cookies(response.cookies)
@@ -145,7 +138,6 @@ class AuthManager:
 			"pid": pid,
 			"agreement_ids": agreement_ids,
 		}
-
 		# 发送POST请求,获取登录安全信息
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/login/security",
@@ -179,7 +171,6 @@ class AuthManager:
 			"deviceId": deviced,
 			"timestamp": timestamp,
 		}
-
 		response = self._client.send_request(
 			endpoint="https://open-service.codemao.cn/captcha/rule/v3",
 			method="POST",
@@ -469,13 +460,11 @@ class UserAction:
 			"pid": pid,
 			"agreement_ids": agreement_ids,
 		}
-
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/register/phone/with-agreement",
 			method="POST",
 			payload=data,
 		)
-
 		return response.json()
 
 	# 删除消息

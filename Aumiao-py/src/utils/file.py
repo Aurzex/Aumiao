@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from .decorator import singleton
+from src.utils.decorator import singleton
 
 
 @singleton
@@ -54,7 +54,6 @@ class CodeMaoFile:
 	) -> None:
 		# 确保父目录存在
 		path.parent.mkdir(parents=True, exist_ok=True)
-
 		# 根据内容类型自动决定模式和编码
 		mode = method
 		kwargs = {}
@@ -72,7 +71,6 @@ class CodeMaoFile:
 		else:
 			msg = "不支持的内容类型"
 			raise TypeError(msg)
-
 		# 打开文件并写入
 		with Path.open(path, mode, **kwargs) as f:
 			if isinstance(content, (str, bytes)):

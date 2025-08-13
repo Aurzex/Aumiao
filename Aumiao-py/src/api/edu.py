@@ -18,7 +18,6 @@ class UserAction:
 	def update_user_real_name(self, user_id: int, real_name: str) -> bool:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"TIME": timestamp, "userId": user_id, "realName": real_name}
-
 		response = self._client.send_request(
 			endpoint="https://eduzone.codemao.cn/edu/zone/account/updateName",
 			method="GET",
@@ -38,7 +37,6 @@ class UserAction:
 	def delete_class(self, class_id: int) -> bool:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"TIME": timestamp}
-
 		response = self._client.send_request(
 			endpoint=f"https://eduzone.codemao.cn/edu/zone/class/{class_id}",
 			method="DELETE",

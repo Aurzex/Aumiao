@@ -11,7 +11,6 @@ from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
 
 T = TypeVar("T")
 FILE_SIZE: int = 1024
-
 # 类型别名定义
 DataDict = dict[str, Any]
 type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
@@ -20,13 +19,10 @@ type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
 @staticmethod
 def is_dataclass_instance[T](obj: T) -> TypeGuard[T]:
 	"""检查对象是否是数据类实例(类型安全的检查方法)
-
 	Args:
 		obj (T): 要检查的对象
-
 	Returns:
 		TypeGuard[T]: 如果是数据类实例返回True
-
 	Example:
 		>>> @dataclass
 		... class User:
@@ -50,20 +46,16 @@ class DataProcessor:
 		strict_mode: bool = False,
 	) -> list[dict]:
 		"""根据嵌套字段值过滤数据集
-
 		Args:
 			data: 输入数据,可以是单个字典或字典的可迭代集合
 			id_path: 嵌套字段路径(使用点号分隔,如:"user.profile.id")
 			target_values: 需要匹配的目标值集合
 			strict_mode: 严格模式(路径类型不匹配时抛出异常)
-
 		Returns:
 			过滤后的字典列表
-
 		Raises:
 			ValueError: 路径格式错误或数据不符合预期结构
 			TypeError: 严格模式下的类型不匹配
-
 		Example:
 			>>> data = [{"user": {"profile": {"id": 1}}}, {"user": {"profile": {"id": 2}}}]
 			>>> DataProcessor.filter_by_nested_values(data, "user.profile.id", [1])
@@ -72,14 +64,11 @@ class DataProcessor:
 		if not isinstance(id_path, str) or not id_path:
 			msg = "id_path 必须是非空字符串"
 			raise ValueError(msg)
-
 		if not isinstance(target_values, Iterable):
 			msg = "target_values 必须是可迭代对象"
 			raise TypeError(msg)
-
 		items = cls._normalize_input(data)
 		path_keys = id_path.split(".")
-
 		results = []
 		for item in items:
 			try:
@@ -92,24 +81,19 @@ class DataProcessor:
 						current_value = None
 						break
 					current_value = current_value.get(key, None)
-
 				if current_value in target_values:
 					results.append(item)
-
 			except (TypeError, AttributeError) as e:
 				if strict_mode:
 					msg = f"处理条目时发生错误: {e!s}"
 					raise ValueError(msg) from e
-
 		return results
 
 	@staticmethod
 	def _is_item_container(data: dict) -> TypeGuard[dict[str, Iterable[dict]]]:
 		"""类型安全的项目容器检查
-
 		Args:
 			data: 需要检查的字典对象
-
 		Returns:
 			当data是包含items键且值为字典迭代器时返回True
 		"""
@@ -118,24 +102,19 @@ class DataProcessor:
 	@overload
 	@staticmethod
 	def _normalize_input(data: dict) -> list[dict]: ...
-
 	@overload
 	@staticmethod
 	def _normalize_input(data: Iterable[dict]) -> Iterable[dict]: ...
-
 	@staticmethod
 	def _normalize_input(data: dict | Iterable[dict]) -> Iterable[dict]:
 		"""标准化输入数据格式(类型安全版本)
-
 		Args:
 			data: 输入数据(支持三种格式):
 				1. 普通字典
 				2. 包含items键的字典(自动展开items内容)
 				3. 字典列表/生成器
-
 		Returns:
 			标准化的可迭代字典集合
-
 		Example:
 			>>> DataProcessor._normalize_input({"a": 1})
 			[{'a': 1}]
@@ -162,35 +141,31 @@ class DataProcessor:
 		exclude: list[str] | None = None,
 	) -> DataObject:
 		"""通用字段过滤方法
-
 		Args:
 			data: 输入数据(字典/列表/生成器)
 			include: 需要包含的字段列表(空列表表示包含所有字段)
 			exclude: 需要排除的字段列表(空列表表示不排除任何字段)
-
 		Returns:
 			过滤后的数据(保持原始数据结构)
-
 		Raises:
 			ValueError: 同时指定include和exclude
 			TypeError: 不支持的数据类型
-
 		Example:
 			>>> data = {"name": "Alice", "age": 30, "email": "alice@example.com"}
 			>>> DataProcessor.filter_data(data, include=["name", "age"])
 			{'name': 'Alice', 'age': 30}
-
 			# 空列表处理示例
 			>>> DataProcessor.filter_data(data, include=[])  # 返回空字典
 			{}
 			>>> DataProcessor.filter_data(data, exclude=[])  # 返回所有字段
 			{'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
-		"""
+		"""  # noqa: DOC502
 		if include is not None and exclude is not None:
 			msg = "不能同时指定包含和排除字段"
 			raise ValueError(msg)
 
 		# 优化后的过滤函数
+
 		def _filter(item: DataDict) -> DataDict:
 			if include is not None:
 				# 显式处理 include 列表(空列表表示无字段)
@@ -199,15 +174,12 @@ class DataProcessor:
 				# 显式处理 exclude 列表(空列表表示无排除)
 				return {k: v for k, v in item.items() if k not in exclude}
 			return item  # 无过滤条件时返回原始数据
-
 			# 根据数据类型进行分发处理
 
 		if isinstance(data, dict):
 			return _filter(data)
-
 		if isinstance(data, list):
 			return [_filter(item) for item in data]
-
 		if isinstance(data, ABCGenerator):
 			# 保持生成器特性(惰性求值)
 			return (_filter(item) for item in data)
@@ -220,14 +192,11 @@ class DataProcessor:
 	@classmethod
 	def get_nested_value(cls, data: Mapping, path: str) -> object:
 		"""安全获取嵌套字典值
-
 		Args:
 			data: 输入字典
 			path: 点号分隔的字段路径
-
 		Returns:
 			找到的值或None
-
 		Example:
 			>>> data = {"user": {"profile": {"id": 1}}}
 			>>> DataProcessor.get_nested_value(data, "user.profile.id")
@@ -246,13 +215,10 @@ class DataProcessor:
 	@classmethod
 	def deduplicate(cls, sequence: Iterable[object]) -> list[object]:
 		"""保持顺序去重
-
 		Args:
 			sequence: 输入序列
-
 		Returns:
 			去重后的列表(保持原始顺序)
-
 		Example:
 			>>> DataProcessor.deduplicate([3, 2, 1, 2, 3])
 			[3, 2, 1]
@@ -267,7 +233,6 @@ class DataConverter:
 	@staticmethod
 	def convert_cookie(cookie: dict[str, str]) -> str:
 		"""将字典格式cookie转换为字符串
-
 		Example:
 			>>> DataConverter.convert_cookie({"name": "value", "age": "20"})
 			'name=value; age=20'
@@ -277,20 +242,17 @@ class DataConverter:
 	@staticmethod
 	def to_serializable(data: object) -> dict[str, object]:
 		"""转换为可序列化字典
-
 		Args:
 			data: 输入数据(支持数据类/对象/字典)
-
 		Raises:
 			TypeError: 不支持的类型
-
 		Example:
 			>>> @dataclass
 			... class User:
 			...	 name: str
 			>>> DataConverter.to_serializable(User("Alice"))
 			{'name': 'Alice'}
-		"""
+		"""  # noqa: DOC502
 		if isinstance(data, dict):
 			return data.copy()
 		if is_dataclass_instance(data):
@@ -312,7 +274,6 @@ class DataConverter:
 	) -> str:
 		"""
 		将HTML转换为可配置的纯文本
-
 		:param html_content: 输入的HTML内容
 		:param replace_images: 是否将图片替换为指定格式 (默认True)
 		:param img_format: 图片替换格式,可用{src}占位符 (默认"[图片链接: {src}]")
@@ -376,7 +337,6 @@ class StringProcessor:
 	@staticmethod
 	def insert_zero_width(text: str) -> str:
 		"""插入零宽空格防爬
-
 		Example:
 			>>> StringProcessor.insert_zero_width("hello")
 			'h\u200be\u200bl\u200bl\u200bo'
@@ -386,14 +346,11 @@ class StringProcessor:
 	@staticmethod
 	def find_substrings(text: str, candidates: Iterable[str]) -> tuple[int | None, int | None]:
 		"""在候选中查找子字符串位置
-
 		Args:
 			text: 需要查找的文本
 			candidates: 候选字符串集合
-
 		Returns:
 			(主ID, 子ID) 或 (None, None)
-
 		Example:
 			>>> StringProcessor.find_substrings("23", ["12.34", "45.23"])
 			(45, 23)
@@ -413,23 +370,18 @@ class TimeUtils:
 	@staticmethod
 	def current_timestamp(length: Literal[10, 13] = 10) -> int:
 		"""获取指定精度的时间戳
-
 		Args:
 			length: 时间戳长度选项
 				10 - 秒级(默认)
 				13 - 毫秒级
-
 		Returns:
 			int: 对应精度的时间戳整数
-
 		Raises:
 			ValueError: 当传入无效长度参数时
-
 		Example:
 			>>> # 获取秒级时间戳
 			>>> TimeUtils.current_timestamp()
 			1717821234
-
 			>>> # 获取毫秒级时间戳
 			>>> TimeUtils.current_timestamp(13)
 			1717821234123
@@ -443,7 +395,6 @@ class TimeUtils:
 	@staticmethod
 	def format_timestamp(ts: float | None = None) -> str:
 		"""格式化时间戳为字符串
-
 		Example:
 			>>> TimeUtils.format_timestamp(1672531200)
 			'2023-01-01 00:00:00'
@@ -462,13 +413,11 @@ class DataAnalyzer:
 		timestamp_field: str | None = None,
 	) -> None:
 		"""对比数据集差异
-
 		Args:
 			before: 原始数据集(字典或对象)
 			after: 新数据集(字典或对象)
 			metrics: 需要对比的指标 {字段: 显示名称}
 			timestamp_field: 时间戳字段名
-
 		Example:
 			>>> analyzer = DataAnalyzer()
 			>>> before = {"users": 100}
@@ -478,11 +427,9 @@ class DataAnalyzer:
 		"""
 		before_dict = self._to_dict(before)
 		after_dict = self._to_dict(after)
-
 		if timestamp_field:
 			fmt = TimeUtils.format_timestamp
 			print(f"时间段: {fmt(before_dict[timestamp_field])} → {fmt(after_dict[timestamp_field])}")
-
 		for field, label in metrics.items():
 			before_val = before_dict.get(field, 0)
 			after_val = after_dict.get(field, 0)
@@ -503,13 +450,10 @@ class DataMerger:
 	@staticmethod
 	def merge(datasets: Iterable[dict]) -> dict:
 		"""智能合并多个字典(深度合并字典值)
-
 		Args:
 			datasets: 需要合并的字典集合
-
 		Returns:
 			合并后的字典
-
 		Example:
 			>>> DataMerger.merge([{"a": 1}, {"a": 2, "b": {"c": 3}}])
 			{'a': 2, 'b': {'c': 3}}
@@ -530,7 +474,6 @@ class MathUtils:
 	@staticmethod
 	def clamp(value: int, min_val: int, max_val: int) -> int:
 		"""数值范围约束
-
 		Example:
 			>>> MathUtils.clamp(15, 0, 10)
 			10
@@ -557,13 +500,11 @@ class EduDataGenerator:
 	) -> list[str]:
 		"""
 		生成随机班级名称
-
 		参数:
 			num_classes: 需要生成的班级数量
 			grade_range: 年级范围,默认小学1-6年级
 			use_letters: 是否使用字母后缀,默认False
 			add_specialty: 是否添加特色班级类型,默认False
-
 		返回:
 			包含班级名称的列表
 		"""
@@ -573,25 +514,20 @@ class EduDataGenerator:
 			return chinese_numbers[n - 1] if 1 <= n <= EduDataGenerator.CLASS_NUM_LIMIT else str(n)
 
 		specialties = ["实验", "重点", "国际", "理科", "文科", "艺术", "体育", "国防"]
-
 		class_names: list[str] = []
 		for _ in range(num_classes):
 			# 生成年级部分
 			grade = random.randint(grade_range[0], grade_range[1])
 			grade_str = f"{number_to_chinese(grade)}年级"
-
 			# 生成班级序号
 			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < EduDataGenerator.LETTER_PROBABILITY else str(random.randint(1, 20))
-
 			# 添加特色类型
 			specialty = ""
 			if add_specialty and random.random() < EduDataGenerator.SPECIALTY_PROBABILITY:
 				specialty = random.choice(specialties)
-
 			# 组合班级名称
 			class_name = f"{grade_str}{class_num}{specialty}班"
 			class_names.append(class_name)
-
 		return class_names
 
 	@staticmethod
@@ -601,11 +537,9 @@ class EduDataGenerator:
 	) -> list[str]:
 		"""
 		生成随机学生姓名
-
 		参数:
 			num_students: 需要生成的学生数量
 			gender: 性别限制,'male'或'female',默认None表示随机
-
 		返回:
 			包含学生姓名的列表
 		"""
@@ -706,7 +640,6 @@ class EduDataGenerator:
 			"覃",
 			"武",
 		]
-
 		# 现代常见名字库
 		male_names = [
 			"浩",
@@ -745,7 +678,6 @@ class EduDataGenerator:
 			"晟睿",
 			"明哲",
 		]
-
 		female_names = [
 			"欣",
 			"怡",
@@ -785,14 +717,11 @@ class EduDataGenerator:
 			"静怡",
 			"晨曦",
 		]
-
 		names: list[str] = []
 		for _ in range(num_students):
 			surname = random.choice(surnames)
-
 			# 确定性别
 			current_gender = gender or random.choice(["male", "female"])
-
 			# 使用三元运算符选择名字
 			first_name = (
 				random.choice(male_names)
@@ -801,16 +730,13 @@ class EduDataGenerator:
 					female_names,
 				)
 			)
-
 			# 添加后缀
 			if random.random() < EduDataGenerator.NAME_SUFFIX_PROBABILITY:
 				suffix = random.choice(["儿", "然", "轩", "瑶", "豪", "菲"])
 				if current_gender == "male" and suffix in {"儿", "瑶", "菲"}:
 					suffix = random.choice(["然", "轩", "豪"])  # 保持性别特征
 				first_name += suffix
-
 			names.append(f"{surname}{first_name}")
-
 		return names
 
 	@staticmethod
@@ -883,7 +809,6 @@ class Encrypt:
 		else:
 			msg = f"不支持的类型: {type(data)}"
 			raise TypeError(msg)
-
 		return self._encrypt_string(str_data)
 
 	def decrypt(self, cipher: str) -> int | LiteralString | list[int | Any]:

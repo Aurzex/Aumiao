@@ -50,7 +50,6 @@ class WorkManager:
 			"work_source_label": work_source_label,
 			"save_type": save_type,
 		}
-
 		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/kitten/r2/work",
 			method="POST",

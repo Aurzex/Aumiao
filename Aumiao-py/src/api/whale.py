@@ -226,11 +226,9 @@ class RequestExtractor:
 	) -> list[str]:
 		"""
 		从代码中提取指定请求方式的链接
-
 		参数:
 			code: 待解析的JS代码字符串
 			methods: 期望提取的请求方式(单个字符串或列表), 如"get"、["get", "post"]
-
 		返回:
 			提取到的请求链接列表,格式为 "方法: 链接"
 		"""
