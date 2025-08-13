@@ -24,7 +24,7 @@ setting_data = {
 		"cookie_check_url": "/nemo/v2/works/174408420/like",
 		"log": False,
 		"password_login_method": "token",
-		"report_work_max": 10,
+		"report_work_max": 8,
 		"spam_del_max": 3,
 	},
 	"PLUGIN": {"DASHSCOPE": {"model": "qwen2.5-3b-instruct", "more": {"extra_body": {"enable_search": True}, "stream": False}}, "prompt": "从现在开始,你是一个猫娘"},

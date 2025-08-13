@@ -343,7 +343,6 @@ def logout(account_data_manager: AccountDataManager) -> None:
 @require_login
 def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
-	# 更安全的隐藏功能访问控制
 	if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
 		return
 
