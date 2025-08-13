@@ -95,7 +95,6 @@ class Tool(ClassUnion):
 	def message_report(self, user_id: str) -> None:
 		response = self.user_obtain.fetch_user_honors(user_id=user_id)
 		timestamp = self.community_obtain.fetch_current_timestamp()["data"]
-
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -106,7 +105,6 @@ class Tool(ClassUnion):
 			"view": response["view_times"],
 			"timestamp": timestamp,
 		}
-
 		if self.cache_manager.data:
 			self.tool.DataAnalyzer().compare_datasets(
 				before=self.cache_manager.data,
@@ -149,7 +147,6 @@ class CommentProcessor:
 		item_id = int(item["id"])
 		comments = config.get_comments(self, item_id)
 		title = item.get(config.title_key, "")
-
 		# 获取处理函数并执行
 		strategy = self._get_strategy(action_type)
 		strategy(comments=comments, item_id=item_id, title=title, params=params, target_lists=target_lists)
@@ -170,7 +167,6 @@ class CommentProcessor:
 		return strategy
 
 	# ========================== 内置处理策略 ==========================
-
 	def _process_ads(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]) -> None:
 		"""处理广告评论"""
 		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists)
@@ -189,13 +185,11 @@ class CommentProcessor:
 	) -> None:
 		"""处理重复刷屏评论"""
 		content_map: defaultdict[tuple, list[str]] = defaultdict(list)
-
 		# 追踪所有评论和回复
 		for comment in comments:
 			self._track_comment(comment, item_id, content_map, is_reply=False)
 			for reply in comment.get("replies", []):
 				self._track_comment(reply, item_id, content_map, is_reply=True)
-
 		# 筛选出超过阈值的重复内容
 		for (user_id, content), identifiers in content_map.items():
 			if len(identifiers) >= params["spam_max"]:
@@ -203,7 +197,6 @@ class CommentProcessor:
 				target_lists["duplicates"].extend(identifiers)
 
 	# ========================== 辅助方法 ==========================
-
 	def _process_abnormal_comments(
 		self, comments: list[dict[str, Any]], item_id: int, title: str, action_type: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]
 	) -> None:
@@ -212,12 +205,10 @@ class CommentProcessor:
 			# 跳过置顶评论
 			if comment.get("is_top"):
 				continue
-
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
 				identifier = f"{item_id}.{comment['id']}:comment"
 				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
-
 			# 检查回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
@@ -229,7 +220,6 @@ class CommentProcessor:
 		"""检查内容是否符合处理条件"""
 		content = data.get("content", "").lower()
 		user_id = str(data.get("user_id", ""))
-
 		if action_type == "ads":
 			return any(ad in content for ad in params.get("ads", []))
 		if action_type == "blacklist":
@@ -241,18 +231,15 @@ class CommentProcessor:
 		"""记录日志并添加标识到目标列表"""
 		# 日志模板配置
 		log_templates = {"ads": "广告{type} [{title}]{parent} : {content}", "blacklist": "黑名单{type} [{title}]{parent} : {nickname}"}
-
 		# 区分评论/回复类型
 		log_type = "回复" if ":reply" in identifier else "评论"
 		parent_info = f" (父内容: {parent_content[:20]}...)" if parent_content else ""
-
 		# 生成日志信息
 		if action_type in log_templates:
 			log_message = log_templates[action_type].format(
 				type=log_type, title=title[:10], parent=parent_info, content=data.get("content", "")[:50], nickname=data.get("nickname", "未知用户")
 			)
 			print(log_message)
-
 		# 添加到目标列表
 		target_lists[action_type].append(identifier)
 
@@ -326,21 +313,17 @@ class Obtain(ClassUnion):
 		Returns:
 			结构化回复数据列表
 		"""
-
 		try:
 			message_data = self.community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
 			return []
-
 		if total_replies == 0 and limit == 0:
 			return []
-
 		remaining = total_replies if limit == 0 else min(limit, total_replies)
 		offset = 0
 		replies = []
-
 		while remaining > 0:
 			current_limit = self.math_utils.clamp(remaining, 5, 200)
 			try:
@@ -354,13 +337,11 @@ class Obtain(ClassUnion):
 				replies.extend(batch[:actual_count])
 				remaining -= actual_count
 				offset += current_limit
-
 				if actual_count < current_limit:
 					break
 			except Exception as e:
 				print(f"获取回复失败: {e}")
 				break
-
 		return replies
 
 	@overload
@@ -371,7 +352,6 @@ class Obtain(ClassUnion):
 		method: Literal["user_id", "comment_id"],
 		max_limit: int | None = 200,
 	) -> list[str]: ...
-
 	@overload
 	def get_comments_detail(
 		self,
@@ -380,7 +360,6 @@ class Obtain(ClassUnion):
 		method: Literal["comments"],
 		max_limit: int | None = 200,
 	) -> list[dict]: ...
-
 	@lru_cache  # noqa: B019
 	def get_comments_detail(
 		self,
@@ -404,7 +383,6 @@ class Obtain(ClassUnion):
 		if source not in self.source_map:
 			msg = f"无效来源: {source}"
 			raise ValueError(msg)
-
 		method_func, id_key, user_field = self.source_map[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
 		reply_cache = {}
@@ -461,11 +439,9 @@ class Obtain(ClassUnion):
 			"comment_id": process_comment_id,
 			"comments": process_detailed,
 		}
-
 		if method not in method_handlers:
 			msg = f"无效方法: {method}"
 			raise ValueError(msg)
-
 		return method_handlers[method]()
 
 	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
@@ -536,11 +512,9 @@ class Motion(ClassUnion):
 			"blacklist": self.data.USER_DATA.black_room,
 			"spam_max": self.setting.PARAMETER.spam_del_max,
 		}
-
 		target_lists = defaultdict(list)
 		for item in config.get_items(self):
 			CommentProcessor().process_item(item, config, action_type, params, target_lists)
-
 		return self._execute_deletion(
 			target_list=target_lists[action_type],
 			delete_handler=config.delete,
@@ -551,32 +525,26 @@ class Motion(ClassUnion):
 	@decorator.skip_on_error
 	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
 		"""执行删除操作
-
 		注意 :由于编程猫社区接口限制,需要先删除回复再删除主评论,
 		通过反转列表实现从后往前删除,避免出现删除父级评论后无法删除子回复的情况
 		"""
 		if not target_list:
 			print(f"未发现{label}")
 			return True
-
 		print(f"\n发现以下{label} (共{len(target_list)}条):")
 		for item in reversed(target_list):
 			print(f" - {item.split(':')[0]}")
-
 		if input(f"\n确认删除所有{label}? (Y/N)").lower() != "y":
 			print("操作已取消")
 			return True
-
 		for entry in reversed(target_list):
 			parts = entry.split(":")[0].split(".")
 			item_id, comment_id = map(int, parts)
 			is_reply = ":reply" in entry
-
 			if not delete_handler(item_id, comment_id, is_reply):
 				print(f"删除失败: {entry}")
 				return False
 			print(f"已删除: {entry}")
-
 		return True
 
 	def clear_red_point(self, method: Literal["nemo", "web"] = "web") -> bool:
@@ -600,11 +568,9 @@ class Motion(ClassUnion):
 				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
 			},
 		}
-
 		if method not in method_config:
 			msg = f"不支持的方法类型: {method}"
 			raise ValueError(msg)
-
 		config = method_config[method]
 		page_size = 200
 		params: dict[str, int | str] = {"limit": page_size, "offset": 0}
@@ -619,14 +585,11 @@ class Motion(ClassUnion):
 			for msg_type in config["message_types"]:
 				config["endpoint"] = cast("str", config["endpoint"])
 				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
-
 				request_params = params.copy()
 				if method == "web":
 					request_params["query_type"] = msg_type
-
 				response = self._client.send_request(endpoint=endpoint, method="GET", params=request_params)  # 统一客户端调用
 				responses[msg_type] = response.status_code
-
 			return all(code == HTTPSTATUS.OK.value for code in responses.values())
 
 		try:
@@ -634,12 +597,10 @@ class Motion(ClassUnion):
 				current_counts = self.community_obtain.fetch_message_count(method)
 				if is_all_cleared(current_counts):
 					return True
-
 				if not send_batch_requests():
 					return False
 				params["offset"] = cast("int", params["offset"])
 				params["offset"] += page_size
-
 		except Exception as e:
 			print(f"清除红点过程中发生异常: {e}")
 			return False
@@ -657,14 +618,12 @@ class Motion(ClassUnion):
 			k: v.format(**self.data.INFO) if isinstance(v, str) else [i.format(**self.data.INFO) for i in v] for answer in self.data.USER_DATA.answers for k, v in answer.items()
 		}
 		formatted_replies = [r.format(**self.data.INFO) for r in self.data.USER_DATA.replies]
-
 		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
 		new_replies = self.tool.DataProcessor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
 			id_path="type",
 			target_values=valid_types,
 		)
-
 		for reply in new_replies:
 			try:
 				content = loads(reply["content"])
@@ -683,7 +642,6 @@ class Motion(ClassUnion):
 					if isinstance(item, (int, str))
 				]
 				target_id = str(msg.get("reply_id", ""))
-
 				if reply_type.endswith("_COMMENT"):
 					comment_id = int(reply.get("reference_id", msg.get("comment_id", 0)))
 					parent_id = 0
@@ -708,7 +666,6 @@ class Motion(ClassUnion):
 				if not matched_keyword:
 					chosen = choice(formatted_replies)
 					print("未匹配关键词,随机选择回复")
-
 				print(f"最终选择回复: 【{chosen}】")
 				params = (
 					{
@@ -725,16 +682,13 @@ class Motion(ClassUnion):
 						"content": chosen,
 					}
 				)
-
 				(self.work_motion.create_comment_reply if source_type == "work" else self.forum_motion.create_comment_reply)(
 					**params  # pyright: ignore[reportArgumentType]
 				)  # 优化方法名:reply_to_comment→create_comment_reply
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
-
 			except Exception as e:
 				print(f"回复处理失败: {e}")
 				continue
-
 		return True
 
 	# 工作室常驻置顶
@@ -797,11 +751,9 @@ class Motion(ClassUnion):
 			"""创建学生账号内部逻辑"""
 			class_capacity = 95
 			class_count = (student_limit + class_capacity - 1) // class_capacity
-
 			generator = tool.EduDataGenerator()
 			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
 			student_names = generator.generate_student_names(num_students=student_limit)
-
 			for class_idx in range(class_count):
 				class_id = edu.UserAction().create_class(name=class_names[class_idx])["id"]
 				print(f"创建班级 {class_id}")
@@ -826,16 +778,13 @@ class Motion(ClassUnion):
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self.library_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
-
 		print(f"正在下载: {info['title']}-{info['nickname']}")
 		print(f"简介: {info['introduction']}")
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
 		print(f"更新时间: {self.tool.TimeUtils().format_timestamp(info['update_time'])}")
-
 		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
-
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
 			section_title = section["title"]
@@ -881,24 +830,20 @@ class Motion(ClassUnion):
 	) -> dict[str, str | None] | str | None:
 		"""
 		上传文件或文件夹
-
 		Args:
 			method: 上传方法 ("pgaot", "codemao" 或 "codegame")
 			file_path: 要上传的文件或文件夹路径
 			save_path: 保存路径 (默认为 "aumiao")
 			recursive: 是否递归上传子文件夹中的文件 (默认为 True)
-
 		Returns:
 			- 如果是单个文件: 返回上传后的URL或None
 			- 如果是文件夹: 返回字典 {文件路径: 上传URL或None}
 		"""
 		uploader = acquire.FileUploader()
-
 		if file_path.is_file():
 			return self._handle_file_upload(file_path=file_path, save_path=save_path, method=method, uploader=uploader)
 		if file_path.is_dir():
 			return self._handle_directory_upload(dir_path=file_path, save_path=save_path, method=method, uploader=uploader, recursive=recursive)
-
 		return None
 
 	def _handle_file_upload(self, file_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader) -> str | None:
@@ -908,15 +853,12 @@ class Motion(ClassUnion):
 			size_mb = file_size / 1024 / 1024
 			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
 			return None
-
 		# 使用重构后的统一上传接口
 		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
-
 		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
 		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
 		self.upload_history.data.history.append(history)
 		self.upload_history.save()
-
 		return url
 
 	def _handle_directory_upload(
@@ -925,7 +867,6 @@ class Motion(ClassUnion):
 		"""处理整个文件夹的上传流程"""
 		results = {}
 		pattern = "**/*" if recursive else "*"
-
 		for child_file in dir_path.rglob(pattern):
 			if child_file.is_file():
 				try:
@@ -936,26 +877,21 @@ class Motion(ClassUnion):
 						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
 						results[str(child_file)] = None
 						continue
-
 					# 计算保存路径
 					relative_path = child_file.relative_to(dir_path)
 					child_save_path = str(Path(save_path) / relative_path.parent)
-
 					# 使用重构后的统一上传接口
 					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
-
 					# 记录上传历史
 					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
 					history = data.UploadHistory(
 						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp()
 					)
 					self.upload_history.data.history.append(history)
-
 					results[str(child_file)] = url
 				except Exception as e:
 					results[str(child_file)] = None
 					print(f"上传 {child_file} 失败: {e}")
-
 		# 保存历史记录
 		self.upload_history.save()
 		return results
@@ -963,17 +899,14 @@ class Motion(ClassUnion):
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
 		"""
 		打印上传历史记录(支持分页、详细查看和链接验证)
-
 		Args:
 			limit: 每页显示记录数(默认10条)
 			reverse: 是否按时间倒序显示(最新的在前)
 		"""
 		history_list = self.upload_history.data.history
-
 		if not history_list:
 			print("暂无上传历史记录")
 			return
-
 		# 排序历史记录
 		sorted_history = sorted(
 			history_list,
@@ -983,16 +916,13 @@ class Motion(ClassUnion):
 		total_records = len(sorted_history)
 		max_page = (total_records + limit - 1) // limit
 		page = 1
-
 		while True:
 			# 获取当前页数据
 			start = (page - 1) * limit
 			end = min(start + limit, total_records)
 			page_data = sorted_history[start:end]
-
 			# 打印当前页
 			self._print_current_page(page, max_page, total_records, start, end, page_data)
-
 			# 处理用户操作
 			action = input("请输入操作: ").strip().lower()
 			if action == "q":
@@ -1037,9 +967,7 @@ class Motion(ClassUnion):
 				com_index = url.find(".com")
 				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
 				url_type = "[cdn]"
-
 			print(f"{i:<3} | {file_name:<25} | {formatted_time:<19} | {url_type}{simplified_url}")
-
 		print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
 		print("\n操作选项:")
 		print("n:下一页 p:上一页 d[ID]:查看详情(含链接验证) q:退出")
@@ -1071,13 +999,11 @@ class Motion(ClassUnion):
 		验证URL链接是否有效
 		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
 		"""
-
 		response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
 		if response.status_code == HTTPSTATUS.OK.value:
 			content_length = response.headers.get("Content-Length")
 			if content_length and int(content_length) > 0:
 				return True
-
 		response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
 		if response.status_code != HTTPSTATUS.OK.value:
 			return False
@@ -1110,7 +1036,6 @@ class ReportHandler(ClassUnion):
 		# 状态变量
 		self.student_accounts: list[tuple[str, str]] = []
 		self.processed_count = 0
-
 		# 批量处理配置
 		self.batch_config = {
 			"total_threshold": 15,
@@ -1157,35 +1082,29 @@ class ReportHandler(ClassUnion):
 		"""执行举报处理主流程"""
 		# 加载学生账号(用于自动举报)
 		self._load_student_accounts()
-
 		# 主处理循环
 		while True:
 			# 获取所有待处理举报
 			all_records = self._fetch_all_reports()
-
 			if not all_records:
 				print("\n当前没有待处理的举报")
 				break
-
 			print(f"\n===== 发现 {len(all_records)} 条待处理举报 =====")
 			batch_processed = self.process_report_batch(all_records, admin_id)
 			self.processed_count += batch_processed
 			print(f"\n本次处理完成: {batch_processed} 条举报")
-
 			if input("\n是否继续检查新举报? (Y/N) ").upper() != "Y":
 				break
-
 			print("\n重新获取新举报...")
-
 		print(f"\n{'=' * 50}")
 		print(f"本次会话共处理 {self.processed_count} 条举报")
 		print(f"{'=' * 50}")
-
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 		print("已恢复原始账号状态")
 
 	def _load_student_accounts(self) -> None:
 		"""加载学生账号用于自动举报"""
+		self._client.switch_account(token=self._client.token.average, identity="average")
 		if input("是否加载学生账号用于自动举报? (Y/N) ").upper() == "Y":
 			try:
 				self.student_accounts = list(Obtain().switch_edu_account(limit=50))
@@ -1195,6 +1114,7 @@ class ReportHandler(ClassUnion):
 				self.student_accounts = []
 		else:
 			print("未加载学生账号,自动举报功能不可用")
+		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 
 	def _fetch_all_reports(self) -> list[ReportRecord]:
 		"""获取所有类型的待处理举报"""
@@ -1204,7 +1124,6 @@ class ReportHandler(ClassUnion):
 			("post", self.whale_obtain.fetch_post_reports_gen(status="TOBEDONE", limit=2000)),
 			("discussion", self.whale_obtain.fetch_discussion_reports_gen(status="TOBEDONE", limit=2000)),
 		]
-
 		for report_type, report_gen in sources:
 			for item in report_gen:
 				cfg = self.get_type_config(report_type, item)
@@ -1265,26 +1184,21 @@ class ReportHandler(ClassUnion):
 		processed = 0
 		id_map = defaultdict(list)
 		content_map = defaultdict(list)
-
 		# 构建ID分组和内容分组
 		for record in records:
 			id_map[record["com_id"]].append(record)
 			content_key = self.get_content_key(record)
 			content_map[content_key].append(record)
-
 		# 合并批量处理组
 		batch_groups = [("ID", items[0]["com_id"], items) for items in id_map.values() if len(items) >= self.batch_config["duplicate_threshold"]]
-
 		for (content, report_type, _), items in content_map.items():
 			if len(items) >= self.batch_config["content_threshold"]:
 				batch_groups.append(("内容", f"{report_type}:{content[:20]}...", items))
-
 		# 批量处理逻辑
 		if batch_groups and len(records) >= self.batch_config["total_threshold"]:
 			print("\n发现以下批量处理项:")
 			for i, (g_type, g_key, items) in enumerate(batch_groups, 1):
 				print(f"{i}. [{g_type}] {g_key} ({len(items)}次举报)")
-
 			if input("\n是否查看详情?(Y/N) ").upper() == "Y":
 				for g_type, g_key, items in batch_groups:
 					print(f"\n=== {g_type}组: {g_key} ===")
@@ -1292,29 +1206,24 @@ class ReportHandler(ClassUnion):
 						print(f"举报ID: {item['item']['id']} | 时间: {self.tool.TimeUtils().format_timestamp(item['item']['created_at'])}")
 					if len(items) > self.batch_config["content_threshold"]:
 						print(f"...及其他{len(items) - 3}条举报")
-
 			if input("\n确认批量处理这些项目?(Y/N) ").upper() == "Y":
 				for g_type, g_key, items in batch_groups:
 					print(f"\n正在处理 [{g_type}] {g_key}...")
 					first_action = None
-
 					# 处理首个项目
 					if not items[0]["processed"]:
 						first_action = self.process_single_item(items[0], admin_id, batch_mode=True)
-
 					# 自动应用操作到同组项目
 					if first_action:
 						for item in items[1:]:
 							if not item["processed"]:
 								self.apply_action(item, first_action, admin_id)
 								print(f"已自动处理举报ID: {item['item']['id']}")
-
 		# 处理剩余未处理项目
 		for record in records:
 			if not record["processed"]:
 				self.process_single_item(record, admin_id)
 				processed += 1
-
 		return processed
 
 	def process_single_item(self, record: ReportRecord, admin_id: int, *, batch_mode: bool = False) -> str | None:
@@ -1322,7 +1231,6 @@ class ReportHandler(ClassUnion):
 		item = data.NestedDefaultDict(record["item"])
 		report_type = record["report_type"]
 		cfg = self.get_type_config(report_type, item.to_dict())
-
 		if batch_mode:
 			print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
 		print(f"\n{'=' * 50}")
@@ -1330,19 +1238,16 @@ class ReportHandler(ClassUnion):
 		print(f"举报类型 {report_type}")
 		print(f"举报内容: {self.tool.DataConverter().html_to_text(item[cfg['content_field']])}")
 		print(f"所属板块: {item.get('board_name', item.get(cfg.get('source_name_field', ''), ''))}")
-
 		# 显示被举报人信息
 		cfg_user_field = cfg["user_field"]
 		if report_type == "post":
 			print(f"被举报人: {item[f'{cfg_user_field}_nick_name']}")
 		else:
 			print(f"被举报人: {item[f'{cfg_user_field}_nickname']}")
-
 		print(f"举报原因: {item['reason_content']}")
 		print(f"举报时间: {self.tool.TimeUtils().format_timestamp(item['created_at'])}")
 		if report_type == "post":
 			print(f"举报线索: {item['description']}")
-
 		# 操作选择循环
 		while True:
 			choice = input("选择操作: D:删除, S:禁言7天, T:禁言3月 P:通过, C:查看, F:检查违规, J:跳过  ").upper()
@@ -1398,11 +1303,9 @@ class ReportHandler(ClassUnion):
 			print(f"所属帖子标题: {item['post_title']}")
 			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item['post_user_id']}")
 			print(f"所属帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
-
 		# 显示违规用户信息
 		cfg_user_field = cfg["user_field"]
 		print(f"违规用户ID: https://shequ.codemao.cn/user/{item[f'{cfg_user_field}_id']}")
-
 		# 显示发送时间
 		if report_type in {"comment", "discussion"}:
 			source = "shop" if report_type == "comment" else "post"
@@ -1438,18 +1341,15 @@ class ReportHandler(ClassUnion):
 				source_type=adjusted_type,
 				title=title,
 			)
-
 			if not violations:
 				print("没有违规评论")
 				return
-
 			# 处理举报请求
 			self._process_report_requests(
 				violations=violations,
 				source_id=source_id,
 				source_type=adjusted_type,
 			)
-
 		if source_type == "post":
 			search_result = list(self.forum_obtain.search_posts_gen(title=title, limit=None))
 			user_posts = self.tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
@@ -1469,13 +1369,11 @@ class ReportHandler(ClassUnion):
 			source=source_type,
 			method="comments",
 		)
-
 		params = {
 			"ads": self.data.USER_DATA.ads,
 			"blacklist": self.data.USER_DATA.black_room,
 			"spam_max": self.setting.PARAMETER.spam_del_max,
 		}
-
 		processor = CommentProcessor()
 
 		class CommentConfig:
@@ -1487,7 +1385,6 @@ class ReportHandler(ClassUnion):
 
 		# 使用简单配置
 		config = CommentConfig()
-
 		# 收集异常评论(广告和黑名单:
 		abnormal_targets = defaultdict(list)
 		# 处理广告
@@ -1500,11 +1397,9 @@ class ReportHandler(ClassUnion):
 		)
 		# 处理黑名单
 		processor.process_item(item={"id": source_id, "title": title}, config=config, action_type="blacklist", params=params, target_lists=abnormal_targets)
-
 		# 收集重复评论
 		duplicate_targets = defaultdict(list)
 		processor.process_item(item={"id": source_id, "title": title}, config=config, action_type="duplicates", params=params, target_lists=duplicate_targets)
-
 		return abnormal_targets["ads"] + abnormal_targets["blacklist"] + duplicate_targets["duplicates"]
 
 	def _process_report_requests(
@@ -1517,32 +1412,26 @@ class ReportHandler(ClassUnion):
 		if not self.student_accounts:
 			print("未加载学生账号,无法执行自动举报")
 			return
-
 		if input("是否自动举报违规评论? (Y/N) ").upper() != "Y":
 			print("操作已取消")
 			return
-
 		# 账号处理逻辑
 		available_accounts = self.student_accounts.copy()
 		current_account = None
 		report_counter = -1
 		reason_content = self.community_obtain.fetch_report_reasons()["items"][7]["content"]
 		source_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {"work": "work", "post": "forum", "shop": "shop"}
-
 		print(f"\n开始自动举报 ({len(violations)} 条违规内容)")
-
 		for i, violation in enumerate(violations, 1):
 			# 账号切换逻辑
 			if report_counter >= self.setting.PARAMETER.report_work_max or report_counter == -1:
 				if not available_accounts:
 					print("所有可用学生账号均已尝试")
 					break
-
 				# 随机选择账号
 				current_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
 				print(f"\n切换教育账号: {current_account[0]}")
 				sleep(2)
-
 				try:
 					self.community_login.authenticate_with_token(
 						identity=current_account[0],
@@ -1553,7 +1442,6 @@ class ReportHandler(ClassUnion):
 				except Exception as e:
 					print(f"账号登录失败: {e}")
 					continue
-
 			# 解析违规内容并执行举报
 			parts = violation.split(":")
 			_item_id, comment_id = parts[0].split(".")
@@ -1562,7 +1450,6 @@ class ReportHandler(ClassUnion):
 				text=comment_id,
 				candidates=violations,
 			)
-
 			try:
 				source_key = source_map[source_type]
 				if self.execute_report_work(
@@ -1581,7 +1468,6 @@ class ReportHandler(ClassUnion):
 					report_counter += 1
 			except Exception as e:
 				print(f"处理异常: {e}")
-
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 		print("\n自动举报完成,已恢复原始账号状态")
 
