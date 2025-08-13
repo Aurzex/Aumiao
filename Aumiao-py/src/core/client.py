@@ -959,9 +959,10 @@ class Motion(ClassUnion):
 						break
 			else:
 				for comment in comments:
-					if comment["id"] == item["comment_id"]:
+					if comment["id"] == item.get("comment_id"):
 						print(f"发送时间: {self.tool.TimeUtils().format_timestamp(comment['created_at'])}")
 						break
+					print("未找到 comment_id")
 		else:
 			details = self.forum_obtain.fetch_single_post_details(post_id=item[cfg["source_id_field"]])
 			print(f"发送时间: {self.tool.TimeUtils().format_timestamp(details['created_at'])}")  # 有的帖子可能有更新,但是大部分是created_at,为了迎合网页显示的发布时间
