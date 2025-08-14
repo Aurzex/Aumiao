@@ -129,6 +129,7 @@ class Tool(ClassUnion):
 		return None
 
 
+@decorator.singleton
 class CommentProcessor:
 	"""评论处理核心类,支持内置处理逻辑和自定义扩展"""
 
@@ -768,8 +769,7 @@ class Motion(ClassUnion):
 			teacher_card_number=generator.generate_teacher_certificate_number(),
 		)
 
-	@staticmethod
-	def execute_batch_handle_account(method: Literal["create", "delete"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
+	def execute_batch_handle_account(self, method: Literal["create", "delete"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
 		"""批量处理教育账号"""
 
 		def _create_students(student_limit: int) -> None:
@@ -790,15 +790,24 @@ class Motion(ClassUnion):
 
 		def _delete_students(delete_limit: int | None) -> None:
 			"""删除学生账号内部逻辑"""
-			students = edu.DataFetcher().fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
+			students = self.edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
 			for student in students:
-				edu.UserAction().delete_student_from_class(stu_id=student["id"])
+				self.edu_motion.delete_student_from_class(stu_id=student["id"])
 
 		if method == "delete":
 			_delete_students(limit)
 		elif method == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
+
+	def execute_chalky_brook(self, work_id: int) -> None:
+		hidden_border = 100
+		accounts = Obtain().switch_edu_account(limit=hidden_border)
+		for current_account in accounts:
+			print("切换教育账号")
+			sleep(5)
+			self.community_login.authenticate_with_password(identity=current_account[0], password=current_account[1], status="edu")
+			self.work_motion.execute_report_work(describe="", reason="", work_id=work_id)
 
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self.novel_obtain.fetch_novel_details(fiction_id)
