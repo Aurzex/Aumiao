@@ -816,7 +816,7 @@ class Motion(ClassUnion):
 			work_info = self._client.send_request(endpoint=work_info_url, method="GET").json()  # 统一客户端调用
 			bcm_url = work_info["work_urls"][0]
 			payload = {
-				"app_version": "5.6.2",
+				"app_version": "5.9.0",
 				"bcm_version": "0.16.2",
 				"equipment": "Aumiao",
 				"name": work_info["name"],
@@ -980,7 +980,7 @@ class Motion(ClassUnion):
 				cn_index = url.find(".cn")
 				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
 				url_type = "[static]"
-			elif host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):
+			elif host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):  # cSpell: ignore bcmcdn
 				com_index = url.find(".com")
 				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
 				url_type = "[cdn]"
