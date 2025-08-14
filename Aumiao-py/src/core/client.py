@@ -613,8 +613,7 @@ class Motion(ClassUnion):
 			self.work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 			self.work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 
-	def like_my_novel(self) -> None:
-		novel_list = self.novel_obtain.fetch_my_novels()
+	def like_my_novel(self, novel_list: list[dict]) -> None:
 		for item in novel_list:
 			item["id"] = cast("int", item["id"])
 			self.novel_motion.execute_toggle_novel_favorite(item["id"])
@@ -714,7 +713,7 @@ class Motion(ClassUnion):
 		status = self.user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
-	def execute_chiaroscuro_chronicles(self, user_id: int) -> None:  # 优化方法名:添加execute_前缀
+	def execute_chiaroscuro_chronicles(self, user_id: int, method: Literal["work", "novel"]) -> None:  # 优化方法名:添加execute_前缀
 		try:
 			self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
 			account_pool = Obtain().switch_edu_account(limit=None)
@@ -724,13 +723,22 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"账号切换失败: {e}")
 			return
-		works_list = list(self.user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
+		if method == "work":
+			target_list = list(self.user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
+		elif method == "novel":
+			target_list = self.novel_obtain.fetch_my_novels()
+		else:
+			msg = f"不支持的{method}"
+			raise TypeError(msg)
 		accounts = Obtain().switch_edu_account(limit=None)
 		for current_account in accounts:
 			print("切换教育账号")
 			sleep(5)
 			self.community_login.authenticate_with_password(identity=current_account[0], password=current_account[1], status="edu")
-			self.like_all_work(user_id=str(user_id), works_list=works_list)
+			if method == "work":
+				self.like_all_work(user_id=str(user_id), works_list=target_list)
+			else:
+				self.like_my_novel(novel_list=target_list)
 		self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
 
 	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
