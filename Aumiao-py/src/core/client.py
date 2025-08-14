@@ -201,7 +201,7 @@ class CommentProcessor:
 	def _process_abnormal_comments(
 		self, comments: list[dict[str, Any]], item_id: int, title: str, action_type: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]
 	) -> None:
-		"""处理异常评论(广告/黑名单:"""
+		"""处理异常评论 广告/黑名单:"""
 		for comment in comments:
 			# 跳过置顶评论
 			if comment.get("is_top"):
@@ -698,15 +698,23 @@ class Motion(ClassUnion):
 		return True
 
 	# 工作室常驻置顶
-	def execute_maintain_workshop_top(self) -> None:  # 优化方法名:添加execute_前缀
-		detail = self.shop_obtain.fetch_workshop_details_list()
-		description = self.shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
-		self.shop_motion.update_workshop_details(
-			description=description,
-			workshop_id=detail["id"],
-			name=detail["name"],
-			preview_url=detail["preview_url"],
-		)
+	def execute_maintain_top(self, method: Literal["shop", "novel"]) -> None:  # 优化方法名:添加execute_前缀
+		if method == "shop":
+			detail = self.shop_obtain.fetch_workshop_details_list()
+			description = self.shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
+			self.shop_motion.update_workshop_details(
+				description=description,
+				workshop_id=detail["id"],
+				name=detail["name"],
+				preview_url=detail["preview_url"],
+			)
+		elif method == "novel":
+			novel_list = self.novel_obtain.fetch_my_novels()
+			for item in novel_list:
+				novel_id = item["id"]
+				novel_detail = self.novel_obtain.fetch_novel_details(novel_id=novel_id)
+				single_chapter_id = novel_detail["data"]["sectionList"][0]["id"]
+				self.novel_motion.publish_chapter(single_chapter_id)
 
 	# 查看账户状态
 	def get_account_status(self) -> str:
