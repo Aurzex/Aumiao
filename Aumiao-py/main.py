@@ -333,7 +333,7 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	sub_choice = get_valid_input("操作选择", valid_options={"1", "2", "3"})
 	if sub_choice == "1":
 		user_id = get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
-		client.Motion().execute_chiaroscuro_chronicles(user_id=user_id)
+		client.Motion().execute_chiaroscuro_chronicles(user_id=user_id, method="work")
 		print(color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = get_valid_input("模式 (delete/create)", {"delete", "create"})

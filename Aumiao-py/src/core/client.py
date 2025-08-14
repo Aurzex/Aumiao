@@ -713,7 +713,7 @@ class Motion(ClassUnion):
 		status = self.user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
-	def execute_chiaroscuro_chronicles(self, user_id: int, method: Literal["work", "novel"]) -> None:  # 优化方法名:添加execute_前缀
+	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
 		try:
 			self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
 			account_pool = Obtain().switch_edu_account(limit=None)
@@ -723,7 +723,9 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"账号切换失败: {e}")
 			return
-		if method == "work":
+		if custom_list:
+			target_list = custom_list
+		elif method == "work":
 			target_list = list(self.user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
 		elif method == "novel":
 			target_list = self.novel_obtain.fetch_my_novels()
