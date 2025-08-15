@@ -5,7 +5,7 @@ from enum import Enum
 from functools import lru_cache
 from json import loads
 from pathlib import Path
-from random import choice, randint
+from random import choice, randint, shuffle
 from time import sleep
 from typing import Any, ClassVar, Literal, TypedDict, cast, overload
 from urllib.parse import urlparse
@@ -471,6 +471,32 @@ class Obtain(ClassUnion):
 			self._client.switch_account(token=self._client.token.average, identity="average")
 			yield student["username"], self.edu_motion.reset_student_password(student["id"])["password"]
 
+	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
+		"""
+		处理教育账号的切换、登录和执行操作
+
+		:param limit: 要处理的账号数量限制
+		:param action: 登录成功后执行的回调函数
+		"""
+		try:
+			self._client.switch_account(token=self._client.token.average, identity="average")
+			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
+			if not students:
+				print("没有可用的教育账号")
+				return
+			shuffle(students)
+			for student in students:
+				print("切换教育账号")
+				new_password = self.edu_motion.reset_student_password(student["id"])["password"]
+				self.community_login.authenticate_with_password(identity=student["username"], password=new_password, status="edu")
+				sleep(5)
+				if action:
+					action()
+		except Exception as e:
+			print(f"教育账号处理失败: {e}")
+		finally:
+			self._client.switch_account(token=self._client.token.average, identity="average")
+
 
 @decorator.singleton
 class Motion(ClassUnion):
@@ -723,15 +749,6 @@ class Motion(ClassUnion):
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
 	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
-		try:
-			self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
-			account_pool = Obtain().switch_edu_account(limit=None)
-			if not account_pool:
-				print("没有可用的教育账号")
-				return
-		except Exception as e:
-			print(f"账号切换失败: {e}")
-			return
 		if custom_list:
 			target_list = custom_list
 		elif method == "work":
@@ -741,16 +758,14 @@ class Motion(ClassUnion):
 		else:
 			msg = f"不支持的{method}"
 			raise TypeError(msg)
-		accounts = Obtain().switch_edu_account(limit=None)
-		for current_account in accounts:
-			print("切换教育账号")
-			sleep(5)
-			self.community_login.authenticate_with_password(identity=current_account[0], password=current_account[1], status="edu")
+
+		def action() -> None:
 			if method == "work":
 				self.like_all_work(user_id=str(user_id), works_list=target_list)
 			else:
 				self.like_my_novel(novel_list=target_list)
-		self._client.switch_account(token=self._client.token.average, identity="average")  # 统一客户端调用
+
+		Obtain().process_edu_accounts(limit=None, action=action())
 
 	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
 		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
@@ -802,12 +817,7 @@ class Motion(ClassUnion):
 
 	def execute_chalky_brook(self, work_id: int) -> None:
 		hidden_border = 100
-		accounts = Obtain().switch_edu_account(limit=hidden_border)
-		for current_account in accounts:
-			print("切换教育账号")
-			sleep(5)
-			self.community_login.authenticate_with_password(identity=current_account[0], password=current_account[1], status="edu")
-			self.work_motion.execute_report_work(describe="", reason="", work_id=work_id)
+		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self.work_motion.execute_report_work(describe="", reason="", work_id=work_id))
 
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self.novel_obtain.fetch_novel_details(fiction_id)
