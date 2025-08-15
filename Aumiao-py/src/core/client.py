@@ -1,11 +1,11 @@
 from collections import defaultdict
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from json import loads
 from pathlib import Path
-from random import choice, randint, shuffle
+from random import choice, randint
 from time import sleep
 from typing import Any, ClassVar, Literal, TypedDict, cast, overload
 from urllib.parse import urlparse
@@ -463,13 +463,52 @@ class Obtain(ClassUnion):
 			for item in source_data["items"]:
 				yield {target: item.get(source_field) for target, source_field in mapping.items()}
 
-	def switch_edu_account(self, limit: int | None) -> Generator[tuple[str, str]]:
-		students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
-		while students:
-			# 随机选择账号
-			student = students.pop(randint(0, len(students) - 1))
-			self._client.switch_account(token=self._client.token.average, identity="average")
-			yield student["username"], self.edu_motion.reset_student_password(student["id"])["password"]
+	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"] = "generator") -> Iterator[Any] | list[Any]:
+		"""
+		获取教育账号信息,可选择返回生成器或列表
+
+		:param limit: 要获取的账号数量限制s
+		:param return_method: 返回方式,"generator"返回生成器,"list"返回列表
+		:return: 账号生成器或列表,每个元素为(username, password)元组
+		"""
+		try:
+			# 获取学生列表
+			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
+
+			if not students:
+				print("没有可用的教育账号")
+				return iter([]) if return_method == "generator" else []
+
+			# 定义处理函数
+			def process_student(student: dict) -> tuple[Any, Any]:
+				self._client.switch_account(token=self._client.token.average, identity="average")
+				return (student["username"], self.edu_motion.reset_student_password(student["id"])["password"])
+
+			# 根据返回方式处理
+			if return_method == "generator":
+
+				def account_generator() -> Generator[tuple[Any, Any], Any]:
+					students_copy = students.copy()  # 避免修改原列表
+					while students_copy:
+						student = students_copy.pop(randint(0, len(students_copy) - 1))
+						yield process_student(student)
+
+				return account_generator()
+
+			if return_method == "list":
+				result = []
+				students_copy = students.copy()  # 避免修改原列表
+				while students_copy:
+					student = students_copy.pop(randint(0, len(students_copy) - 1))
+					result.append(process_student(student))
+				return result
+
+			msg = f"不支持的返回方式: {return_method}"
+			raise ValueError(msg)  # noqa: TRY301
+
+		except Exception as e:
+			print(f"获取教育账号失败: {e}")
+			return iter([]) if return_method == "generator" else []
 
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
 		"""
@@ -480,16 +519,11 @@ class Obtain(ClassUnion):
 		"""
 		try:
 			self._client.switch_account(token=self._client.token.average, identity="average")
-			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
-			if not students:
-				print("没有可用的教育账号")
-				return
-			shuffle(students)
-			for student in students:
+			accounts = self.switch_edu_account(limit=limit, return_method="list")
+			for identity, password in accounts:
 				print("切换教育账号")
-				new_password = self.edu_motion.reset_student_password(student["id"])["password"]
-				self.community_login.authenticate_with_password(identity=student["username"], password=new_password, status="edu")
-				sleep(5)
+				sleep(3)
+				self.community_login.authenticate_with_password(identity=identity, password=password, status="edu")
 				if action:
 					action()
 		except Exception as e:
@@ -816,8 +850,8 @@ class Motion(ClassUnion):
 			_create_students(actual_limit)
 
 	def execute_chalky_brook(self, work_id: int) -> None:
-		hidden_border = 100
-		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self.work_motion.execute_report_work(describe="", reason="", work_id=work_id))
+		hidden_border = 10
+		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self.work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
 
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self.novel_obtain.fetch_novel_details(fiction_id)
