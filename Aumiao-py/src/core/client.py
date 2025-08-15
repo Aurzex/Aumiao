@@ -853,6 +853,17 @@ class Motion(ClassUnion):
 		hidden_border = 10
 		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self.work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
 
+	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
+		if source == "post":
+			self.forum_motion.create_post_reply(post_id=target_id, content=content)
+		elif source == "shop":
+			self.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
+		elif source == "work":
+			self.work_motion.create_work_comment(work_id=target_id, comment=content)
+		else:
+			msg = f"不支持的源 {source}"
+			raise TypeError(msg)
+
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self.novel_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
