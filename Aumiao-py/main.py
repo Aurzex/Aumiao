@@ -1,7 +1,7 @@
+import platform
 import logging
 import sys
 from collections.abc import Callable
-from ctypes import windll
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -9,6 +9,10 @@ from typing import Literal, TypeVar, cast
 
 from src import client, community, user, whale
 from src.utils import tool
+
+# 基于系统，判断是否需要引入ctypes库
+if platform.system() == 'Windows':
+	from ctypes import windll
 
 # 常量定义
 MAX_MENU_KEY_LENGTH = 2
