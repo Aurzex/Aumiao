@@ -2,7 +2,6 @@ from collections import defaultdict
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
 from json import loads
 from pathlib import Path
 from random import choice, randint
@@ -362,7 +361,7 @@ class Obtain(ClassUnion):
 		method: Literal["comments"],
 		max_limit: int | None = 200,
 	) -> list[dict]: ...
-	@lru_cache  # noqa: B019
+	@decorator.lru_cache_with_reset(max_calls=3)
 	def get_comments_detail(
 		self,
 		com_id: int,
