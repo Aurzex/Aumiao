@@ -1,11 +1,12 @@
+import weakref
+from collections import defaultdict
 from collections.abc import Callable, Generator
-from functools import wraps
+from functools import lru_cache, wraps
 from locale import Error
 from time import sleep
-from typing import Any
 
 
-def singleton(cls):  # noqa: ANN001, ANN201
+def singleton(cls: ...) -> Callable:
 	instance = {}
 
 	def _singleton(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
@@ -29,7 +30,7 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 	def decorator(func: Callable) -> Callable:
 		# 使用wraps装饰器,保留原函数的元信息
 		@wraps(func)
-		def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+		def wrapper(*args: ..., **kwargs: ...) -> ...:
 			# 循环重试
 			for i in range(1, retries + 1):
 				try:
@@ -96,3 +97,50 @@ def lazy_property(func: Callable) -> ...:
 
 	# 返回装饰后的函数
 	return wrapper
+
+
+def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool = False) -> Callable:
+	# 使用弱引用字典避免内存泄漏
+	func_registry = weakref.WeakKeyDictionary()
+
+	def decorator(func: Callable) -> ...:
+		# 使用 lru_cache 缓存结果
+		cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
+
+		# 为每个函数创建独立的计数器
+		call_counts = defaultdict(int)
+		func_registry[func] = (cached_func, call_counts)
+
+		@wraps(func)
+		def wrapper(*args: ..., **kwargs: ...) -> Callable:
+			# 使用更健壮的键生成方式
+			key = (
+				args,
+				frozenset(kwargs.items()),  # 使用frozenset避免顺序依赖
+			)
+
+			# 获取当前计数
+			current_count = call_counts[key] + 1
+			call_counts[key] = current_count
+
+			# 检查是否需要重置
+			if current_count > max_calls:
+				# 只清除当前键的计数,而不是整个缓存
+				call_counts[key] = 1
+
+				# 清除特定键的缓存
+				if hasattr(cached_func, "__wrapped__"):
+					# 创建新的缓存函数实例,模拟清除特定缓存
+					new_cached_func = lru_cache(maxsize=maxsize, typed=typed)(cached_func.__wrapped__)
+					func_registry[func] = (new_cached_func, call_counts)
+					return new_cached_func(*args, **kwargs)
+
+			return cached_func(*args, **kwargs)
+
+		# 添加缓存访问方法
+		wrapper.cache_info = cached_func.cache_info  # pyright: ignore[reportAttributeAccessIssue]
+		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore[reportAttributeAccessIssue]
+
+		return wrapper
+
+	return decorator
