@@ -466,7 +466,7 @@ class Obtain(ClassUnion):
 		"""
 		获取教育账号信息,可选择返回生成器或列表
 
-		:param limit: 要获取的账号数量限制s
+		:param limit: 要获取的账号数量限制
 		:param return_method: 返回方式,"generator"返回生成器,"list"返回列表
 		:return: 账号生成器或列表,每个元素为(username, password)元组
 		"""
