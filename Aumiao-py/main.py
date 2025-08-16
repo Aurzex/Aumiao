@@ -1,5 +1,5 @@
-import platform
 import logging
+import platform
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -9,10 +9,6 @@ from typing import Literal, TypeVar, cast
 
 from src import client, community, user, whale
 from src.utils import tool
-
-# 基于系统，判断是否需要引入ctypes库
-if platform.system() == 'Windows':
-	from ctypes import windll
 
 # 常量定义
 MAX_MENU_KEY_LENGTH = 2
@@ -77,7 +73,10 @@ def print_header(text: str) -> None:
 
 def enable_vt_mode() -> None:
 	"""启用Windows虚拟终端模式"""
-	if sys.platform == "win32":
+	if platform.system() == "Windows":
+		# 基于系统, 判断是否需要引入ctypes库
+		from ctypes import windll  # noqa: PLC0415
+
 		try:
 			kernel32 = windll.kernel32
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
