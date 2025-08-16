@@ -1188,6 +1188,7 @@ class ReportHandler(ClassUnion):
 		print(f"\n{'=' * 50}")
 		print(f"本次会话共处理 {self.processed_count} 条举报")
 		print(f"{'=' * 50}")
+		self.whale_routine.terminate_session()
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 		print("已恢复原始账号状态")
 
