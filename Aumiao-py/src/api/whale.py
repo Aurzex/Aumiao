@@ -157,7 +157,7 @@ class RequestExtractor:
 		{"url": "/forum-topic", "num": 28, "hash": "c1ab3aeb578a23798ee3", "func": "话题管理"},
 		{"url": "/fiction", "num": 18, "hash": "440835071ce984bb0732", "func": "全部小说管理"},
 		{"url": "/fiction/:id", "num": 8, "hash": "8ddbfa0574924100268b", "func": "小说详情管理"},
-		{"url": "/fiction/:id/comment", "num": 62, "hash": "9c06626812252519ba39", "func": "小说评论管理"},
+		{"url": "/fiction/:id/comment", "num": 62, "hash": "9c06626812252519ba39", "func": "小说评论管理"},  # spellchecker:disable-line
 		{"url": "/fiction-recommend", "num": 43, "hash": "0b0361683adddcb85ae2", "func": "推荐小说管理"},
 		{"url": "/fiction-tab", "num": 63, "hash": "078eaf7b8b54ef652a4a", "func": "小说标签管理"},
 		{"url": "/work-published", "num": 4, "hash": "bf3bdf089e5927af2910", "func": "已发布作品管理"},
@@ -184,13 +184,13 @@ class RequestExtractor:
 		{"url": "/column-manage", "num": 15, "hash": "05f3afc2099af53f9204", "func": "活动栏目配置管理"},
 		{"url": "/column/:columnId/activity", "num": 16, "hash": "cbdf69cbcc663b18e0d8", "func": "栏目活动管理"},
 		{"url": "/work-studio", "num": 24, "hash": "ec087c323541f2a1a13d", "func": "活动工作台"},
-		{"url": "/add-studio", "num": 26, "hash": "395d789772a79ba1bb64", "func": "添加工作室"},
+		{"url": "/add-studio", "num": 26, "hash": "395d789772a79ba1bb64", "func": "添加工作室"},  # spellchecker:disable-line
 		{"url": "/studio-work-manager/:studio_id", "num": 41, "hash": "02e8aaeadc9a5f034a71", "func": "工作室作品管理"},
 		{"url": "/studio-work-list/:studio_id", "num": 42, "hash": "badde5c591a120f319c7", "func": "工作室作品列表"},
 		{"url": "/common-label", "num": 0, "hash": "849eeb4c4a71c441f0e4", "func": "通用标签管理"},
 		{"url": "/label-type/:type", "num": 0, "hash": "849eeb4c4a71c441f0e4", "func": "标签类型管理"},
 		{"url": "/label-list/:label_type_id", "num": 57, "hash": "a3cbbb135753607a0d80", "func": "标签列表管理"},
-		{"url": "/sensitive-word", "num": 49, "hash": "924bb824d6ee13caf6c2", "func": "敏感词管理"},
+		{"url": "/sensitive-word", "num": 49, "hash": "924bb824d6ee13caf6c2", "func": "敏感词管理"},  # spellchecker:disable-line
 		{"url": "/interview-record", "num": 58, "hash": "39c1c7e1701acad98431", "func": "访问日志管理"},
 		{"url": "/audit-record", "num": 67, "hash": "e6f83c795dc895563d75", "func": "审计日志管理"},
 		{"url": "/sample-all", "num": 5, "hash": "3b037867f0570dd19c83", "func": "全部样本管理"},
@@ -245,3 +245,6 @@ class RequestExtractor:
 				seen.add(url)
 				requests.append(f"{method}: {url}")
 		return requests
+
+
+sdio = {}
