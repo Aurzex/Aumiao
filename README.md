@@ -10,6 +10,8 @@
 [![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Node.js](https://img.shields.io/badge/Lua-01007c?logo=lua&logoColor=white)](https://nodejs.org/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
+
+[关注这个仓库谢谢喵](https://github.com/Wangs-official/CodemaoEDUTools)
 ## 📌 项目简介
 
 **Aumiao** 是一款专为编程猫社区设计的自动化工具套件，由 Aumiao 开发团队倾力打造。项目于 2023 年 5 月 2 日正式发布，旨在为用户提供更高效的编程猫社区交互体验。
