@@ -666,6 +666,11 @@ class UserManager:
 		)
 		return response.status_code == HTTPSTATUS.OK.value
 
+	def delete_user(self, reason: str, *, return_data: bool = False) -> dict | bool:
+		data = {"closeReason": reason}
+		response = self._client.send_request(endpoint="/tiger/v3/web/accounts/close", method="POST", payload=data)
+		return response.json() if return_data else response.status_code == HTTPSTATUS.OK
+
 
 # TODO@Aurzex: 待完善
 # /tiger/v3/web/accounts/captcha/password/update

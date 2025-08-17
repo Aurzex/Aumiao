@@ -58,29 +58,29 @@ class Union:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()  # 统一客户端属性命名
 		self.cache = data.CacheManager().data
-		self.community_login = community.AuthManager()
-		self.community_motion = community.UserAction()
-		self.community_obtain = community.DataFetcher()
-		self.data = data.DataManager().data
-		self.edu_motion = edu.UserAction()
-		self.edu_obtain = edu.DataFetcher()
-		self.file = file.CodeMaoFile()
-		self.forum_motion = forum.ForumActionHandler()
-		self.forum_obtain = forum.ForumDataFetcher()
-		self.novel_obtain = library.NovelDataFetcher()
-		self.novel_motion = library.NovelActionHandler()
-		self.setting = data.SettingManager().data
-		self.shop_motion = shop.WorkshopActionHandler()
-		self.shop_obtain = shop.WorkshopDataFetcher()
-		self.tool = tool
-		self.upload_history = data.HistoryManger()
-		self.user_motion = user.UserManager()
-		self.user_obtain = user.UserDataFetcher()
-		self.whale_motion = whale.ReportHandler()
-		self.whale_obtain = whale.ReportFetcher()
-		self.whale_routine = whale.AuthManager()
-		self.work_motion = work.WorkManager()
-		self.work_obtain = work.WorkDataFetcher()
+		self._community_login = community.AuthManager()
+		self._community_motion = community.UserAction()
+		self._community_obtain = community.DataFetcher()
+		self._data = data.DataManager().data
+		self._edu_motion = edu.UserAction()
+		self._edu_obtain = edu.DataFetcher()
+		self._file = file.CodeMaoFile()
+		self._forum_motion = forum.ForumActionHandler()
+		self._forum_obtain = forum.ForumDataFetcher()
+		self._novel_obtain = library.NovelDataFetcher()
+		self._novel_motion = library.NovelActionHandler()
+		self._setting = data.SettingManager().data
+		self._shop_motion = shop.WorkshopActionHandler()
+		self._shop_obtain = shop.WorkshopDataFetcher()
+		self._tool = tool
+		self._upload_history = data.HistoryManger()
+		self._user_motion = user.UserManager()
+		self._user_obtain = user.UserDataFetcher()
+		self._whale_motion = whale.ReportHandler()
+		self._whale_obtain = whale.ReportFetcher()
+		self._whale_routine = whale.AuthManager()
+		self._work_motion = work.WorkManager()
+		self._work_obtain = work.WorkDataFetcher()
 
 
 ClassUnion = Union().__class__
@@ -90,11 +90,11 @@ ClassUnion = Union().__class__
 class Tool(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
-		self.cache_manager = data.CacheManager()
+		self._cache_manager = data.CacheManager()
 
 	def message_report(self, user_id: str) -> None:
-		response = self.user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp = self.community_obtain.fetch_current_timestamp()["data"]
+		response = self._user_obtain.fetch_user_honors(user_id=user_id)
+		timestamp = self._community_obtain.fetch_current_timestamp()["data"]
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -105,9 +105,9 @@ class Tool(ClassUnion):
 			"view": response["view_times"],
 			"timestamp": timestamp,
 		}
-		if self.cache_manager.data:
-			self.tool.DataAnalyzer().compare_datasets(
-				before=self.cache_manager.data,
+		if self._cache_manager.data:
+			self._tool.DataAnalyzer().compare_datasets(
+				before=self._cache_manager.data,
 				after=user_data,
 				metrics={
 					"fans": "粉丝",
@@ -117,13 +117,13 @@ class Tool(ClassUnion):
 				},
 				timestamp_field="timestamp",
 			)
-		self.cache_manager.update(user_data)
+		self._cache_manager.update(user_data)
 
 	def guess_phone_num(self, phone_num: str) -> int | None:
 		for i in range(10000):
 			guess = f"{i:04d}"
 			test_string = int(phone_num.replace("****", guess))
-			if self.user_motion.validate_phone_number(test_string):  # 优化方法名:verify→validate
+			if self._user_motion.validate_phone_number(test_string):  # 优化方法名:verify→validate
 				return test_string
 		return None
 
@@ -265,8 +265,8 @@ class Index(ClassUnion):
 		print(f"\n{self.COLOR_TITLE}{'*' * 22} {title} {'*' * 22}{self.COLOR_RESET}")
 
 	def _print_slogan(self) -> None:
-		print(f"\n{self.COLOR_SLOGAN}{self.setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
-		print(f"{self.COLOR_VERSION}版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
+		print(f"\n{self.COLOR_SLOGAN}{self._setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
+		print(f"{self.COLOR_VERSION}版本号: {self._setting.PROGRAM.VERSION}{self.COLOR_RESET}")
 
 	def _print_lyric(self) -> None:
 		self._print_title("一言")
@@ -280,7 +280,7 @@ class Index(ClassUnion):
 
 	def _print_user_data(self) -> None:
 		self._print_title("数据")
-		Tool().message_report(user_id=self.data.ACCOUNT_DATA.id)
+		Tool().message_report(user_id=self._data.ACCOUNT_DATA.id)
 		print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
 
 	def index(self) -> None:
@@ -294,13 +294,13 @@ class Index(ClassUnion):
 class Obtain(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
-		self.source_map: dict[str, tuple[Callable[..., Any], str, str]] = {
-			"work": (self.work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),  # 生成器后缀优化
-			"post": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),  # 生成器后缀优化
-			"shop": (self.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),  # 生成器后缀优化
+		self._source_map: dict[str, tuple[Callable[..., Any], str, str]] = {
+			"work": (self._work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),  # 生成器后缀优化
+			"post": (self._forum_obtain.fetch_post_replies_gen, "post_id", "user"),  # 生成器后缀优化
+			"shop": (self._shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),  # 生成器后缀优化
 		}
-		self.math_utils = self.tool.MathUtils()
-		self.data_processor = self.tool.DataProcessor()
+		self._math_utils = self._tool.MathUtils()
+		self._data_processor = self._tool.DataProcessor()
 
 	def get_new_replies(
 		self,
@@ -315,7 +315,7 @@ class Obtain(ClassUnion):
 			结构化回复数据列表
 		"""
 		try:
-			message_data = self.community_obtain.fetch_message_count(method="web")
+			message_data = self._community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
@@ -326,9 +326,9 @@ class Obtain(ClassUnion):
 		offset = 0
 		replies = []
 		while remaining > 0:
-			current_limit = self.math_utils.clamp(remaining, 5, 200)
+			current_limit = self._math_utils.clamp(remaining, 5, 200)
 			try:
-				response = self.community_obtain.fetch_replies(
+				response = self._community_obtain.fetch_replies(
 					types=type_item,
 					limit=current_limit,
 					offset=offset,
@@ -381,10 +381,10 @@ class Obtain(ClassUnion):
 		Returns:
 			根据method参数返回对应格式的数据
 		"""
-		if source not in self.source_map:
+		if source not in self._source_map:
 			msg = f"无效来源: {source}"
 			raise ValueError(msg)
-		method_func, id_key, user_field = self.source_map[source]
+		method_func, id_key, user_field = self._source_map[source]
 		comments = method_func(**{id_key: com_id, "limit": max_limit})
 		reply_cache = {}
 
@@ -395,7 +395,7 @@ class Obtain(ClassUnion):
 			if source == "post":
 				# 缓存未命中时请求数据
 				if comment["id"] not in reply_cache:
-					reply_cache[comment["id"]] = list(self.forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))  # 生成器后缀优化
+					reply_cache[comment["id"]] = list(self._forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))  # 生成器后缀优化
 				yield from reply_cache[comment["id"]]
 			else:
 				yield from comment.get("replies", {}).get("items", [])
@@ -405,14 +405,14 @@ class Obtain(ClassUnion):
 			for comment in comments:
 				user_ids.append(comment["user"]["id"])
 				user_ids.extend(extract_reply_user(reply) for reply in generate_replies(comment))
-			return self.data_processor.deduplicate(user_ids)
+			return self._data_processor.deduplicate(user_ids)
 
 		def process_comment_id() -> list:
 			comment_ids = []
 			for comment in comments:
 				comment_ids.append(str(comment["id"]))
 				comment_ids.extend(f"{comment['id']}.{reply['id']}" for reply in generate_replies(comment))
-			return self.data_processor.deduplicate(comment_ids)
+			return self._data_processor.deduplicate(comment_ids)
 
 		def process_detailed() -> list[dict]:
 			return [
@@ -448,8 +448,8 @@ class Obtain(ClassUnion):
 	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
 		per_source_limit = limit // 2
 		data_sources = [
-			(self.work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
-			(self.work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
+			(self._work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
+			(self._work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
 		]
 		field_mapping = {
 			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
@@ -462,7 +462,11 @@ class Obtain(ClassUnion):
 			for item in source_data["items"]:
 				yield {target: item.get(source_field) for target, source_field in mapping.items()}
 
-	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"] = "generator") -> Iterator[Any] | list[Any]:
+	@overload
+	def switch_edu_account(self, limit: int | None, return_method: Literal["generator"]) -> Iterator[Any]: ...
+	@overload
+	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[Any]: ...
+	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
 		"""
 		获取教育账号信息,可选择返回生成器或列表
 
@@ -472,7 +476,7 @@ class Obtain(ClassUnion):
 		"""
 		try:
 			# 获取学生列表
-			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
+			students = list(self._edu_obtain.fetch_class_students_gen(limit=limit))
 
 			if not students:
 				print("没有可用的教育账号")
@@ -481,7 +485,7 @@ class Obtain(ClassUnion):
 			# 定义处理函数
 			def process_student(student: dict) -> tuple[Any, Any]:
 				self._client.switch_account(token=self._client.token.average, identity="average")
-				return (student["username"], self.edu_motion.reset_student_password(student["id"])["password"])
+				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
 
 			# 根据返回方式处理
 			if return_method == "generator":
@@ -522,7 +526,7 @@ class Obtain(ClassUnion):
 			for identity, password in accounts:
 				print("切换教育账号")
 				sleep(3)
-				self.community_login.authenticate_with_password(identity=identity, password=password, status="edu")
+				self._community_login.authenticate_with_password(identity=identity, password=password, status="edu")
 				if action:
 					action()
 		except Exception as e:
@@ -569,9 +573,9 @@ class Motion(ClassUnion):
 		"""
 		config = self.SOURCE_CONFIG[source]
 		params = {
-			"ads": self.data.USER_DATA.ads,
-			"blacklist": self.data.USER_DATA.black_room,
-			"spam_max": self.setting.PARAMETER.spam_del_max,
+			"ads": self._data.USER_DATA.ads,
+			"blacklist": self._data.USER_DATA.black_room,
+			"spam_max": self._setting.PARAMETER.spam_del_max,
 		}
 		target_lists = defaultdict(list)
 		for item in config.get_items(self):
@@ -620,7 +624,7 @@ class Motion(ClassUnion):
 		method_config = {
 			"web": {
 				"endpoint": "/web/message-record",
-				"message_types": self.setting.PARAMETER.all_read_type,
+				"message_types": self._setting.PARAMETER.all_read_type,
 				"check_keys": ["count"],
 			},
 			"nemo": {
@@ -655,7 +659,7 @@ class Motion(ClassUnion):
 
 		try:
 			while True:
-				current_counts = self.community_obtain.fetch_message_count(method)
+				current_counts = self._community_obtain.fetch_message_count(method)
 				if is_all_cleared(current_counts):
 					return True
 				if not send_batch_requests():
@@ -667,25 +671,25 @@ class Motion(ClassUnion):
 			return False
 
 	def like_all_work(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
-		self.work_motion.execute_toggle_follow(user_id=int(user_id))  # 优化方法名:manage→execute_toggle
+		self._work_motion.execute_toggle_follow(user_id=int(user_id))  # 优化方法名:manage→execute_toggle
 		for item in works_list:
 			item["id"] = cast("int", item["id"])
-			self.work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
-			self.work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
+			self._work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
+			self._work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 
 	def like_my_novel(self, novel_list: list[dict]) -> None:
 		for item in novel_list:
 			item["id"] = cast("int", item["id"])
-			self.novel_motion.execute_toggle_novel_favorite(item["id"])
+			self._novel_motion.execute_toggle_novel_favorite(item["id"])
 
 	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀  # noqa: PLR0914
 		"""自动回复作品/帖子评论"""
 		formatted_answers = {
-			k: v.format(**self.data.INFO) if isinstance(v, str) else [i.format(**self.data.INFO) for i in v] for answer in self.data.USER_DATA.answers for k, v in answer.items()
+			k: v.format(**self._data.INFO) if isinstance(v, str) else [i.format(**self._data.INFO) for i in v] for answer in self._data.USER_DATA.answers for k, v in answer.items()
 		}
-		formatted_replies = [r.format(**self.data.INFO) for r in self.data.USER_DATA.replies]
+		formatted_replies = [r.format(**self._data.INFO) for r in self._data.USER_DATA.replies]
 		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
-		new_replies = self.tool.DataProcessor().filter_by_nested_values(
+		new_replies = self._tool.DataProcessor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
 			id_path="type",
 			target_values=valid_types,
@@ -713,7 +717,7 @@ class Motion(ClassUnion):
 					parent_id = 0
 				else:
 					parent_id = int(reply.get("reference_id", msg.get("replied_id", 0)))
-					found = self.tool.StringProcessor().find_substrings(
+					found = self._tool.StringProcessor().find_substrings(
 						text=target_id,
 						candidates=comment_ids,
 					)[0]
@@ -748,7 +752,7 @@ class Motion(ClassUnion):
 						"content": chosen,
 					}
 				)
-				(self.work_motion.create_comment_reply if source_type == "work" else self.forum_motion.create_comment_reply)(
+				(self._work_motion.create_comment_reply if source_type == "work" else self._forum_motion.create_comment_reply)(
 					**params  # pyright: ignore[reportArgumentType]
 				)  # 优化方法名:reply_to_comment→create_comment_reply
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
@@ -760,34 +764,34 @@ class Motion(ClassUnion):
 	# 工作室常驻置顶
 	def execute_maintain_top(self, method: Literal["shop", "novel"]) -> None:  # 优化方法名:添加execute_前缀
 		if method == "shop":
-			detail = self.shop_obtain.fetch_workshop_details_list()
-			description = self.shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
-			self.shop_motion.update_workshop_details(
+			detail = self._shop_obtain.fetch_workshop_details_list()
+			description = self._shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
+			self._shop_motion.update_workshop_details(
 				description=description,
 				workshop_id=detail["id"],
 				name=detail["name"],
 				preview_url=detail["preview_url"],
 			)
 		elif method == "novel":
-			novel_list = self.novel_obtain.fetch_my_novels()
+			novel_list = self._novel_obtain.fetch_my_novels()
 			for item in novel_list:
 				novel_id = item["id"]
-				novel_detail = self.novel_obtain.fetch_novel_details(novel_id=novel_id)
+				novel_detail = self._novel_obtain.fetch_novel_details(novel_id=novel_id)
 				single_chapter_id = novel_detail["data"]["sectionList"][0]["id"]
-				self.novel_motion.publish_chapter(single_chapter_id)
+				self._novel_motion.publish_chapter(single_chapter_id)
 
 	# 查看账户状态
 	def get_account_status(self) -> str:
-		status = self.user_obtain.fetch_account_details()
+		status = self._user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
 	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
 		if custom_list:
 			target_list = custom_list
 		elif method == "work":
-			target_list = list(self.user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
+			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
 		elif method == "novel":
-			target_list = self.novel_obtain.fetch_my_novels()
+			target_list = self._novel_obtain.fetch_my_novels()
 		else:
 			msg = f"不支持的{method}"
 			raise TypeError(msg)
@@ -803,8 +807,8 @@ class Motion(ClassUnion):
 	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
 		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
 		generator = tool.EduDataGenerator()
-		self.edu_motion.execute_upgrade_to_teacher(
-			user_id=int(self.data.ACCOUNT_DATA.id),
+		self._edu_motion.execute_upgrade_to_teacher(
+			user_id=int(self._data.ACCOUNT_DATA.id),
 			real_name=real_name,
 			grade=["2", "3", "4"],
 			school_id=11000161,
@@ -838,9 +842,9 @@ class Motion(ClassUnion):
 
 		def _delete_students(delete_limit: int | None) -> None:
 			"""删除学生账号内部逻辑"""
-			students = self.edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
+			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
 			for student in students:
-				self.edu_motion.delete_student_from_class(stu_id=student["id"])
+				self._edu_motion.delete_student_from_class(stu_id=student["id"])
 
 		if method == "delete":
 			_delete_students(limit)
@@ -850,36 +854,36 @@ class Motion(ClassUnion):
 
 	def execute_chalky_brook(self, work_id: int) -> None:
 		hidden_border = 10
-		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self.work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
+		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self._work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
 
 	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
 		if source == "post":
-			self.forum_motion.create_post_reply(post_id=target_id, content=content)
+			self._forum_motion.create_post_reply(post_id=target_id, content=content)
 		elif source == "shop":
-			self.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
+			self._shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
 		elif source == "work":
-			self.work_motion.create_work_comment(work_id=target_id, comment=content)
+			self._work_motion.create_work_comment(work_id=target_id, comment=content)
 		else:
 			msg = f"不支持的源 {source}"
 			raise TypeError(msg)
 
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
-		details = self.novel_obtain.fetch_novel_details(fiction_id)
+		details = self._novel_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
 		print(f"正在下载: {info['title']}-{info['nickname']}")
 		print(f"简介: {info['introduction']}")
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
-		print(f"更新时间: {self.tool.TimeUtils().format_timestamp(info['update_time'])}")
+		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
 		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
 			section_title = section["title"]
 			section_path = fiction_dir / f"{section_title}.txt"
-			content = self.novel_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
-			formatted_content = self.tool.DataConverter().html_to_text(content, merge_empty_lines=True)
-			self.file.file_write(path=section_path, content=formatted_content)
+			content = self._novel_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
+			formatted_content = self._tool.DataConverter().html_to_text(content, merge_empty_lines=True)
+			self._file.file_write(path=section_path, content=formatted_content)
 
 	def generate_nemo_code(self, work_id: int) -> None:
 		try:
@@ -943,10 +947,10 @@ class Motion(ClassUnion):
 			return None
 		# 使用重构后的统一上传接口
 		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
-		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
-		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
-		self.upload_history.data.history.append(history)
-		self.upload_history.save()
+		file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
+		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp())
+		self._upload_history.data.history.append(history)
+		self._upload_history.save()
 		return url
 
 	def _handle_directory_upload(
@@ -971,17 +975,17 @@ class Motion(ClassUnion):
 					# 使用重构后的统一上传接口
 					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
-					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
 					history = data.UploadHistory(
-						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp()
+						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp()
 					)
-					self.upload_history.data.history.append(history)
+					self._upload_history.data.history.append(history)
 					results[str(child_file)] = url
 				except Exception as e:
 					results[str(child_file)] = None
 					print(f"上传 {child_file} 失败: {e}")
 		# 保存历史记录
-		self.upload_history.save()
+		self._upload_history.save()
 		return results
 
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
@@ -991,7 +995,7 @@ class Motion(ClassUnion):
 			limit: 每页显示记录数(默认10条)
 			reverse: 是否按时间倒序显示(最新的在前)
 		"""
-		history_list = self.upload_history.data.history
+		history_list = self._upload_history.data.history
 		if not history_list:
 			print("暂无上传历史记录")
 			return
@@ -1039,7 +1043,7 @@ class Motion(ClassUnion):
 		for i, record in enumerate(page_data, start + 1):
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
-				upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+				upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
 			formatted_time = str(upload_time)[:19]
 			file_name = record.file_name.replace("\\", "/")[:25]
 			url = record.save_url.replace("\\", "/")
@@ -1065,7 +1069,7 @@ class Motion(ClassUnion):
 		# 格式化上传时间
 		upload_time = record.upload_time
 		if isinstance(upload_time, (int, float)):
-			upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+			upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
 		print("\n文件上传详情:")
 		print("-" * 60)
 		print(f"文件名: {record.file_name}")
@@ -1103,7 +1107,7 @@ class Motion(ClassUnion):
 		for single_work in works:
 			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
 			comments.extend(work_comments)
-		filtered_comments = self.tool.DataProcessor().filter_data(data=comments, include=["user_id", "content"])
+		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content"])
 		filtered_comments = cast("list[dict]", filtered_comments)
 		user_comments = {}
 		for comment in filtered_comments:
@@ -1135,7 +1139,7 @@ class ReportHandler(ClassUnion):
 		choice = input("请选择登录方式: 1.Token登录 2.账密登录 ")
 		if choice == "1":
 			token = input("请输入 Authorization: ")
-			self.whale_routine.configure_authentication_token(token)
+			self._whale_routine.configure_authentication_token(token)
 		if choice == "2":
 
 			def input_password() -> tuple[str, str]:
@@ -1145,17 +1149,17 @@ class ReportHandler(ClassUnion):
 
 			def input_captcha(timestamp: int) -> tuple[str, whale.RequestsCookieJar]:
 				print("正在获取验证码...")
-				cookies: whale.RequestsCookieJar = self.whale_routine.fetch_verification_captcha(timestamp=timestamp)
+				cookies: whale.RequestsCookieJar = self._whale_routine.fetch_verification_captcha(timestamp=timestamp)
 				return input("请输入验证码: "), cookies
 
-			timestamp = self.tool.TimeUtils().current_timestamp(13)
+			timestamp = self._tool.TimeUtils().current_timestamp(13)
 			identity, password = input_password()
 			captcha, _cookies = input_captcha(timestamp=timestamp)
 			while True:
 				# self._client.update_cookies(cookies)  # 统一客户端调用
-				response = self.whale_routine.authenticate_user(username=identity, password=password, key=timestamp, code=captcha)
+				response = self._whale_routine.authenticate_user(username=identity, password=password, key=timestamp, code=captcha)
 				if "token" in response:
-					self.whale_routine.configure_authentication_token(response["token"])
+					self._whale_routine.configure_authentication_token(response["token"])
 					break
 				if "error_code" in response:
 					print(response["error_msg"])
@@ -1163,7 +1167,7 @@ class ReportHandler(ClassUnion):
 						identity, password = input_password()
 					elif response["error_code"] == "Captcha-Error@Community-Admin":
 						pass
-					timestamp = self.tool.TimeUtils().current_timestamp(13)
+					timestamp = self._tool.TimeUtils().current_timestamp(13)
 					captcha, _cookies = input_captcha(timestamp=timestamp)
 
 	def execute_handle_report(self, admin_id: int) -> None:
@@ -1187,7 +1191,7 @@ class ReportHandler(ClassUnion):
 		print(f"\n{'=' * 50}")
 		print(f"本次会话共处理 {self.processed_count} 条举报")
 		print(f"{'=' * 50}")
-		self.whale_routine.terminate_session()
+		self._whale_routine.terminate_session()
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 		print("已恢复原始账号状态")
 
@@ -1196,7 +1200,7 @@ class ReportHandler(ClassUnion):
 		self._client.switch_account(token=self._client.token.average, identity="average")
 		if input("是否加载学生账号用于自动举报? (Y/N) ").upper() == "Y":
 			try:
-				self.student_accounts = list(Obtain().switch_edu_account(limit=50))
+				self.student_accounts = list(Obtain().switch_edu_account(limit=50, return_method="list"))
 				print(f"已加载 {len(self.student_accounts)} 个学生账号")
 			except Exception as e:
 				print(f"加载学生账号失败: {e}")
@@ -1209,9 +1213,9 @@ class ReportHandler(ClassUnion):
 		"""获取所有类型的待处理举报"""
 		all_records: list[ReportRecord] = []
 		sources: list[tuple[Literal["comment", "post", "discussion"], Generator]] = [
-			("comment", self.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status="TOBEDONE", limit=2000)),
-			("post", self.whale_obtain.fetch_post_reports_gen(status="TOBEDONE", limit=2000)),
-			("discussion", self.whale_obtain.fetch_discussion_reports_gen(status="TOBEDONE", limit=2000)),
+			("comment", self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status="TOBEDONE", limit=2000)),
+			("post", self._whale_obtain.fetch_post_reports_gen(status="TOBEDONE", limit=2000)),
+			("discussion", self._whale_obtain.fetch_discussion_reports_gen(status="TOBEDONE", limit=2000)),
 		]
 		for report_type, report_gen in sources:
 			for item in report_gen:
@@ -1292,7 +1296,7 @@ class ReportHandler(ClassUnion):
 				for g_type, g_key, items in batch_groups:
 					print(f"\n=== {g_type}组: {g_key} ===")
 					for item in items[:3]:  # 展示前3条
-						print(f"举报ID: {item['item']['id']} | 时间: {self.tool.TimeUtils().format_timestamp(item['item']['created_at'])}")
+						print(f"举报ID: {item['item']['id']} | 时间: {self._tool.TimeUtils().format_timestamp(item['item']['created_at'])}")
 					if len(items) > self.batch_config["content_threshold"]:
 						print(f"...及其他{len(items) - 3}条举报")
 			if input("\n确认批量处理这些项目?(Y/N) ").upper() == "Y":
@@ -1325,7 +1329,7 @@ class ReportHandler(ClassUnion):
 		print(f"\n{'=' * 50}")
 		print(f"举报ID: {item['id']}")
 		print(f"举报类型 {report_type}")
-		print(f"举报内容: {self.tool.DataConverter().html_to_text(item[cfg['content_field']])}")
+		print(f"举报内容: {self._tool.DataConverter().html_to_text(item[cfg['content_field']])}")
 		print(f"所属板块: {item.get('board_name', item.get(cfg.get('source_name_field', ''), ''))}")
 		# 显示被举报人信息
 		cfg_user_field = cfg["user_field"]
@@ -1334,7 +1338,7 @@ class ReportHandler(ClassUnion):
 		else:
 			print(f"被举报人: {item[f'{cfg_user_field}_nickname']}")
 		print(f"举报原因: {item['reason_content']}")
-		print(f"举报时间: {self.tool.TimeUtils().format_timestamp(item['created_at'])}")
+		print(f"举报时间: {self._tool.TimeUtils().format_timestamp(item['created_at'])}")
 		if report_type == "post":
 			print(f"举报线索: {item['description']}")
 		# 操作选择循环
@@ -1342,7 +1346,7 @@ class ReportHandler(ClassUnion):
 			choice = input("选择操作: D:删除, S:禁言7天, T:禁言3月 P:通过, C:查看, F:检查违规, J:跳过  ").upper()
 			if choice in {"D", "S", "T", "P"}:
 				status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS", "T": "MUTE_THREE_MONTHS"}
-				handler = getattr(self.whale_motion, cfg["handle_method"])
+				handler = getattr(self._whale_motion, cfg["handle_method"])
 				handler(report_id=item["id"], resolution=status_map[choice], admin_id=admin_id)
 				record["processed"] = True
 				return choice
@@ -1369,7 +1373,7 @@ class ReportHandler(ClassUnion):
 	def apply_action(self, record: ReportRecord, action: str, admin_id: int) -> None:
 		"""应用处理操作到举报项目"""
 		cfg = self.get_type_config(record["report_type"], record["item"])
-		handler = getattr(self.whale_motion, cfg["handle_method"])
+		handler = getattr(self._whale_motion, cfg["handle_method"])
 		status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS", "T": "MUTE_THREE_MONTHS"}
 		handler(
 			report_id=record["item"]["id"],
@@ -1386,8 +1390,8 @@ class ReportHandler(ClassUnion):
 			print(f"违规帖子ID: https://shequ.codemao.cn/community/{item[cfg['source_id_field']]}")
 			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
 			post_id = item[cfg["source_id_field"]]
-			content = self.forum_obtain.fetch_posts_details(post_ids=int(post_id))["items"][0]["content"]
-			print(self.tool.DataConverter().html_to_text(content))
+			content = self._forum_obtain.fetch_posts_details(post_ids=int(post_id))["items"][0]["content"]
+			print(self._tool.DataConverter().html_to_text(content))
 		elif report_type == "discussion":
 			print(f"所属帖子标题: {item['post_title']}")
 			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item['post_user_id']}")
@@ -1404,21 +1408,21 @@ class ReportHandler(ClassUnion):
 					if comment["id"] == item["comment_parent_id"]:
 						for reply in comment["replies"]:
 							if reply["id"] == item["comment_id"]:
-								print(f"发送时间: {self.tool.TimeUtils().format_timestamp(reply['created_at'])}")
+								print(f"发送时间: {self._tool.TimeUtils().format_timestamp(reply['created_at'])}")
 								break
 						break
 			else:
 				found = False
 				for comment in comments:
 					if comment["id"] == item.get("comment_id"):
-						print(f"发送时间: {self.tool.TimeUtils().format_timestamp(comment['created_at'])}")
+						print(f"发送时间: {self._tool.TimeUtils().format_timestamp(comment['created_at'])}")
 						found = True
 						break
 				if not found:
 					print("未找到 comment_id")
 		else:
-			details = self.forum_obtain.fetch_single_post_details(post_id=item[cfg["source_id_field"]])
-			print(f"发送时间: {self.tool.TimeUtils().format_timestamp(details['created_at'])}")
+			details = self._forum_obtain.fetch_single_post_details(post_id=item[cfg["source_id_field"]])
+			print(f"发送时间: {self._tool.TimeUtils().format_timestamp(details['created_at'])}")
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
 		"""检查举报内容"""
@@ -1440,9 +1444,9 @@ class ReportHandler(ClassUnion):
 				source_type=adjusted_type,
 			)
 		if source_type == "post":
-			search_result = list(self.forum_obtain.search_posts_gen(title=title, limit=None))
-			user_posts = self.tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
-			if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
+			search_result = list(self._forum_obtain.search_posts_gen(title=title, limit=None))
+			user_posts = self._tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
+			if len(user_posts) >= self._setting.PARAMETER.spam_del_max:
 				print(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次")
 
 	def _analyze_comments_violations(
@@ -1459,9 +1463,9 @@ class ReportHandler(ClassUnion):
 			method="comments",
 		)
 		params = {
-			"ads": self.data.USER_DATA.ads,
-			"blacklist": self.data.USER_DATA.black_room,
-			"spam_max": self.setting.PARAMETER.spam_del_max,
+			"ads": self._data.USER_DATA.ads,
+			"blacklist": self._data.USER_DATA.black_room,
+			"spam_max": self._setting.PARAMETER.spam_del_max,
 		}
 		processor = CommentProcessor()
 
@@ -1508,12 +1512,12 @@ class ReportHandler(ClassUnion):
 		available_accounts = self.student_accounts.copy()
 		current_account = None
 		report_counter = -1
-		reason_content = self.community_obtain.fetch_report_reasons()["items"][7]["content"]
+		reason_content = self._community_obtain.fetch_report_reasons()["items"][7]["content"]
 		source_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {"work": "work", "post": "forum", "shop": "shop"}
 		print(f"\n开始自动举报 ({len(violations)} 条违规内容)")
 		for i, violation in enumerate(violations, 1):
 			# 账号切换逻辑
-			if report_counter >= self.setting.PARAMETER.report_work_max or report_counter == -1:
+			if report_counter >= self._setting.PARAMETER.report_work_max or report_counter == -1:
 				if not available_accounts:
 					print("所有可用学生账号均已尝试")
 					break
@@ -1522,7 +1526,7 @@ class ReportHandler(ClassUnion):
 				print(f"\n切换教育账号: {current_account[0]}")
 				sleep(2)
 				try:
-					self.community_login.authenticate_with_token(
+					self._community_login.authenticate_with_token(
 						identity=current_account[0],
 						password=current_account[1],
 						status="edu",
@@ -1535,7 +1539,7 @@ class ReportHandler(ClassUnion):
 			parts = violation.split(":")
 			_item_id, comment_id = parts[0].split(".")
 			is_reply = "reply" in violation
-			parent_id, _ = self.tool.StringProcessor().find_substrings(
+			parent_id, _ = self._tool.StringProcessor().find_substrings(
 				text=comment_id,
 				candidates=violations,
 			)
@@ -1575,24 +1579,24 @@ class ReportHandler(ClassUnion):
 		"""执行举报操作"""
 		match source:
 			case "work":
-				return self.work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
+				return self._work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
 			case "forum":
 				source_ = "COMMENT" if is_reply else "REPLY"
-				return self.forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=source_, return_data=False)
+				return self._forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=source_, return_data=False)
 			case "shop":
 				if is_reply and parent_id is not None:
-					return self.shop_motion.execute_report_comment(
+					return self._shop_motion.execute_report_comment(
 						comment_id=target_id,
 						reason_content=reason_content,
 						reason_id=reason_id,
-						reporter_id=int(self.data.ACCOUNT_DATA.id),
+						reporter_id=int(self._data.ACCOUNT_DATA.id),
 						comment_parent_id=parent_id,
 						description=description,
 					)
-				return self.shop_motion.execute_report_comment(
+				return self._shop_motion.execute_report_comment(
 					comment_id=target_id,
 					reason_content=reason_content,
 					reason_id=reason_id,
-					reporter_id=int(self.data.ACCOUNT_DATA.id),
+					reporter_id=int(self._data.ACCOUNT_DATA.id),
 					description=description,
 				)
