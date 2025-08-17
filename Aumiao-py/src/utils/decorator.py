@@ -6,7 +6,7 @@ from locale import Error
 from time import sleep
 
 
-def singleton(cls: ...) -> Callable:
+def singleton(cls):  # noqa: ANN001, ANN201
 	instance = {}
 
 	def _singleton(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
