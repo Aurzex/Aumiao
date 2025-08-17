@@ -1523,12 +1523,13 @@ class ReportHandler(ClassUnion):
 					break
 				# 随机选择账号
 				current_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
-				print(f"\n切换教育账号: {current_account[0]}")
+				username, password = current_account  # Unpack for clarity; do not log password
+				print(f"\n切换教育账号: {username}")
 				sleep(2)
 				try:
 					self._community_login.authenticate_with_token(
-						identity=current_account[0],
-						password=current_account[1],
+						identity=username,
+						password=password,
 						status="edu",
 					)
 					report_counter = 0
