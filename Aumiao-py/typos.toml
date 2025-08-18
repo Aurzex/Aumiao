@@ -5,7 +5,7 @@ extend-ignore-re = [
 	"(#|//)\\s*spellchecker:ignore-next-line\\n.*",
 	"(?i)#\\s*typos:ignore\\s+\\w+",
 	"(?i)//\\s*typos:ignore\\s+\\w+",
-	""(?Rm)^.*(#|//)\\s*typos:ignore$",",
+	"(?Rm)^.*(#|//)\\s*typos:ignore$",
 ]
 
 
