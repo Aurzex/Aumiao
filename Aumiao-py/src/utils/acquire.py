@@ -459,6 +459,7 @@ class FileUploader:
 	def upload(self, file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str = "aumiao") -> str:
 		"""
 		统一文件上传接口
+
 		参数:
 			file_path: 文件路径
 			method: 上传方式 (pgaot/codegame/codemao)
@@ -491,7 +492,7 @@ class FileUploader:
 
 	def _upload_via_codegame(self, file_path: Path, save_path: str) -> str:
 		"""七牛云上传(code.game)"""
-		token_info = self._get_codegame_token(prefix=save_path)
+		token_info = self._get_codegame_token(prefix=save_path, file_path=file_path)
 		with file_path.open("rb") as file_obj:
 			files = {"file": (file_path.name, file_obj)}
 			data = {
@@ -552,9 +553,9 @@ class FileUploader:
 			"pic_host": data["bucket_url"],
 		}
 
-	def _get_codegame_token(self, prefix: str) -> dict:
+	def _get_codegame_token(self, prefix: str, file_path: Path) -> dict:
 		"""获取code.game上传凭证(私有)"""
-		params = {"prefix": prefix, "bucket": "static"}
+		params = {"prefix": prefix, "bucket": "static", "type": file_path.suffix}
 		response = self.client.send_request(endpoint="https://oversea-api.code.game/tiger/kitten/cdn/token/1", method="GET", params=params)
 		data = response.json()
 		return {

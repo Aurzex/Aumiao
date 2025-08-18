@@ -294,8 +294,8 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 	"""上传文件"""
 	print_header("上传文件")
 	print(color_text("上传方法说明: ", "COMMENT"))
-	print(color_text("- codemao: 上传到bcmcdn域名 (需要登录)", "COMMENT"))
-	print(color_text("- codegame: 上传到static域名(下载后需要自己补充文件类型)", "COMMENT"))
+	print(color_text("- codemao: 上传到bcmcdn域名", "COMMENT"))
+	print(color_text("- codegame: 上传到static域名", "COMMENT"))
 	print(color_text("- pgaot: 上传到static域名", "COMMENT"))  # cSpell:ignore bcmcdn
 	method = get_valid_input("请输入方法 (pgaot/codemao/codegame)", {"pgaot", "codemao", "codegame"})
 	file_path_str = prompt_input("请输入文件或文件夹路径")
@@ -307,7 +307,8 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 		print(color_text("文件或路径不存在", "ERROR"))
 		return
 	method = cast("Literal['pgaot', 'codemao','codegame']", method)
-	client.FileUploader().upload_file(method=method, file_path=file_path)
+	url = client.FileUploader().upload_file(method=method, file_path=file_path)
+	print(f"保存地址: {url}")
 	print(color_text("文件上传成功", "SUCCESS"))
 
 
