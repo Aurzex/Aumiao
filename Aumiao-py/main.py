@@ -284,7 +284,7 @@ def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noq
 def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传历史"""
 	print_header("上传历史")
-	client.Motion().print_upload_history()
+	client.FileUploader().print_upload_history()
 	print(color_text("查看完成", "SUCCESS"))
 
 
@@ -307,7 +307,7 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 		print(color_text("文件或路径不存在", "ERROR"))
 		return
 	method = cast("Literal['pgaot', 'codemao','codegame']", method)
-	client.Motion().upload_file(method=method, file_path=file_path)
+	client.FileUploader().upload_file(method=method, file_path=file_path)
 	print(color_text("文件上传成功", "SUCCESS"))
 
 
