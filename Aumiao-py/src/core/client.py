@@ -1524,7 +1524,7 @@ class ReportHandler(ClassUnion):
 				# 随机选择账号
 				current_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
 				identity, pass_key = current_account
-				print(f"\n切换教育账号: {identity}")
+				print(f"\n切换教育账号: {id(identity)}")
 				sleep(2)
 				try:
 					self._community_login.authenticate_with_token(
