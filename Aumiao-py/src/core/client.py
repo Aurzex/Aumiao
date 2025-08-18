@@ -94,7 +94,7 @@ class Tool(ClassUnion):
 
 	def message_report(self, user_id: str) -> None:
 		response = self._user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp = self._community_obtain.fetch_current_timestamp()["data"]
+		timestamp = self._community_obtain.fetch_current_timestamp_10()["data"]
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],

@@ -92,7 +92,7 @@ class AuthManager:
 		pid: str = "65edCTyg",
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
-		timestamp = DataFetcher().fetch_current_timestamp()["data"]
+		timestamp = DataFetcher().fetch_current_timestamp_10()["data"]
 		response = self._get_login_ticket(identity=identity, timestamp=timestamp, pid=pid)
 		ticket = response["ticket"]
 		resp = self._get_login_security_info(identity=identity, password=password, ticket=ticket, pid=pid)
@@ -246,35 +246,39 @@ class DataFetcher:
 
 	# 获取kitten4更新
 	def fetch_kitten4_update(self) -> dict:
-		time_stamp = self.fetch_current_timestamp()["data"]
+		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"TIME": time_stamp}
 		response = self._client.send_request(endpoint="https://kn-cdn.codemao.cn/kitten4/application/kitten4_update_info.json", method="GET", params=params)
 		return response.json()
 
 	# 获取kitten更新
 	def fetch_kitten_update(self) -> dict:
-		time_stamp = self.fetch_current_timestamp()["data"]
+		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self._client.send_request(endpoint="https://kn-cdn.codemao.cn/application/kitten_update_info.json", method="GET", params=params)
 		return response.json()
 
 	# 获取海龟编辑器更新
 	def fetch_wood_editor_update(self) -> dict:
-		time_stamp = self.fetch_current_timestamp()["data"]
+		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self._client.send_request(endpoint="https://static-am.codemao.cn/wood/client/xp/prod/package.json", method="GET", params=params)
 		return response.json()
 
 	# 获取源码智造编辑器更新
 	def fetch_matrix_editor_update(self) -> dict:
-		time_stamp = self.fetch_current_timestamp()["data"]
+		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"timeStamp": time_stamp}
 		response = self._client.send_request(endpoint="https://public-static-edu.codemao.cn/matrix/publish/desktop_matrix.json", method="GET", params=params)
 		return response.json()
 
 	# 获取时间戳
-	def fetch_current_timestamp(self) -> dict:
+	def fetch_current_timestamp_10(self) -> dict:
 		response = self._client.send_request(endpoint="/coconut/clouddb/currentTime", method="GET")
+		return response.json()
+
+	def fetch_current_timestamp_13(self) -> dict:
+		response = self._client.send_request(endpoint="https://time.codemao.cn/time/current", method="GET")
 		return response.json()
 
 	# 获取推荐头图
