@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal, TypeVar, cast
 
 from src import client, community, user, whale
-from src.utils import tool
+from src.utils import data, plugin, tool
 
 # 常量定义
 MAX_MENU_KEY_LENGTH = 2
@@ -21,6 +21,7 @@ logging.basicConfig(
 	format="%(asctime)s - %(levelname)s - %(message)s",  # cSpell:ignore levelname
 )
 printer = tool.Printer()
+plugins_path = data.CURRENT_DIR / "plugins"
 
 
 @dataclass
@@ -254,6 +255,14 @@ def logout(account_data_manager: AccountDataManager) -> None:
 
 
 @handle_errors
+def plugin_manager() -> None:
+	printer.print_header("插件管理")
+	plugin_manager = plugin.LazyPluginManager(plugins_path)
+	console = plugin.PluginConsole(plugin_manager)
+	console.run()
+
+
+@handle_errors
 @require_login
 def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
@@ -321,7 +330,8 @@ def main() -> None:
 		"9": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
 		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
 		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
-		"12": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
+		"12": MenuOption(name="插件管理", handler=partial(plugin_manager, account_data_manager), require_auth=False),
+		"13": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
 		"1106": MenuOption(
 			name="隐藏功能",
 			handler=partial(handle_hidden_features, account_data_manager),
