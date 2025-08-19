@@ -255,7 +255,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 
 
 @handle_errors
-def plugin_manager() -> None:
+def plugin_manager(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	printer.print_header("插件管理")
 	plugin_manager = plugin.LazyPluginManager(plugins_path)
 	console = plugin.PluginConsole(plugin_manager)
@@ -319,19 +319,19 @@ def main() -> None:
 	client.Index().index()
 	account_data_manager = AccountDataManager()
 	menu_options = {
-		"1": MenuOption(name="用户登录", handler=partial(login, account_data_manager), require_auth=False),
-		"2": MenuOption(name="清除评论", handler=partial(clear_comments, account_data_manager), require_auth=True),
-		"3": MenuOption(name="清除红点", handler=partial(clear_red_point, account_data_manager), require_auth=True),
-		"4": MenuOption(name="自动回复", handler=partial(reply_work, account_data_manager), require_auth=True),
-		"5": MenuOption(name="账户登出", handler=partial(logout, account_data_manager), require_auth=True),
-		"6": MenuOption(name="处理举报", handler=partial(handle_report, account_data_manager), require_auth=False),
-		"7": MenuOption(name="状态查询", handler=partial(check_account_status, account_data_manager), require_auth=True),
-		"8": MenuOption(name="下载小说", handler=partial(download_fiction, account_data_manager), require_auth=False),
-		"9": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
+		"01": MenuOption(name="用户登录", handler=partial(login, account_data_manager), require_auth=False),
+		"02": MenuOption(name="清除评论", handler=partial(clear_comments, account_data_manager), require_auth=True),
+		"03": MenuOption(name="清除红点", handler=partial(clear_red_point, account_data_manager), require_auth=True),
+		"04": MenuOption(name="自动回复", handler=partial(reply_work, account_data_manager), require_auth=True),
+		"05": MenuOption(name="账户登出", handler=partial(logout, account_data_manager), require_auth=True),
+		"06": MenuOption(name="处理举报", handler=partial(handle_report, account_data_manager), require_auth=False),
+		"07": MenuOption(name="状态查询", handler=partial(check_account_status, account_data_manager), require_auth=True),
+		"08": MenuOption(name="下载小说", handler=partial(download_fiction, account_data_manager), require_auth=False),
+		"09": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
 		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
 		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
 		"12": MenuOption(name="插件管理", handler=partial(plugin_manager, account_data_manager), require_auth=False),
-		"13": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
+		"00": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
 		"1106": MenuOption(
 			name="隐藏功能",
 			handler=partial(handle_hidden_features, account_data_manager),
