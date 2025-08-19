@@ -28,7 +28,7 @@ ReadType = Literal["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"]
 # 增强型数据类定义
 # --------------------------
 @dataclass
-class _AccountData:
+class AccountData:
 	author_level: str = ""
 	create_time: str = ""
 	description: str = ""
@@ -39,7 +39,7 @@ class _AccountData:
 
 
 @dataclass
-class _UserData:
+class UserData:
 	ads: list[str] = field(default_factory=list)
 	answers: list[dict[str, str | list[str]]] = field(default_factory=list)
 	black_room: list[str] = field(default_factory=list)
@@ -49,14 +49,14 @@ class _UserData:
 
 
 @dataclass
-class _CodeMaoData:
-	ACCOUNT_DATA: _AccountData = field(default_factory=_AccountData)
+class CodeMaoData:
+	ACCOUNT_DATA: AccountData = field(default_factory=AccountData)
 	INFO: dict[str, str] = field(default_factory=dict)
-	USER_DATA: _UserData = field(default_factory=_UserData)
+	USER_DATA: UserData = field(default_factory=UserData)
 
 
 @dataclass
-class _Parameter:
+class Parameter:
 	all_read_type: list[ReadType] = field(default_factory=list)
 	cookie_check_url: str = ""
 	log: bool = False
@@ -66,18 +66,18 @@ class _Parameter:
 
 
 @dataclass
-class _ExtraBody:
+class ExtraBody:
 	enable_search: bool = False
 
 
 @dataclass
-class _More:
-	extra_body: _ExtraBody = field(default_factory=_ExtraBody)
+class More:
+	extra_body: ExtraBody = field(default_factory=ExtraBody)
 	stream: bool = False
 
 
 @dataclass
-class _Program:
+class Program:
 	AUTHOR: str = ""
 	HEADERS: dict[str, str] = field(default_factory=dict)
 	MEMBER: str = ""
@@ -87,7 +87,7 @@ class _Program:
 
 
 @dataclass
-class _UploadHistory:
+class UploadHistory:
 	file_name: str = ""
 	file_size: str = ""
 	method: Literal["codemao", "pgaot", "codegame"] = "pgaot"
@@ -96,7 +96,7 @@ class _UploadHistory:
 
 
 @dataclass
-class _CodeMaoCache:
+class CodeMaoCache:
 	collected: int = 0
 	fans: int = 0
 	level: int = 0
@@ -108,15 +108,15 @@ class _CodeMaoCache:
 
 
 @dataclass
-class _CodeMaoSetting:
-	PARAMETER: _Parameter = field(default_factory=_Parameter)
+class CodeMaoSetting:
+	PARAMETER: Parameter = field(default_factory=Parameter)
 	PLUGIN: dict = field(default_factory=dict)
-	PROGRAM: _Program = field(default_factory=_Program)
+	PROGRAM: Program = field(default_factory=Program)
 
 
 @dataclass
-class _CodemaoHistory:
-	history: list[_UploadHistory] = field(default_factory=list)
+class CodemaoHistory:
+	history: list[UploadHistory] = field(default_factory=list)
 
 
 # --------------------------
@@ -290,27 +290,27 @@ class BaseManager(Generic[T]):  # noqa: UP046 # 此处修改规范nuitka编译�
 # 单例管理器
 # --------------------------
 @decorator.singleton
-class DataManager(BaseManager[_CodeMaoData]):
+class DataManager(BaseManager[CodeMaoData]):
 	def __init__(self) -> None:
-		super().__init__(file_path=DATA_FILE_PATH, data_class=_CodeMaoData)
+		super().__init__(file_path=DATA_FILE_PATH, data_class=CodeMaoData)
 
 
 @decorator.singleton
-class CacheManager(BaseManager[_CodeMaoCache]):
+class CacheManager(BaseManager[CodeMaoCache]):
 	def __init__(self) -> None:
-		super().__init__(file_path=CACHE_FILE_PATH, data_class=_CodeMaoCache)
+		super().__init__(file_path=CACHE_FILE_PATH, data_class=CodeMaoCache)
 
 
 @decorator.singleton
-class SettingManager(BaseManager[_CodeMaoSetting]):
+class SettingManager(BaseManager[CodeMaoSetting]):
 	def __init__(self) -> None:
-		super().__init__(file_path=SETTING_FILE_PATH, data_class=_CodeMaoSetting)
+		super().__init__(file_path=SETTING_FILE_PATH, data_class=CodeMaoSetting)
 
 
 @decorator.singleton
-class HistoryManger(BaseManager[_CodemaoHistory]):
+class HistoryManger(BaseManager[CodemaoHistory]):
 	def __init__(self) -> None:
-		super().__init__(file_path=HISTORY_FILE_PATH, data_class=_CodemaoHistory)
+		super().__init__(file_path=HISTORY_FILE_PATH, data_class=CodemaoHistory)
 
 
 class NestedDefaultDict(UserDict):
