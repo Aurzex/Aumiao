@@ -9,6 +9,8 @@ from dataclasses import asdict, is_dataclass
 from html import unescape
 from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
 
+from src.utils.decorator import singleton
+
 T = TypeVar("T")
 FILE_SIZE: int = 1024
 # 类型别名定义
@@ -46,6 +48,7 @@ def is_dataclass_instance[T](obj: T) -> TypeGuard[T]:
 	return not isinstance(obj, type) and is_dataclass(obj)
 
 
+@singleton
 class DataProcessor:
 	"""核心数据处理工具类"""
 
@@ -240,6 +243,7 @@ class DataProcessor:
 		return [x for x in sequence if not (x in seen or seen.add(x))]
 
 
+@singleton
 class DataConverter:
 	"""数据转换工具类"""
 
@@ -344,6 +348,7 @@ class DataConverter:
 		return f"{size_float:.2f} GB"  # 兜底返回
 
 
+@singleton
 class StringProcessor:
 	"""字符串处理工具类"""
 
@@ -379,6 +384,7 @@ class StringProcessor:
 		return (None, None)
 
 
+@singleton
 class TimeUtils:
 	@staticmethod
 	def current_timestamp(length: Literal[10, 13] = 10) -> int:
@@ -415,6 +421,7 @@ class TimeUtils:
 		return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
 
 
+@singleton
 class DataAnalyzer:
 	"""数据分析工具类"""
 
@@ -457,6 +464,7 @@ class DataAnalyzer:
 			raise ValueError(msg) from e
 
 
+@singleton
 class DataMerger:
 	"""数据合并工具类"""
 
@@ -481,6 +489,7 @@ class DataMerger:
 		return merged
 
 
+@singleton
 class MathUtils:
 	"""数学工具类"""
 
@@ -496,6 +505,7 @@ class MathUtils:
 		return max(min_val, min(value, max_val))
 
 
+@singleton
 class EduDataGenerator:
 	# 定义常量
 	CLASS_NUM_LIMIT = 12
@@ -805,6 +815,7 @@ class EduDataGenerator:
 		return f"{year}{province}{agency}{teacher_type}{gender_code}{sequence}"
 
 
+@singleton
 class Encrypt:
 	def __init__(self) -> None:
 		self.MAPPING = "jklmnopqrst"  # cSpell:ignore jklmnopqrst
@@ -897,6 +908,7 @@ class Encrypt:
 		return "".join(result)
 
 
+@singleton
 class Printer:
 	def __init__(self) -> None:
 		pass

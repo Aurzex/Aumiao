@@ -452,6 +452,7 @@ class CodeMaoClient:
 		}
 
 
+@singleton
 class FileUploader:
 	def __init__(self) -> None:
 		self.client = CodeMaoClient()

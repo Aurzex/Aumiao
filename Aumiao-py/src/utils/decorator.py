@@ -7,17 +7,16 @@ from time import sleep
 
 
 def singleton(cls):  # noqa: ANN001, ANN201
-	instance = {}
+	instances = {}
 
-	def _singleton(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
-		# 如果cls不在_instance中,则创建cls的实例,并将其添加到_instance中
-		if cls not in instance:
-			instance[cls] = cls(*args, **kwargs)
-		# 返回_instance中cls的实例
-		return instance[cls]
+	@wraps(cls)
+	def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+		if cls not in instances:
+			instances[cls] = cls(*args, **kwargs)
+		return instances[cls]
 
-	# 返回_singleton函数
-	return _singleton
+	wrapper.__dict__.update(cls.__dict__)
+	return wrapper
 
 
 def retry(retries: int = 3, delay: float = 1) -> Callable:
