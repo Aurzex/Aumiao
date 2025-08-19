@@ -3,8 +3,8 @@ from __future__ import annotations
 import random
 import re
 import time
+from collections.abc import Callable, Iterable, Mapping
 from collections.abc import Generator as ABCGenerator
-from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from html import unescape
 from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
@@ -14,6 +14,19 @@ FILE_SIZE: int = 1024
 # 类型别名定义
 DataDict = dict[str, Any]
 type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
+# 颜色常量
+COLOR_CODES = {
+	"COMMENT": "\033[38;5;245m",  # 辅助说明
+	"ERROR": "\033[38;5;203m",  # 错误提示
+	"MENU_ITEM": "\033[38;5;183m",  # 菜单项
+	"MENU_TITLE": "\033[38;5;80m",  # 菜单标题
+	"PROMPT": "\033[38;5;75m",  # 输入提示
+	"RESET": "\033[0m",  # 重置样式
+	"STATUS": "\033[38;5;228m",  # 状态信息
+	"SUCCESS": "\033[38;5;114m",  # 成功提示
+}
+# 延迟加载分隔符
+SEPARATOR: str | None = None
 
 
 @staticmethod
@@ -882,3 +895,65 @@ class Encrypt:
 			else:
 				result.append(chr(~val & 0xFF))
 		return "".join(result)
+
+
+class Printer:
+	def __init__(self) -> None:
+		pass
+
+	@staticmethod
+	def color_text(text: str, color_name: str) -> str:
+		"""为文本添加颜色"""
+		return f"{COLOR_CODES[color_name]}{text}{COLOR_CODES['RESET']}"
+
+	def prompt_input(self, text: str, color: str = "PROMPT") -> str:
+		"""统一的输入提示函数"""
+		return input(self.color_text(f"↳ {text}: ", color))
+
+	@staticmethod
+	def get_separator() -> str:
+		"""获取分隔符,延迟初始化"""
+		global SEPARATOR  # noqa: PLW0603
+		if SEPARATOR is None:
+			SEPARATOR = f"{COLOR_CODES['PROMPT']}══════════════════════════════════════════════════════════{COLOR_CODES['RESET']}"
+		return SEPARATOR
+
+	def print_header(self, text: str) -> None:
+		"""打印装饰头部"""
+		separator = self.get_separator()
+		print(f"\n{separator}")
+		print(f"{COLOR_CODES['MENU_TITLE']}{text:^60}{COLOR_CODES['RESET']}")
+		print(f"{separator}\n")
+
+	def get_valid_input(
+		self,
+		prompt: str,
+		valid_options: set[T] | range | None = None,  # 支持范围验证
+		cast_type: Callable[[str], T] = str,
+		validator: Callable[[T], bool] | None = None,  # 自定义验证函数
+	) -> T:
+		"""获取有效输入并进行类型转换验证.支持范围和自定义验证"""
+		while True:
+			try:
+				value_str = self.prompt_input(prompt)
+				# 进行类型转换
+				value = cast_type(value_str)
+				# 检查是否在有效选项中
+				if valid_options is not None:
+					if isinstance(valid_options, range):
+						if value not in valid_options:
+							print(self.color_text(f"输入超出范围.有效范围: [{valid_options.start}-{valid_options.stop - 1}]", "ERROR"))
+							continue
+					elif value not in valid_options:
+						print(self.color_text(f"无效输入.请重试。有效选项: {valid_options}", "ERROR"))
+						continue
+				# 执行自定义验证
+				if validator and not validator(value):
+					print(self.color_text("输入不符合要求", "ERROR"))
+					continue
+			except ValueError:
+				print(self.color_text(f"格式错误,请输入{cast_type.__name__}类型的值", "ERROR"))
+			except Exception as e:
+				print(self.color_text(f"发生错误: {e!s}", "ERROR"))
+			else:
+				return value
