@@ -7,9 +7,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-# ======================
-# 插件适配规范
-# ======================
 """
 插件开发规范:
 1. 每个插件必须是一个独立的Python模块(.py文件或包)
@@ -36,34 +33,34 @@ from typing import Any
 class BasePlugin(ABC):
 	@property
 	@abstractmethod
-	def PLUGIN_NAME(self) -> str:
+	def PLUGIN_NAME(self) -> str:  # noqa: N802
 		pass
 
 	@property
 	@abstractmethod
-	def PLUGIN_DESCRIPTION(self) -> str:
+	def PLUGIN_DESCRIPTION(self) -> str:  # noqa: N802
 		pass
 
 	@property
 	@abstractmethod
-	def PLUGIN_VERSION(self) -> str:
+	def PLUGIN_VERSION(self) -> str:  # noqa: N802
 		pass
 
 	@property
 	@abstractmethod
-	def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:
+	def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:  # noqa: N802
 		"""配置模式, 定义配置项的类型和默认值"""
 
 	@property
 	@abstractmethod
-	def PLUGIN_DEFAULT_CONFIG(self) -> dict[str, Any]:
+	def PLUGIN_DEFAULT_CONFIG(self) -> dict[str, Any]:  # noqa: N802
 		"""默认配置值"""
 
 	@abstractmethod
 	def register(self) -> dict[str, tuple[Callable, str]]:
 		"""返回要暴露的方法字典"""
 
-	def on_load(self, config: dict[str, Any]) -> None:
+	def on_load(self, _config: dict[str, Any]) -> None:
 		"""插件加载时的回调, 传入当前配置"""
 		print(f"[系统] 插件 {self.PLUGIN_NAME} v{self.PLUGIN_VERSION} 已加载")
 
@@ -72,9 +69,6 @@ class BasePlugin(ABC):
 		print(f"[系统] 插件 {self.PLUGIN_NAME} 已卸载")
 
 
-# ======================
-# 插件管理器 (懒加载实现)
-# ======================
 class LazyPluginManager:
 	def __init__(self, plugin_dir: Path, config_dir: Path) -> None:
 		self.plugin_dir = plugin_dir
@@ -93,7 +87,7 @@ class LazyPluginManager:
 		sys.path.insert(0, str(self.plugin_dir))  # 转换Path为字符串
 		self.plugin_info = {}
 		for filename in Path.iterdir(self.plugin_dir):
-			# 使用suffix检查文件后缀，更准确的Path用法
+			# 使用suffix检查文件后缀, 更准确的Path用法
 			if filename.suffix == ".py" and filename.name != "__init__.py":
 				module_name = filename.stem  # 使用stem获取不带后缀的文件名
 				plugin_name = module_name
@@ -124,7 +118,7 @@ class LazyPluginManager:
 		# 简单搜索:名称或描述中包含关键词
 		return {name: info for name, info in plugins.items() if keyword.lower() in name.lower() or (info["status"] == "loaded" and keyword.lower() in info["description"].lower())}
 
-	def load_plugin(self, plugin_name: str) -> bool:
+	def load_plugin(self, plugin_name: str) -> bool:  # noqa: PLR0911
 		"""按需加载插件"""
 		if plugin_name in self.loaded_plugins:
 			return True  # 已加载
@@ -204,7 +198,7 @@ class LazyPluginManager:
 			self.load_plugin(plugin_name)
 		return self.plugin_info[plugin_name]["commands"]
 
-	def execute_command(self, command_name: str, *args: Any, **kwargs: Any) -> Any:
+	def execute_command(self, command_name: str, *args: ..., **kwargs: ...) -> ...:
 		"""执行插件命令"""
 		if command_name not in self.command_map:
 			# 尝试在未加载的插件中查找
@@ -227,7 +221,7 @@ class LazyPluginManager:
 		"""加载插件配置"""
 		config_path = self.config_dir / f"{plugin_name}.json"  # 使用Path的/运算符
 		default_config: dict[str, Any] = {}
-		# 获取默认配置（需要先加载插件)
+		# 获取默认配置(需要先加载插件)
 		if plugin_name in self.loaded_plugins:
 			default_config = self.loaded_plugins[plugin_name].PLUGIN_DEFAULT_CONFIG
 		# 如果配置文件存在, 加载它
@@ -236,10 +230,12 @@ class LazyPluginManager:
 				with config_path.open("r", encoding="utf-8") as f:  # 使用Path.open并指定编码
 					saved_config = json.load(f)
 				# 合并默认配置和保存的配置
-				return {**default_config, **saved_config}
+
 			except Exception as e:
 				print(f"[警告] 加载插件 {plugin_name} 配置失败: {e!s}")
 				return default_config
+			else:
+				return {**default_config, **saved_config}
 		return default_config
 
 	def save_config(self, plugin_name: str, config: dict[str, Any]) -> bool:
@@ -277,15 +273,14 @@ class LazyPluginManager:
 		config_schema = plugin.PLUGIN_CONFIG_SCHEMA
 		# 简单的配置验证
 		for key, expected_type in config_schema.items():
-			if key in new_config:  # 使用in代替in.keys()
-				if not isinstance(new_config[key], expected_type):
-					print(f"[警告] 配置项 '{key}' 类型错误, 应为 {expected_type.__name__}")
-					# 尝试转换类型
-					try:
-						new_config[key] = expected_type(new_config[key])
-					except:
-						print(f"[错误] 无法转换配置项 '{key}' 到 {expected_type.__name__}")
-						return False
+			if key in new_config and not isinstance(new_config[key], expected_type):  # 使用in代替in.keys()
+				print(f"[警告] 配置项 '{key}' 类型错误, 应为 {expected_type.__name__}")
+				# 尝试转换类型
+				try:
+					new_config[key] = expected_type(new_config[key])
+				except Exception:
+					print(f"[错误] 无法转换配置项 '{key}' 到 {expected_type.__name__}")
+					return False
 		# 保存配置
 		return self.save_config(plugin_name, new_config)
 
@@ -298,7 +293,7 @@ class PluginConsole:
 		self.manager = plugin_manager
 		self.running = True
 
-	@staticmethod  # 改为静态方法，因为未使用self
+	@staticmethod  # 改为静态方法, 因为未使用self
 	def display_main_menu() -> None:
 		"""显示主菜单"""
 		print("\n===== 插件管理系统 =====")
@@ -426,7 +421,7 @@ class PluginConsole:
 		except ValueError:
 			print("请输入有效数字")
 
-	def update_config(self) -> None:
+	def update_config(self) -> None:  # noqa: PLR0912
 		"""更新插件配置"""
 		plugins = self.manager.get_plugin_list()
 		print("\n插件列表:")
@@ -452,7 +447,7 @@ class PluginConsole:
 				# 获取新配置
 				new_config: dict[str, Any] = {}
 				print("\n输入新配置 (输入空行结束):")
-				for key in current_config.keys():
+				for key in current_config:
 					new_value = input(f"{key} ({type(current_config[key]).__name__}): ").strip()
 					if new_value:
 						# 尝试转换类型
