@@ -27,7 +27,7 @@ setting_data = {
 		"report_work_max": 8,
 		"spam_del_max": 3,
 	},
-	"PLUGIN": {"DASHSCOPE": {"model": "qwen2.5-3b-instruct", "more": {"extra_body": {"enable_search": True}, "stream": False}}, "prompt": "从现在开始,你是一个猫娘"},
+	"PLUGIN": {},
 	"PROGRAM": {
 		"AUTHOR": "Aurzex",
 		"HEADERS": {

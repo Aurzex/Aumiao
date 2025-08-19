@@ -28,7 +28,7 @@ ReadType = Literal["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"]
 # 增强型数据类定义
 # --------------------------
 @dataclass
-class AccountData:
+class _AccountData:
 	author_level: str = ""
 	create_time: str = ""
 	description: str = ""
@@ -39,7 +39,7 @@ class AccountData:
 
 
 @dataclass
-class UserData:
+class _UserData:
 	ads: list[str] = field(default_factory=list)
 	answers: list[dict[str, str | list[str]]] = field(default_factory=list)
 	black_room: list[str] = field(default_factory=list)
@@ -49,14 +49,14 @@ class UserData:
 
 
 @dataclass
-class CodeMaoData:
-	ACCOUNT_DATA: AccountData = field(default_factory=AccountData)
+class _CodeMaoData:
+	ACCOUNT_DATA: _AccountData = field(default_factory=_AccountData)
 	INFO: dict[str, str] = field(default_factory=dict)
-	USER_DATA: UserData = field(default_factory=UserData)
+	USER_DATA: _UserData = field(default_factory=_UserData)
 
 
 @dataclass
-class Parameter:
+class _Parameter:
 	all_read_type: list[ReadType] = field(default_factory=list)
 	cookie_check_url: str = ""
 	log: bool = False
@@ -66,30 +66,18 @@ class Parameter:
 
 
 @dataclass
-class ExtraBody:
+class _ExtraBody:
 	enable_search: bool = False
 
 
 @dataclass
-class More:
-	extra_body: ExtraBody = field(default_factory=ExtraBody)
+class _More:
+	extra_body: _ExtraBody = field(default_factory=_ExtraBody)
 	stream: bool = False
 
 
 @dataclass
-class DashscopePlugin:
-	model: str = ""
-	more: More = field(default_factory=More)
-
-
-@dataclass
-class Plugin:
-	DASHSCOPE: DashscopePlugin = field(default_factory=DashscopePlugin)
-	prompt: str = ""
-
-
-@dataclass
-class Program:
+class _Program:
 	AUTHOR: str = ""
 	HEADERS: dict[str, str] = field(default_factory=dict)
 	MEMBER: str = ""
@@ -99,7 +87,7 @@ class Program:
 
 
 @dataclass
-class UploadHistory:
+class _UploadHistory:
 	file_name: str = ""
 	file_size: str = ""
 	method: Literal["codemao", "pgaot", "codegame"] = "pgaot"
@@ -108,7 +96,7 @@ class UploadHistory:
 
 
 @dataclass
-class CodeMaoCache:
+class _CodeMaoCache:
 	collected: int = 0
 	fans: int = 0
 	level: int = 0
@@ -120,15 +108,15 @@ class CodeMaoCache:
 
 
 @dataclass
-class CodeMaoSetting:
-	PARAMETER: Parameter = field(default_factory=Parameter)
-	PLUGIN: Plugin = field(default_factory=Plugin)
-	PROGRAM: Program = field(default_factory=Program)
+class _CodeMaoSetting:
+	PARAMETER: _Parameter = field(default_factory=_Parameter)
+	PLUGIN: dict = field(default_factory=dict)
+	PROGRAM: _Program = field(default_factory=_Program)
 
 
 @dataclass
-class CodemaoHistory:
-	history: list[UploadHistory] = field(default_factory=list)
+class _CodemaoHistory:
+	history: list[_UploadHistory] = field(default_factory=list)
 
 
 # --------------------------
@@ -302,27 +290,27 @@ class BaseManager(Generic[T]):  # noqa: UP046 # 此处修改规范nuitka编译�
 # 单例管理器
 # --------------------------
 @decorator.singleton
-class DataManager(BaseManager[CodeMaoData]):
+class DataManager(BaseManager[_CodeMaoData]):
 	def __init__(self) -> None:
-		super().__init__(file_path=DATA_FILE_PATH, data_class=CodeMaoData)
+		super().__init__(file_path=DATA_FILE_PATH, data_class=_CodeMaoData)
 
 
 @decorator.singleton
-class CacheManager(BaseManager[CodeMaoCache]):
+class CacheManager(BaseManager[_CodeMaoCache]):
 	def __init__(self) -> None:
-		super().__init__(file_path=CACHE_FILE_PATH, data_class=CodeMaoCache)
+		super().__init__(file_path=CACHE_FILE_PATH, data_class=_CodeMaoCache)
 
 
 @decorator.singleton
-class SettingManager(BaseManager[CodeMaoSetting]):
+class SettingManager(BaseManager[_CodeMaoSetting]):
 	def __init__(self) -> None:
-		super().__init__(file_path=SETTING_FILE_PATH, data_class=CodeMaoSetting)
+		super().__init__(file_path=SETTING_FILE_PATH, data_class=_CodeMaoSetting)
 
 
 @decorator.singleton
-class HistoryManger(BaseManager[CodemaoHistory]):
+class HistoryManger(BaseManager[_CodemaoHistory]):
 	def __init__(self) -> None:
-		super().__init__(file_path=HISTORY_FILE_PATH, data_class=CodemaoHistory)
+		super().__init__(file_path=HISTORY_FILE_PATH, data_class=_CodemaoHistory)
 
 
 class NestedDefaultDict(UserDict):
