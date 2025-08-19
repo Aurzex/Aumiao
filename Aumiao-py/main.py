@@ -341,7 +341,7 @@ def main() -> None:
 	}
 	while True:
 		display_menu(menu_options, account_data_manager)
-		choice = printer.prompt_input("请输入操作编号 (1-12)")
+		choice = printer.prompt_input("请输入操作编号 (01-12)")
 		if choice in menu_options:
 			option = menu_options[choice]
 			if option.require_auth and not account_data_manager.is_logged_in:
