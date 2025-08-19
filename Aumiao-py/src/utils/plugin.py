@@ -310,10 +310,10 @@ class PluginConsole:
 		self.manager = plugin_manager
 		self.running = True
 
-	def display_main_menu(self) -> None:
+	@staticmethod
+	def display_main_menu() -> None:
 		"""显示主菜单"""
-		printer.print_header("插件管理系统")
-		menu_options = {"1": ("搜索插件", True), "2": ("使用插件", True), "3": ("查看插件配置", True), "4": ("更新插件配置", True), "0": ("退出系统", True)}
+		menu_options = {"1": ("搜索插件", True), "2": ("使用插件", True), "3": ("查看配置", True), "4": ("更新配置", True), "0": ("退出系统", True)}
 		for key, (name, visible) in menu_options.items():
 			if not visible:
 				continue
