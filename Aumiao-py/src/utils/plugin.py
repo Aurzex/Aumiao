@@ -1,4 +1,7 @@
 import importlib
+import inspect
+import operator
+import re
 import sys
 import traceback
 from abc import ABC, abstractmethod
@@ -16,25 +19,134 @@ T = TypeVar("T")
 1. 每个插件必须是一个独立的Python模块(.py文件或包)
 2. 每个插件必须包含一个名为 'Plugin' 的类
 3. Plugin类必须实现以下内容:
-	- 类属性:
-		PLUGIN_NAME: 插件名称(字符串)
-		PLUGIN_DESCRIPTION: 插件描述(字符串)
-		PLUGIN_VERSION: 插件版本(字符串)
-		PLUGIN_CONFIG_SCHEMA: 插件配置模式(字典), 定义配置结构
-		PLUGIN_DEFAULT_CONFIG: 插件默认配置(字典)
-	- 方法:
-		register() -> dict: 返回要暴露的方法字典
-			格式: {"方法名": (方法对象, "方法描述")}
-		on_load(config: dict): 插件加载时调用, 传入当前配置
-		on_unload(): 插件卸载时调用
+    - 类属性:
+        PLUGIN_NAME: 插件名称(字符串)
+        PLUGIN_DESCRIPTION: 插件描述(字符串)
+        PLUGIN_VERSION: 插件版本(字符串)
+        PLUGIN_CONFIG_SCHEMA: 插件配置模式(字典), 定义配置结构
+        PLUGIN_DEFAULT_CONFIG: 插件默认配置(字典)
+    - 方法:
+        register() -> dict: 返回要暴露的方法字典
+            格式: {"方法名": (方法对象, "方法描述")}
+        on_load(config: dict): 插件加载时调用, 传入当前配置
+        on_unload(): 插件卸载时调用
 4. 插件可以放置在任意目录, 但需要被插件管理器扫描到
+
+新增功能:
+5. 插件现在可以修改其他模块的代码:
+    - 通过 inject_code_at_line() 在指定行号插入代码
+    - 通过 inject_code_at_pattern() 基于代码模式插入代码
+    - 通过 rewrite_function() 完全重写函数
 """
 
 
-# ======================
-# 插件接口抽象类
-# ======================
+class CodeModificationManager:
+	"""管理代码修改的类"""
+
+	def __init__(self) -> None:
+		self.line_injections = {}  # {module_name: [(line_number, code, position)]}
+		self.pattern_injections = {}  # {module_name: [(pattern, code, position)]}
+		self.function_rewrites = {}  # {module_name: {function_name: new_function}}
+		self.modified_modules = set()
+
+	def inject_code_at_line(self, module_name, line_number, code, position="before") -> None:  # noqa: ANN001
+		"""在指定模块的指定行号插入代码"""
+		if module_name not in self.line_injections:
+			self.line_injections[module_name] = []
+
+		self.line_injections[module_name].append({"line": line_number, "code": code, "position": position})
+
+	def inject_code_at_pattern(self, module_name, pattern, code, position="after") -> None:  # noqa: ANN001
+		"""基于代码模式插入代码"""
+		if module_name not in self.pattern_injections:
+			self.pattern_injections[module_name] = []
+
+		self.pattern_injections[module_name].append({"pattern": re.compile(pattern), "code": code, "position": position})
+
+	def rewrite_function(self, module_name, function_name, new_function) -> None:  # noqa: ANN001
+		"""完全重写函数"""
+		if module_name not in self.function_rewrites:
+			self.function_rewrites[module_name] = {}
+
+		self.function_rewrites[module_name][function_name] = new_function
+
+	def apply_modifications(self, module_name: str) -> None:
+		"""应用所有修改到指定模块"""
+		if module_name not in sys.modules or module_name in self.modified_modules:
+			return
+
+		module = sys.modules[module_name]
+
+		try:
+			# 获取模块源代码
+			source = inspect.getsource(module)
+			modified_source = self._apply_all_modifications(module_name, source)
+
+			if modified_source != source:
+				# 编译并执行修改后的代码
+				code = compile(modified_source, module.__file__, "exec")  # pyright: ignore[reportArgumentType]
+				exec(code, module.__dict__)  # noqa: S102
+
+			# 应用函数重写
+			self._apply_function_rewrites(module_name, module)
+
+			self.modified_modules.add(module_name)
+			print(f"代码修改已应用到模块: {module_name}")
+
+		except Exception as e:
+			print(f"应用代码修改到 {module_name} 失败: {e}")
+			traceback.print_exc()
+
+	def _apply_all_modifications(self, module_name, source) -> str:  # noqa: ANN001
+		"""应用所有代码修改"""
+		lines = source.split("\n")
+		modifications = []
+
+		# 收集行号注入
+		for injection in self.line_injections.get(module_name, []):
+			line_num = injection["line"]
+			if 0 <= line_num - 1 < len(lines):
+				modifications.append({"line": line_num - 1, "code": injection["code"], "position": injection["position"]})
+
+		# 收集模式匹配注入
+		for injection in self.pattern_injections.get(module_name, []):
+			for i, line in enumerate(lines):
+				if injection["pattern"].search(line):
+					modifications.append({"line": i, "code": injection["code"], "position": injection["position"]})
+
+		# 按行号倒序应用修改(避免影响行号)
+		modifications.sort(key=operator.itemgetter("line"), reverse=True)
+
+		for mod in modifications:
+			indent = self._get_indentation(lines[mod["line"]])
+			injected_code = f"{indent}{mod['code']}"
+
+			if mod["position"] == "before":
+				lines.insert(mod["line"], injected_code)
+			elif mod["position"] == "after":
+				lines.insert(mod["line"] + 1, injected_code)
+			elif mod["position"] == "replace":
+				lines[mod["line"]] = injected_code
+
+		return "\n".join(lines)
+
+	def _apply_function_rewrites(self, module_name, module) -> None:  # noqa: ANN001
+		"""应用函数重写"""
+		if module_name in self.function_rewrites:
+			for func_name, new_func in self.function_rewrites[module_name].items():
+				if hasattr(module, func_name):
+					setattr(module, func_name, new_func)
+
+	@staticmethod
+	def _get_indentation(line) -> Any:  # noqa: ANN001, ANN401
+		"""获取行的缩进"""
+		return line[: len(line) - len(line.lstrip())]
+
+
 class BasePlugin(ABC):
+	# 新增代码修改管理器
+	code_modifier = CodeModificationManager()
+
 	@property
 	@abstractmethod
 	def PLUGIN_NAME(self) -> str:  # noqa: N802
@@ -67,20 +179,43 @@ class BasePlugin(ABC):
 	def on_load(self, _config: dict[str, Any]) -> None:
 		"""插件加载时的回调, 传入当前配置"""
 		print(f"[系统] 插件 {self.PLUGIN_NAME} v{self.PLUGIN_VERSION} 已加载")
+		self.apply_code_modifications()
 
 	def on_unload(self) -> None:
 		"""插件卸载时的回调"""
 		print(f"[系统] 插件 {self.PLUGIN_NAME} 已卸载")
 
+	def apply_code_modifications(self) -> None:  # noqa: B027
+		"""应用代码修改 - 子类可以重写此方法"""
 
+	# 新增代码修改方法
+	def inject_at_line(self, module_name, line_number, code, position="before") -> None:  # noqa: ANN001
+		"""在指定行号插入代码"""
+		self.code_modifier.inject_code_at_line(module_name, line_number, code, position)
+
+	def inject_at_pattern(self, module_name, pattern, code, position="after") -> None:  # noqa: ANN001
+		"""基于代码模式插入代码"""
+		self.code_modifier.inject_code_at_pattern(module_name, pattern, code, position)
+
+	def rewrite_function(self, module_name, function_name, new_function) -> None:  # noqa: ANN001
+		"""完全重写函数"""
+		self.code_modifier.rewrite_function(module_name, function_name, new_function)
+
+
+# ======================
+# 增强的插件管理器
+# ======================
 class LazyPluginManager:
 	def __init__(self, plugin_dir: Path) -> None:
 		self.plugin_dir = plugin_dir
-		# 不再需要 config_dir, 但保留参数以保持接口兼容
 		self.plugin_info: dict[str, dict] = {}  # 插件元信息 {plugin_name: {meta}}
 		self.loaded_plugins: dict[str, BasePlugin] = {}  # 已加载的插件 {plugin_name: plugin_instance}
 		self.command_map: dict[str, tuple[str, str]] = {}  # 命令映射 {command_name: (plugin_name, method_name)}
 		self.plugin_modules: dict[str, Any] = {}  # 已加载的模块 {plugin_name: module}
+
+		# 代码修改管理器
+		self.code_modifier = CodeModificationManager()
+
 		# 扫描插件
 		self.scan_plugins()
 
@@ -167,6 +302,8 @@ class LazyPluginManager:
 			self.plugin_info[plugin_name]["status"] = "loaded"
 			# 更新全局配置
 			self._update_global_config(plugin_name, config)
+			# 应用代码修改
+			self.code_modifier.apply_modifications(plugin_name)
 		except Exception as e:
 			print(f"[错误] 加载插件 {plugin_name} 失败: {e!s}")
 			traceback.print_exc()
