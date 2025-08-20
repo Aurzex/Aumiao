@@ -539,6 +539,8 @@ class PluginConsole:
 			status_text = printer.color_text(f"({status})", status_color)
 			print(f"{idx:2d}. {name} {status_text}")
 
+		print(" 0. 返回")
+
 		choice = printer.get_valid_input("请选择插件编号 (输入0返回)", valid_options=range(len(plugin_names) + 1), cast_type=int)
 
 		if choice == 0:
@@ -548,33 +550,36 @@ class PluginConsole:
 		self.use_plugin_commands(plugin_name)
 
 	def use_plugin_commands(self, plugin_name: str) -> None:
-		"""使用插件的命令"""
+		"""使用插件的命令 - 优化为循环显示命令列表"""
 		# 确保插件已加载
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
 
-		# 获取插件命令
-		commands = self.manager.get_plugin_commands(plugin_name)
-		if not commands:
-			printer.prompt_input(f"插件 {plugin_name} 没有可用命令, 按回车键返回", "COMMENT")
-			return
+		while True:
+			# 获取插件命令
+			commands = self.manager.get_plugin_commands(plugin_name)
+			if not commands:
+				printer.prompt_input(f"插件 {plugin_name} 没有可用命令, 按回车键返回", "COMMENT")
+				return
 
-		printer.print_header(f"{plugin_name} 的命令列表")
-		command_names = list(commands.keys())
-		for idx, cmd in enumerate(command_names, 1):
-			info = commands[cmd]
-			print(f"{idx:2d}. {printer.color_text(cmd, 'MENU_ITEM')} - {info['description']}")
+			printer.print_header(f"{plugin_name} 的命令列表")
+			command_names = list(commands.keys())
+			for idx, cmd in enumerate(command_names, 1):
+				info = commands[cmd]
+				print(f"{idx:2d}. {printer.color_text(cmd, 'MENU_ITEM')} - {info['description']}")
 
-		print(" 0. 返回")
+			print(" 0. 返回")
 
-		choice = printer.get_valid_input("请选择命令编号", valid_options=range(len(command_names) + 1), cast_type=int)
+			choice = printer.get_valid_input("请选择命令编号", valid_options=range(len(command_names) + 1), cast_type=int)
 
-		if choice == 0:
-			return
+			if choice == 0:
+				break
 
-		command_name = command_names[choice - 1]
-		self.execute_command(plugin_name, command_name, commands[command_name])
+			command_name = command_names[choice - 1]
+			self.execute_command(plugin_name, command_name, commands[command_name])
+
+			# 执行完命令后不立即返回, 而是继续显示命令列表
 
 	@staticmethod
 	def execute_command(_plugin_name: str, command_name: str, command_info: dict) -> None:
@@ -637,9 +642,9 @@ class PluginConsole:
 			printer.print_header("执行结果")
 			if result is not None:
 				print(result)
-			printer.prompt_input("按回车键返回", "COMMENT")
+			printer.prompt_input("按回车键继续...", "COMMENT")
 		except Exception as e:
-			printer.prompt_input(f"执行命令失败: {e!s}, 按回车键返回", "ERROR")
+			printer.prompt_input(f"执行命令失败: {e!s}, 按回车键继续...", "ERROR")
 
 	def view_config(self) -> None:
 		"""查看插件配置"""
