@@ -2,239 +2,131 @@
 
 ## 概述
 
-本文档详细介绍了如何为基于 `LazyPluginManager` 的插件系统开发插件。该系统采用懒加载机制，支持动态加载、卸载和配置管理。
+本插件系统允许开发者扩展应用程序功能，而无需修改主程序代码。插件可以：
 
-## 插件结构要求
+1. 提供新的命令和功能
+2. 修改现有模块的代码（通过行号插入、模式匹配插入、函数重写）
+3. 响应插件加载和卸载事件
 
-每个插件必须是一个独立的 Python 模块（.py 文件或包），并包含一个名为 `Plugin` 的类，该类必须继承自 `BasePlugin` 抽象类或实现其所有抽象方法和属性。
+## 插件结构
 
-### 必需组件
+每个插件必须是一个独立的 Python 模块（.py 文件），并包含一个名为`Plugin`的类，该类继承自`BasePlugin`。
+
+### 必需部分
 
 1. **类属性**：
 
    - `PLUGIN_NAME`: 插件名称（字符串）
    - `PLUGIN_DESCRIPTION`: 插件描述（字符串）
    - `PLUGIN_VERSION`: 插件版本（字符串）
-   - `PLUGIN_CONFIG_SCHEMA`: 插件配置模式（字典），定义配置结构
-   - `PLUGIN_DEFAULT_CONFIG`: 插件默认配置（字典）
+   - `PLUGIN_CONFIG_SCHEMA`: 配置模式（字典），定义配置项的类型
+   - `PLUGIN_DEFAULT_CONFIG`: 默认配置（字典）
 
 2. **方法**：
-   - `register() -> dict`: 返回要暴露的方法字典
-   - `on_load(config: dict)`: 插件加载时调用，传入当前配置（可选重写）
-   - `on_unload()`: 插件卸载时调用（可选重写）
+   - `register()`: 返回一个字典，键为命令名，值为一个元组（可调用对象，描述字符串）
+   - `on_load(config)`: 插件加载时调用，传入当前配置
+   - `on_unload()`: 插件卸载时调用
 
-## 详细规范
+### 可选部分
 
-### 1. 插件元信息
+- `apply_code_modifications()`: 如果你需要修改其他模块的代码，可以重写此方法，并在其中使用注入方法。
 
-```python
-@property
-def PLUGIN_NAME(self) -> str:
-    return "示例插件"
+## 代码修改功能
 
-@property
-def PLUGIN_DESCRIPTION(self) -> str:
-    return "这是一个示例插件，用于演示插件开发规范"
+插件可以修改其他模块的代码，支持三种方式：
 
-@property
-def PLUGIN_VERSION(self) -> str:
-    return "1.0.0"
-```
+1. **行号注入**：在指定模块的指定行号前后插入代码
 
-### 2. 配置管理
+   ```python
+   self.inject_at_line(module_name, line_number, code, position='before')
+   ```
 
-```python
-@property
-def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:
-    return {
-        "api_key": str,        # 字符串类型配置
-        "max_retries": int,     # 整数类型配置
-        "enable_feature": bool, # 布尔类型配置
-        "timeout": float        # 浮点数类型配置
-    }
+2. **模式匹配注入**：在匹配到指定正则表达式模式的代码行前后插入代码
 
-@property
-def PLUGIN_DEFAULT_CONFIG(self) -> dict[str, Any]:
-    return {
-        "api_key": "",
-        "max_retries": 3,
-        "enable_feature": True,
-        "timeout": 30.0
-    }
-```
+   ```python
+   self.inject_at_pattern(module_name, pattern, code, position='after')
+   ```
 
-### 3. 方法注册
+3. **函数重写**：完全替换指定模块中的函数
+   ```python
+   self.rewrite_function(module_name, function_name, new_function)
+   ```
 
-```python
-def register(self) -> dict[str, tuple[Callable, str]]:
-    return {
-        "fetch_data": (self.fetch_data, "获取数据方法"),
-        "process_item": (self.process_item, "处理单个项目"),
-        "batch_process": (self.batch_process, "批量处理方法")
-    }
-```
+## 配置说明
 
-### 4. 生命周期方法
+插件配置通过全局配置管理器管理。配置模式定义了每个配置项的类型，系统会自动进行类型验证和转换。
 
-```python
-def on_load(self, config: dict[str, Any]) -> None:
-    """插件加载时的回调"""
-    # 初始化操作
-    self.config = config
-    self.initialize_client()
-    print(f"[{self.PLUGIN_NAME}] 插件已加载，配置: {config}")
+### 配置模式支持的类型
 
-def on_unload(self) -> None:
-    """插件卸载时的回调"""
-    # 清理操作
-    self.cleanup_resources()
-    print(f"[{self.PLUGIN_NAME}] 插件已卸载")
-```
+- `bool`: 布尔值（true/false, 1/0, yes/no）
+- `int`: 整数
+- `float`: 浮点数
+- `str`: 字符串
+- `list`: 列表
+- `dict`: 字典
 
-## 完整示例插件
+## 开发指南
+
+### 1. 创建插件文件
+
+在插件目录中创建新的.py 文件，例如`my_plugin.py`。
+
+### 2. 实现插件类
+
+按照上述结构实现`Plugin`类，确保包含所有必需的属性和方法。
+
+### 3. 测试插件
+
+使用插件控制台加载和测试插件功能：
 
 ```python
-# example_plugin.py
-import time
-from typing import Any
-from collections.abc import Callable
+# 初始化插件管理器
+manager = LazyPluginManager(Path("plugins"))
 
-class Plugin:
-    """示例插件"""
+# 加载插件
+manager.load_plugin("example_plugin")
 
-    @property
-    def PLUGIN_NAME(self) -> str:
-        return "示例数据处理插件"
-
-    @property
-    def PLUGIN_DESCRIPTION(self) -> str:
-        return "提供数据获取和处理功能"
-
-    @property
-    def PLUGIN_VERSION(self) -> str:
-        return "1.0.0"
-
-    @property
-    def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:
-        return {
-            "api_endpoint": str,
-            "timeout_seconds": int,
-            "enable_cache": bool
-        }
-
-    @property
-    def PLUGIN_DEFAULT_CONFIG(self) -> dict[str, Any]:
-        return {
-            "api_endpoint": "https://api.example.com/data",
-            "timeout_seconds": 10,
-            "enable_cache": True
-        }
-
-    def on_load(self, config: dict[str, Any]) -> None:
-        """插件加载回调"""
-        self.config = config
-        self.cache = {} if config["enable_cache"] else None
-        print(f"[{self.PLUGIN_NAME}] 已加载，配置: {config}")
-
-    def on_unload(self) -> None:
-        """插件卸载回调"""
-        print(f"[{self.PLUGIN_NAME}] 已卸载")
-
-    def register(self) -> dict[str, tuple[Callable, str]]:
-        """注册暴露的方法"""
-        return {
-            "fetch_user_data": (self.fetch_user_data, "获取用户数据"),
-            "process_data": (self.process_data, "处理数据"),
-            "get_stats": (self.get_stats, "获取统计信息")
-        }
-
-    # 以下是插件提供的功能方法
-    def fetch_user_data(self, user_id: str) -> dict:
-        """获取用户数据"""
-        # 模拟API调用
-        print(f"获取用户 {user_id} 的数据...")
-        time.sleep(0.5)  # 模拟网络延迟
-        return {"id": user_id, "name": "示例用户", "score": 85}
-
-    def process_data(self, data: list) -> list:
-        """处理数据"""
-        print(f"处理 {len(data)} 条数据...")
-        return [{"processed": True, **item} for item in data]
-
-    def get_stats(self) -> dict:
-        """获取统计信息"""
-        return {"total_processed": 100, "average_score": 78.5}
+# 执行插件命令
+result = manager.execute_command("example_info")
+print(result)
 ```
 
-## 插件开发最佳实践
+### 4. 调试技巧
 
-### 1. 命名规范
+- 使用`print`语句输出调试信息
+- 检查控制台错误消息
+- 使用`try/except`捕获和处理异常
 
-遵循项目统一的函数命名规范：
+## 最佳实践
 
-- `fetch_` - 远程数据获取
-- `grab_` - 本地数据获取
-- `create_` - 创建资源
-- `delete_` - 删除资源
-- `update_` - 更新资源
-- `execute_` - 执行操作
-- `validate_` - 数据验证
-- `is_` - 布尔判断
-- `has_` - 存在性检查
-- `_gen` - 生成器
-- `do_` - 其他操作
+1. **错误处理**：妥善处理可能出现的异常
+2. **资源管理**：在`on_unload`中释放资源
+3. **配置验证**：确保配置值在合理范围内
+4. **性能考虑**：避免在代码修改中引入性能问题
+5. **兼容性**：确保插件与不同版本的主程序兼容
 
-### 2. 错误处理
+## 常见问题
 
-```python
-def safe_method(self, *args):
-    try:
-        # 可能出错的操作
-        return self._unsafe_method(*args)
-    except Exception as e:
-        print(f"方法执行失败: {e}")
-        return None
-```
+### Q: 插件加载失败怎么办？
 
-### 3. 资源管理
+A: 检查控制台错误信息，常见问题包括：
 
-```python
-def on_load(self, config):
-    # 初始化资源
-    self.db_connection = create_connection(config["db_url"])
+- 缺少必需的类属性
+- register()返回格式不正确
+- 语法错误
 
-def on_unload(self):
-    # 清理资源
-    if hasattr(self, "db_connection"):
-        self.db_connection.close()
-```
+### Q: 代码修改没有生效怎么办？
 
-### 4. 配置验证
+A: 检查：
 
-```python
-def validate_config(self, config: dict) -> bool:
-    """验证配置有效性"""
-    required_keys = ["api_key", "endpoint"]
-    return all(key in config for key in required_keys)
-```
+- 模块名称是否正确
+- 行号是否准确
+- 正则表达式模式是否匹配
 
-## 插件部署
+### Q: 如何调试代码修改？
 
-1. 将插件文件(.py)放置在插件管理器指定的目录中
-2. 确保插件文件名与插件名称一致（或通过模块名识别）
-3. 插件管理器会自动扫描并识别可用插件
+A: 在`apply_code_modifications`方法中添加打印语句，确认修改已应用。
 
-## 调试与测试
+## 支持
 
-1. 使用插件控制台交互式测试插件功能
-2. 检查控制台输出以识别加载和运行问题
-3. 验证配置是否正确保存和加载
-
-## 注意事项
-
-1. 避免在插件中使用全局状态，除非必要
-2. 确保插件线程安全（如果系统是多线程的）
-3. 遵循最小权限原则，只暴露必要的方法
-4. 处理所有可能的异常，避免插件崩溃影响主系统
-
-通过遵循本文档规范，您可以开发出符合标准的插件，并能与插件管理系统无缝集成。
+如有问题，请参考示例插件或联系开发团队。
