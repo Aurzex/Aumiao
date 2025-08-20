@@ -930,6 +930,9 @@ class Printer:
 			SEPARATOR = f"{COLOR_CODES['PROMPT']}══════════════════════════════════════════════════════════{COLOR_CODES['RESET']}"
 		return SEPARATOR
 
+	def print_message(self, text: str, colour_name: str) -> None:
+		print(self.color_text(text=text, color_name=colour_name))
+
 	def print_header(self, text: str) -> None:
 		"""打印装饰头部"""
 		separator = self.get_separator()

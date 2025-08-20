@@ -7,7 +7,7 @@ import traceback
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, get_type_hints
 
 from src.utils import data, tool
 
@@ -37,6 +37,7 @@ T = TypeVar("T")
     - 通过 inject_code_at_line() 在指定行号插入代码
     - 通过 inject_code_at_pattern() 基于代码模式插入代码
     - 通过 rewrite_function() 完全重写函数
+6. 插件方法可以定义参数类型和默认值, 系统会自动提示用户输入
 """
 
 
@@ -296,7 +297,7 @@ class LazyPluginManager:
 					print(f"[错误] 插件 {plugin_name} 的方法 {method_name} 不可调用")
 					continue
 				self.command_map[method_name] = (plugin_name, method_name)
-				self.plugin_info[plugin_name]["commands"][method_name] = {"description": description, "method": method}
+				self.plugin_info[plugin_name]["commands"][method_name] = {"description": description, "method": method, "signature": self._get_method_signature(method)}
 			# 保存插件实例
 			self.loaded_plugins[plugin_name] = plugin_instance
 			self.plugin_info[plugin_name]["status"] = "loaded"
@@ -310,6 +311,28 @@ class LazyPluginManager:
 			return False
 		else:
 			return True
+
+	@staticmethod
+	def _get_method_signature(method: Callable) -> dict:
+		"""获取方法的签名信息"""
+		signature = inspect.signature(method)
+		type_hints = get_type_hints(method)
+
+		params = {}
+		for name, param in signature.parameters.items():
+			if name == "self":
+				continue
+
+			param_info = {
+				"name": name,
+				"default": param.default if param.default is not param.empty else None,
+				"has_default": param.default is not param.empty,
+				"type": type_hints.get(name, str),
+				"annotation": param.annotation if param.annotation is not param.empty else Any,
+			}
+			params[name] = param_info
+
+		return {"params": params, "return_type": type_hints.get("return", Any)}
 
 	@staticmethod
 	def _update_global_config(plugin_name: str, config: dict[str, Any]) -> None:
@@ -451,6 +474,7 @@ class PluginConsole:
 	def display_main_menu() -> None:
 		"""显示主菜单"""
 		menu_options = {"1": ("搜索插件", True), "2": ("使用插件", True), "3": ("查看配置", True), "4": ("更新配置", True), "0": ("退出系统", True)}
+		printer.print_header("插件管理系统")
 		for key, (name, visible) in menu_options.items():
 			if not visible:
 				continue
@@ -477,10 +501,14 @@ class PluginConsole:
 	def search_plugins(self) -> None:
 		"""搜索插件"""
 		keyword = printer.prompt_input("输入搜索关键词")
+		if not keyword:
+			return
+
 		results = self.manager.search_plugins(keyword)
 		if not results:
 			printer.prompt_input("未找到匹配的插件, 按回车键返回", "COMMENT")
 			return
+
 		printer.print_header("搜索结果")
 		for name, info in results.items():
 			status = "已加载" if info["status"] == "loaded" else "未加载"
@@ -499,6 +527,10 @@ class PluginConsole:
 		"""使用插件功能"""
 		# 显示所有插件
 		plugins = self.manager.get_plugin_list()
+		if not plugins:
+			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
+			return
+
 		printer.print_header("可用插件")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
@@ -506,7 +538,12 @@ class PluginConsole:
 			status_color = "SUCCESS" if plugins[name]["status"] == "loaded" else "COMMENT"
 			status_text = printer.color_text(f"({status})", status_color)
 			print(f"{idx:2d}. {name} {status_text}")
-		choice = printer.get_valid_input("请选择插件编号", valid_options=range(1, len(plugin_names) + 1), cast_type=int)
+
+		choice = printer.get_valid_input("请选择插件编号 (输入0返回)", valid_options=range(len(plugin_names) + 1), cast_type=int)
+
+		if choice == 0:
+			return
+
 		plugin_name = plugin_names[choice - 1]
 		self.use_plugin_commands(plugin_name)
 
@@ -516,30 +553,90 @@ class PluginConsole:
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
+
 		# 获取插件命令
 		commands = self.manager.get_plugin_commands(plugin_name)
 		if not commands:
 			printer.prompt_input(f"插件 {plugin_name} 没有可用命令, 按回车键返回", "COMMENT")
 			return
+
 		printer.print_header(f"{plugin_name} 的命令列表")
 		command_names = list(commands.keys())
 		for idx, cmd in enumerate(command_names, 1):
 			info = commands[cmd]
 			print(f"{idx:2d}. {printer.color_text(cmd, 'MENU_ITEM')} - {info['description']}")
-		choice = printer.get_valid_input("请选择命令编号", valid_options=range(1, len(command_names) + 1), cast_type=int)
-		command_name = command_names[choice - 1]
-		self.execute_command(plugin_name, command_name)
 
-	def execute_command(self, _plugin_name: str, command_name: str) -> None:
+		print(" 0. 返回")
+
+		choice = printer.get_valid_input("请选择命令编号", valid_options=range(len(command_names) + 1), cast_type=int)
+
+		if choice == 0:
+			return
+
+		command_name = command_names[choice - 1]
+		self.execute_command(plugin_name, command_name, commands[command_name])
+
+	@staticmethod
+	def execute_command(_plugin_name: str, command_name: str, command_info: dict) -> None:
 		"""执行插件命令"""
-		# 获取参数
-		args_input = printer.prompt_input("输入参数 (空格分隔)")
-		args = args_input.split() if args_input else []
+		method = command_info["method"]
+		signature = command_info.get("signature", {})
+		params = signature.get("params", {})
+
+		# 收集参数
+		args = []
+		kwargs = {}
+
+		printer.print_header(f"执行命令: {command_name}")
+
+		if params:
+			print("请提供参数:")
+			for param_name, param_info in params.items():
+				param_type = param_info["type"]
+				has_default = param_info["has_default"]
+				default_value = param_info["default"]
+
+				# 构建提示信息
+				prompt = f"  {param_name} ({param_type.__name__})"
+				if has_default:
+					prompt += f" [默认: {default_value}]"
+				prompt += ": "
+
+				# 获取用户输入
+				value_input = input(prompt).strip()
+
+				if not value_input and has_default:
+					# 使用默认值
+					value = default_value
+				elif not value_input and not has_default:
+					# 必需参数但没有提供值
+					printer.print_message("此参数为必需参数, 必须提供值", "ERROR")
+					return
+				else:
+					# 转换类型
+					try:
+						if param_type is int:
+							value = int(value_input)
+						elif param_type is float:
+							value = float(value_input)
+						elif param_type is bool:
+							value = value_input.lower() in {"true", "1", "yes", "y"}
+						else:
+							value = value_input
+					except ValueError:
+						printer.print_message(f"无法将 '{value_input}' 转换为 {param_type.__name__}", "ERROR")
+						return
+
+				kwargs[param_name] = value
+		else:
+			printer.print_message("此命令不需要参数", "COMMENT")
+
 		# 执行命令
 		try:
-			result = self.manager.execute_command(command_name, *args)
+			result = method(*args, **kwargs)
 			printer.print_header("执行结果")
-			print(result)
+			if result is not None:
+				print(result)
 			printer.prompt_input("按回车键返回", "COMMENT")
 		except Exception as e:
 			printer.prompt_input(f"执行命令失败: {e!s}, 按回车键返回", "ERROR")
@@ -547,20 +644,33 @@ class PluginConsole:
 	def view_config(self) -> None:
 		"""查看插件配置"""
 		plugins = self.manager.get_plugin_list()
+		if not plugins:
+			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
+			return
+
 		printer.print_header("插件列表")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
 			print(f"{idx:2d}. {name}")
-		choice = printer.get_valid_input("请选择插件查看配置", valid_options=range(1, len(plugin_names) + 1), cast_type=int)
+
+		print(" 0. 返回")
+
+		choice = printer.get_valid_input("请选择插件查看配置", valid_options=range(len(plugin_names) + 1), cast_type=int)
+
+		if choice == 0:
+			return
+
 		plugin_name = plugin_names[choice - 1]
 		# 确保插件已加载
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
+
 		config = self.manager.get_config(plugin_name)
 		if config is None:
 			printer.prompt_input("无可用配置, 按回车键返回", "COMMENT")
 			return
+
 		printer.print_header(f"{plugin_name} 的配置")
 		for key, value in config.items():
 			print(f"- {printer.color_text(key, 'MENU_ITEM')}: {value}")
@@ -569,49 +679,67 @@ class PluginConsole:
 	def update_config(self) -> None:
 		"""更新插件配置"""
 		plugins = self.manager.get_plugin_list()
+		if not plugins:
+			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
+			return
+
 		printer.print_header("插件列表")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
 			print(f"{idx:2d}. {name}")
-		choice = printer.get_valid_input("请选择插件更新配置", valid_options=range(1, len(plugin_names) + 1), cast_type=int)
+
+		print(" 0. 返回")
+
+		choice = printer.get_valid_input("请选择插件更新配置", valid_options=range(len(plugin_names) + 1), cast_type=int)
+
+		if choice == 0:
+			return
+
 		plugin_name = plugin_names[choice - 1]
 		# 确保插件已加载
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
+
 		# 获取当前配置
 		current_config = self.manager.get_config(plugin_name)
 		if current_config is None:
 			printer.prompt_input("无可用配置, 按回车键返回", "COMMENT")
 			return
+
 		printer.print_header(f"{plugin_name} 的当前配置")
 		for key, value in current_config.items():
 			print(f"- {printer.color_text(key, 'MENU_ITEM')}: {value}")
+
 		# 获取新配置
 		new_config: dict[str, Any] = {}
-		printer.print_header("输入新配置")
-		printer.prompt_input("输入新配置 (输入空行结束)", "PROMPT")
-		for key in current_config:
-			new_value = printer.prompt_input(f"{key} ({type(current_config[key]).__name__})")
-			if new_value:
-				# 尝试转换类型
-				try:
-					# 根据当前值的类型转换
-					if isinstance(current_config[key], int):
-						new_config[key] = int(new_value)
-					elif isinstance(current_config[key], float):
-						new_config[key] = float(new_value)
-					elif isinstance(current_config[key], bool):
-						# 使用集合提高查找效率
-						new_config[key] = new_value.lower() in {"true", "1", "yes", "y"}
-					else:
-						new_config[key] = new_value
-				except ValueError:
-					printer.prompt_input(f"无法转换 {key} 的值, 使用字符串", "WARNING")
+		printer.print_header("输入新配置 (输入空值保持原配置)")
+
+		for key, current_value in current_config.items():
+			value_type = type(current_value)
+			prompt = f"{key} ({value_type.__name__}) [当前: {current_value}]: "
+			new_value = input(prompt).strip()
+
+			if not new_value:
+				new_config[key] = current_value
+				continue
+
+			# 尝试转换类型
+			try:
+				if value_type is int:
+					new_config[key] = int(new_value)
+				elif value_type is float:
+					new_config[key] = float(new_value)
+				elif value_type is bool:
+					new_config[key] = new_value.lower() in {"true", "1", "yes", "y"}
+				else:
 					new_config[key] = new_value
+			except ValueError:
+				printer.print_message(f"无法转换 {key} 的值, 使用原值", "WARNING")
+				new_config[key] = current_value
+
 		# 更新配置
-		if new_config:
-			if self.manager.update_config(plugin_name, new_config):
-				printer.prompt_input("配置更新成功, 按回车键返回", "SUCCESS")
+		if self.manager.update_config(plugin_name, new_config):
+			printer.prompt_input("配置更新成功, 按回车键返回", "SUCCESS")
+		else:
 			printer.prompt_input("配置更新失败, 按回车键返回", "ERROR")
-		printer.prompt_input("未提供新配置, 按回车键返回", "COMMENT")

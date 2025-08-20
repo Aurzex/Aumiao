@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from src.utils.plugin import BasePlugin  # 假设你的插件管理器代码保存在 plugin_manager.py 中
+from src.utils.plugin import BasePlugin
 
 
 class Plugin(BasePlugin):
@@ -52,15 +52,32 @@ class Plugin(BasePlugin):
 		print(message)
 		return message
 
-	def greet_many(self, *names: str) -> list[str]:
-		"""向多个人问候"""
+	def greet_many(self, name1: str, name2: str = "", name3: str = "") -> list[str]:
+		"""向多个人问候
+
+		Args:
+		    name1: 第一个人的名字 (必需)
+		    name2: 第二个人的名字 (可选)
+		    name3: 第三个人的名字 (可选)
+		"""
+		names = [name1]
+		if name2:
+			names.append(name2)
+		if name3:
+			names.append(name3)
+
 		results = []
 		for name in names:
 			results.append(self.greet(name))
 		return results
 
 	def repeat_greeting(self, name: str = "World", count: int = 1) -> list[str]:
-		"""重复问候指定次数"""
+		"""重复问候指定次数
+
+		Args:
+		    name: 要问候的人名
+		    count: 重复次数 (最大不超过配置中的max_repeat_count)
+		"""
 		max_count = self.config.get("max_repeat_count", 3)
 		actual_count = min(count, max_count)
 
