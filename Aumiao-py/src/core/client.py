@@ -13,9 +13,6 @@ from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
 from src.utils.acquire import HTTPSTATUS
 
-# 常量定义
-DOWNLOAD_DIR: Path = data.CURRENT_DIR / "download"
-DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_SIZE_BYTES: int = 15 * 1024 * 1024  # 转换为字节
 REPORT_BATCH_THRESHOLD: int = 15
 VALID_REPLY_TYPES: set[str] = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
@@ -782,88 +779,6 @@ class Motion(ClassUnion):
 		status = self._user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
-	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
-		if custom_list:
-			target_list = custom_list
-		elif method == "work":
-			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
-		elif method == "novel":
-			target_list = self._novel_obtain.fetch_my_novels()
-		else:
-			msg = f"不支持的{method}"
-			raise TypeError(msg)
-
-		def action() -> None:
-			if method == "work":
-				self.like_all_work(user_id=str(user_id), works_list=target_list)
-			else:
-				self.like_my_novel(novel_list=target_list)
-
-		Obtain().process_edu_accounts(limit=None, action=action())
-
-	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
-		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
-		generator = tool.EduDataGenerator()
-		self._edu_motion.execute_upgrade_to_teacher(
-			user_id=int(self._data.ACCOUNT_DATA.id),
-			real_name=real_name,
-			grade=["2", "3", "4"],
-			school_id=11000161,
-			school_name="北京景山学校",
-			school_type=1,
-			country_id="156",
-			province_id=1,
-			city_id=1,
-			district_id=1,
-			teacher_card_number=generator.generate_teacher_certificate_number(),
-		)
-
-	def execute_batch_handle_account(self, method: Literal["create", "delete"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
-		"""批量处理教育账号"""
-
-		def _create_students(student_limit: int) -> None:
-			"""创建学生账号内部逻辑"""
-			class_capacity = 95
-			class_count = (student_limit + class_capacity - 1) // class_capacity
-			generator = tool.EduDataGenerator()
-			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
-			student_names = generator.generate_student_names(num_students=student_limit)
-			for class_idx in range(class_count):
-				class_id = edu.UserAction().create_class(name=class_names[class_idx])["id"]
-				print(f"创建班级 {class_id}")
-				start = class_idx * class_capacity
-				end = start + class_capacity
-				batch_names = student_names[start:end]
-				edu.UserAction().add_students_to_class(name=batch_names, class_id=class_id)
-				print("添加学生ing")
-
-		def _delete_students(delete_limit: int | None) -> None:
-			"""删除学生账号内部逻辑"""
-			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
-			for student in students:
-				self._edu_motion.delete_student_from_class(stu_id=student["id"])
-
-		if method == "delete":
-			_delete_students(limit)
-		elif method == "create":
-			actual_limit = limit or 100
-			_create_students(actual_limit)
-
-	def execute_chalky_brook(self, work_id: int) -> None:
-		hidden_border = 10
-		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self._work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
-
-	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
-		if source == "post":
-			self._forum_motion.create_post_reply(post_id=target_id, content=content)
-		elif source == "shop":
-			self._shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
-		elif source == "work":
-			self._work_motion.create_work_comment(work_id=target_id, comment=content)
-		else:
-			msg = f"不支持的源 {source}"
-			raise TypeError(msg)
-
 	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self._novel_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
@@ -872,7 +787,7 @@ class Motion(ClassUnion):
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
 		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
-		fiction_dir = DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir = data.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
@@ -936,6 +851,8 @@ class ReportHandler(ClassUnion):
 		super().__init__()
 		# 状态变量
 		self.student_accounts: list[tuple[str, str]] = []
+		self.student_tokens: list[str] = []
+		self.auth_method: Literal["load", "grab"] = "grab"
 		self.processed_count = 0
 		# 批量处理配置
 		self.batch_config = {
@@ -943,7 +860,7 @@ class ReportHandler(ClassUnion):
 			"duplicate_threshold": 5,
 			"content_threshold": 3,
 		}
-		self.official_id: set[int] = {128963, 629005, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
+		self.official_id: set[int] = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
 
 	def execute_judgement_login(self) -> None:
 		"""执行登录流程"""
@@ -1015,12 +932,23 @@ class ReportHandler(ClassUnion):
 		"""加载学生账号用于自动举报"""
 		self._client.switch_account(token=self._client.token.average, identity="average")
 		if input("是否加载学生账号用于自动举报? (Y/N) ").upper() == "Y":
-			try:
-				self.student_accounts = list(Obtain().switch_edu_account(limit=50, return_method="list"))
-				print(f"已加载 {len(self.student_accounts)} 个学生账号")
-			except Exception as e:
-				print(f"加载学生账号失败: {e}")
-				self.student_accounts = []
+			method = self._tool.Printer().get_valid_input(prompt="选择模式(load.加载 grab.获取)", valid_options={"load", "grab"}, cast_type=str)
+			self.auth_method = method = cast("Literal['load', 'grab']", method)
+			if method == "grab":
+				try:
+					num = tool.Printer().get_valid_input(prompt="输入获取账号数", cast_type=int, validator=lambda x: x >= 0)
+					self.student_accounts = list(Obtain().switch_edu_account(limit=num, return_method="list"))
+					print(f"已加载 {len(self.student_accounts)} 个学生账号")
+				except Exception as e:
+					print(f"加载学生账号失败: {e}")
+					self.student_accounts = []
+			elif method == "load":
+				try:
+					token_list = self._file.read_line(data.TOKEN_DIR)
+					self.student_tokens.extend(token.strip() for token in token_list)
+					print(f"已从文件加载 {len(self.student_tokens)} 个学生账号")
+				except Exception as e:
+					print(f"从文件加载学生账号失败: {e}")
 		else:
 			print("未加载学生账号,自动举报功能不可用")
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
@@ -1171,11 +1099,16 @@ class ReportHandler(ClassUnion):
 		user_nickname = item.get(f"{cfg_user_field}_nick_name", item.get(f"{cfg_user_field}_nickname", "N/A"))
 		print(f"被举报人: {user_nickname}")
 		# 检查是否为官方内容
+
 		user_id = cast("str", item.get(f"{cfg_user_field}_id"))
 		if user_id and int(user_id) in self.official_id:
 			print("这是一条官方发布的内容")
-			print("已跳过")
-			return None
+			handler = getattr(self._whale_motion, cfg["handle_method"])
+			handler(report_id=item.get("id"), resolution="PASS", admin_id=admin_id)
+			record["processed"] = True
+			print("已通过")
+			return "P"
+
 		print(f"举报原因: {item.get('reason_content', 'N/A')}")
 		created_at = item.get("created_at", 0)
 		print(f"举报时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
@@ -1376,21 +1309,21 @@ class ReportHandler(ClassUnion):
 			print(f"分析评论违规内容失败: {e}")
 			return []
 
-	def _process_report_requests(  # noqa: PLR0914
+	def _process_report_requests(  # noqa: PLR0914, PLR0915
 		self,
 		violations: list[str],
 		source_id: int,
 		source_type: Literal["post", "work", "shop"],
 	) -> None:
 		"""处理举报请求核心逻辑"""
-		if not self.student_accounts:
+		if not self.student_accounts and not self.student_tokens:
 			print("未加载学生账号,无法执行自动举报")
 			return
 		if input("是否自动举报违规评论? (Y/N) ").upper() != "Y":
 			print("操作已取消")
 			return
 		# 账号处理逻辑
-		available_accounts = self.student_accounts.copy()
+		available_accounts = self.student_accounts.copy() if self.student_accounts else self.student_tokens
 		current_account = None
 		report_counter = -1
 		try:
@@ -1408,19 +1341,26 @@ class ReportHandler(ClassUnion):
 					break
 				# 随机选择账号
 				current_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
-				identity, pass_key = current_account
-				print(f"\n切换教育账号: {id(identity)}")
-				sleep(2)
-				try:
-					self._community_login.authenticate_with_token(
-						identity=identity,
-						password=pass_key,
-						status="edu",
-					)
-					report_counter = 0
-				except Exception as e:
-					print(f"账号登录失败: {e}")
-					continue
+				if self.auth_method == "grab":
+					identity, pass_key = current_account
+					print(f"\n切换教育账号: {id(identity)}")
+					sleep(2)
+					try:
+						self._community_login.authenticate_with_token(
+							identity=identity,
+							password=pass_key,
+							status="edu",
+						)
+						report_counter = 0
+					except Exception as e:
+						print(f"账号登录失败: {e}")
+						continue
+				elif self.auth_method == "load":
+					token = cast("str", current_account)
+					print(f"\n切换教育账号: {id(token)}")
+					self._client.switch_account(token=token, identity="edu")
+			user_details = self._user_obtain.fetch_account_details()
+			user_id = user_details["id"]
 			# 解析违规内容并执行举报
 			parts = violation.split(":")
 			item_id_part = parts[0].split(".")
@@ -1441,6 +1381,7 @@ class ReportHandler(ClassUnion):
 					target_id=target_id,
 					source_id=source_id,
 					reason_id=7,
+					reporter_id=user_id,
 					reason_content=reason_content,
 					parent_id=parent_id,
 					is_reply=is_reply,
@@ -1461,6 +1402,7 @@ class ReportHandler(ClassUnion):
 		target_id: int,
 		source_id: int,
 		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
+		reporter_id: int,
 		reason_content: str,
 		parent_id: int | None = None,
 		description: str = "",
@@ -1481,7 +1423,7 @@ class ReportHandler(ClassUnion):
 							comment_id=target_id,
 							reason_content=reason_content,
 							reason_id=reason_id,
-							reporter_id=int(self._data.ACCOUNT_DATA.id),
+							reporter_id=reporter_id,
 							comment_parent_id=parent_id,
 							description=description,
 						)
@@ -1489,7 +1431,7 @@ class ReportHandler(ClassUnion):
 						comment_id=target_id,
 						reason_content=reason_content,
 						reason_id=reason_id,
-						reporter_id=int(self._data.ACCOUNT_DATA.id),
+						reporter_id=reporter_id,
 						description=description,
 					)
 		except Exception as e:
@@ -1691,3 +1633,103 @@ class FileUploader(ClassUnion):
 		if response.status_code != HTTPSTATUS.OK.value:
 			return False
 		return bool(next(response.iter_content(chunk_size=1)))
+
+
+class MillenniumEntanglement(ClassUnion):
+	def __init__(self) -> None:
+		super().__init__()
+
+	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
+		if custom_list:
+			target_list = custom_list
+		elif method == "work":
+			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
+		elif method == "novel":
+			target_list = self._novel_obtain.fetch_my_novels()
+		else:
+			msg = f"不支持的{method}"
+			raise TypeError(msg)
+
+		def action() -> None:
+			if method == "work":
+				Motion().like_all_work(user_id=str(user_id), works_list=target_list)
+			else:
+				Motion().like_my_novel(novel_list=target_list)
+
+		Obtain().process_edu_accounts(limit=None, action=action())
+
+	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
+		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+		generator = tool.EduDataGenerator()
+		self._edu_motion.execute_upgrade_to_teacher(
+			user_id=int(self._data.ACCOUNT_DATA.id),
+			real_name=real_name,
+			grade=["2", "3", "4"],
+			school_id=11000161,
+			school_name="北京景山学校",
+			school_type=1,
+			country_id="156",
+			province_id=1,
+			city_id=1,
+			district_id=1,
+			teacher_card_number=generator.generate_teacher_certificate_number(),
+		)
+
+	def execute_batch_handle_account(self, method: Literal["create", "delete", "token"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
+		"""批量处理教育账号"""
+
+		def _create_students(student_limit: int) -> None:
+			"""创建学生账号内部逻辑"""
+			class_capacity = 95
+			class_count = (student_limit + class_capacity - 1) // class_capacity
+			generator = tool.EduDataGenerator()
+			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
+			student_names = generator.generate_student_names(num_students=student_limit)
+			for class_idx in range(class_count):
+				class_id = edu.UserAction().create_class(name=class_names[class_idx])["id"]
+				print(f"创建班级 {class_id}")
+				start = class_idx * class_capacity
+				end = start + class_capacity
+				batch_names = student_names[start:end]
+				edu.UserAction().add_students_to_class(name=batch_names, class_id=class_id)
+				print("添加学生ing")
+
+		def _delete_students(delete_limit: int | None) -> None:
+			"""删除学生账号内部逻辑"""
+			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
+			for student in students:
+				self._edu_motion.delete_student_from_class(stu_id=student["id"])
+
+		def _create_token(token_limit: int) -> list[str]:
+			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
+			token_list = []
+			for identity, pass_key in accounts:
+				response = community.AuthManager().authenticate_with_password(identity=identity, password=pass_key, status="edu")
+				token = response["auth"]["token"]
+				token_list.append(token)
+				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")
+			return token_list
+
+		if method == "delete":
+			_delete_students(limit)
+		elif method == "create":
+			actual_limit = limit or 100
+			_create_students(actual_limit)
+		elif method == "token":
+			actual_limit = limit or 100
+			_create_token(token_limit=actual_limit)
+
+	def execute_chalky_brook(self, work_id: int) -> None:
+		hidden_border = 10
+		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self._work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
+
+	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
+		if source == "post":
+			self._forum_motion.create_post_reply(post_id=target_id, content=content)
+		elif source == "shop":
+			self._shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
+		elif source == "work":
+			self._work_motion.create_work_comment(work_id=target_id, comment=content)
+		else:
+			msg = f"不支持的源 {source}"
+			raise TypeError(msg)
