@@ -946,6 +946,7 @@ class ReportHandler(ClassUnion):
 			"duplicate_threshold": 5,
 			"content_threshold": 3,
 		}
+		self.official_id: set[int] = {128963, 629005, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
 
 	def execute_judgement_login(self) -> None:  # 优化方法名:添加execute_前缀
 		choice = input("请选择登录方式: 1.Token登录 2.账密登录 ")
@@ -1139,16 +1140,23 @@ class ReportHandler(ClassUnion):
 		if batch_mode:
 			print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
 		print(f"\n{'=' * 50}")
+
 		print(f"举报ID: {item['id']}")
 		print(f"举报类型 {report_type}")
 		print(f"举报内容: {self._tool.DataConverter().html_to_text(item[cfg['content_field']])}")
 		print(f"所属板块: {item.get('board_name', item.get(cfg.get('source_name_field', ''), ''))}")
 		# 显示被举报人信息
 		cfg_user_field = cfg["user_field"]
+
 		if report_type == "post":
 			print(f"被举报人: {item[f'{cfg_user_field}_nick_name']}")
 		else:
 			print(f"被举报人: {item[f'{cfg_user_field}_nickname']}")
+		for official_id in self.official_id:
+			if str(official_id) == str(item[f"{cfg_user_field}_id"]):
+				print("这是一条官方发布的内容")
+				print("已跳过")
+				return None
 		print(f"举报原因: {item['reason_content']}")
 		print(f"举报时间: {self._tool.TimeUtils().format_timestamp(item['created_at'])}")
 		if report_type == "post":
@@ -1226,6 +1234,7 @@ class ReportHandler(ClassUnion):
 			else:
 				found = False
 				for comment in comments:
+					comment = data.NestedDefaultDict(comment)  # noqa: PLW2901
 					if comment["id"] == item.get("comment_id"):
 						print(f"发送时间: {self._tool.TimeUtils().format_timestamp(comment['created_at'])}")
 						found = True
@@ -1234,6 +1243,7 @@ class ReportHandler(ClassUnion):
 					print("未找到 comment_id")
 		else:
 			details = self._forum_obtain.fetch_single_post_details(post_id=item[cfg["source_id_field"]])
+			details = data.NestedDefaultDict(details)
 			print(f"发送时间: {self._tool.TimeUtils().format_timestamp(details['created_at'])}")
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: int) -> None:
