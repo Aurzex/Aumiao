@@ -21,7 +21,6 @@ logging.basicConfig(
 	format="%(asctime)s - %(levelname)s - %(message)s",  # cSpell:ignore levelname
 )
 printer = tool.Printer()
-plugins_path = data.CURRENT_DIR / "plugins"
 
 
 @dataclass
@@ -257,16 +256,18 @@ def logout(account_data_manager: AccountDataManager) -> None:
 @handle_errors
 def plugin_manager(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	printer.print_header("插件管理")
-	plugin_manager = plugin.LazyPluginManager(plugins_path)
+	plugin_manager = plugin.LazyPluginManager(data.PLUGIN_PATH)
 	console = plugin.PluginConsole(plugin_manager)
 	console.run()
 
 
 @handle_errors
 @require_login
-def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
+def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
-	if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
+	# if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
+	# 	return
+	if printer.prompt_input("") not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
 		return
 	printer.print_header("隐藏功能")
 	print(printer.color_text("1. 自动点赞", "COMMENT"))
@@ -275,23 +276,23 @@ def handle_hidden_features(account_data_manager: AccountDataManager) -> None:
 	sub_choice = printer.get_valid_input("操作选择", valid_options={"1", "2", "3"})
 	if sub_choice == "1":
 		user_id = printer.get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
-		client.Motion().execute_chiaroscuro_chronicles(user_id=user_id, method="work")
+		client.MillenniumEntanglement().execute_chiaroscuro_chronicles(user_id=user_id, method="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
-		mode = printer.get_valid_input("模式 (delete/create)", {"delete", "create"})
+		mode = printer.get_valid_input("模式 (delete/create/token)", {"delete", "create", "token"})
 		# 显式转换为Literal类型,解决类型不匹配问题
-		mode = cast("Literal['delete', 'create']", mode)
+		mode = cast("Literal['delete', 'create','token']", mode)
 		limit = printer.get_valid_input(
 			"数量",
 			cast_type=int,
 			valid_options=range(1, 101),  # 限制1-100的范围
 			validator=lambda x: x > 0,
 		)
-		client.Motion().execute_batch_handle_account(method=mode, limit=limit)
+		client.MillenniumEntanglement().execute_batch_handle_account(method=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
 		real_name = printer.prompt_input("输入姓名")
-		client.Motion().execute_celestial_maiden_chronicles(real_name=real_name)
+		client.MillenniumEntanglement().execute_celestial_maiden_chronicles(real_name=real_name)
 		print(printer.color_text("账号提权完成", "SUCCESS"))
 
 

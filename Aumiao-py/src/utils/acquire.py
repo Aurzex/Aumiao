@@ -61,7 +61,7 @@ class PaginationConfig(TypedDict, total=False):
 
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD"]
 FetchMethod = Literal["GET", "POST"]
-EXTRA_HEADERS: dict[str, str] = {"access-token": "0"}
+EXTRA_HEADERS: dict[str, str] = {"Cookie": "access-token=0;"}
 
 
 @singleton
@@ -124,7 +124,7 @@ class CodeMaoClient:
 		url = endpoint if endpoint.startswith("http") else f"{self.base_url}{endpoint}"
 		base_headers = dict(self._session.headers)  # 包含账户token
 		# 优先级:传入headers > 会话headers > 全局headers
-		merged_headers = {
+		merged_headers: dict[str, str | bytes] = {
 			**self.headers,  # 全局默认头
 			**EXTRA_HEADERS,  # 额外请求头
 			**base_headers,  # 当前会话头.含账户token

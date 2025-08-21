@@ -80,3 +80,10 @@ class CodeMaoFile:
 				f.write(json_str)
 			elif isinstance(content, list):
 				f.writelines(line + "\n" for line in content)
+
+	@staticmethod
+	def read_line(path: Path) -> list[str]:
+		lines = []
+		with Path.open(self=path, encoding="utf-8") as f:
+			lines.extend(line.strip() for line in f)
+		return lines

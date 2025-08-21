@@ -16,8 +16,11 @@ CURRENT_DIR = Path.cwd()
 DATA_DIR = Path(os.getenv("APP_DATA_DIR", CURRENT_DIR / "data"))
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
 DATA_FILE_PATH = DATA_DIR / "data.json"
+DOWNLOAD_DIR: Path = CURRENT_DIR / "download"
 HISTORY_FILE_PATH = DATA_DIR / "history.json"
+PLUGIN_PATH = CURRENT_DIR / "plugins"
 SETTING_FILE_PATH = DATA_DIR / "setting.json"
+TOKEN_DIR: Path = DATA_DIR / "token.txt"
 # 确保数据目录存在
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 # 定义Literal类型别名
