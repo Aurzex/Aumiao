@@ -861,10 +861,13 @@ class ReportHandler(ClassUnion):
 			"content_threshold": 3,
 		}
 		self.official_id: set[int] = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
+		# 初始化打印机
+		self.printer = tool.Printer()
 
 	def execute_judgement_login(self) -> None:
 		"""执行登录流程"""
-		choice = input("请选择登录方式: 1.Token登录 2.账密登录 ")
+		self.printer.print_header("登录管理后台")
+		choice = self.printer.get_valid_input("请选择登录方式: 1.Token登录 2.账密登录", valid_options={"1", "2"})
 		if choice == "1":
 			self._handle_token_login()
 		elif choice == "2":
@@ -872,32 +875,36 @@ class ReportHandler(ClassUnion):
 
 	def _handle_token_login(self) -> None:
 		"""处理Token登录"""
-		token = input("请输入 Authorization: ")
+		token = self.printer.prompt_input("请输入 Authorization")
 		self._whale_routine.configure_authentication_token(token)
+		self.printer.print_message("Token登录成功", "SUCCESS")
 
 	def _handle_password_login(self) -> None:
 		"""处理账密登录"""
 
 		def input_password() -> tuple[str, str]:
-			identity = input("请输入用户名: ")
-			password = input("请输入密码: ")
+			identity = self.printer.prompt_input("请输入用户名")
+			password = self.printer.prompt_input("请输入密码")
 			return (identity, password)
 
 		def input_captcha(timestamp: int) -> tuple[str, whale.RequestsCookieJar]:
-			print("正在获取验证码...")
+			self.printer.print_message("正在获取验证码...", "INFO")
 			cookies: whale.RequestsCookieJar = self._whale_routine.fetch_verification_captcha(timestamp=timestamp)
-			return input("请输入验证码: "), cookies
+			captcha = self.printer.prompt_input("请输入验证码")
+			return captcha, cookies
 
 		timestamp = self._tool.TimeUtils().current_timestamp(13)
 		identity, password = input_password()
 		captcha, _cookies = input_captcha(timestamp=timestamp)
+
 		while True:
 			response = self._whale_routine.authenticate_user(username=identity, password=password, key=timestamp, code=captcha)
 			if "token" in response:
 				self._whale_routine.configure_authentication_token(response["token"])
+				self.printer.print_message("登录成功", "SUCCESS")
 				break
 			if "error_code" in response:
-				print(response["error_msg"])
+				self.printer.print_message(response["error_msg"], "ERROR")
 				if response["error_code"] in {"Admin-Password-Error@Community-Admin", "Param - Invalid @ Common"}:
 					identity, password = input_password()
 				timestamp = self._tool.TimeUtils().current_timestamp(13)
@@ -905,6 +912,7 @@ class ReportHandler(ClassUnion):
 
 	def execute_handle_report(self, admin_id: int) -> None:
 		"""执行举报处理主流程"""
+		self.printer.print_header("举报处理系统")
 		# 加载学生账号(用于自动举报)
 		self._load_student_accounts()
 		# 主处理循环
@@ -912,45 +920,51 @@ class ReportHandler(ClassUnion):
 			# 获取所有待处理举报
 			all_records = self._fetch_all_reports()
 			if not all_records:
-				print("\n当前没有待处理的举报")
+				self.printer.print_message("当前没有待处理的举报", "INFO")
 				break
-			print(f"\n===== 发现 {len(all_records)} 条待处理举报 =====")
+
+			self.printer.print_message(f"发现 {len(all_records)} 条待处理举报", "INFO")
 			batch_processed = self.process_report_batch(all_records, admin_id)
 			self.processed_count += batch_processed
-			print(f"\n本次处理完成: {batch_processed} 条举报")
-			if input("\n是否继续检查新举报? (Y/N) ").upper() != "Y":
+			self.printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
+
+			if self.printer.get_valid_input("是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 				break
-			print("\n重新获取新举报...")
-		print(f"\n{'=' * 50}")
-		print(f"本次会话共处理 {self.processed_count} 条举报")
-		print(f"{'=' * 50}")
+
+			self.printer.print_message("重新获取新举报...", "INFO")
+
+		self.printer.print_header("处理结果统计")
+		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		self._whale_routine.terminate_session()
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
-		print("已恢复原始账号状态")
+		self.printer.print_message("已恢复原始账号状态", "INFO")
 
 	def _load_student_accounts(self) -> None:
 		"""加载学生账号用于自动举报"""
 		self._client.switch_account(token=self._client.token.average, identity="average")
-		if input("是否加载学生账号用于自动举报? (Y/N) ").upper() == "Y":
-			method = self._tool.Printer().get_valid_input(prompt="选择模式(load.加载 grab.获取)", valid_options={"load", "grab"}, cast_type=str)
+
+		if self.printer.get_valid_input("是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() == "Y":
+			method = self.printer.get_valid_input("选择模式(load.加载 grab.获取)", valid_options={"load", "grab"}, cast_type=str)
 			self.auth_method = method = cast("Literal['load', 'grab']", method)
+
 			if method == "grab":
 				try:
-					num = tool.Printer().get_valid_input(prompt="输入获取账号数", cast_type=int, validator=lambda x: x >= 0)
+					num = self.printer.get_valid_input("输入获取账号数", cast_type=int, validator=lambda x: x >= 0)
 					self.student_accounts = list(Obtain().switch_edu_account(limit=num, return_method="list"))
-					print(f"已加载 {len(self.student_accounts)} 个学生账号")
+					self.printer.print_message(f"已加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 				except Exception as e:
-					print(f"加载学生账号失败: {e}")
+					self.printer.print_message(f"加载学生账号失败: {e}", "ERROR")
 					self.student_accounts = []
 			elif method == "load":
 				try:
 					token_list = self._file.read_line(data.TOKEN_DIR)
 					self.student_tokens.extend(token.strip() for token in token_list)
-					print(f"已从文件加载 {len(self.student_tokens)} 个学生账号")
+					self.printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号", "SUCCESS")
 				except Exception as e:
-					print(f"从文件加载学生账号失败: {e}")
+					self.printer.print_message(f"从文件加载学生账号失败: {e}", "ERROR")
 		else:
-			print("未加载学生账号,自动举报功能不可用")
+			self.printer.print_message("未加载学生账号,自动举报功能不可用", "WARNING")
+
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
 
 	def _fetch_all_reports(self) -> list[ReportRecord]:
@@ -963,7 +977,7 @@ class ReportHandler(ClassUnion):
 		]
 		for report_type, report_gen in sources:
 			for item in report_gen:
-				item_dict = data.NestedDefaultDict(item).to_dict()  # 使用NestedDefaultDict包装
+				item_dict = data.NestedDefaultDict(item).to_dict()
 				cfg = self.get_type_config(report_type, item_dict)
 				all_records.append(
 					{
@@ -1056,20 +1070,22 @@ class ReportHandler(ClassUnion):
 
 	def _handle_batch_groups(self, batch_groups: list, admin_id: int) -> None:
 		"""处理批量分组"""
-		print("\n发现以下批量处理项:")
+		self.printer.print_message("发现以下批量处理项:", "INFO")
 		for i, (g_type, g_key, items) in enumerate(batch_groups, 1):
-			print(f"{i}. [{g_type}] {g_key} ({len(items)}次举报)")
-		if input("\n是否查看详情?(Y/N) ").upper() == "Y":
+			self.printer.print_message(f"{i}. [{g_type}] {g_key} ({len(items)}次举报)", "INFO")
+
+		if self.printer.get_valid_input("是否查看详情?(Y/N)", valid_options={"Y", "N"}).upper() == "Y":
 			for g_type, g_key, items in batch_groups:
-				print(f"\n=== {g_type}组: {g_key} ===")
-				for item in items[:3]:  # 展示前3条
+				self.printer.print_header(f"{g_type}组: {g_key}")
+				for item in items[:3]:
 					created_at = item["item"].get("created_at", 0)
-					print(f"举报ID: {item['item'].get('id', 'N/A')} | 时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
+					self.printer.print_message(f"举报ID: {item['item'].get('id', 'N/A')} | 时间: {self._tool.TimeUtils().format_timestamp(created_at)}", "INFO")
 				if len(items) > self.batch_config["content_threshold"]:
-					print(f"...及其他{len(items) - 3}条举报")
-		if input("\n确认批量处理这些项目?(Y/N) ").upper() == "Y":
+					self.printer.print_message(f"...及其他{len(items) - 3}条举报", "INFO")
+
+		if self.printer.get_valid_input("确认批量处理这些项目?(Y/N)", valid_options={"Y", "N"}).upper() == "Y":
 			for g_type, g_key, items in batch_groups:
-				print(f"\n正在处理 [{g_type}] {g_key}...")
+				self.printer.print_message(f"正在处理 [{g_type}] {g_key}...", "INFO")
 				first_action = None
 				# 处理首个项目
 				if not items[0]["processed"]:
@@ -1079,50 +1095,61 @@ class ReportHandler(ClassUnion):
 					for item in items[1:]:
 						if not item["processed"]:
 							self.apply_action(item, first_action, admin_id)
-							print(f"已自动处理举报ID: {item['item'].get('id', 'N/A')}")
+							self.printer.print_message(f"已自动处理举报ID: {item['item'].get('id', 'N/A')}", "SUCCESS")
 
 	def process_single_item(self, record: ReportRecord, admin_id: int, *, batch_mode: bool = False) -> str | None:
 		"""处理单个举报项目"""
-		item = record["item"]  # 已经是NestedDefaultDict
+		item = record["item"]
 		report_type = record["report_type"]
 		cfg = self.get_type_config(report_type, item)
+
 		if batch_mode:
-			print(f"\n{'=' * 30} 批量处理首个项目 {'=' * 30}")
-		print(f"\n{'=' * 50}")
-		print(f"举报ID: {item.get('id', 'N/A')}")
-		print(f"举报类型 {report_type}")
-		print(f"举报内容: {self._tool.DataConverter().html_to_text(item.get(cfg['content_field'], ''))}")
+			self.printer.print_header("批量处理首个项目")
+
+		self.printer.print_header("举报详情")
+		self.printer.print_message(f"举报ID: {item.get('id', 'N/A')}", "INFO")
+		self.printer.print_message(f"举报类型: {report_type}", "INFO")
+		self.printer.print_message(f"举报内容: {self._tool.DataConverter().html_to_text(item.get(cfg['content_field'], ''))}", "INFO")
+
 		board_name = item.get("board_name", item.get(cfg.get("source_name_field", ""), ""))
-		print(f"所属板块: {board_name}")
+		self.printer.print_message(f"所属板块: {board_name}", "INFO")
+
 		# 显示被举报人信息
 		cfg_user_field = cfg["user_field"]
 		user_nickname = item.get(f"{cfg_user_field}_nick_name", item.get(f"{cfg_user_field}_nickname", "N/A"))
-		print(f"被举报人: {user_nickname}")
-		# 检查是否为官方内容
+		self.printer.print_message(f"被举报人: {user_nickname}", "INFO")
 
+		# 检查是否为官方内容
 		user_id = cast("str", item.get(f"{cfg_user_field}_id"))
 		if user_id and int(user_id) in self.official_id:
-			print("这是一条官方发布的内容")
+			self.printer.print_message("这是一条官方发布的内容", "WARNING")
 			handler = getattr(self._whale_motion, cfg["handle_method"])
 			handler(report_id=item.get("id"), resolution="PASS", admin_id=admin_id)
 			record["processed"] = True
-			print("已通过")
+			self.printer.print_message("已通过", "SUCCESS")
 			return "P"
 
-		print(f"举报原因: {item.get('reason_content', 'N/A')}")
+		self.printer.print_message(f"举报原因: {item.get('reason_content', 'N/A')}", "INFO")
 		created_at = item.get("created_at", 0)
-		print(f"举报时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
+		self.printer.print_message(f"举报时间: {self._tool.TimeUtils().format_timestamp(created_at)}", "INFO")
+
 		if report_type == "post":
-			print(f"举报线索: {item.get('description', 'N/A')}")
+			self.printer.print_message(f"举报线索: {item.get('description', 'N/A')}", "INFO")
+
 		# 操作选择循环
 		while True:
-			choice = input("选择操作: D:删除, S:禁言7天, T:禁言3月 P:通过, C:查看, F:检查违规, J:跳过  ").upper()
+			choice = self.printer.get_valid_input(
+				"选择操作: D:删除, S:禁言7天, T:禁言3月 P:通过, C:查看, F:检查违规, J:跳过", valid_options={"D", "S", "T", "P", "C", "F", "J"}
+			).upper()
+
 			if choice in {"D", "S", "T", "P"}:
 				status_map = {"D": "DELETE", "S": "MUTE_SEVEN_DAYS", "P": "PASS", "T": "MUTE_THREE_MONTHS"}
 				handler = getattr(self._whale_motion, cfg["handle_method"])
 				handler(report_id=item.get("id"), resolution=status_map[choice], admin_id=admin_id)
 				record["processed"] = True
+				self.printer.print_message(f"已执行操作: {status_map[choice]}", "SUCCESS")
 				return choice
+
 			if choice == "C":
 				self._show_details(item, report_type, cfg)
 			elif choice == "F" and cfg["special_check"]():
@@ -1138,10 +1165,10 @@ class ReportHandler(ClassUnion):
 					user_id=user_id,
 				)
 			elif choice == "J":
-				print("已跳过")
+				self.printer.print_message("已跳过", "INFO")
 				return None
 			else:
-				print("无效输入")
+				self.printer.print_message("无效输入", "ERROR")
 
 	def apply_action(self, record: ReportRecord, action: str, admin_id: int) -> None:
 		"""应用处理操作到举报项目"""
@@ -1154,31 +1181,34 @@ class ReportHandler(ClassUnion):
 			admin_id=admin_id,
 		)
 		record["processed"] = True
+		self.printer.print_message(f"已应用操作: {status_map[action]}", "SUCCESS")
 
 	def _show_details(self, item: dict, report_type: Literal["comment", "post", "discussion"], cfg: dict) -> None:  # noqa: PLR0912, PLR0915
 		"""显示举报项目详细信息"""
-		item = data.NestedDefaultDict(item).to_dict()  # 使用NestedDefaultDict包装
+		item = data.NestedDefaultDict(item).to_dict()
 		if report_type == "comment":
 			source_id = item.get(cfg["source_id_field"], "")
-			print(f"违规板块ID: https://shequ.codemao.cn/work_shop/{source_id}")
+			self.printer.print_message(f"违规板块ID: https://shequ.codemao.cn/work_shop/{source_id}", "INFO")
 		elif report_type == "post":
 			post_id = item.get(cfg["source_id_field"], "")
-			print(f"违规帖子ID: https://shequ.codemao.cn/community/{post_id}")
-			print(f"\n{'=' * 30} 帖子内容 {'=' * 30}")
+			self.printer.print_message(f"违规帖子ID: https://shequ.codemao.cn/community/{post_id}", "INFO")
+			self.printer.print_header("帖子内容")
 			try:
 				content = self._forum_obtain.fetch_posts_details(post_ids=int(post_id))["items"][0]["content"]
-				print(self._tool.DataConverter().html_to_text(content))
+				self.printer.print_message(self._tool.DataConverter().html_to_text(content), "INFO")
 			except (KeyError, IndexError, ValueError):
-				print("获取帖子内容失败")
+				self.printer.print_message("获取帖子内容失败", "ERROR")
 		elif report_type == "discussion":
-			print(f"所属帖子标题: {item.get('post_title', 'N/A')}")
-			print(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item.get('post_user_id', 'N/A')}")
+			self.printer.print_message(f"所属帖子标题: {item.get('post_title', 'N/A')}", "INFO")
+			self.printer.print_message(f"所属帖子帖主ID: https://shequ.codemao.cn/user/{item.get('post_user_id', 'N/A')}", "INFO")
 			source_id = item.get(cfg["source_id_field"], "")
-			print(f"所属帖子ID: https://shequ.codemao.cn/community/{source_id}")
+			self.printer.print_message(f"所属帖子ID: https://shequ.codemao.cn/community/{source_id}", "INFO")
+
 		# 显示违规用户信息
 		cfg_user_field = cfg["user_field"]
 		user_id = item.get(f"{cfg_user_field}_id", "N/A")
-		print(f"违规用户ID: https://shequ.codemao.cn/user/{user_id}")
+		self.printer.print_message(f"违规用户ID: https://shequ.codemao.cn/user/{user_id}", "INFO")
+
 		# 显示发送时间
 		if report_type in {"comment", "discussion"}:
 			source = "shop" if report_type == "comment" else "post"
@@ -1193,7 +1223,7 @@ class ReportHandler(ClassUnion):
 							for reply in comment.get("replies", []):
 								if reply.get("id") == comment_id:
 									created_at = reply.get("created_at", 0)
-									print(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
+									self.printer.print_message(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}", "INFO")
 									break
 							break
 				else:
@@ -1203,22 +1233,22 @@ class ReportHandler(ClassUnion):
 						comment = data.NestedDefaultDict(comment)  # noqa: PLW2901
 						if comment.get("id") == comment_id:
 							created_at = comment.get("created_at", 0)
-							print(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
+							self.printer.print_message(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}", "INFO")
 							found = True
 							break
 					if not found:
-						print("未找到 comment_id")
+						self.printer.print_message("未找到 comment_id", "WARNING")
 			except Exception as e:
-				print(f"获取评论详情失败: {e}")
+				self.printer.print_message(f"获取评论详情失败: {e}", "ERROR")
 		else:
 			try:
 				post_id = item.get(cfg["source_id_field"], 0)
 				details = self._forum_obtain.fetch_single_post_details(post_id=post_id)
 				details = data.NestedDefaultDict(details)
 				created_at = details.get("created_at", 0)
-				print(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}")
+				self.printer.print_message(f"发送时间: {self._tool.TimeUtils().format_timestamp(created_at)}", "INFO")
 			except Exception as e:
-				print(f"获取帖子详情失败: {e}")
+				self.printer.print_message(f"获取帖子详情失败: {e}", "ERROR")
 
 	def _check_report(self, source_id: int, source_type: Literal["shop", "work", "discussion", "post"], title: str, user_id: str) -> None:
 		"""检查举报内容"""
@@ -1231,7 +1261,7 @@ class ReportHandler(ClassUnion):
 				title=title,
 			)
 			if not violations:
-				print("没有违规评论")
+				self.printer.print_message("没有违规评论", "INFO")
 				return
 			# 处理举报请求
 			self._process_report_requests(
@@ -1244,9 +1274,9 @@ class ReportHandler(ClassUnion):
 				search_result = list(self._forum_obtain.search_posts_gen(title=title, limit=None))
 				user_posts = self._tool.DataProcessor().filter_by_nested_values(data=search_result, id_path="user.id", target_values=[user_id])
 				if len(user_posts) >= self._setting.PARAMETER.spam_del_max:
-					print(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次")
+					self.printer.print_message(f"用户{user_id} 已连续发布帖子{title} {len(user_posts)}次", "WARNING")
 			except Exception as e:
-				print(f"搜索帖子失败: {e}")
+				self.printer.print_message(f"搜索帖子失败: {e}", "ERROR")
 
 	def _analyze_comments_violations(
 		self,
@@ -1281,7 +1311,7 @@ class ReportHandler(ClassUnion):
 			abnormal_targets = defaultdict(list)
 			# 处理广告
 			processor.process_item(
-				item={"id": source_id, "title": title},  # 临时item对象
+				item={"id": source_id, "title": title},
 				config=config,
 				action_type="ads",
 				params=params,
@@ -1306,7 +1336,7 @@ class ReportHandler(ClassUnion):
 			)
 			return abnormal_targets["ads"] + abnormal_targets["blacklist"] + duplicate_targets["duplicates"]
 		except Exception as e:
-			print(f"分析评论违规内容失败: {e}")
+			self.printer.print_message(f"分析评论违规内容失败: {e}", "ERROR")
 			return []
 
 	def _process_report_requests(  # noqa: PLR0914, PLR0915
@@ -1317,33 +1347,41 @@ class ReportHandler(ClassUnion):
 	) -> None:
 		"""处理举报请求核心逻辑"""
 		if not self.student_accounts and not self.student_tokens:
-			print("未加载学生账号,无法执行自动举报")
+			self.printer.print_message("未加载学生账号,无法执行自动举报", "WARNING")
 			return
-		if input("是否自动举报违规评论? (Y/N) ").upper() != "Y":
-			print("操作已取消")
+
+		if self.printer.get_valid_input("是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+			self.printer.print_message("操作已取消", "INFO")
 			return
+
 		# 账号处理逻辑
 		available_accounts = self.student_accounts.copy() if self.student_accounts else self.student_tokens
 		current_account = None
 		report_counter = -1
+
 		try:
 			reason_content = self._community_obtain.fetch_report_reasons()["items"][7]["content"]
 		except (KeyError, IndexError):
-			print("获取举报原因失败")
+			self.printer.print_message("获取举报原因失败", "ERROR")
 			return
+
 		source_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {"work": "work", "post": "forum", "shop": "shop"}
-		print(f"\n开始自动举报 ({len(violations)} 条违规内容)")
+
+		self.printer.print_message(f"开始自动举报 ({len(violations)} 条违规内容)", "INFO")
+
 		for i, violation in enumerate(violations, 1):
 			# 账号切换逻辑
 			if report_counter >= self._setting.PARAMETER.report_work_max or report_counter == -1:
 				if not available_accounts:
-					print("所有可用学生账号均已尝试")
+					self.printer.print_message("所有可用学生账号均已尝试", "WARNING")
 					break
+
 				# 随机选择账号
 				current_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
+
 				if self.auth_method == "grab":
 					identity, pass_key = current_account
-					print(f"\n切换教育账号: {id(identity)}")
+					self.printer.print_message(f"切换教育账号: {id(identity)}", "INFO")
 					sleep(2)
 					try:
 						self._community_login.authenticate_with_token(
@@ -1353,19 +1391,20 @@ class ReportHandler(ClassUnion):
 						)
 						report_counter = 0
 					except Exception as e:
-						print(f"账号登录失败: {e}")
+						self.printer.print_message(f"账号登录失败: {e}", "ERROR")
 						continue
 				elif self.auth_method == "load":
 					token = cast("str", current_account)
-					print(f"\n切换教育账号: {id(token)}")
+					self.printer.print_message(f"切换教育账号: {id(token)}", "INFO")
 					self._client.switch_account(token=token, identity="edu")
+
 			user_details = self._user_obtain.fetch_account_details()
 			user_id = user_details["id"]
 			# 解析违规内容并执行举报
 			parts = violation.split(":")
 			item_id_part = parts[0].split(".")
 			if len(item_id_part) < 2:  # noqa: PLR2004
-				print(f"违规内容格式错误: {violation}")
+				self.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
 				continue
 			_item_id, comment_id = item_id_part
 			is_reply = "reply" in violation
@@ -1387,14 +1426,15 @@ class ReportHandler(ClassUnion):
 					is_reply=is_reply,
 				):
 					report_counter += 1
-					print(f"[{i}/{len(violations)}] 举报成功: {violation}")
+					self.printer.print_message(f"[{i}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
 				else:
-					print(f"[{i}/{len(violations)}] 举报失败: {violation}")
+					self.printer.print_message(f"[{i}/{len(violations)}] 举报失败: {violation}", "ERROR")
 					report_counter += 1
 			except Exception as e:
-				print(f"处理异常: {e}")
+				self.printer.print_message(f"处理异常: {e}", "ERROR")
+
 		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
-		print("\n自动举报完成,已恢复原始账号状态")
+		self.printer.print_message("自动举报完成,已恢复原始账号状态", "SUCCESS")
 
 	def execute_report_work(
 		self,
@@ -1435,7 +1475,7 @@ class ReportHandler(ClassUnion):
 						description=description,
 					)
 		except Exception as e:
-			print(f"执行举报操作失败: {e}")
+			self.printer.print_message(f"执行举报操作失败: {e}", "ERROR")
 			return False
 		return False
 

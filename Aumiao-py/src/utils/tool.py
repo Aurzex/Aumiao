@@ -17,7 +17,7 @@ FILE_SIZE: int = 1024
 DataDict = dict[str, Any]
 type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
 # 颜色常量
-COLOR_CODES = {
+COLOR_CODES: dict[Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"], str] = {
 	"COMMENT": "\033[38;5;245m",  # 辅助说明
 	"ERROR": "\033[38;5;203m",  # 错误提示
 	"MENU_ITEM": "\033[38;5;183m",  # 菜单项
@@ -26,6 +26,8 @@ COLOR_CODES = {
 	"RESET": "\033[0m",  # 重置样式
 	"STATUS": "\033[38;5;228m",  # 状态信息
 	"SUCCESS": "\033[38;5;114m",  # 成功提示
+	"INFO": "\033[38;5;39m",  # 信息提示 - 蓝色
+	"WARNING": "\033[38;5;214m",  # 警告提示 - 橙色
 }
 # 延迟加载分隔符
 SEPARATOR: str | None = None
@@ -914,11 +916,11 @@ class Printer:
 		pass
 
 	@staticmethod
-	def color_text(text: str, color_name: str) -> str:
+	def color_text(text: str, color_name: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]) -> str:
 		"""为文本添加颜色"""
 		return f"{COLOR_CODES[color_name]}{text}{COLOR_CODES['RESET']}"
 
-	def prompt_input(self, text: str, color: str = "PROMPT") -> str:
+	def prompt_input(self, text: str, color: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"] = "PROMPT") -> str:
 		"""统一的输入提示函数"""
 		return input(self.color_text(f"↳ {text}: ", color))
 
@@ -930,7 +932,7 @@ class Printer:
 			SEPARATOR = f"{COLOR_CODES['PROMPT']}══════════════════════════════════════════════════════════{COLOR_CODES['RESET']}"
 		return SEPARATOR
 
-	def print_message(self, text: str, colour_name: str) -> None:
+	def print_message(self, text: str, colour_name: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]) -> None:
 		print(self.color_text(text=text, color_name=colour_name))
 
 	def print_header(self, text: str) -> None:
