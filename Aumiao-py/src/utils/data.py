@@ -1,5 +1,4 @@
 import json
-import os
 from collections import UserDict
 from collections.abc import Mapping
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass, replace
@@ -13,7 +12,7 @@ T = TypeVar("T")
 DataclassInstance = Any  # 类型别名
 # 路径处理改进
 CURRENT_DIR = Path.cwd()
-DATA_DIR = Path(os.getenv("APP_DATA_DIR", CURRENT_DIR / "data"))
+DATA_DIR = CURRENT_DIR / "data"
 CACHE_FILE_PATH = DATA_DIR / "cache.json"
 DATA_FILE_PATH = DATA_DIR / "data.json"
 DOWNLOAD_DIR: Path = CURRENT_DIR / "download"
