@@ -1094,8 +1094,13 @@ class ReportHandler(ClassUnion):
 				if first_action:
 					for item in items[1:]:
 						if not item["processed"]:
-							self.apply_action(item, first_action, admin_id)
-							self.printer.print_message(f"已自动处理举报ID: {item['item'].get('id', 'N/A')}", "SUCCESS")
+							# 如果是ID分组, 其余项自动通过
+							if g_type == "ID":
+								self.apply_action(item, "P", admin_id)
+								self.printer.print_message(f"已自动通过举报ID: {item['item'].get('id', 'N/A')}", "SUCCESS")
+							else:
+								self.apply_action(item, first_action, admin_id)
+								self.printer.print_message(f"已自动处理举报ID: {item['item'].get('id', 'N/A')}", "SUCCESS")
 
 	def process_single_item(self, record: ReportRecord, admin_id: int, *, batch_mode: bool = False) -> str | None:
 		"""处理单个举报项目"""
