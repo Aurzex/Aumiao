@@ -60,7 +60,9 @@ class ReportFetcher:
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"type": report_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"type": report_type, "status": status, "offset": offset, "limit": limit}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
 	def fetch_comment_reports_gen(
@@ -72,29 +74,41 @@ class ReportFetcher:
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"source": source_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"source": source_type, "status": status, "offset": offset, "limit": limit}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
 
 	def fetch_post_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"status": status, "offset": offset, "limit": limit}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
 	def fetch_discussion_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
 		filter_type: Literal["post_id"] | None = None,
-		target_id: int = 15,
+		target_id: int | None = None,
 		limit: int | None = 15,
 		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"status": status, "offset": offset, "limit": limit}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
 
 
@@ -245,6 +259,3 @@ class RequestExtractor:
 				seen.add(url)
 				requests.append(f"{method}: {url}")
 		return requests
-
-
-sdio = {}
