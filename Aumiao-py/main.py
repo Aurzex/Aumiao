@@ -165,11 +165,11 @@ def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG00
 def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""处理举报"""
 	printer.print_header("处理举报")
-	client.ReportHandler().execute_judgement_login()
+	client.ReportAuthManager().execute_admin_login()
 	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-	client.ReportHandler().execute_handle_report(admin_id=admin_id)
+	client.ReportProcessor().execute_report_handle(admin_id=admin_id)
 	print(printer.color_text("已成功处理举报", "SUCCESS"))
 
 

@@ -2,7 +2,6 @@ import weakref
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from functools import lru_cache, wraps
-from locale import Error
 from time import sleep
 
 
@@ -45,7 +44,7 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 					print(f"Error: {e!r} -> Retrying...")
 					sleep(delay)
 			# 如果重试次数达到上限,则抛出Error异常
-			raise Error
+			raise ValueError
 
 		return wrapper
 

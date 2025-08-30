@@ -58,9 +58,10 @@ class ReportFetcher:
 		filter_type: Literal["admin_id", "work_user_id", "work_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"type": report_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"type": report_type, "status": status, "offset": 0, "limit": 15}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
 	def fetch_comment_reports_gen(
@@ -70,31 +71,40 @@ class ReportFetcher:
 		filter_type: Literal["admin_id", "comment_user_id", "comment_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"source": source_type, "status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
 
 	def fetch_post_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"status": status, "offset": 0, "limit": 15}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
 	def fetch_discussion_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
 		filter_type: Literal["post_id"] | None = None,
-		target_id: int = 15,
+		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, filter_type: target_id, "offset": offset, "limit": 15}
+		params = {"status": status, "offset": 0, "limit": 15}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
 
 
@@ -102,7 +112,7 @@ class ReportHandler:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 
-	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/{report_id}",
 			method="PATCH",
@@ -110,7 +120,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/discussions/{report_id}",
 			method="PATCH",
@@ -118,7 +128,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/comments/{report_id}",
 			method="PATCH",
@@ -126,7 +136,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD"]) -> bool:
+	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/works/{report_id}",
 			method="PATCH",
@@ -245,6 +255,3 @@ class RequestExtractor:
 				seen.add(url)
 				requests.append(f"{method}: {url}")
 		return requests
-
-
-sdio = {}

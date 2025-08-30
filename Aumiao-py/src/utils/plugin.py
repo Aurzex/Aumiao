@@ -474,7 +474,6 @@ class PluginConsole:
 	def display_main_menu() -> None:
 		"""显示主菜单"""
 		menu_options = {"1": ("搜索插件", True), "2": ("使用插件", True), "3": ("查看配置", True), "4": ("更新配置", True), "0": ("退出系统", True)}
-		printer.print_header("插件管理系统")
 		for key, (name, visible) in menu_options.items():
 			if not visible:
 				continue
@@ -740,7 +739,7 @@ class PluginConsole:
 				else:
 					new_config[key] = new_value
 			except ValueError:
-				printer.print_message(f"无法转换 {key} 的值, 使用原值", "WARNING")
+				printer.print_message(f"无法转换 {key} 的值, 使用原值", "ERROR")
 				new_config[key] = current_value
 
 		# 更新配置

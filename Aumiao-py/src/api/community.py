@@ -332,6 +332,11 @@ class DataFetcher:
 		)
 		return response.json()
 
+	# 获取编程猫nemo作品推荐
+	def fetch_recommended_works_nemo(self) -> dict:
+		response = self._client.send_request(endpoint="/nemo/v2/system/recommended/pool", method="GET")
+		return response.json()
+
 	# 获取编程猫首页推荐channel
 	def fetch_work_channels(self, types: Literal["KITTEN", "NEMO"]) -> dict:
 		params = {"type": types}

@@ -1,7 +1,6 @@
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
-from http.cookies import SimpleCookie
 from pathlib import Path
 from time import sleep
 from typing import Literal, TypedDict, cast
@@ -383,7 +382,7 @@ class CodeMaoClient:
 				del clean_headers[header]
 		return clean_headers
 
-	def update_cookies(self, cookies: RequestsCookieJar | dict | str) -> None:
+	def cookie_to_str(self, cookies: RequestsCookieJar | dict | str) -> str:
 		"""更安全的cookie更新方法"""
 		# 仅在明确需要时使用,默认禁用
 		self._session.cookies.clear()
@@ -400,18 +399,7 @@ class CodeMaoClient:
 			msg = f"不支持的Cookie类型: {type(cookie).__name__}"
 			raise TypeError(msg)
 
-		try:
-			cookie_str = _to_cookie_str(cookies)
-			if cookie_str:
-				self._session.headers["Cookie"] = cookie_str
-				cookie_obj = SimpleCookie()
-				cookie_obj.load(cookie_str)
-				for key, morsel in cookie_obj.items():
-					self._session.cookies.set(key, morsel.value, domain=morsel.get("domain"), path=morsel.get("path"))
-		except Exception as e:
-			error_msg = "无效的Cookie格式"
-			print(f"Cookie更新失败: {e!s}")
-			raise ValueError(error_msg) from e
+		return _to_cookie_str(cookies)
 
 	def _update_token_storage(self, token: str, identity: str) -> None:
 		"""更新token存储"""
