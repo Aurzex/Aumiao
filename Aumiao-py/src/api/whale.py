@@ -112,7 +112,7 @@ class ReportHandler:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 
-	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/{report_id}",
 			method="PATCH",
@@ -120,7 +120,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/posts/discussions/{report_id}",
 			method="PATCH",
@@ -128,7 +128,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS"]) -> bool:
+	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/comments/{report_id}",
 			method="PATCH",
@@ -136,7 +136,7 @@ class ReportHandler:
 		)
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD"]) -> bool:
+	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
 			endpoint=f"https://api-whale.codemao.cn/reports/works/{report_id}",
 			method="PATCH",
