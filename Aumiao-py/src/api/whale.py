@@ -58,9 +58,8 @@ class ReportFetcher:
 		filter_type: Literal["admin_id", "work_user_id", "work_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"type": report_type, "status": status, "offset": offset, "limit": limit}
+		params = {"type": report_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
@@ -72,9 +71,8 @@ class ReportFetcher:
 		filter_type: Literal["admin_id", "comment_user_id", "comment_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"source": source_type, "status": status, "offset": offset, "limit": limit}
+		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
@@ -86,9 +84,8 @@ class ReportFetcher:
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, "offset": offset, "limit": limit}
+		params = {"status": status, "offset": 0, "limit": 15}
 		if board_id is not None:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
@@ -102,9 +99,8 @@ class ReportFetcher:
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
-		offset: int = 0,
 	) -> Generator[dict]:
-		params = {"status": status, "offset": offset, "limit": limit}
+		params = {"status": status, "offset": 0, "limit": 15}
 		if board_id is not None:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
