@@ -1396,16 +1396,15 @@ class ReportProcessor(ClassUnion):
 		if not source_id:
 			self.printer.print_message("无效的来源ID,无法检查违规", "ERROR")
 			return
-		# 1. 评论/讨论/作品的违规检查(广告、黑名单、重复评论)
-		if source_type in {"work", "discussion", "shop"}:
-			adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
-			# 分析违规评论
-			violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
-			if not violations:
-				self.printer.print_message("未检测到违规评论", "INFO")
-				return
-			# 执行自动举报(用学生账号)
-			self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
+
+		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
+		# 分析违规评论
+		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
+		if not violations:
+			self.printer.print_message("未检测到违规评论", "INFO")
+			return
+		# 执行自动举报(用学生账号)
+		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
 		# 2. 帖子的违规检查:重复发帖(同一用户发布同标题帖子过多)
 		if source_type == "post" and user_id and user_id != "UNKNOWN":
 			try:
