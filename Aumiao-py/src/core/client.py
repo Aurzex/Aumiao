@@ -1053,14 +1053,14 @@ class ReportProcessor(ClassUnion):
 		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		self.auth_manager.terminate_session()
 
-	def _fetch_all_reports(self) -> list[ReportRecord]:
+	def _fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> list[ReportRecord]:
 		"""获取所有待处理举报:整合评论/帖子/讨论三类举报"""
 		report_records: list[ReportRecord] = []
 		# 举报来源配置:(举报类型,数据生成器)
 		report_sources: list[tuple[Literal["comment", "post", "discussion"], Generator]] = [
-			("comment", self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status="TOBEDONE", limit=2000)),
-			("post", self._whale_obtain.fetch_post_reports_gen(status="TOBEDONE", limit=2000)),
-			("discussion", self._whale_obtain.fetch_discussion_reports_gen(status="TOBEDONE", limit=2000)),
+			("comment", self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=2000)),
+			("post", self._whale_obtain.fetch_post_reports_gen(status=status, limit=2000)),
+			("discussion", self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=2000)),
 		]
 		# 遍历所有来源,构建统一举报记录
 		for report_type, report_generator in report_sources:
