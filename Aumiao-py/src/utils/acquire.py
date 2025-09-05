@@ -245,7 +245,7 @@ class CodeMaoClient:
 			# 确保日志记录过程中不会引发新的异常
 			print(f"Failed to log HTTP error: {e}")
 
-	def fetch_data(  # noqa: PLR0914
+	def fetch_data(  # noqa: PLR0912, PLR0914, PLR0915
 		self,
 		endpoint: str,
 		params: dict,
@@ -258,6 +258,7 @@ class CodeMaoClient:
 		config: PaginationConfig | None = None,
 	) -> Generator[dict]:
 		"""获取分页API数据
+
 		Args:
 			endpoint: API端点地址
 			params: 基础请求参数
@@ -268,11 +269,13 @@ class CodeMaoClient:
 			data_key: 数据列表键名
 			pagination_method: 分页方式 (offset/page)
 			config: 分页参数配置
+
 		Yields:
 			数据条目
+
 		Raises:
 			ValueError: 无效分页配置或参数错误
-		"""  # noqa: DOC402
+		"""
 		# 合并分页配置参数
 		config_: PaginationConfig = {
 			"amount_key": "limit",
@@ -281,53 +284,74 @@ class CodeMaoClient:
 			"response_offset_key": "offset",
 			**(config or {}),
 		}
+		# 获取分页参数配置
+		amount_key = config_.get("amount_key", "limit")
+		page_size_key = config_.get("response_amount_key", "limit")
+		offset_param_key = config_.get("offset_key", "offset")
 		# 参数副本避免污染原始参数
 		base_params = params.copy()
 		yielded_count = 0
 		# 处理初始请求
-		initial_response: Response = self.send_request(endpoint, fetch_method, base_params, payload)
+		initial_response = self.send_request(endpoint, fetch_method, base_params, payload)
 		if not initial_response:
 			return
 		initial_data = initial_response.json()
-		first_page = cast("list[dict]", self.tool.DataProcessor().get_nested_value(initial_data, data_key))
-		total_items = int(cast("int", self.tool.DataProcessor().get_nested_value(initial_data, total_key)))
-		# 安全获取分页参数配置
-		amount_key: Literal["limit", "page_size", "current_page"] = config_.get("amount_key", "limit")
-		page_size_key: Literal["limit", "page_size"] = config_.get("response_amount_key", "limit")
-		offset_param_key: Literal["offset", "page", "current_page"] = config_.get("offset_key", "offset")
+		data_processor = self.tool.DataProcessor()
+		# 获取数据列表和总数,确保类型安全
+		first_page_raw = data_processor.get_nested_value(initial_data, data_key)
+		first_page = first_page_raw if isinstance(first_page_raw, list) else []
+		total_items_raw: str = data_processor.get_nested_value(initial_data, total_key)
+		try:
+			total_items = int(total_items_raw) if total_items_raw is not None else 0
+		except (ValueError, TypeError):
+			total_items = 0
 		# 计算每页数量
-		items_per_page = base_params.get(
-			amount_key,
-			initial_data.get(page_size_key, 0),
-		)
+		items_per_page_param = base_params.get(amount_key)
+		items_per_page_response = initial_data.get(page_size_key)
+		# 优先使用参数中的每页数量,其次是响应中的,最后是首屏数据长度
+		if items_per_page_param is not None and items_per_page_param > 0:
+			items_per_page = items_per_page_param
+		elif items_per_page_response is not None and items_per_page_response > 0:
+			items_per_page = items_per_page_response
+		else:
+			items_per_page = len(first_page) or 1  # 避免除零错误
 		if items_per_page <= 0:
-			msg = f"无效的每页数量: {items_per_page}"
-			raise ValueError(msg)
+			error_msg = f"无效的每页数量: {items_per_page}"
+			raise ValueError(error_msg)
 		# 处理首屏数据
 		for item in first_page:
 			yield item
 			yielded_count += 1
 			if limit and yielded_count >= limit:
 				return
-		# 计算总页数
-		total_pages = (total_items + items_per_page - 1) // items_per_page
+		# 如果没有更多数据,提前返回
+		if total_items <= len(first_page):
+			return
+		# 计算需要请求的页数
+		remaining_items = total_items - len(first_page)
+		if limit:
+			remaining_items = min(remaining_items, limit - yielded_count)
+		if remaining_items <= 0:
+			return
+		total_pages = (remaining_items + items_per_page - 1) // items_per_page
 		# 分页请求循环
-		for current_page in range(1, total_pages):
+		for page_idx in range(1, total_pages + 1):
 			page_params = base_params.copy()
 			# 设置分页参数
 			if pagination_method == "offset":
-				page_params[offset_param_key] = current_page * items_per_page
+				page_params[offset_param_key] = page_idx * items_per_page
 			elif pagination_method == "page":
-				page_params[offset_param_key] = current_page + 1  # 页码通常从1开始
+				page_params[offset_param_key] = page_idx + 1  # 页码通常从1开始
 			else:
-				msg = f"不支持的分页方式: {pagination_method}"
-				raise ValueError(msg)
+				error_msg = f"不支持的分页方式: {pagination_method}"
+				raise ValueError(error_msg)
 			# 发送分页请求
 			page_response = self.send_request(endpoint, fetch_method, page_params, payload)
 			if not page_response:
 				continue
-			# 处理分页数据
-			page_data = cast("list[dict]", self.tool.DataProcessor().get_nested_value(page_response.json(), data_key))
+			# 处理分页数据,确保类型安全
+			page_data_raw = data_processor.get_nested_value(page_response.json(), data_key)
+			page_data = page_data_raw if isinstance(page_data_raw, list) else []
 			for item in page_data:
 				yield item
 				yielded_count += 1
@@ -448,7 +472,6 @@ class FileUploader:
 	def upload(self, file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str = "aumiao") -> str:
 		"""
 		统一文件上传接口
-
 		参数:
 			file_path: 文件路径
 			method: 上传方式 (pgaot/codegame/codemao)
