@@ -1135,7 +1135,7 @@ class ReportProcessor(ClassUnion):
 			item_id_map[record["item_id"]].append(record)
 			content_key = self._get_content_key(record)
 			content_map[content_key].append(record)
-		# 2. 创建批量处理组:满足阈值的分组才进入批量处理
+		# 2. 创建批量处理组:避免重复分组
 		batch_groups = self._create_batch_groups(item_id_map, content_map)
 		# 3. 批量处理:仅当总举报数达标时触发
 		if batch_groups and len(records) >= self.batch_config["total_threshold"]:
@@ -1148,19 +1148,40 @@ class ReportProcessor(ClassUnion):
 		return processed_count
 
 	def _create_batch_groups(
-		self, item_id_map: defaultdict[str, list[ReportRecord]], content_map: defaultdict[tuple, list[ReportRecord]]
+		self,
+		item_id_map: defaultdict[str, list[ReportRecord]],
+		content_map: defaultdict[tuple, list[ReportRecord]],
 	) -> list[tuple[str, str, list[ReportRecord]]]:
-		"""创建批量处理组:返回(分组类型,分组标识,举报列表)"""
+		"""创建批量处理组:避免重复分组,优先处理ID分组"""
 		batch_groups = []
-		# 1. 同ID分组:重复举报同一对象(如同一评论被举报多次)
+		processed_records = set()  # 记录已分组的举报记录ID
+		# 1. 优先处理同ID分组:重复举报同一对象
 		for item_id, records in item_id_map.items():
 			if len(records) >= self.batch_config["duplicate_threshold"]:
+				# 标记这些记录为已处理
+				for record in records:
+					record_id = record["item"]["id"]
+					if record_id != "UNKNOWN":
+						processed_records.add(record_id)
 				batch_groups.append(("item_id", item_id, records))
-		# 2. 同内容分组:重复举报同内容(如不同对象但内容相同)
+		# 2. 处理同内容分组:排除已分组的记录
 		for (content, report_type, _), records in content_map.items():
 			if len(records) >= self.batch_config["content_threshold"]:
-				content_summary = f"{report_type}:{content[:20]}..."  # 内容摘要(避免过长)
-				batch_groups.append(("content", content_summary, records))
+				# 过滤掉已经在ID分组中的记录
+				filtered_records = []
+				for record in records:
+					record_id = record["item"]["id"]
+					if record_id != "UNKNOWN" and record_id not in processed_records:
+						filtered_records.append(record)
+				# 如果过滤后仍然满足阈值,则添加到批量组
+				if len(filtered_records) >= self.batch_config["content_threshold"]:
+					content_summary = f"{report_type}:{content[:20]}..."  # 内容摘要
+					batch_groups.append(("content", content_summary, filtered_records))
+					# 更新已处理的记录
+					for record in filtered_records:
+						record_id = record["item"]["id"]
+						if record_id != "UNKNOWN":
+							processed_records.add(record_id)
 		return batch_groups
 
 	def _handle_batch_groups(self, batch_groups: list, admin_id: int) -> None:
@@ -1173,9 +1194,9 @@ class ReportProcessor(ClassUnion):
 		if self.printer.get_valid_input(prompt="是否查看详情?(Y/N)", valid_options={"Y", "N"}).upper() == "Y":
 			for group_type, group_key, records in batch_groups:
 				self.printer.print_header(f"=== {group_type}组: {group_key} ===")
-				# 仅展示前3条详情(避免输出过长)
+				# 仅展示前3条详情
 				for record in records[:3]:
-					create_time = record["item"]["created_at"]  # 直接访问,缺失返回"UNKNOWN"
+					create_time = record["item"]["created_at"]
 					create_time_str = self._tool.TimeUtils().format_timestamp(create_time) if create_time != "UNKNOWN" else "未知"
 					self.printer.print_message(f"举报ID: {record['item']['id']} | 时间: {create_time_str}", "INFO")
 				# 多于3条时提示省略
@@ -1184,12 +1205,12 @@ class ReportProcessor(ClassUnion):
 		# 3. 确认是否批量处理
 		if self.printer.get_valid_input(prompt="确认批量处理这些项目?(Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			return
-		# 4. 执行批量处理:处理首个项目 → 自动应用动作到同组
+		# 4. 执行批量处理
 		for group_type, group_key, records in batch_groups:
 			self.printer.print_message(f"正在处理 [{group_type}] {group_key}...", "INFO")
-			first_action = None  # 首个项目的处理动作(用于同组复用)
+			first_action = None
 			# 处理首个项目(作为同组的模板动作)
-			if not records[0]["processed"]:
+			if records and not records[0]["processed"]:
 				first_action = self.process_single_item(records[0], admin_id, batch_mode=True)
 			# 自动应用动作到同组其他项目
 			if first_action:
@@ -1199,7 +1220,7 @@ class ReportProcessor(ClassUnion):
 						if group_type == "item_id":
 							self._apply_action(record, "P", admin_id)
 							self.printer.print_message(f"已自动通过举报ID: {record['item']['id']}", "SUCCESS")
-						# 同内容分组:复用首个动作(同内容大概率违规类型一致)
+						# 同内容分组:复用首个动作
 						else:
 							self._apply_action(record, first_action, admin_id)
 							self.printer.print_message(f"已自动处理举报ID: {record['item']['id']}", "SUCCESS")
@@ -1396,7 +1417,6 @@ class ReportProcessor(ClassUnion):
 		if not source_id:
 			self.printer.print_message("无效的来源ID,无法检查违规", "ERROR")
 			return
-
 		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
 		# 分析违规评论
 		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
