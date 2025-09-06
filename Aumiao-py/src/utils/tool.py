@@ -208,7 +208,7 @@ class DataProcessor:
 		raise TypeError(msg)
 
 	@classmethod
-	def get_nested_value(cls, data: Mapping, path: str) -> object:
+	def get_nested_value(cls, data: Mapping, path: str) -> ...:
 		"""安全获取嵌套字典值
 		Args:
 			data: 输入字典

@@ -1022,6 +1022,7 @@ class ReportProcessor(ClassUnion):
 	) -> None:
 		self.batch_config = self.DEFAULT_BATCH_CONFIG.copy()  # 批量配置(支持动态修改)
 		self.processed_count = 0  # 累计处理举报数
+		self.total_report = 0
 		self.printer = tool.Printer()
 		self.auth_manager = ReportAuthManager()
 		super().__init__()
@@ -1034,12 +1035,13 @@ class ReportProcessor(ClassUnion):
 		# 2. 主处理循环:获取举报 → 批量处理 → 询问是否继续
 		while True:
 			# 获取所有待处理举报(评论/帖子/讨论)
+			self.total_report = self._get_total_reports()
 			report_records = self._fetch_all_reports()
 			if not report_records:
 				self.printer.print_message("当前没有待处理的举报", "INFO")
 				break
 			# 批量处理举报
-			self.printer.print_message(f"发现 {len(report_records)} 条待处理举报", "INFO")
+			self.printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
 			batch_processed = self.process_report_batch(report_records, admin_id)
 			self.processed_count += batch_processed
 			# 本次处理结果
@@ -1053,34 +1055,49 @@ class ReportProcessor(ClassUnion):
 		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		self.auth_manager.terminate_session()
 
-	def _fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> list[ReportRecord]:
-		"""获取所有待处理举报:整合评论/帖子/讨论三类举报"""
-		report_records: list[ReportRecord] = []
-		# 举报来源配置:(举报类型,数据生成器)
-		report_sources: list[tuple[Literal["comment", "post", "discussion"], Generator]] = [
-			("comment", self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=2000)),
-			("post", self._whale_obtain.fetch_post_reports_gen(status=status, limit=2000)),
-			("discussion", self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=2000)),
+	def _get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
+		"""获取所有举报类型的总数"""
+		report_configs = [
+			("comment", lambda: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
+			("post", lambda: self._whale_obtain.fetch_post_reports_total(status=status)),
+			("discussion", lambda: self._whale_obtain.fetch_discussion_reports_total(status=status)),
 		]
-		# 遍历所有来源,构建统一举报记录
-		for report_type, report_generator in report_sources:
+		total_reports = 0
+		for _report_type, total_func in report_configs:
+			total_info = total_func()
+			total_reports += total_info.get("total", 0)
+		return total_reports
+
+	def _fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator:
+		"""获取所有举报类型的数据生成器"""
+		report_configs = [
+			(
+				"comment",
+				lambda: self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=2000),
+			),
+			(
+				"post",
+				lambda: self._whale_obtain.fetch_post_reports_gen(status=status, limit=2000),
+			),
+			(
+				"discussion",
+				lambda: self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=2000),
+			),
+		]
+		# 处理数据生成器
+		for report_type, gen_func in report_configs:
+			report_generator = gen_func()
 			for item in report_generator:
-				# 用 NestedDefaultDict 包装数据(避免 get 方法)
 				item_ndd = data.NestedDefaultDict(item)
-				# 获取当前举报类型的配置(字段映射、处理方法等)
 				type_config = self._get_type_config(report_type, item_ndd)
-				# 构建统一举报记录(所有字段通过 NestedDefaultDict 直接访问)
-				report_records.append(
-					{
-						"item": item_ndd,
-						"report_type": report_type,
-						"item_id": str(item_ndd[type_config["item_id_field"]]),  # 统一ID字段
-						"content": item_ndd[type_config["content_field"]],  # 举报内容
-						"processed": False,
-						"action": None,
-					}
-				)
-		return report_records
+				yield {
+					"item": item_ndd,
+					"report_type": report_type,
+					"item_id": str(item_ndd[type_config["item_id_field"]]),
+					"content": item_ndd[type_config["content_field"]],
+					"processed": False,
+					"action": None,
+				}
 
 	@staticmethod
 	def _get_type_config(report_type: str, item_ndd: data.NestedDefaultDict) -> dict:
@@ -1125,7 +1142,7 @@ class ReportProcessor(ClassUnion):
 			item_ndd[type_config["source_id_field"]],
 		)
 
-	def process_report_batch(self, records: list[ReportRecord], admin_id: int) -> int:
+	def process_report_batch(self, records: Generator[ReportRecord], admin_id: int) -> int:
 		"""批量处理举报:分组 → 批量处理 → 剩余单条处理"""
 		processed_count = 0
 		# 1. 构建分组:按ID分组(同对象)、按内容分组(同内容)
@@ -1138,7 +1155,7 @@ class ReportProcessor(ClassUnion):
 		# 2. 创建批量处理组:避免重复分组
 		batch_groups = self._create_batch_groups(item_id_map, content_map)
 		# 3. 批量处理:仅当总举报数达标时触发
-		if batch_groups and len(records) >= self.batch_config["total_threshold"]:
+		if batch_groups and self.total_report >= self.batch_config["total_threshold"]:
 			self._handle_batch_groups(batch_groups, admin_id)
 		# 4. 处理剩余未批量处理的举报(单条处理)
 		for record in records:
@@ -1429,7 +1446,7 @@ class ReportProcessor(ClassUnion):
 		if source_type == "post" and user_id and user_id != "UNKNOWN":
 			try:
 				# 搜索同标题的帖子
-				post_results = list(self._forum_obtain.search_posts_gen(title=board_name, limit=None))
+				post_results = self._forum_obtain.search_posts_gen(title=board_name, limit=None)
 				# 筛选当前用户发布的帖子
 				user_posts = self._tool.DataProcessor().filter_by_nested_values(
 					data=post_results,

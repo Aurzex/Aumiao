@@ -245,36 +245,23 @@ class CodeMaoClient:
 			# 确保日志记录过程中不会引发新的异常
 			print(f"Failed to log HTTP error: {e}")
 
-	def fetch_data(  # noqa: PLR0912, PLR0914, PLR0915
+	def _get_pagination_info(
 		self,
 		endpoint: str,
 		params: dict,
 		payload: dict | None = None,
-		limit: int | None = None,
 		fetch_method: Literal["GET", "POST"] = "GET",
 		total_key: str = "total",
 		data_key: str = "items",
-		pagination_method: Literal["offset", "page"] = "offset",
 		config: PaginationConfig | None = None,
-	) -> Generator[dict]:
-		"""获取分页API数据
-
+		*,
+		include_first_page: bool = False,  # 新增参数,控制是否返回第一页数据
+	) -> tuple[int, int, list, dict]:
+		"""内部方法:获取分页信息(公共逻辑提取)
 		Args:
-			endpoint: API端点地址
-			params: 基础请求参数
-			payload: POST请求负载
-			limit: 最大返回条目数
-			fetch_method: 请求方法 (GET/POST)
-			total_key: 总条目数键名
-			data_key: 数据列表键名
-			pagination_method: 分页方式 (offset/page)
-			config: 分页参数配置
-
-		Yields:
-			数据条目
-
-		Raises:
-			ValueError: 无效分页配置或参数错误
+			include_first_page: 是否包含第一页数据(避免重复请求)
+		Returns:
+			tuple: (total_items, items_per_page, first_page, initial_data)
 		"""
 		# 合并分页配置参数
 		config_: PaginationConfig = {
@@ -287,19 +274,20 @@ class CodeMaoClient:
 		# 获取分页参数配置
 		amount_key = config_.get("amount_key", "limit")
 		page_size_key = config_.get("response_amount_key", "limit")
-		offset_param_key = config_.get("offset_key", "offset")
 		# 参数副本避免污染原始参数
 		base_params = params.copy()
-		yielded_count = 0
-		# 处理初始请求
+		# 如果不包含第一页数据,可以设置较小的limit来减少响应大小
+		original_limit = 0
+		if not include_first_page and amount_key in base_params:
+			original_limit = base_params[amount_key]
+			base_params[amount_key] = 15  # 只请求15条数据来获取总数
+		# 发送初始请求
 		initial_response = self.send_request(endpoint, fetch_method, base_params, payload)
 		if not initial_response:
-			return
+			return 0, 0, [], {}
 		initial_data = initial_response.json()
 		data_processor = self.tool.DataProcessor()
-		# 获取数据列表和总数,确保类型安全
-		first_page_raw = data_processor.get_nested_value(initial_data, data_key)
-		first_page = first_page_raw if isinstance(first_page_raw, list) else []
+		# 获取总数
 		total_items_raw: str = data_processor.get_nested_value(initial_data, total_key)
 		try:
 			total_items = int(total_items_raw) if total_items_raw is not None else 0
@@ -308,16 +296,68 @@ class CodeMaoClient:
 		# 计算每页数量
 		items_per_page_param = base_params.get(amount_key)
 		items_per_page_response = initial_data.get(page_size_key)
-		# 优先使用参数中的每页数量,其次是响应中的,最后是首屏数据长度
+		# 优先使用参数中的每页数量,其次是响应中的
 		if items_per_page_param is not None and items_per_page_param > 0:
 			items_per_page = items_per_page_param
 		elif items_per_page_response is not None and items_per_page_response > 0:
 			items_per_page = items_per_page_response
 		else:
-			items_per_page = len(first_page) or 1  # 避免除零错误
+			items_per_page = 15  # 默认值
 		if items_per_page <= 0:
-			error_msg = f"无效的每页数量: {items_per_page}"
-			raise ValueError(error_msg)
+			items_per_page = 1  # 防止除零错误
+		# 只有在需要时才获取第一页数据
+		first_page = []
+		if include_first_page:
+			first_page_raw = data_processor.get_nested_value(initial_data, data_key)
+			first_page = first_page_raw if isinstance(first_page_raw, list) else []
+		# 恢复原始limit(如果被修改过)
+		elif not include_first_page and amount_key in base_params:
+			base_params[amount_key] = original_limit
+		return total_items, items_per_page, first_page, initial_data
+
+	def get_pagination_total(
+		self,
+		endpoint: str,
+		params: dict,
+		payload: dict | None = None,
+		fetch_method: Literal["GET", "POST"] = "GET",
+		total_key: str = "total",
+		data_key: str = "items",
+		config: PaginationConfig | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		"""获取分页API的总数据条数和总页数"""
+		# 使用内部公共方法获取分页信息,不包含第一页数据
+		total_items, items_per_page, _, _ = self._get_pagination_info(endpoint, params, payload, fetch_method, total_key, data_key, config, include_first_page=False)
+		# 计算总页数
+		total_pages = 0 if total_items == 0 else (total_items + items_per_page - 1) // items_per_page
+		return {"total": total_items, "total_pages": total_pages}
+
+	def fetch_data(  # noqa: PLR0914
+		self,
+		endpoint: str,
+		params: dict,
+		payload: dict | None = None,
+		limit: int | None = None,
+		fetch_method: Literal["GET", "POST"] = "GET",
+		total_key: str = "total",
+		data_key: str = "items",
+		pagination_method: Literal["offset", "page"] = "offset",
+		config: PaginationConfig | None = None,
+	) -> Generator[dict]:
+		# 使用内部公共方法获取分页信息,包含第一页数据
+		total_items, items_per_page, first_page, _initial_data = self._get_pagination_info(
+			endpoint=endpoint, params=params, payload=payload, fetch_method=fetch_method, total_key=total_key, data_key=data_key, config=config, include_first_page=True
+		)
+		# 获取分页配置
+		config_: PaginationConfig = {
+			"offset_key": "offset",
+			**(config or {}),
+		}
+		offset_param_key = config_.get("offset_key", "offset")
+		# 参数副本避免污染原始参数
+		base_params = params.copy()
+		yielded_count = 0
+		data_processor = self.tool.DataProcessor()
 		# 处理首屏数据
 		for item in first_page:
 			yield item
@@ -327,7 +367,7 @@ class CodeMaoClient:
 		# 如果没有更多数据,提前返回
 		if total_items <= len(first_page):
 			return
-		# 计算需要请求的页数
+		# 计算需要请求的页数,从第二页开始
 		remaining_items = total_items - len(first_page)
 		if limit:
 			remaining_items = min(remaining_items, limit - yielded_count)
