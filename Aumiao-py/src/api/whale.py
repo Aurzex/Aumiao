@@ -5,20 +5,19 @@ from typing import ClassVar, Literal
 
 from requests.cookies import RequestsCookieJar
 
-from src.utils import acquire, data, file, tool
+from src.utils import acquire, data, file
 from src.utils.acquire import HTTPSTATUS
 from src.utils.decorator import singleton
 
-CAPTCHA_DIR: Path = data.CURRENT_DIR / "captcha"
+CAPTCHA_DIR: Path = data.CURRENT_DIR / "captcha.jpg"
 JS_DIR: Path = data.CURRENT_DIR / "js_module"
-CAPTCHA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @singleton
 class AuthManager:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
-		self._captcha_img_path = CAPTCHA_DIR / f"{tool.TimeUtils().current_timestamp()}.jpg"
+		self._captcha_img_path = CAPTCHA_DIR
 
 	def authenticate_user(self, username: str, password: str, key: int, code: str) -> dict:
 		payload = {"username": username, "password": password, "key": key, "code": code}
