@@ -64,6 +64,18 @@ class ReportFetcher:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
+	def fetch_work_reports_total(
+		self,
+		report_type: Literal["KITTEN", "BOX2", "ALL"],
+		status: Literal["TOBEDONE", "DONE", "ALL"],
+		filter_type: Literal["admin_id", "work_user_id", "work_id"] | None = None,
+		target_id: int | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		params = {"type": report_type, "status": status, "offset": 0, "limit": 15}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params)
+
 	def fetch_comment_reports_gen(
 		self,
 		source_type: Literal["ALL", "KITTEN", "BOX2", "FICTION", "COMIC", "WORK_SUBJECT"],
@@ -76,6 +88,18 @@ class ReportFetcher:
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
+
+	def fetch_comment_reports_total(
+		self,
+		source_type: Literal["ALL", "KITTEN", "BOX2", "FICTION", "COMIC", "WORK_SUBJECT"],
+		status: Literal["TOBEDONE", "DONE", "ALL"],
+		filter_type: Literal["admin_id", "comment_user_id", "comment_id"] | None = None,
+		target_id: int | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params)
 
 	def fetch_post_reports_gen(
 		self,
@@ -92,6 +116,20 @@ class ReportFetcher:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
+	def fetch_post_reports_total(
+		self,
+		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
+		filter_type: Literal["post_id"] | None = None,
+		target_id: int | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		params = {"status": status, "offset": 0, "limit": 15}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/posts", params=params)
+
 	def fetch_discussion_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
@@ -106,6 +144,20 @@ class ReportFetcher:
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
 		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
+
+	def fetch_discussion_reports_total(
+		self,
+		status: Literal["TOBEDONE", "DONE", "ALL"],
+		board_id: int | None = None,  # 新增分区ID参数
+		filter_type: Literal["post_id"] | None = None,
+		target_id: int | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		params = {"status": status, "offset": 0, "limit": 15}
+		if board_id is not None:
+			params["board_id"] = board_id
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params)
 
 
 class ReportHandler:
