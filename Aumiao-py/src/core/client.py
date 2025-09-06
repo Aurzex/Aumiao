@@ -2,11 +2,12 @@ from collections import defaultdict
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from json import loads
 from pathlib import Path
 from random import choice, randint
 from time import sleep
-from typing import Any, ClassVar, Literal, TypedDict, cast, overload
+from typing import Any, ClassVar, Literal, NamedTuple, TypedDict, cast, overload
 from urllib.parse import urlparse
 
 from src.api import community, edu, forum, library, shop, user, whale, work
@@ -41,6 +42,12 @@ class ReportRecord(TypedDict):
 	content: str  # 举报对象内容
 	processed: bool  # 是否已处理
 	action: str | None  # 处理动作(D-删除/S-禁言7天/T-禁言3月/P-通过)
+
+
+class BatchGroup(NamedTuple):
+	group_type: str
+	group_key: str
+	record_ids: list
 
 
 @dataclass
@@ -140,7 +147,7 @@ class CommentProcessor:
 		item: dict[str, Any],
 		config: ...,  # 实际使用时应替换为SourceConfig类型
 		action_type: str,
-		params: dict[str, Any],
+		params: dict[Literal["ads", "blacklist", "spam_max"], Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
 		"""处理项目主入口,根据action_type分发到对应处理策略"""
@@ -568,7 +575,7 @@ class Motion(ClassUnion):
 			blacklist=黑名单用户
 		"""
 		config = self.SOURCE_CONFIG[source]
-		params = {
+		params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
 			"ads": self._data.USER_DATA.ads,
 			"blacklist": self._data.USER_DATA.black_room,
 			"spam_max": self._setting.PARAMETER.spam_del_max,
@@ -1036,13 +1043,14 @@ class ReportProcessor(ClassUnion):
 		while True:
 			# 获取所有待处理举报(评论/帖子/讨论)
 			self.total_report = self._get_total_reports()
-			report_records = self._fetch_all_reports()
-			if not report_records:
+			# 使用partial绑定参数,创建生成器函数
+			report_gen_func = partial(self._fetch_all_reports)
+			if self.total_report == 0:
 				self.printer.print_message("当前没有待处理的举报", "INFO")
 				break
 			# 批量处理举报
 			self.printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
-			batch_processed = self.process_report_batch(report_records, admin_id)
+			batch_processed = self.process_report_batch(report_gen_func, admin_id)
 			self.processed_count += batch_processed
 			# 本次处理结果
 			self.printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
@@ -1068,9 +1076,8 @@ class ReportProcessor(ClassUnion):
 			total_reports += total_info.get("total", 0)
 		return total_reports
 
-	def _fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator:
-		"""获取所有举报类型的数据生成器"""
-		report_configs = [
+	def _fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator[ReportRecord]:
+		report_configs: list[tuple[Literal["comment", "post", "discussion"], Callable[[], Generator[dict]]]] = [
 			(
 				"comment",
 				lambda: self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=2000),
@@ -1090,14 +1097,14 @@ class ReportProcessor(ClassUnion):
 			for item in report_generator:
 				item_ndd = data.NestedDefaultDict(item)
 				type_config = self._get_type_config(report_type, item_ndd)
-				yield {
-					"item": item_ndd,
-					"report_type": report_type,
-					"item_id": str(item_ndd[type_config["item_id_field"]]),
-					"content": item_ndd[type_config["content_field"]],
-					"processed": False,
-					"action": None,
-				}
+				yield ReportRecord(
+					item=item_ndd,
+					report_type=report_type,
+					item_id=str(item_ndd[type_config["item_id_field"]]),
+					content=item_ndd[type_config["content_field"]],
+					processed=False,
+					action=None,
+				)
 
 	@staticmethod
 	def _get_type_config(report_type: str, item_ndd: data.NestedDefaultDict) -> dict:
@@ -1142,27 +1149,81 @@ class ReportProcessor(ClassUnion):
 			item_ndd[type_config["source_id_field"]],
 		)
 
-	def process_report_batch(self, records: Generator[ReportRecord], admin_id: int) -> int:
-		"""批量处理举报:分组 → 批量处理 → 剩余单条处理"""
+	def process_report_batch(self, report_gen_func: Callable[[], Generator[ReportRecord]], admin_id: int) -> int:
+		"""批量处理举报:两次遍历生成器,第一次收集分组信息,第二次处理记录"""
 		processed_count = 0
-		# 1. 构建分组:按ID分组(同对象)、按内容分组(同内容)
-		item_id_map: defaultdict[str, list[ReportRecord]] = defaultdict(list)  # 同ID分组
-		content_map: defaultdict[tuple, list[ReportRecord]] = defaultdict(list)  # 同内容分组
-		for record in records:
-			item_id_map[record["item_id"]].append(record)
+		# 第一次遍历: 收集分组信息(只记录ID和分组键)
+		item_id_groups = defaultdict(list)  # item_id -> list[record_id]
+		content_groups = defaultdict(list)  # content_key -> list[record_id]
+		for record in report_gen_func():
+			record_id = record["item"]["id"]
+			item_id = record["item_id"]
 			content_key = self._get_content_key(record)
-			content_map[content_key].append(record)
-		# 2. 创建批量处理组:避免重复分组
-		batch_groups = self._create_batch_groups(item_id_map, content_map)
-		# 3. 批量处理:仅当总举报数达标时触发
-		if batch_groups and self.total_report >= self.batch_config["total_threshold"]:
-			self._handle_batch_groups(batch_groups, admin_id)
-		# 4. 处理剩余未批量处理的举报(单条处理)
-		for record in records:
-			if not record["processed"]:
+			item_id_groups[item_id].append(record_id)
+			content_groups[content_key].append(record_id)
+		# 如果没有足够的批量处理项,直接处理所有记录
+		if not any(len(ids) >= self.batch_config["duplicate_threshold"] for ids in item_id_groups.values()) and not any(
+			len(ids) >= self.batch_config["content_threshold"] for ids in content_groups.values()
+		):
+			for record in report_gen_func():
 				self.process_single_item(record, admin_id)
 				processed_count += 1
+			return processed_count
+		# 确定批量组,避免重复记录
+		batch_groups = []
+		processed_record_ids = set()
+		# 同ID分组
+		for item_id, record_ids in item_id_groups.items():
+			if len(record_ids) >= self.batch_config["duplicate_threshold"]:
+				batch_groups.append(BatchGroup("item_id", item_id, record_ids))
+				processed_record_ids.update(record_ids)
+		# 同内容分组
+		for content_key, record_ids in content_groups.items():
+			if len(record_ids) >= self.batch_config["content_threshold"]:
+				filtered_record_ids = [rid for rid in record_ids if rid not in processed_record_ids]
+				if len(filtered_record_ids) >= self.batch_config["content_threshold"]:
+					# 生成内容摘要
+					content_summary = f"{content_key[1]}:{content_key[0][:20]}..."  # content_key: (content, report_type, source_id)
+					batch_groups.append(BatchGroup("content", content_summary, filtered_record_ids))
+					processed_record_ids.update(filtered_record_ids)
+		# 构建记录ID到组的映射
+		record_id_to_group = {}
+		for group in batch_groups:
+			for rid in group.record_ids:
+				record_id_to_group[rid] = group
+		# 第二次遍历: 处理记录
+		groups_records = defaultdict(list)  # 存储每个组的记录
+		for record in report_gen_func():
+			record_id = record["item"]["id"]
+			if record_id in record_id_to_group:
+				group = record_id_to_group[record_id]
+				groups_records[group].append(record)
+			else:
+				self.process_single_item(record, admin_id)
+				processed_count += 1
+		# 处理批量组
+		for group, records in groups_records.items():
+			self._handle_batch_group(group, records, admin_id)
+			processed_count += len(records)
 		return processed_count
+
+	def _handle_batch_group(self, group: BatchGroup, records: list[ReportRecord], admin_id: int) -> None:
+		"""处理一个批量组:首先处理第一个记录,然后应用动作到组内其他记录"""
+		self.printer.print_message(f"处理批量组 [{group.group_type}] {group.group_key} (共{len(records)}条举报)", "INFO")
+		if not records:
+			return
+		# 处理第一个记录
+		first_action = self.process_single_item(records[0], admin_id, batch_mode=True)
+		if first_action is not None:
+			for record in records[1:]:
+				if group.group_type == "item_id":
+					self._apply_action(record, "P", admin_id)  # 同ID分组自动通过
+				else:
+					self._apply_action(record, first_action, admin_id)
+		else:
+			# 如果第一个记录跳过,则处理其余记录为单条
+			for record in records[1:]:
+				self.process_single_item(record, admin_id)
 
 	def _create_batch_groups(
 		self,
@@ -1328,12 +1389,10 @@ class ReportProcessor(ClassUnion):
 				self.printer.print_message("无效操作,请重新选择", "ERROR")
 
 	def _apply_action(self, record: ReportRecord, action: str, admin_id: int) -> None:
-		"""应用处理动作到举报:封装重复的动作执行逻辑"""
+		"""应用处理动作到举报记录"""
 		type_config = self._get_type_config(record["report_type"], record["item"])
 		handle_method = getattr(self._whale_motion, type_config["handle_method"])
-		# 执行动作(从STATUS_MAP获取标准动作名称)
 		handle_method(report_id=record["item"]["id"], resolution=self.STATUS_MAP[action], admin_id=admin_id)
-		# 更新举报状态
 		record["processed"] = True
 		record["action"] = action
 		self.printer.print_message(f"已应用操作: {self.STATUS_MAP[action]}", "SUCCESS")
@@ -1465,7 +1524,11 @@ class ReportProcessor(ClassUnion):
 			# 1. 获取评论详情列表
 			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments")
 			# 2. 违规检查参数(广告关键词、黑名单、垃圾帖阈值)
-			check_params = {"ads_keywords": self._data.USER_DATA.ads, "blacklist": self._data.USER_DATA.black_room, "spam_threshold": self._setting.PARAMETER.spam_del_max}
+			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
+				"ads": self._data.USER_DATA.ads,
+				"blacklist": self._data.USER_DATA.black_room,
+				"spam_max": self._setting.PARAMETER.spam_del_max,
+			}
 			# 3. 调用评论处理器分析违规
 			comment_processor = CommentProcessor()
 			# 临时配置类:适配评论处理器的参数要求
