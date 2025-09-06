@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
@@ -7,7 +7,7 @@ from json import loads
 from pathlib import Path
 from random import choice, randint
 from time import sleep
-from typing import Any, ClassVar, Literal, NamedTuple, TypedDict, cast, overload
+from typing import Any, ClassVar, Literal, TypedDict, cast, overload
 from urllib.parse import urlparse
 
 from src.api import community, edu, forum, library, shop, user, whale, work
@@ -44,10 +44,7 @@ class ReportRecord(TypedDict):
 	action: str | None  # 处理动作(D-删除/S-禁言7天/T-禁言3月/P-通过)
 
 
-class BatchGroup(NamedTuple):
-	group_type: str
-	group_key: str
-	record_ids: list
+BatchGroup = namedtuple("BatchGroup", ["group_type", "group_key", "record_ids"])  # noqa: PYI024
 
 
 @dataclass
@@ -1161,21 +1158,14 @@ class ReportProcessor(ClassUnion):
 			content_key = self._get_content_key(record)
 			item_id_groups[item_id].append(record_id)
 			content_groups[content_key].append(record_id)
-		# 如果没有足够的批量处理项,直接处理所有记录
-		if not any(len(ids) >= self.batch_config["duplicate_threshold"] for ids in item_id_groups.values()) and not any(
-			len(ids) >= self.batch_config["content_threshold"] for ids in content_groups.values()
-		):
-			for record in report_gen_func():
-				self.process_single_item(record, admin_id)
-				processed_count += 1
-			return processed_count
 		# 确定批量组,避免重复记录
 		batch_groups = []
 		processed_record_ids = set()
 		# 同ID分组
 		for item_id, record_ids in item_id_groups.items():
 			if len(record_ids) >= self.batch_config["duplicate_threshold"]:
-				batch_groups.append(BatchGroup("item_id", item_id, record_ids))
+				# 将 record_ids 转换为元组,使其可哈希
+				batch_groups.append(BatchGroup("item_id", item_id, tuple(record_ids)))
 				processed_record_ids.update(record_ids)
 		# 同内容分组
 		for content_key, record_ids in content_groups.items():
@@ -1184,25 +1174,39 @@ class ReportProcessor(ClassUnion):
 				if len(filtered_record_ids) >= self.batch_config["content_threshold"]:
 					# 生成内容摘要
 					content_summary = f"{content_key[1]}:{content_key[0][:20]}..."  # content_key: (content, report_type, source_id)
-					batch_groups.append(BatchGroup("content", content_summary, filtered_record_ids))
+					# 将 filtered_record_ids 转换为元组
+					batch_groups.append(BatchGroup("content", content_summary, tuple(filtered_record_ids)))
 					processed_record_ids.update(filtered_record_ids)
+		# 如果没有批量组,则直接第二次遍历处理所有记录
+		if not batch_groups:
+			for record in report_gen_func():
+				self.process_single_item(record, admin_id)
+				processed_count += 1
+			return processed_count
 		# 构建记录ID到组的映射
 		record_id_to_group = {}
 		for group in batch_groups:
 			for rid in group.record_ids:
 				record_id_to_group[rid] = group
 		# 第二次遍历: 处理记录
-		groups_records = defaultdict(list)  # 存储每个组的记录
+		# 使用字典来存储每个组的记录,键为组的唯一标识
+		groups_records = {}
+		for group in batch_groups:
+			# 使用 (group_type, group_key) 作为唯一标识
+			groups_records[group.group_type, group.group_key] = []
 		for record in report_gen_func():
 			record_id = record["item"]["id"]
 			if record_id in record_id_to_group:
 				group = record_id_to_group[record_id]
-				groups_records[group].append(record)
+				# 使用 (group_type, group_key) 作为键
+				groups_records[group.group_type, group.group_key].append(record)
 			else:
 				self.process_single_item(record, admin_id)
 				processed_count += 1
 		# 处理批量组
-		for group, records in groups_records.items():
+		for group in batch_groups:
+			group_key = (group.group_type, group.group_key)
+			records = groups_records.get(group_key, [])
 			self._handle_batch_group(group, records, admin_id)
 			processed_count += len(records)
 		return processed_count
