@@ -67,21 +67,20 @@ jobs:
         with:
           version: "0.7.4"
           enable-cache: true
-          cache-dependency-glob: |
-            **/pyproject.toml
-            **/uv.lock
+
+      - name: Set Python version from pyproject.toml
+        shell: bash
+        run: |
+          # 从 pyproject.toml 提取 Python 版本要求
+          PYTHON_VERSION=$(grep -E 'requires-python' ./Aumiao-py/pyproject.toml | grep -oE '[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$PYTHON_VERSION" ]; then
+            PYTHON_VERSION="3.13"  # 默认值
+          fi
+          echo "PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
 
       - name: Install Python with uv
         run: |
-          uv python install --from ./Aumiao-py/pyproject.toml
-
-      - name: Cache UPX
-        uses: actions/cache@v4
-        with:
-          path: upx.exe
-          key: ${{ runner.os }}-upx-${{ env.UPX_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-upx-
+          uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Download UPX if not cached
         if: env.CACHE_MISS == 'true'
