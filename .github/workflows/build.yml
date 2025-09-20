@@ -146,7 +146,7 @@ jobs:
           $distDir = "build/main.dist"
           New-Item -Path "$distDir/.log" -ItemType Directory -Force
           $essentialFiles = @(
-              "./Aumiao-py/README.txt",
+              "./Aumiao-py/README.md",
               "./Aumiao-py/DISCLAIMER.txt",
               "./Aumiao-py/data"
           )
