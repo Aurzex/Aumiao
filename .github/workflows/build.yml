@@ -49,51 +49,49 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          # 从pyproject.toml中提取版本号
-          $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw -Encoding UTF8
-          Write-Host "TOML content: $tomlContent"
-
-          $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
-          if ($versionLine) {
-              $version = $versionLine.Matches.Groups[1].Value
-              Write-Host "Extracted version: $version"
-              
-              # 正确设置环境变量
-              Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          } else {
-              Write-Error "Version not found in pyproject.toml"
-              exit 1
+          try {
+            $version = (Get-Content -Path ./Aumiao-py/pyproject.toml -Raw | 
+                       Select-String -Pattern 'version\s*=\s*"([\d.]+)"').Matches.Groups[1].Value
+            if (-not $version) {
+              throw "Version not found in pyproject.toml"
+            }
+            Write-Host "Extracted version: $version"
+            Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } catch {
+            Write-Error "Failed to extract version: $($_.Exception.Message)"
+            exit 1
           }
 
-      - name: Verify Version Extraction
-        shell: pwsh
-        run: |
-          Write-Host "PROJECT_VERSION = $env:PROJECT_VERSION"
-          Write-Host "GITHUB_ENV content:"
-          if (Test-Path $env:GITHUB_ENV) {
-              Get-Content $env:GITHUB_ENV
-          } else {
-              Write-Host "GITHUB_ENV file not found"
-          }
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          architecture: "x64"
-          cache: "pip"
+          version: "0.7.4"
+          enable-cache: true
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
 
-      - name: Cache Dependencies
+      - name: Install Python with uv
+        run: |
+          uv python install --from ./Aumiao-py/pyproject.toml
+
+      - name: Cache UPX
         uses: actions/cache@v4
         with:
-          path: |
-            .venv
-            ~/.cache/pip
-            ~/.cache/uv
-            upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('**/requirements.txt') }}-upx-${{ env.UPX_VERSION }}
+          path: upx.exe
+          key: ${{ runner.os }}-upx-${{ env.UPX_VERSION }}
           restore-keys: |
-            ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-upx-
+
+      - name: Download UPX if not cached
+        if: env.CACHE_MISS == 'true'
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
+          Expand-Archive upx.zip -DestinationPath upx_tmp
+          Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
+          Remove-Item upx_tmp, upx.zip -Recurse -Force
 
       - name: Install 7-Zip
         shell: pwsh
@@ -110,18 +108,15 @@ jobs:
               exit 1
           }
 
-      - name: Setup Python Environment
-        shell: pwsh
+      - name: Install Dependencies
         run: |
-          python -m venv .venv
-          .\.venv\Scripts\activate
-          python -m pip install --upgrade pip
-          pip install uv
-          uv pip install --system -r ./Aumiao-py/requirements.in
-          pip list
+          cd Aumiao-py
+          uv sync --locked --no-dev
 
       - name: Build with Nuitka
         uses: Nuitka/Nuitka-Action@main
+        env:
+          NUITKA_VERBOSE: 1
         with:
           assume-yes-for-downloads: true
           company-name: "Aumiao Team"
@@ -139,12 +134,12 @@ jobs:
           show-progress: true
           windows-console-mode: force
           windows-icon-from-ico: "./Aumiao-py/resource/icons/favicon.ico"
+          remove-output: true
+          nofollow-import-to: "test,tests"
 
       - name: Run recover.py
-        shell: pwsh
         run: |
-          .\.venv\Scripts\activate
-          python ./Aumiao-py/recover.py
+          uv run python ./Aumiao-py/recover.py
 
       - name: Prepare Distribution
         shell: pwsh
@@ -168,24 +163,28 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          if (-not (Test-Path "./upx.exe")) {
-              $ProgressPreference = 'SilentlyContinue'
-              Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
-              Expand-Archive upx.zip -DestinationPath upx_tmp
-              Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
-              Remove-Item upx_tmp, upx.zip -Recurse -Force
+          if (Test-Path "./upx.exe") {
+              # 压缩主程序（忽略错误）
+              ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log" || Write-Host "UPX compression warning (ignored)"
+
+              # 压缩DLL文件（跳过已知问题文件）
+              $excludeDlls = @("vcruntime140.dll", "vcruntime140_1.dll")
+              Get-ChildItem ./build/main.dist/*.dll | Where-Object { 
+                  $_.Name -notin $excludeDlls 
+              } | ForEach-Object {
+                  ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
+              }
+          } else {
+              Write-Host "UPX not available, skipping compression"
           }
 
-          # 压缩主程序（忽略错误）
-          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log" || Write-Host "UPX compression warning (ignored)"
-
-          # 压缩DLL文件（跳过已知问题文件）
-          $excludeDlls = @("vcruntime140.dll", "vcruntime140_1.dll")
-          Get-ChildItem ./build/main.dist/*.dll | Where-Object { 
-              $_.Name -notin $excludeDlls 
-          } | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
-          }
+      - name: Cleanup Build Artifacts
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force build/*.build 2>$null
+          Remove-Item -Recurse -Force build/*.dist/.log 2>$null
+          Get-ChildItem -Path build -Include __pycache__ -Recurse -Directory | Remove-Item -Recurse -Force
+          Get-ChildItem -Path build -Include *.pyc -Recurse -File | Remove-Item -Force
 
       - name: Package Artifacts
         shell: pwsh
