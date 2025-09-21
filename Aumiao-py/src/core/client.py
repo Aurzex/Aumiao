@@ -1,3 +1,4 @@
+import operator
 from collections import defaultdict, namedtuple
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
@@ -830,23 +831,54 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
 
-	def collect_work_comments(self, limit: int) -> dict[str, list[str]]:
+	def collect_work_comments(self, limit: int) -> list[dict]:
 		works = Obtain().integrate_work_data(limit=limit)
 		comments = []
 		for single_work in works:
 			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
 			comments.extend(work_comments)
-		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content"])
+		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
 		filtered_comments = cast("list[dict]", filtered_comments)
-		user_comments = {}
+		user_comments_map = {}
 		for comment in filtered_comments:
 			user_id = comment.get("user_id")
 			content = comment.get("content")
-			if user_id is None or content is None:
+			nickname = comment.get("nickname")
+			if user_id is None or content is None or nickname is None:
 				continue
 			user_id_str = str(user_id)
-			user_comments.setdefault(user_id_str, []).append(content)
-		return user_comments
+			if user_id_str not in user_comments_map:
+				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
+			user_comments_map[user_id_str]["comments"].append(content)
+			user_comments_map[user_id_str]["comment_count"] += 1
+		# 转换为列表并按评论数从大到小排序
+		result = list(user_comments_map.values())
+		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
+		return result
+
+	@staticmethod
+	def print_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
+		"""打印用户评论统计信息
+		Args:
+			comments_data: 用户评论数据列表
+			min_comments: 最小评论数目阈值, 只有评论数大于等于此值的用户才会被打印
+		"""
+		# 过滤出评论数达到阈值的用户
+		filtered_users = [user for user in comments_data if user["comment_count"] >= min_comments]
+		if not filtered_users:
+			print(f"没有用户评论数达到或超过 {min_comments} 条")
+			return
+		print(f"评论数达到 {min_comments}+ 的用户统计:")
+		print("=" * 60)
+		for user_data in filtered_users:
+			nickname = user_data["nickname"]
+			user_id = user_data["user_id"]
+			comment_count = user_data["comment_count"]
+			print(f"用户 {nickname} (ID: {user_id}) 发送了 {comment_count} 条评论")
+			print("评论内容:")
+			for i, comment in enumerate(user_data["comments"], 1):
+				print(f"  {i}. {comment}")
+			print("*" * 50)
 
 
 # ------------------------------
