@@ -108,7 +108,7 @@ class AuthManager:
 		cookie_str = self.tool.DataConverter().convert_cookie(token_ca)  # 将cookie转换为字符串
 		headers = {**self._client.headers, "cookie": cookie_str}  # 添加cookie到headers中
 		response = self._client.send_request(method="GET", endpoint="/web/users/details", headers=headers)  # 发送请求获取用户详情
-		auth = response.cookies.get_dict()  # 获取cookie
+		auth = response.cookies.get_dict()  # pyright: ignore[reportGeneralTypeIssues] # 获取cookie
 		return {**token_ca, **auth}  # 返回完整cookie
 
 	# 退出登录
@@ -330,6 +330,12 @@ class DataFetcher:
 			method="GET",
 			params=params,
 		)
+		return response.json()
+
+	# 获取nemo端新作喵喵看作品
+	def fetch_new_recommend_works(self, limit: int = 15, offset: int = 0) -> dict:
+		params = {"limit": limit, "offset": offset}
+		response = self._client.send_request(endpoint="/nemo/v3/new-recommend/more/list", method="GET", params=params)
 		return response.json()
 
 	# 获取编程猫nemo作品推荐
