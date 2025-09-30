@@ -109,6 +109,12 @@ class WorkshopDataFetcher:
 		params = {"limit": 20, "offset": 0}
 		return self._client.fetch_data(endpoint=f"/web/works/subjects/labels/{label_id}/posts", params=params, limit=limit)
 
+	# 获取工作室待审核成员
+	def fetch_workshop_unaudited_member(self, workshop_id: int, limit: int = 40, offset: int = 0) -> dict:
+		params = {"limit": limit, "offset": offset, "id": workshop_id}
+		response = self._client.send_request(endpoint="https://api.codemao.cn/web/work_shops/users/unaudited/list", method="GET", params=params)
+		return response.json()
+
 
 @singleton
 class WorkshopActionHandler:
