@@ -24,7 +24,7 @@ env:
   COMMIT_INTERVAL: 20
   PYTHON_VERSION: "3.13"
   UPX_VERSION: "4.2.4"
-  UV_VERSION: "0.4.22"  # 固定uv版本
+  UV_VERSION: "0.4.22"
 
 jobs:
   # 检查是否需要创建release
@@ -43,12 +43,17 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          # 获取最近的tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          # 获取所有tag，如果没有tag则使用初始commit
+          if git describe --tags --abbrev=0 > /dev/null 2>&1; then
+            LATEST_TAG=$(git describe --tags --abbrev=0)
+            echo "Latest tag: $LATEST_TAG"
+            COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
+          else
+            echo "No tags found, counting all commits"
+            LATEST_TAG="initial"
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+          fi
           
-          # 计算从该tag开始的commit数量
-          COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
           echo "Commits since last tag: $COMMIT_COUNT"
           
           # 检查是否达到commit间隔
@@ -114,7 +119,6 @@ jobs:
     needs: [check-release, changelog]
     
     env:
-      # 配置uv缓存目录
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
@@ -262,11 +266,9 @@ jobs:
               ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
           }
 
-
       - name: Build Installer with Inno Setup
         shell: pwsh
         run: ISCC.exe ./Aumiao-py/resource/aumiao.iss
-
 
       - name: Package Artifacts
         shell: pwsh
