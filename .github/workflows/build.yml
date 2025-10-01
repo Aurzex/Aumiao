@@ -207,22 +207,22 @@ jobs:
       - name: Build with Nuitka using uv
         working-directory: ./Aumiao-py
         run: |
-          uv run nuitka \
-            --assume-yes-for-downloads \
-            --company-name="Aumiao Team" \
-            --copyright="Copyright © 2025 喵鱼a. All rights reserved." \
-            --file-version="${{ env.PROJECT_VERSION || '2.0.0' }}" \
-            --follow-imports \
-            --jobs=4 \
-            --lto=yes \
-            --mode=standalone \
-            --output-dir=../build \
-            --output-filename=aumiao \
-            --product-name="Aumiao" \
-            --product-version="${{ env.PROJECT_VERSION || '2.0.0' }}" \
-            --show-progress \
-            --windows-console-mode=force \
-            --windows-icon-from-ico="./resource/icons/favicon.ico" \
+          uv run nuitka `
+            --assume-yes-for-downloads `
+            --company-name="Aumiao Team" `
+            --copyright="Copyright © 2025 喵鱼a. All rights reserved." `
+            --file-version="${{ env.PROJECT_VERSION || '2.0.0' }}" `
+            --follow-imports `
+            --jobs=4 `
+            --lto=yes `
+            --mode=standalone `
+            --output-dir=../build `
+            --output-filename=aumiao `
+            --product-name="Aumiao" `
+            --product-version="${{ env.PROJECT_VERSION || '2.0.0' }}" `
+            --show-progress `
+            --windows-console-mode=force `
+            --windows-icon-from-ico="./resource/icons/favicon.ico" `
             ./main.py
 
       - name: Run recover.py with uv
