@@ -473,7 +473,6 @@ class Obtain(ClassUnion):
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
 		"""
 		获取教育账号信息,可选择返回生成器或列表
-
 		:param limit: 要获取的账号数量限制
 		:param return_method: 返回方式,"generator"返回生成器,"list"返回列表
 		:return: 账号生成器或列表,每个元素为(username, password)元组
@@ -517,7 +516,6 @@ class Obtain(ClassUnion):
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
 		"""
 		处理教育账号的切换、登录和执行操作
-
 		:param limit: 要处理的账号数量限制
 		:param action: 登录成功后执行的回调函数
 		"""
@@ -1927,27 +1925,28 @@ class MillenniumEntanglement(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 
-	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
+	def batch_like_content(self, user_id: int | None, content_type: Literal["work", "novel"], custom_list: list | None = None) -> None:
+		"""批量点赞用户作品或小说"""
 		if custom_list:
 			target_list = custom_list
-		elif method == "work":
-			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
-		elif method == "novel":
+		elif content_type == "work":
+			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))
+		elif content_type == "novel":
 			target_list = self._novel_obtain.fetch_my_novels()
 		else:
-			msg = f"不支持的{method}"
+			msg = f"不支持的内容类型 {content_type}"
 			raise TypeError(msg)
 
 		def action() -> None:
-			if method == "work":
+			if content_type == "work":
 				Motion().like_all_work(user_id=str(user_id), works_list=target_list)
 			else:
 				Motion().like_my_novel(novel_list=target_list)
 
 		Obtain().process_edu_accounts(limit=None, action=action())
 
-	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
-		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+	def upgrade_to_teacher(self, real_name: str) -> None:
+		"""升级账号为教师身份"""
 		generator = tool.EduDataGenerator()
 		self._edu_motion.execute_upgrade_to_teacher(
 			user_id=int(self._data.ACCOUNT_DATA.id),
@@ -1963,11 +1962,11 @@ class MillenniumEntanglement(ClassUnion):
 			teacher_card_number=generator.generate_teacher_certificate_number(),
 		)
 
-	def execute_batch_handle_account(self, method: Literal["create", "delete", "token"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
-		"""批量处理教育账号"""
+	def manage_edu_accounts(self, action_type: Literal["create", "delete", "token"], limit: int | None = 100) -> None:
+		"""批量管理教育账号"""
 
 		def _create_students(student_limit: int) -> None:
-			"""创建学生账号内部逻辑"""
+			"""创建学生账号"""
 			class_capacity = 95
 			class_count = (student_limit + class_capacity - 1) // class_capacity
 			generator = tool.EduDataGenerator()
@@ -1983,12 +1982,13 @@ class MillenniumEntanglement(ClassUnion):
 				print("添加学生ing")
 
 		def _delete_students(delete_limit: int | None) -> None:
-			"""删除学生账号内部逻辑"""
-			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
+			"""删除学生账号"""
+			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)
 			for student in students:
 				self._edu_motion.delete_student_from_class(stu_id=student["id"])
 
 		def _create_token(token_limit: int | None) -> list[str]:
+			"""生成账号token"""
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
@@ -1998,25 +1998,27 @@ class MillenniumEntanglement(ClassUnion):
 				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")
 			return token_list
 
-		if method == "delete":
+		if action_type == "delete":
 			_delete_students(limit)
-		elif method == "create":
+		elif action_type == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
-		elif method == "token":
+		elif action_type == "token":
 			_create_token(token_limit=limit)
 
-	def execute_chalky_brook(self, work_id: int) -> None:
+	def batch_report_work(self, work_id: int) -> None:
+		"""批量举报作品"""
 		hidden_border = 10
 		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self._work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
 
-	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
-		if source == "post":
+	def create_comment(self, target_id: int, content: str, source_type: Literal["work", "shop", "post"]) -> None:
+		"""创建评论/回复"""
+		if source_type == "post":
 			self._forum_motion.create_post_reply(post_id=target_id, content=content)
-		elif source == "shop":
+		elif source_type == "shop":
 			self._shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
-		elif source == "work":
+		elif source_type == "work":
 			self._work_motion.create_work_comment(work_id=target_id, comment=content)
 		else:
-			msg = f"不支持的源 {source}"
+			msg = f"不支持的来源类型 {source_type}"
 			raise TypeError(msg)
