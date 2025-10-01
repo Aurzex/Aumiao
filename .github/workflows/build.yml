@@ -196,10 +196,13 @@ jobs:
           }
           Remove-Item "innosetup.exe" -Force
 
+      - name: Update uv lock file
+        working-directory: ./Aumiao-py
+        run: uv lock
+
       - name: Install Project Dependencies with uv
         working-directory: ./Aumiao-py
-        run: |
-          uv sync --locked --all-extras --dev
+        run: uv sync --all-extras --dev
 
       - name: Build with Nuitka using uv
         working-directory: ./Aumiao-py
