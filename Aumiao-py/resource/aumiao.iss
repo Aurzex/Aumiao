@@ -10,7 +10,9 @@
 #define OutputDir "..\..\build\installer"
 
 [Setup]
-AppId={305ED0F1-25F5-49D1-AD4C-AFBE685D2457}
+; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
+; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
+AppId={{305ED0F1-25F5-49D1-AD4C-AFBE685D2457}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
