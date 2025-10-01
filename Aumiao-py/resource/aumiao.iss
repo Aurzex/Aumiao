@@ -10,7 +10,7 @@
 #define OutputDir "..\..\build\installer"
 
 [Setup]
-AppId={{305ED0F1-25F5-49D1-AD4C-AFBE685D2457}
+AppId={305ED0F1-25F5-49D1-AD4C-AFBE685D2457}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
