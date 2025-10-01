@@ -14,15 +14,13 @@ from websocket import WebSocketApp
 class CodeMaoAIChat:
 	"""
 	CodeMao AI Chat Client
-
 	A Python client for interacting with CodeMao AI chat service via WebSocket.
-
 	Args:
 		token (str): Authentication token
 		verbose (bool, optional): Whether to show detailed logs. Defaults to True.
 	"""
 
-	def __init__(self, token: str, *, verbose: bool = True) -> None:
+	def __init__(self, token: str, *, verbose: bool = False) -> None:
 		self.ws: WebSocketApp | None = None
 		self.token = token
 		self.connected = False
@@ -32,12 +30,35 @@ class CodeMaoAIChat:
 		self.current_response = ""
 		self.is_receiving_response = False
 		self.verbose = verbose
-		self._response_callbacks: list[Callable[[str, str], None]] = []
+		self._stream_callbacks: list[Callable[[str, str], None]] = []
 
 	def _log(self, message: str) -> None:
-		"""Log output"""
+		"""Log output - only in verbose mode"""
 		if self.verbose:
 			print(message)
+
+	def add_stream_callback(self, callback: Callable[[str, str], None]) -> None:
+		"""
+		Add stream callback function
+		Args:
+			callback: Callback function that receives two parameters:
+				- content: the text content
+				- event_type: 'start', 'text', 'end', or 'error'
+		"""
+		self._stream_callbacks.append(callback)
+
+	def remove_stream_callback(self, callback: Callable[[str, str], None]) -> None:
+		"""Remove stream callback function"""
+		if callback in self._stream_callbacks:
+			self._stream_callbacks.remove(callback)
+
+	def _emit_stream_event(self, content: str, event_type: str) -> None:
+		"""Emit stream event to all callbacks"""
+		for callback in self._stream_callbacks:
+			try:
+				callback(content, event_type)
+			except Exception as e:
+				self._log(f"Callback error: {e}")
 
 	def _handle_event(self, event_name: str, payload: dict[str, Any]) -> None:
 		"""Handle specific events"""
@@ -93,27 +114,18 @@ class CodeMaoAIChat:
 		self.session_id = data.get("session_id")
 		self.current_response = ""
 		self.is_receiving_response = True
-		self._log("\nAI: ")
+		self._emit_stream_event("", "start")
 
 	def _handle_stream_content(self, _data: dict[str, Any], content: str) -> None:
 		"""Handle stream output content"""
 		if self.is_receiving_response:
 			self.current_response += content
-			# Call response callback functions
-			for callback in self._response_callbacks:
-				callback(content, "content")
-			if self.verbose:
-				print(content, end="", flush=True)
+			self._emit_stream_event(content, "text")
 
 	def _handle_stream_end(self, _data: dict[str, Any], _content: str) -> None:
 		"""Handle stream output end"""
 		self.is_receiving_response = False
-		# Call response completion callback functions
-		for callback in self._response_callbacks:
-			callback(self.current_response, "end")
-		if self.verbose:
-			print(f"\n\nComplete reply: {self.current_response}")
-			print("=" * 50)
+		self._emit_stream_event(self.current_response, "end")
 
 	def on_message(self, _ws: object, message: str) -> None:
 		"""Handle received messages"""
@@ -132,6 +144,7 @@ class CodeMaoAIChat:
 				self._handle_event(event_data[0], event_data[1] if len(event_data) > 1 else {})
 		except Exception as e:
 			self._log(f"Message processing error: {e}")
+			self._emit_stream_event(str(e), "error")
 
 	def _send_preset_messages(self) -> None:
 		"""Send preset messages"""
@@ -140,7 +153,9 @@ class CodeMaoAIChat:
 			self.ws.send('42["get_text2Img_remaining_times"]')
 
 	def on_error(self, _ws: object, error: object) -> None:
-		self._log(f"WebSocket error: {error}")
+		error_msg = f"WebSocket error: {error}"
+		self._log(error_msg)
+		self._emit_stream_event(error_msg, "error")
 
 	def on_close(self, _ws: object, _close_status_code: int | None = None, _close_msg: str | None = None) -> None:
 		self._log("Connection closed")
@@ -174,7 +189,7 @@ class CodeMaoAIChat:
 			on_message=self.on_message,
 			on_error=self.on_error,
 			on_close=self.on_close,
-			on_open=self.on_open,  # type: ignore  # noqa: PGH003
+			on_open=self.on_open,  # pyright: ignore[reportArgumentType]
 			header={
 				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
 				"Origin": "https://kn.codemao.cn",
@@ -203,7 +218,7 @@ class CodeMaoAIChat:
 		"""Generate session ID"""
 		return "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
 
-	def send_message(self, message: str) -> bool:
+	def send_message(self, message: str, wait_for_start: bool = True, start_timeout: int = 10) -> bool:
 		"""Send chat message"""
 		if not self.connected or not self.ws:
 			self._log("Error: Not connected to server")
@@ -214,69 +229,25 @@ class CodeMaoAIChat:
 		chat_data = {"session_id": self._generate_session_id(), "messages": [{"role": "user", "content": message}], "chat_type": "chat_v3", "msg_channel": 0}
 		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws.send(message_str)
-		self._log(f"\nYou: {message}")
+		self._log(f"Message sent: {message}")
+		# 等待AI开始回复
+		if wait_for_start:
+			return self._wait_for_response_start(start_timeout)
 		return True
 
-	def add_response_callback(self, callback: Callable[[str, str], None]) -> None:
-		"""
-		Add response callback function
-
-		Args:
-			callback: Callback function that receives two parameters: content and type
-			type can be 'content' or 'end'
-		"""
-		self._response_callbacks.append(callback)
-
-	def remove_response_callback(self, callback: Callable[[str, str], None]) -> None:
-		"""Remove response callback function"""
-		if callback in self._response_callbacks:
-			self._response_callbacks.remove(callback)
+	def _wait_for_response_start(self, timeout: int = 10) -> bool:
+		"""Wait for AI to start responding"""
+		start_time = time.time()
+		while not self.is_receiving_response and time.time() - start_time < timeout:
+			time.sleep(0.1)
+		return self.is_receiving_response
 
 	def wait_for_response(self, timeout: int = 60) -> bool:
-		"""
-		Wait for current response to complete
-
-		Args:
-			timeout: Timeout in seconds
-
-		Returns:
-			bool: Whether successfully waited for response completion
-		"""
+		"""Wait for current response to complete"""
 		start_time = time.time()
 		while self.is_receiving_response and time.time() - start_time < timeout:
 			time.sleep(0.1)
 		return not self.is_receiving_response
-
-	def start_chat(self) -> None:
-		"""Start interactive chat"""
-		if not self.connect():
-			return
-		self._log("\nConnection successful!")
-		self._log("Enter your message (type 'quit' to exit):")
-		try:
-			while self.connected:
-				if self.is_receiving_response:
-					time.sleep(0.1)
-					continue
-				user_input = input("\n> ").strip()
-				if user_input.lower() in {"quit", "exit", "退出"}:
-					break
-				if user_input:
-					self.send_message(user_input)
-					wait_count = 0
-					max_wait_count = 50
-					while not self.is_receiving_response and wait_count < max_wait_count:
-						time.sleep(0.1)
-						wait_count += 1
-				else:
-					self._log("Please enter valid content")
-		except KeyboardInterrupt:
-			self._log("\nProgram interrupted by user")
-		except EOFError:
-			self._log("\nInput ended")
-		finally:
-			if self.ws:
-				self.ws.close()
 
 	def close(self) -> None:
 		"""Close connection"""
@@ -285,18 +256,46 @@ class CodeMaoAIChat:
 		self.connected = False
 
 
-def main() -> None:
-	"""Main function for command line usage"""
-	print("=" * 60)
-	print("           CodeMao AI Chat Client")
-	print("=" * 60)
-	token = input("Please enter your token: ").strip()
-	if not token:
-		print("Error: Token cannot be empty")
-		return
-	chat_client = CodeMaoAIChat(token=token)
-	chat_client.start_chat()
+def stream_chat(token: str, message: str, timeout: int = 60) -> str:
+	"""
+	直接流式打印AI回复的便捷函数
+	Args:
+		token: 认证token
+		message: 要发送的消息
+		timeout: 超时时间(秒)
+	Returns:
+		完整的回复内容
+	"""
+	client = CodeMaoAIChat(token=token, verbose=False)
+	full_response = []
 
+	def stream_handler(content: str, event_type: str) -> None:
+		if event_type == "text":
+			print(content, end="", flush=True)
+			full_response.append(content)
+		elif event_type == "end":
+			full_response.append(content)
+			print()  # 换行
 
-if __name__ == "__main__":
-	main()
+	client.add_stream_callback(stream_handler)
+	try:
+		if client.connect():
+			# 等待初始
+			time.sleep(2)
+			if client.send_message(message):
+				# 等待回复开始
+				start_time = time.time()
+				while not client.is_receiving_response and time.time() - start_time < 10:  # noqa: PLR2004
+					time.sleep(0.1)
+				if client.is_receiving_response:
+					# 等待回复完成
+					client.wait_for_response(timeout)
+				else:
+					print("AI未开始回复")
+			else:
+				print("消息发送失败")
+		else:
+			print("连接失败")
+	finally:
+		client.close()
+	return "".join(full_response)
