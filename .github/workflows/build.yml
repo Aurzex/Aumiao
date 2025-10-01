@@ -202,7 +202,9 @@ jobs:
 
       - name: Install Project Dependencies with uv
         working-directory: ./Aumiao-py
-        run: uv sync --all-extras --dev
+        run: |
+          uv sync --all-extras --dev
+          uv pip install nuitka
 
       - name: Build with Nuitka using uv
         working-directory: ./Aumiao-py
