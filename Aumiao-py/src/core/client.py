@@ -485,7 +485,6 @@ class Obtain(ClassUnion):
 				return iter([]) if return_method == "generator" else []
 
 			# 定义处理函数
-
 			def process_student(student: dict) -> tuple[Any, Any]:
 				self._client.switch_account(token=self._client.token.average, identity="average")
 				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
