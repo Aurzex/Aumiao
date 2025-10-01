@@ -25,10 +25,10 @@ MAX_CHARACTER = 100
 @singleton
 @dataclass
 class Token:
-	average: str = field(default="", metadata={"track": True})
-	edu: str = field(default="", metadata={"track": True})
-	judgement: str = field(default="", metadata={"track": True})
-	blank: str = field(default="", metadata={"track": True})
+	average: str = field(default="", metadata={"track": False})
+	edu: str = field(default="", metadata={"track": False})
+	judgement: str = field(default="", metadata={"track": False})
+	blank: str = field(default="", metadata={"track": False})
 
 	def __setattr__(self, name: str, value: ...) -> None:
 		if hasattr(self, name) and hasattr(self.__class__, name):
