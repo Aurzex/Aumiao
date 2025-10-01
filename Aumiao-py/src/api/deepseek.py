@@ -31,6 +31,8 @@ class CodeMaoAIChat:
 		self.is_receiving_response = False
 		self.verbose = verbose
 		self._stream_callbacks: list[Callable[[str, str], None]] = []
+		# 用户信息缓存
+		self._user_info: dict[str, Any] = {}
 
 	def _log(self, message: str) -> None:
 		"""Log output - only in verbose mode"""
@@ -77,6 +79,7 @@ class CodeMaoAIChat:
 		"""Handle connection acknowledgment event"""
 		if payload.get("code") == 1:
 			data = payload.get("data", {})
+			self._user_info.update(data)
 			self._log(f"Connection confirmed - Remaining chat count: {data.get('chat_count', 'Unknown')}")
 
 	def _handle_join_ack(self, payload: dict[str, Any]) -> None:
@@ -90,8 +93,10 @@ class CodeMaoAIChat:
 
 	def _handle_remaining_times(self, payload: dict[str, Any]) -> None:
 		"""Handle remaining times query"""
-		data = payload.get("data", {})
-		self._log(f"Remaining image generation times: {data.get('remaining_times', 'Unknown')}")
+		if payload.get("code") == 1:
+			data = payload.get("data", {})
+			self._user_info.update({"remaining_image_times": data.get("remaining_times")})
+			self._log(f"Remaining image generation times: {data.get('remaining_times', 'Unknown')}")
 
 	def _handle_chat_ack(self, payload: dict[str, Any]) -> None:
 		"""Handle chat reply event"""
@@ -218,7 +223,7 @@ class CodeMaoAIChat:
 		"""Generate session ID"""
 		return "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
 
-	def send_message(self, message: str, wait_for_start: bool = True, start_timeout: int = 10) -> bool:
+	def send_message(self, message: str) -> bool:
 		"""Send chat message"""
 		if not self.connected or not self.ws:
 			self._log("Error: Not connected to server")
@@ -230,17 +235,7 @@ class CodeMaoAIChat:
 		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws.send(message_str)
 		self._log(f"Message sent: {message}")
-		# 等待AI开始回复
-		if wait_for_start:
-			return self._wait_for_response_start(start_timeout)
 		return True
-
-	def _wait_for_response_start(self, timeout: int = 10) -> bool:
-		"""Wait for AI to start responding"""
-		start_time = time.time()
-		while not self.is_receiving_response and time.time() - start_time < timeout:
-			time.sleep(0.1)
-		return self.is_receiving_response
 
 	def wait_for_response(self, timeout: int = 60) -> bool:
 		"""Wait for current response to complete"""
@@ -248,6 +243,14 @@ class CodeMaoAIChat:
 		while self.is_receiving_response and time.time() - start_time < timeout:
 			time.sleep(0.1)
 		return not self.is_receiving_response
+
+	def get_user_info(self) -> dict[str, Any]:
+		"""
+		获取用户信息
+		Returns:
+			包含用户信息的字典
+		"""
+		return {"user_id": self.user_id, **self._user_info}
 
 	def close(self) -> None:
 		"""Close connection"""
@@ -280,7 +283,7 @@ def stream_chat(token: str, message: str, timeout: int = 60) -> str:
 	client.add_stream_callback(stream_handler)
 	try:
 		if client.connect():
-			# 等待初始
+			# 等待初始化
 			time.sleep(2)
 			if client.send_message(message):
 				# 等待回复开始
@@ -299,3 +302,22 @@ def stream_chat(token: str, message: str, timeout: int = 60) -> str:
 	finally:
 		client.close()
 	return "".join(full_response)
+
+
+def get_user_quota(token: str) -> dict[str, Any]:
+	"""
+	快速获取用户配额信息
+	Args:
+		token: 认证token
+	Returns:
+		用户配额信息字典
+	"""
+	client = CodeMaoAIChat(token=token, verbose=False)
+	try:
+		if client.connect():
+			# 等待用户信息加载完成
+			time.sleep(3)
+			return client.get_user_info()
+		return {"error": "连接失败"}
+	finally:
+		client.close()
