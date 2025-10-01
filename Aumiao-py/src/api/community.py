@@ -363,7 +363,7 @@ class DataFetcher:
 		)
 		return response.json()
 
-	# 获取推荐作者
+	# 获取社区星推荐
 	def fetch_recommended_users(self) -> dict:
 		response = self._client.send_request(endpoint="/web/users/recommended", method="GET")
 		return response.json()
