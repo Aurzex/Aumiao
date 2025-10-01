@@ -188,62 +188,14 @@ class CodeMaoClient:
 				return response
 		return cast("Response", None)
 
-	def _log_http_error(self, response: Response, attempt: int, max_attempts: int) -> None:
-		"""
-		记录HTTP错误的详细信息
-		"""
-		try:
-			# 提取请求信息
-			request_info = {
-				"method": response.request.method,
-				"url": response.request.url,
-				"headers": dict(response.request.headers),
-				"body": response.request.body[:1000] if response.request.body else None,
-			}
-			# 提取响应信息,安全处理可能不存在的键
-			response_info = {
-				"status_code": response.status_code,
-				"headers": dict(response.headers),
-				"text": response.text[:1000] if response.text else None,
-			}
-			# 尝试解析JSON响应,避免因解析失败导致日志记录中断
-			try:
-				response_info["json"] = response.json()
-			except Exception:
-				response_info["json"] = "Failed to parse JSON"
-			# 提取额外的上下文信息
-			context_info = {
-				"attempt": attempt + 1,
-				"max_attempts": max_attempts,
-				"session_identity": self._identity,
-				"timestamp": tool.TimeUtils().format_timestamp(),
-			}
-			# 构建完整的日志条目
-			log_entry = (
-				f"{'=' * 80}\n"
-				f"HTTP Error {response.status_code}\n"
-				f"Timestamp: {context_info['timestamp']}\n"
-				f"Attempt {context_info['attempt']}/{context_info['max_attempts']}\n"
-				f"Session Identity: {context_info['session_identity']}\n\n"
-				f"Request:\n"
-				f"  Method: {request_info['method']}\n"
-				f"  URL: {request_info['url']}\n"
-				f"  Headers: {request_info['headers']}\n"
-				f"  Body: {request_info['body']}\n\n"
-				f"Response:\n"
-				f"  Status: {response_info['status_code']}\n"
-				f"  Headers: {response_info['headers']}\n"
-				f"  Text: {response_info['text']}\n"
-				f"  JSON: {response_info['json']}\n"
-				f"{'=' * 80}\n\n"
-			)
-			# 写入日志文件
-			self._file.file_write(path=ERROR_LOG_PATH, content=log_entry, method="a")
-			# 同时在控制台输出简要信息
-			print(f"[ERROR] HTTP {response.status_code} - Logged to {ERROR_LOG_PATH}")
-		except Exception as e:
-			# 确保日志记录过程中不会引发新的异常
-			print(f"Failed to log HTTP error: {e}")
+	@staticmethod
+	def _get_default_pagination_config(method: str) -> PaginationConfig:
+		return {
+			"amount_key": "limit" if method == "GET" else "page_size",
+			"offset_key": "offset" if method == "GET" else "current_page",
+			"response_amount_key": "limit",
+			"response_offset_key": "offset",
+		}
 
 	def _get_pagination_info(
 		self,
@@ -494,14 +446,62 @@ class CodeMaoClient:
 		)
 		self._file.file_write(path=LOG_FILE_PATH, content=log_entry, method="a")
 
-	@staticmethod
-	def _get_default_pagination_config(method: str) -> PaginationConfig:
-		return {
-			"amount_key": "limit" if method == "GET" else "page_size",
-			"offset_key": "offset" if method == "GET" else "current_page",
-			"response_amount_key": "limit",
-			"response_offset_key": "offset",
-		}
+	def _log_http_error(self, response: Response, attempt: int, max_attempts: int) -> None:
+		"""
+		记录HTTP错误的详细信息
+		"""
+		try:
+			# 提取请求信息
+			request_info = {
+				"method": response.request.method,
+				"url": response.request.url,
+				"headers": dict(response.request.headers),
+				"body": response.request.body[:1000] if response.request.body else None,
+			}
+			# 提取响应信息,安全处理可能不存在的键
+			response_info = {
+				"status_code": response.status_code,
+				"headers": dict(response.headers),
+				"text": response.text[:1000] if response.text else None,
+			}
+			# 尝试解析JSON响应,避免因解析失败导致日志记录中断
+			try:
+				response_info["json"] = response.json()
+			except Exception:
+				response_info["json"] = "Failed to parse JSON"
+			# 提取额外的上下文信息
+			context_info = {
+				"attempt": attempt + 1,
+				"max_attempts": max_attempts,
+				"session_identity": self._identity,
+				"timestamp": tool.TimeUtils().format_timestamp(),
+			}
+			# 构建完整的日志条目
+			log_entry = (
+				f"{'=' * 80}\n"
+				f"HTTP Error {response.status_code}\n"
+				f"Timestamp: {context_info['timestamp']}\n"
+				f"Attempt {context_info['attempt']}/{context_info['max_attempts']}\n"
+				f"Session Identity: {context_info['session_identity']}\n\n"
+				f"Request:\n"
+				f"  Method: {request_info['method']}\n"
+				f"  URL: {request_info['url']}\n"
+				f"  Headers: {request_info['headers']}\n"
+				f"  Body: {request_info['body']}\n\n"
+				f"Response:\n"
+				f"  Status: {response_info['status_code']}\n"
+				f"  Headers: {response_info['headers']}\n"
+				f"  Text: {response_info['text']}\n"
+				f"  JSON: {response_info['json']}\n"
+				f"{'=' * 80}\n\n"
+			)
+			# 写入日志文件
+			self._file.file_write(path=ERROR_LOG_PATH, content=log_entry, method="a")
+			# 同时在控制台输出简要信息
+			print(f"[ERROR] HTTP {response.status_code} - Logged to {ERROR_LOG_PATH}")
+		except Exception as e:
+			# 确保日志记录过程中不会引发新的异常
+			print(f"Failed to log HTTP error: {e}")
 
 
 @singleton
