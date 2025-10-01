@@ -4,18 +4,26 @@ import ssl
 import string
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import quote
 
-import websocket
-
-if TYPE_CHECKING:
-	from collections.abc import Callable
+from websocket import WebSocketApp
 
 
 class CodeMaoAIChat:
-	def __init__(self, token: str | None = None) -> None:
-		self.ws: websocket.WebSocketApp | None = None
+	"""
+	CodeMao AI Chat Client
+
+	A Python client for interacting with CodeMao AI chat service via WebSocket.
+
+	Args:
+		token (str): Authentication token
+		verbose (bool, optional): Whether to show detailed logs. Defaults to True.
+	"""
+
+	def __init__(self, token: str, *, verbose: bool = True) -> None:
+		self.ws: WebSocketApp | None = None
 		self.token = token
 		self.connected = False
 		self.session_id: str | None = None
@@ -23,13 +31,20 @@ class CodeMaoAIChat:
 		self.user_id: str | None = None
 		self.current_response = ""
 		self.is_receiving_response = False
+		self.verbose = verbose
+		self._response_callbacks: list[Callable[[str, str], None]] = []
+
+	def _log(self, message: str) -> None:
+		"""Log output"""
+		if self.verbose:
+			print(message)
 
 	def _handle_event(self, event_name: str, payload: dict[str, Any]) -> None:
-		"""处理具体事件"""
+		"""Handle specific events"""
 		event_handlers: dict[str, Callable[[dict[str, Any]], None]] = {
 			"on_connect_ack": self._handle_connect_ack,
 			"join_ack": self._handle_join_ack,
-			"preset_chat_message_ack": lambda _: print("预设消息确认"),
+			"preset_chat_message_ack": lambda _: self._log("Preset message confirmed"),
 			"get_text2Img_remaining_times_ack": self._handle_remaining_times,
 			"chat_ack": self._handle_chat_ack,
 		}
@@ -37,30 +52,28 @@ class CodeMaoAIChat:
 		if handler:
 			handler(payload)
 
-	@staticmethod
-	def _handle_connect_ack(payload: dict[str, Any]) -> None:
-		"""处理连接确认事件"""
+	def _handle_connect_ack(self, payload: dict[str, Any]) -> None:
+		"""Handle connection acknowledgment event"""
 		if payload.get("code") == 1:
 			data = payload.get("data", {})
-			print(f"连接确认 - 剩余聊天次数: {data.get('chat_count', '未知')}")
+			self._log(f"Connection confirmed - Remaining chat count: {data.get('chat_count', 'Unknown')}")
 
 	def _handle_join_ack(self, payload: dict[str, Any]) -> None:
-		"""处理加入确认事件"""
+		"""Handle join acknowledgment event"""
 		if payload.get("code") == 1:
 			data = payload.get("data", {})
 			self.user_id = data.get("user_id")
 			self.search_session = data.get("search_session")
-			print(f"加入成功 - 用户ID: {self.user_id}, 会话: {self.search_session}")
+			self._log(f"Join successful - User ID: {self.user_id}, Session: {self.search_session}")
 			self._send_preset_messages()
 
-	@staticmethod
-	def _handle_remaining_times(payload: dict[str, Any]) -> None:
-		"""处理剩余次数查询"""
+	def _handle_remaining_times(self, payload: dict[str, Any]) -> None:
+		"""Handle remaining times query"""
 		data = payload.get("data", {})
-		print(f"剩余图片生成次数: {data.get('remaining_times', '未知')}")
+		self._log(f"Remaining image generation times: {data.get('remaining_times', 'Unknown')}")
 
 	def _handle_chat_ack(self, payload: dict[str, Any]) -> None:
-		"""处理聊天回复事件"""
+		"""Handle chat reply event"""
 		code = payload.get("code")
 		data = payload.get("data", {})
 		if code == 1:
@@ -76,58 +89,65 @@ class CodeMaoAIChat:
 				handler(data, content)
 
 	def _handle_stream_begin(self, data: dict[str, Any], _content: str) -> None:
-		"""处理流式输出开始"""
+		"""Handle stream output start"""
 		self.session_id = data.get("session_id")
 		self.current_response = ""
 		self.is_receiving_response = True
-		print("\nAI: ", end="", flush=True)
+		self._log("\nAI: ")
 
 	def _handle_stream_content(self, _data: dict[str, Any], content: str) -> None:
-		"""处理流式输出内容"""
+		"""Handle stream output content"""
 		if self.is_receiving_response:
 			self.current_response += content
-			print(content, end="", flush=True)
+			# Call response callback functions
+			for callback in self._response_callbacks:
+				callback(content, "content")
+			if self.verbose:
+				print(content, end="", flush=True)
 
 	def _handle_stream_end(self, _data: dict[str, Any], _content: str) -> None:
-		"""处理流式输出结束"""
+		"""Handle stream output end"""
 		self.is_receiving_response = False
-		print(f"\n\n完整回复: {self.current_response}")
-		print("=" * 50)
+		# Call response completion callback functions
+		for callback in self._response_callbacks:
+			callback(self.current_response, "end")
+		if self.verbose:
+			print(f"\n\nComplete reply: {self.current_response}")
+			print("=" * 50)
 
 	def on_message(self, _ws: object, message: str) -> None:
-		"""处理接收到的消息"""
+		"""Handle received messages"""
 		try:
-			if message.startswith("0"):  # 连接确认
-				print("连接已建立")
+			if message.startswith("0"):  # Connection confirmation
+				self._log("Connection established")
 				data = json.loads(message[1:])
-				print(f"Session ID: {data.get('sid')}")
+				self._log(f"Session ID: {data.get('sid')}")
 			elif message.startswith("3"):  # ping
 				if self.ws:
 					self.ws.send("2")  # pong
-			elif message.startswith("40"):  # 连接成功
-				print("Socket.IO连接成功")
-			elif message.startswith("42"):  # 事件消息
+			elif message.startswith("40"):  # Connection successful
+				self._log("Socket.IO connection successful")
+			elif message.startswith("42"):  # Event message
 				event_data = json.loads(message[2:])
 				self._handle_event(event_data[0], event_data[1] if len(event_data) > 1 else {})
 		except Exception as e:
-			print(f"消息处理错误: {e}")
+			self._log(f"Message processing error: {e}")
 
 	def _send_preset_messages(self) -> None:
-		"""发送预设消息"""
+		"""Send preset messages"""
 		if self.connected and self.ws:
 			self.ws.send('42["preset_chat_message",{"turn_count":5,"system_content_enum":"default"}]')
 			self.ws.send('42["get_text2Img_remaining_times"]')
 
-	@staticmethod
-	def on_error(_ws: object, error: object) -> None:
-		print(f"WebSocket错误: {error}")
+	def on_error(self, _ws: object, error: object) -> None:
+		self._log(f"WebSocket error: {error}")
 
 	def on_close(self, _ws: object, _close_status_code: int | None = None, _close_msg: str | None = None) -> None:
-		print("连接已关闭")
+		self._log("Connection closed")
 		self.connected = False
 
-	def on_open(self, ws: ...) -> None:
-		print("WebSocket连接已建立")
+	def on_open(self, ws: WebSocketApp) -> None:
+		self._log("WebSocket connection established")
 		self.connected = True
 		ws.send("40")
 
@@ -138,23 +158,23 @@ class CodeMaoAIChat:
 		threading.Thread(target=send_join, daemon=True).start()
 
 	def _build_websocket_url(self) -> str:
-		"""构建WebSocket URL"""
+		"""Build WebSocket URL"""
 		params = {"stag": 6, "rf": "", "token": self.token, "source_label": "kn", "question_type": "undefined", "EIO": 3, "transport": "websocket"}
 		query_string = "&".join([f"{k}={quote(str(v))}" for k, v in params.items()])
 		return f"wss://cr-aichat.codemao.cn/aichat/?{query_string}"
 
 	def connect(self) -> bool:
-		"""连接到WebSocket服务器"""
+		"""Connect to WebSocket server"""
 		if not self.token:
-			print("错误: 未提供token")
+			self._log("Error: No token provided")
 			return False
-		print("正在连接到服务器...")
-		self.ws = websocket.WebSocketApp(
+		self._log("Connecting to server...")
+		self.ws = WebSocketApp(
 			self._build_websocket_url(),
 			on_message=self.on_message,
 			on_error=self.on_error,
 			on_close=self.on_close,
-			on_open=self.on_open,
+			on_open=self.on_open,  # type: ignore  # noqa: PGH003
 			header={
 				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
 				"Origin": "https://kn.codemao.cn",
@@ -171,7 +191,7 @@ class CodeMaoAIChat:
 
 		thread = threading.Thread(target=run_websocket, daemon=True)
 		thread.start()
-		# 等待连接建立
+		# Wait for connection to be established
 		timeout = 10
 		start_time = time.time()
 		while not self.connected and time.time() - start_time < timeout:
@@ -180,29 +200,59 @@ class CodeMaoAIChat:
 
 	@staticmethod
 	def _generate_session_id() -> str:
-		"""生成会话ID"""
+		"""Generate session ID"""
 		return "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
 
 	def send_message(self, message: str) -> bool:
-		"""发送聊天消息"""
+		"""Send chat message"""
 		if not self.connected or not self.ws:
-			print("错误: 未连接到服务器")
+			self._log("Error: Not connected to server")
 			return False
 		if self.is_receiving_response:
-			print("请等待上一个回复完成...")
+			self._log("Please wait for the previous reply to complete...")
 			return False
 		chat_data = {"session_id": self._generate_session_id(), "messages": [{"role": "user", "content": message}], "chat_type": "chat_v3", "msg_channel": 0}
 		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws.send(message_str)
-		print(f"\n你: {message}")
+		self._log(f"\nYou: {message}")
 		return True
 
+	def add_response_callback(self, callback: Callable[[str, str], None]) -> None:
+		"""
+		Add response callback function
+
+		Args:
+			callback: Callback function that receives two parameters: content and type
+			type can be 'content' or 'end'
+		"""
+		self._response_callbacks.append(callback)
+
+	def remove_response_callback(self, callback: Callable[[str, str], None]) -> None:
+		"""Remove response callback function"""
+		if callback in self._response_callbacks:
+			self._response_callbacks.remove(callback)
+
+	def wait_for_response(self, timeout: int = 60) -> bool:
+		"""
+		Wait for current response to complete
+
+		Args:
+			timeout: Timeout in seconds
+
+		Returns:
+			bool: Whether successfully waited for response completion
+		"""
+		start_time = time.time()
+		while self.is_receiving_response and time.time() - start_time < timeout:
+			time.sleep(0.1)
+		return not self.is_receiving_response
+
 	def start_chat(self) -> None:
-		"""开始交互式聊天"""
+		"""Start interactive chat"""
 		if not self.connect():
 			return
-		print("\n连接成功!")
-		print("输入你的消息 (输入 'quit' 退出):")
+		self._log("\nConnection successful!")
+		self._log("Enter your message (type 'quit' to exit):")
 		try:
 			while self.connected:
 				if self.is_receiving_response:
@@ -214,27 +264,35 @@ class CodeMaoAIChat:
 				if user_input:
 					self.send_message(user_input)
 					wait_count = 0
-					while not self.is_receiving_response and wait_count < 50:  # noqa: PLR2004
+					max_wait_count = 50
+					while not self.is_receiving_response and wait_count < max_wait_count:
 						time.sleep(0.1)
 						wait_count += 1
 				else:
-					print("请输入有效内容")
+					self._log("Please enter valid content")
 		except KeyboardInterrupt:
-			print("\n程序被用户中断")
+			self._log("\nProgram interrupted by user")
 		except EOFError:
-			print("\n输入结束")
+			self._log("\nInput ended")
 		finally:
 			if self.ws:
 				self.ws.close()
 
+	def close(self) -> None:
+		"""Close connection"""
+		if self.ws:
+			self.ws.close()
+		self.connected = False
+
 
 def main() -> None:
+	"""Main function for command line usage"""
 	print("=" * 60)
-	print("           CodeMao AI 聊天客户端")
+	print("           CodeMao AI Chat Client")
 	print("=" * 60)
-	token = input("请输入你的token: ").strip()
+	token = input("Please enter your token: ").strip()
 	if not token:
-		print("错误: token不能为空")
+		print("Error: Token cannot be empty")
 		return
 	chat_client = CodeMaoAIChat(token=token)
 	chat_client.start_chat()
