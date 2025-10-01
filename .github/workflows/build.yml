@@ -209,7 +209,8 @@ jobs:
       - name: Build with Nuitka using uv
         working-directory: ./Aumiao-py
         run: |
-          uv run nuitka `
+          # 使用 python -m nuitka 方式运行
+          uv run python -m nuitka `
             --assume-yes-for-downloads `
             --company-name="Aumiao Team" `
             --copyright="Copyright © 2025 喵鱼a. All rights reserved." `
