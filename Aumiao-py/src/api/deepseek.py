@@ -33,6 +33,9 @@ class CodeMaoAIChat:
 		self._stream_callbacks: list[Callable[[str, str], None]] = []
 		# 用户信息缓存
 		self._user_info: dict[str, Any] = {}
+		# 对话历史管理
+		self._conversation_history: list[dict[str, str]] = []
+		self._current_conversation_id: str = self._generate_session_id()
 
 	def _log(self, message: str) -> None:
 		"""Log output - only in verbose mode"""
@@ -131,6 +134,9 @@ class CodeMaoAIChat:
 		"""Handle stream output end"""
 		self.is_receiving_response = False
 		self._emit_stream_event(self.current_response, "end")
+		# 将AI回复添加到对话历史
+		if self.current_response:
+			self._conversation_history.append({"role": "assistant", "content": self.current_response})
 
 	def on_message(self, _ws: object, message: str) -> None:
 		"""Handle received messages"""
@@ -223,19 +229,48 @@ class CodeMaoAIChat:
 		"""Generate session ID"""
 		return "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
 
-	def send_message(self, message: str) -> bool:
-		"""Send chat message"""
+	def send_message(self, message: str, *, include_history: bool = True) -> bool:
+		"""
+		Send chat message
+
+		Args:
+			message: 要发送的消息
+			include_history: 是否包含对话历史
+		"""
 		if not self.connected or not self.ws:
 			self._log("Error: Not connected to server")
 			return False
 		if self.is_receiving_response:
 			self._log("Please wait for the previous reply to complete...")
 			return False
-		chat_data = {"session_id": self._generate_session_id(), "messages": [{"role": "user", "content": message}], "chat_type": "chat_v3", "msg_channel": 0}
+
+		# 将用户消息添加到对话历史
+		self._conversation_history.append({"role": "user", "content": message})
+
+		# 将用户消息添加到对话历史
+		self._conversation_history.append({"role": "user", "content": message})
+
+		# 构建消息数据
+		messages = self._conversation_history if include_history and len(self._conversation_history) > 1 else [{"role": "user", "content": message}]
+
+		chat_data = {"session_id": self._current_conversation_id, "messages": messages, "chat_type": "chat_v3", "msg_channel": 0}
 		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws.send(message_str)
 		self._log(f"Message sent: {message}")
 		return True
+
+	def wait_for_response_start(self, timeout: int = 10) -> bool:
+		"""
+		等待AI开始回复
+		Args:
+			timeout: 超时时间(秒)
+		Returns:
+			是否成功开始回复
+		"""
+		start_time = time.time()
+		while not self.is_receiving_response and time.time() - start_time < timeout:
+			time.sleep(0.1)
+		return self.is_receiving_response
 
 	def wait_for_response(self, timeout: int = 60) -> bool:
 		"""Wait for current response to complete"""
@@ -244,6 +279,29 @@ class CodeMaoAIChat:
 			time.sleep(0.1)
 		return not self.is_receiving_response
 
+	def send_and_wait(self, message: str, *, include_history: bool = True, response_timeout: int = 60) -> bool:
+		"""
+		发送消息并等待回复完成(推荐使用这个方法)
+
+		Args:
+			message: 要发送的消息
+			include_history: 是否包含对话历史
+			response_timeout: 回复超时时间(秒)
+
+		Returns:
+			是否成功完成对话
+		"""
+		if not self.send_message(message=message, include_history=include_history):
+			return False
+
+		# 等待AI开始回复
+		if not self.wait_for_response_start(timeout=10):
+			self._log("AI未开始回复")
+			return False
+
+		# 等待回复完成
+		return self.wait_for_response(timeout=response_timeout)
+
 	def get_user_info(self) -> dict[str, Any]:
 		"""
 		获取用户信息
@@ -251,6 +309,30 @@ class CodeMaoAIChat:
 			包含用户信息的字典
 		"""
 		return {"user_id": self.user_id, **self._user_info}
+
+	def new_conversation(self) -> None:
+		"""
+		创建新对话,清空对话历史
+		"""
+		self._conversation_history.clear()
+		self._current_conversation_id = self._generate_session_id()
+		self._log("新对话已创建")
+
+	def get_conversation_history(self) -> list[dict[str, str]]:
+		"""
+		获取当前对话历史
+		Returns:
+			对话历史列表
+		"""
+		return self._conversation_history.copy()
+
+	def get_conversation_count(self) -> int:
+		"""
+		获取当前对话轮数
+		Returns:
+			对话轮数(用户消息数)
+		"""
+		return len([msg for msg in self._conversation_history if msg["role"] == "user"])
 
 	def close(self) -> None:
 		"""Close connection"""
@@ -261,7 +343,7 @@ class CodeMaoAIChat:
 
 def stream_chat(token: str, message: str, timeout: int = 60) -> str:
 	"""
-	直接流式打印AI回复的便捷函数
+	直接流式打印AI回复的便捷函数(单次对话)
 	Args:
 		token: 认证token
 		message: 要发送的消息
@@ -285,23 +367,93 @@ def stream_chat(token: str, message: str, timeout: int = 60) -> str:
 		if client.connect():
 			# 等待初始化
 			time.sleep(2)
-			if client.send_message(message):
-				# 等待回复开始
-				start_time = time.time()
-				while not client.is_receiving_response and time.time() - start_time < 10:  # noqa: PLR2004
-					time.sleep(0.1)
-				if client.is_receiving_response:
-					# 等待回复完成
-					client.wait_for_response(timeout)
-				else:
-					print("AI未开始回复")
+			# 使用新的send_and_wait方法
+			if client.send_and_wait(message, include_history=False, response_timeout=timeout):
+				pass  # 回复已完成
 			else:
-				print("消息发送失败")
+				print("对话失败")
 		else:
 			print("连接失败")
 	finally:
 		client.close()
 	return "".join(full_response)
+
+
+def create_chat_session(token: str) -> CodeMaoAIChat:
+	"""
+	创建支持连续对话的聊天会话
+	Args:
+		token: 认证token
+	Returns:
+		CodeMaoAIChat 实例
+	"""
+	client = CodeMaoAIChat(token=token, verbose=False)
+	if client.connect():
+		time.sleep(2)  # 等待初始化
+		return client
+	msg = "连接失败"
+	raise ConnectionError(msg)
+
+
+def interactive_chat(token: str) -> None:
+	"""
+	交互式聊天会话,支持连续对话和新对话创建
+	Args:
+		token: 认证token
+	"""
+	client = create_chat_session(token)
+
+	def stream_handler(content: str, event_type: str) -> None:
+		if event_type == "text":
+			print(content, end="", flush=True)
+		elif event_type == "end":
+			print()  # 换行
+
+	client.add_stream_callback(stream_handler)
+
+	print("=== CodeMao AI 聊天 ===")
+	print("输入消息开始聊天")
+	print("输入 '/new' 创建新对话")
+	print("输入 '/history' 查看对话历史")
+	print("输入 '/quit' 退出")
+	print("=" * 20)
+
+	try:
+		while True:
+			user_input = input("\n你: ").strip()
+
+			if not user_input:
+				continue
+
+			if user_input.lower() in {"/quit", "/exit", "退出"}:
+				break
+
+			if user_input.lower() == "/new":
+				client.new_conversation()
+				print("🆕 已创建新对话")
+				continue
+
+			if user_input.lower() == "/history":
+				history = client.get_conversation_history()
+				print(f"对话历史 ({client.get_conversation_count()} 轮):")
+				for i, msg in enumerate(history[-6:], 1):  # 显示最近6条
+					role = "你" if msg["role"] == "user" else "AI"
+					content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]  # noqa: PLR2004
+					print(f"  {i}. {role}: {content_preview}")
+				continue
+
+			# 发送消息并等待回复 - 使用新的send_and_wait方法
+			print("AI: ", end="", flush=True)
+			if client.send_and_wait(user_input, response_timeout=60):
+				# 回复已完成,继续下一轮
+				pass
+			else:
+				print("\n回复超时或失败")
+
+	except KeyboardInterrupt:
+		print("\n\n聊天结束")
+	finally:
+		client.close()
 
 
 def get_user_quota(token: str) -> dict[str, Any]:
