@@ -14,3 +14,9 @@ description = "Aumiao 是一款针对于编程猫社区的爬虫(划掉)你说�
 readme = "README.txt"
 requires-python = ">=3.13"
 dependencies = ["requests>=2.32", "websocket-client>=1.8.0"]
+
+[project.scripts]
+aumiao = "main:main"
+
+[tool.uv]
+dev-dependencies = ["nuitka>=2.0.0"]
