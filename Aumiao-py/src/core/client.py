@@ -1988,7 +1988,7 @@ class MillenniumEntanglement(ClassUnion):
 			for student in students:
 				self._edu_motion.delete_student_from_class(stu_id=student["id"])
 
-		def _create_token(token_limit: int) -> list[str]:
+		def _create_token(token_limit: int | None) -> list[str]:
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
@@ -2004,8 +2004,7 @@ class MillenniumEntanglement(ClassUnion):
 			actual_limit = limit or 100
 			_create_students(actual_limit)
 		elif method == "token":
-			actual_limit = limit or 100
-			_create_token(token_limit=actual_limit)
+			_create_token(token_limit=limit)
 
 	def execute_chalky_brook(self, work_id: int) -> None:
 		hidden_border = 10
