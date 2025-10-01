@@ -14,11 +14,13 @@ _is_compiling: bool = any("nuitka" in arg.lower() for arg in argv) or hasattr(sy
 # 类型检查时显式导入 (仅供 IDE 识别)
 if TYPE_CHECKING or _is_compiling:
 	# 显式导入所有子模块以确保类型系统识别
-	from . import coco, community, edu, forum, library, pickduck, shop, user, whale, work
+	from . import coco, community, deepseek, edu, forum, library, pickduck, shop, user, whale, work
 
 # 模块路径映射 (使用 Final 类型提示)
 _MODULE_PATHS: Final[dict[str, str]] = {
+	"coco": ".api.coco",
 	"community": ".api.community",
+	"deepseek": ".api.deepseek",
 	"edu": ".api.edu",
 	"forum": ".api.forum",
 	"library": ".api.library",
@@ -27,7 +29,6 @@ _MODULE_PATHS: Final[dict[str, str]] = {
 	"user": ".api.user",
 	"whale": ".api.whale",
 	"work": ".api.work",
-	"coco": ".api.coco",
 }
 
 # 导出列表 (根据映射自动生成)
@@ -44,6 +45,7 @@ __all__: list[str] = [  # noqa: PLE0604
 	"whale",
 	"work",
 	"coco",
+	"deepseek",
 ]  # type: ignore  # noqa: PGH003
 
 # 模块缓存 (使用弱引用字典可考虑 WeakValueDictionary)
