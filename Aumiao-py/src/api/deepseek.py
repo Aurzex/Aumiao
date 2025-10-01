@@ -232,7 +232,6 @@ class CodeMaoAIChat:
 	def send_message(self, message: str, *, include_history: bool = True) -> bool:
 		"""
 		Send chat message
-
 		Args:
 			message: 要发送的消息
 			include_history: 是否包含对话历史
@@ -243,16 +242,12 @@ class CodeMaoAIChat:
 		if self.is_receiving_response:
 			self._log("Please wait for the previous reply to complete...")
 			return False
-
 		# 将用户消息添加到对话历史
 		self._conversation_history.append({"role": "user", "content": message})
-
 		# 将用户消息添加到对话历史
 		self._conversation_history.append({"role": "user", "content": message})
-
 		# 构建消息数据
 		messages = self._conversation_history if include_history and len(self._conversation_history) > 1 else [{"role": "user", "content": message}]
-
 		chat_data = {"session_id": self._current_conversation_id, "messages": messages, "chat_type": "chat_v3", "msg_channel": 0}
 		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws.send(message_str)
@@ -282,23 +277,19 @@ class CodeMaoAIChat:
 	def send_and_wait(self, message: str, *, include_history: bool = True, response_timeout: int = 60) -> bool:
 		"""
 		发送消息并等待回复完成(推荐使用这个方法)
-
 		Args:
 			message: 要发送的消息
 			include_history: 是否包含对话历史
 			response_timeout: 回复超时时间(秒)
-
 		Returns:
 			是否成功完成对话
 		"""
 		if not self.send_message(message=message, include_history=include_history):
 			return False
-
 		# 等待AI开始回复
 		if not self.wait_for_response_start(timeout=10):
 			self._log("AI未开始回复")
 			return False
-
 		# 等待回复完成
 		return self.wait_for_response(timeout=response_timeout)
 
@@ -410,29 +401,23 @@ def interactive_chat(token: str) -> None:
 			print()  # 换行
 
 	client.add_stream_callback(stream_handler)
-
 	print("=== CodeMao AI 聊天 ===")
 	print("输入消息开始聊天")
 	print("输入 '/new' 创建新对话")
 	print("输入 '/history' 查看对话历史")
 	print("输入 '/quit' 退出")
 	print("=" * 20)
-
 	try:
 		while True:
 			user_input = input("\n你: ").strip()
-
 			if not user_input:
 				continue
-
 			if user_input.lower() in {"/quit", "/exit", "退出"}:
 				break
-
 			if user_input.lower() == "/new":
 				client.new_conversation()
 				print("🆕 已创建新对话")
 				continue
-
 			if user_input.lower() == "/history":
 				history = client.get_conversation_history()
 				print(f"对话历史 ({client.get_conversation_count()} 轮):")
@@ -441,7 +426,6 @@ def interactive_chat(token: str) -> None:
 					content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]  # noqa: PLR2004
 					print(f"  {i}. {role}: {content_preview}")
 				continue
-
 			# 发送消息并等待回复 - 使用新的send_and_wait方法
 			print("AI: ", end="", flush=True)
 			if client.send_and_wait(user_input, response_timeout=60):
@@ -449,7 +433,6 @@ def interactive_chat(token: str) -> None:
 				pass
 			else:
 				print("\n回复超时或失败")
-
 	except KeyboardInterrupt:
 		print("\n\n聊天结束")
 	finally:
