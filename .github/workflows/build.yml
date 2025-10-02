@@ -1,7 +1,7 @@
 name: Build and Package with Nuitka
 
 permissions:
-  contents: write  # 需要 write 权限来创建 release
+  contents: write
   actions: write
 
 on:
@@ -27,12 +27,13 @@ env:
   UV_VERSION: "0.4.22"
 
 jobs:
-  # 检查是否需要创建release
-  check-release:
+  check-release-condition:
+    name: "Check Release Condition"
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.check-commits.outputs.should_release }}
       release_tag: ${{ steps.check-commits.outputs.release_tag }}
+      commit_count: ${{ steps.check-commits.outputs.commit_count }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -43,7 +44,6 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          # 获取所有tag，如果没有tag则使用初始commit
           if git describe --tags --abbrev=0 > /dev/null 2>&1; then
             LATEST_TAG=$(git describe --tags --abbrev=0)
             echo "Latest tag: $LATEST_TAG"
@@ -55,31 +55,29 @@ jobs:
           fi
           
           echo "Commits since last tag: $COMMIT_COUNT"
+          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
           
-          # 检查是否达到commit间隔
           if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
-            echo "Reached $COMMIT_COUNT commits, triggering release"
+            echo "Reached $COMMIT_COUNT commits (>= ${{ env.COMMIT_INTERVAL }}), triggering release"
             echo "should_release=true" >> $GITHUB_OUTPUT
             
-            # 生成新的版本标签 (基于时间戳)
             RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
             
-            # 创建git tag
             git tag $RELEASE_TAG
             git push origin $RELEASE_TAG
+            echo "Created and pushed tag: $RELEASE_TAG"
           else
-            echo "Only $COMMIT_COUNT commits, skipping release (needs ${{ env.COMMIT_INTERVAL }})"
+            echo "Only $COMMIT_COUNT commits (< ${{ env.COMMIT_INTERVAL }}), skipping release"
             echo "should_release=false" >> $GITHUB_OUTPUT
             echo "release_tag=" >> $GITHUB_OUTPUT
           fi
 
-  # 生成变更日志
-  changelog:
-    name: Generate Changelog
+  generate-changelog:
+    name: "Generate Changelog"
     runs-on: ubuntu-latest
-    needs: check-release
-    if: needs.check-release.outputs.should_release == 'true'
+    needs: check-release-condition
+    if: needs.check-release-condition.outputs.should_release == 'true'
     outputs:
       release_body: ${{ steps.git-cliff.outputs.content }}
     steps:
@@ -98,25 +96,19 @@ jobs:
         env:
           OUTPUT: CHANGES.md
 
-      - name: Save changelog to file
+      - name: Display Changelog Summary
         run: |
-          echo "${{ steps.git-cliff.outputs.content }}" > CHANGES.md
-          cat CHANGES.md
+          echo "Generated changelog:"
+          head -20 CHANGES.md
 
-      - name: Upload changelog artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: changelog
-          path: CHANGES.md
-          retention-days: 1
-
-  build:
+  build-application:
+    name: "Build Application"
     permissions:
-      contents: write  # 这里也需要 write 权限
+      contents: write
       actions: write
     runs-on: windows-latest
     timeout-minutes: 30
-    needs: [check-release, changelog]
+    needs: check-release-condition
     
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
@@ -127,22 +119,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Beijing Timezone
+      - name: Setup Build Environment
+        id: setup-env
         shell: bash
         run: |
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_ENV
           echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "SHOULD_RELEASE=${{ needs.check-release.outputs.should_release }}" >> $GITHUB_ENV
-          echo "RELEASE_TAG=${{ needs.check-release.outputs.release_tag }}" >> $GITHUB_ENV
+          echo "SHOULD_RELEASE=${{ needs.check-release-condition.outputs.should_release }}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${{ needs.check-release-condition.outputs.release_tag }}" >> $GITHUB_ENV
+          echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Read Project Version
         id: version
         shell: pwsh
         run: |
           $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw -Encoding UTF8
-          Write-Host "TOML content: $tomlContent"
-
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
@@ -153,7 +146,7 @@ jobs:
               exit 1
           }
 
-      - name: Install uv
+      - name: Install uv and Python
         uses: astral-sh/setup-uv@v6
         with:
           version: ${{ env.UV_VERSION }}
@@ -162,7 +155,7 @@ jobs:
             Aumiao-py/pyproject.toml
             Aumiao-py/uv.lock
 
-      - name: Set up Python with uv
+      - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Cache Build Dependencies
@@ -175,46 +168,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-
 
-      - name: Install 7-Zip and Inno Setup
+      - name: Install Build Tools
         shell: pwsh
         run: |
-          # 安装7-Zip
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
           Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
-          $sevenZipPath = "C:\Program Files\7-Zip"
-          if (Test-Path $sevenZipPath) {
-              "$sevenZipPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          }
+          "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
-          # 安装 Inno Setup
           Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.5.0.exe" -OutFile "innosetup.exe"
           Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-          $innoPath = "C:\Program Files (x86)\Inno Setup 6"
-          if (Test-Path $innoPath) {
-              "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          }
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           Remove-Item "innosetup.exe" -Force
 
-      - name: Update uv lock file
-        working-directory: ./Aumiao-py
-        run: uv lock
-
-      - name: Install Project Dependencies with uv
+      - name: Install Project Dependencies
         working-directory: ./Aumiao-py
         run: |
+          uv lock
           uv sync --all-extras --dev
           uv pip install nuitka
 
-      - name: Build with Nuitka using uv
+      - name: Build with Nuitka
         working-directory: ./Aumiao-py
         run: |
-          # 使用 python -m nuitka 方式运行
           uv run python -m nuitka `
             --assume-yes-for-downloads `
             --company-name="Aumiao Team" `
             --copyright="Copyright © 2025 喵鱼a. All rights reserved." `
-            --file-version="${{ env.PROJECT_VERSION || '2.0.0' }}" `
+            --file-version="${{ env.PROJECT_VERSION }}" `
             --follow-imports `
             --jobs=4 `
             --lto=yes `
@@ -222,17 +203,17 @@ jobs:
             --output-dir=../build `
             --output-filename=aumiao `
             --product-name="Aumiao" `
-            --product-version="${{ env.PROJECT_VERSION || '2.0.0' }}" `
+            --product-version="${{ env.PROJECT_VERSION }}" `
             --show-progress `
             --windows-console-mode=force `
             --windows-icon-from-ico="./resource/icons/favicon.ico" `
             ./main.py
 
-      - name: Run recover.py with uv
+      - name: Run Recovery Script
         working-directory: ./Aumiao-py
         run: uv run python recover.py
 
-      - name: Prepare Distribution
+      - name: Prepare Distribution Files
         shell: pwsh
         run: |
           $distDir = "build/main.dist"
@@ -243,15 +224,17 @@ jobs:
               "./Aumiao-py/data"
           )
           Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
+          
           $versionInfo = @{
-              Version   = "${{ env.PROJECT_VERSION || '2.0.0' }}"
+              Version = "${{ env.PROJECT_VERSION }}"
               BuildDate = "${{ env.BUILD_DATE }}"
               GitCommit = "${{ env.GIT_SHA }}"
               ReleaseTag = "${{ env.RELEASE_TAG }}"
+              CommitCount = "${{ env.COMMIT_COUNT }}"
           } | ConvertTo-Json
           Set-Content -Path "$distDir/version.json" -Value $versionInfo
 
-      - name: Optimize Binaries
+      - name: Optimize Binaries with UPX
         shell: pwsh
         continue-on-error: true
         run: |
@@ -262,61 +245,77 @@ jobs:
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
+          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Out-Null
 
-          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Tee-Object -FilePath "$pwd/build/upx-main.log" || Write-Host "UPX compression warning (ignored)"
-
-          $excludeDlls = @("vcruntime140.dll", "vcruntime140_1.dll")
-          Get-ChildItem ./build/main.dist/*.dll | Where-Object { 
-              $_.Name -notin $excludeDlls 
-          } | ForEach-Object {
-              ./upx.exe --best --lzma $_.FullName 2>&1 | Tee-Object -FilePath "$pwd/build/upx-dll.log" -Append
-          }
-
-      - name: Build Installer with Inno Setup
-        shell: pwsh
-        run: ISCC.exe ./Aumiao-py/resource/aumiao.iss
-
-      - name: Package Artifacts
+      - name: Create Portable Zip Package
         shell: pwsh
         run: |
-          $packageName = "Aumiao_v${{ env.PROJECT_VERSION || '2.0.0' }}.${{ env.BUILD_DATE }}_alpha.zip"
-          $distDir = Resolve-Path "./build/main.dist"
-          7z a -tzip "$(Resolve-Path "./build")/$packageName" "$distDir\*"
+          $packageName = "Aumiao_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
+          7z a -tzip "build/$packageName" "build/main.dist/*"
+          Write-Host "Created portable package: $packageName"
 
-      - name: Minimize uv cache (CI optimization)
-        run: uv cache prune --ci
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          ISCC.exe ./Aumiao-py/resource/aumiao.iss
+          Write-Host "Installer built successfully"
 
-      - name: Upload Build Artifacts
+      - name: Upload Portable Package to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Aumiao_Build_${{ env.BUILD_DATE }}
-          path: |
-            build/*.zip
-            build/installer/*.exe
-          retention-days: 7
+          name: Aumiao-Portable-${{ env.BUILD_DATE }}
+          path: build/*.zip
+          retention-days: 30
+
+      - name: Minimize UV Cache
+        run: uv cache prune --ci
+
+    outputs:
+      build_date: ${{ steps.setup-env.outputs.BUILD_DATE }}
+
+  publish-release:
+    name: "Publish Release"
+    runs-on: ubuntu-latest
+    needs: [check-release-condition, generate-changelog, build-application]
+    if: needs.check-release-condition.outputs.should_release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Aumiao-Portable-${{ needs.build-application.outputs.build_date }}
+          path: ./release-assets
+
+      - name: Upload Installer to Release
+        run: |
+          mkdir -p ./release-assets
+          cp ./Aumiao-py/build/installer/*.exe ./release-assets/ 2>/dev/null || echo "Installer not found, continuing..."
 
       - name: Create GitHub Release
-        if: env.SHOULD_RELEASE == 'true'
-        uses: softprops/action-gh-release@v2  # 使用 v2 版本
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: "Aumiao ${{ env.RELEASE_TAG }}"
-          body: ${{ needs.changelog.outputs.release_body }}
+          tag_name: ${{ needs.check-release-condition.outputs.release_tag }}
+          name: "Aumiao ${{ needs.check-release-condition.outputs.release_tag }}"
+          body: ${{ needs.generate-changelog.outputs.release_body }}
           files: |
-            build/installer/*.exe
-            build/*.zip
+            ./release-assets/*
           draft: false
           prerelease: true
 
-      - name: Upload Debug Files
-        if: always()
+  upload-debug-files:
+    name: "Upload Debug Files"
+    runs-on: windows-latest
+    needs: build-application
+    if: always()
+    steps:
+      - name: Upload Build Logs
         uses: actions/upload-artifact@v4
         with:
-          name: Build_Debug_${{ env.BUILD_DATE }}
+          name: Build-Debug-Logs-${{ needs.build-application.outputs.build_date }}
           path: |
             build/**/*.log
             build/**/*.json
             **/nuitka-*.log
-            **/nuitka-*.xml
           if-no-files-found: ignore
           retention-days: 14
