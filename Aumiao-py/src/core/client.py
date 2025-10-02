@@ -1,3 +1,4 @@
+import operator
 from collections import defaultdict, namedtuple
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
@@ -472,7 +473,6 @@ class Obtain(ClassUnion):
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
 		"""
 		获取教育账号信息,可选择返回生成器或列表
-
 		:param limit: 要获取的账号数量限制
 		:param return_method: 返回方式,"generator"返回生成器,"list"返回列表
 		:return: 账号生成器或列表,每个元素为(username, password)元组
@@ -485,7 +485,6 @@ class Obtain(ClassUnion):
 				return iter([]) if return_method == "generator" else []
 
 			# 定义处理函数
-
 			def process_student(student: dict) -> tuple[Any, Any]:
 				self._client.switch_account(token=self._client.token.average, identity="average")
 				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
@@ -516,7 +515,6 @@ class Obtain(ClassUnion):
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
 		"""
 		处理教育账号的切换、登录和执行操作
-
 		:param limit: 要处理的账号数量限制
 		:param action: 登录成功后执行的回调函数
 		"""
@@ -830,23 +828,54 @@ class Motion(ClassUnion):
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
 
-	def collect_work_comments(self, limit: int) -> dict[str, list[str]]:
+	def collect_work_comments(self, limit: int) -> list[dict]:
 		works = Obtain().integrate_work_data(limit=limit)
 		comments = []
 		for single_work in works:
 			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
 			comments.extend(work_comments)
-		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content"])
+		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
 		filtered_comments = cast("list[dict]", filtered_comments)
-		user_comments = {}
+		user_comments_map = {}
 		for comment in filtered_comments:
 			user_id = comment.get("user_id")
 			content = comment.get("content")
-			if user_id is None or content is None:
+			nickname = comment.get("nickname")
+			if user_id is None or content is None or nickname is None:
 				continue
 			user_id_str = str(user_id)
-			user_comments.setdefault(user_id_str, []).append(content)
-		return user_comments
+			if user_id_str not in user_comments_map:
+				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
+			user_comments_map[user_id_str]["comments"].append(content)
+			user_comments_map[user_id_str]["comment_count"] += 1
+		# 转换为列表并按评论数从大到小排序
+		result = list(user_comments_map.values())
+		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
+		return result
+
+	@staticmethod
+	def print_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
+		"""打印用户评论统计信息
+		Args:
+			comments_data: 用户评论数据列表
+			min_comments: 最小评论数目阈值, 只有评论数大于等于此值的用户才会被打印
+		"""
+		# 过滤出评论数达到阈值的用户
+		filtered_users = [user for user in comments_data if user["comment_count"] >= min_comments]
+		if not filtered_users:
+			print(f"没有用户评论数达到或超过 {min_comments} 条")
+			return
+		print(f"评论数达到 {min_comments}+ 的用户统计:")
+		print("=" * 60)
+		for user_data in filtered_users:
+			nickname = user_data["nickname"]
+			user_id = user_data["user_id"]
+			comment_count = user_data["comment_count"]
+			print(f"用户 {nickname} (ID: {user_id}) 发送了 {comment_count} 条评论")
+			print("评论内容:")
+			for i, comment in enumerate(user_data["comments"], 1):
+				print(f"  {i}. {comment}")
+			print("*" * 50)
 
 
 # ------------------------------
@@ -1895,27 +1924,28 @@ class MillenniumEntanglement(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 
-	def execute_chiaroscuro_chronicles(self, user_id: int | None, method: Literal["work", "novel"], custom_list: list | None = None) -> None:  # 优化方法名:添加execute_前缀
+	def batch_like_content(self, user_id: int | None, content_type: Literal["work", "novel"], custom_list: list | None = None) -> None:
+		"""批量点赞用户作品或小说"""
 		if custom_list:
 			target_list = custom_list
-		elif method == "work":
-			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))  # 生成器后缀优化
-		elif method == "novel":
+		elif content_type == "work":
+			target_list = list(self._user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))
+		elif content_type == "novel":
 			target_list = self._novel_obtain.fetch_my_novels()
 		else:
-			msg = f"不支持的{method}"
+			msg = f"不支持的内容类型 {content_type}"
 			raise TypeError(msg)
 
 		def action() -> None:
-			if method == "work":
+			if content_type == "work":
 				Motion().like_all_work(user_id=str(user_id), works_list=target_list)
 			else:
 				Motion().like_my_novel(novel_list=target_list)
 
 		Obtain().process_edu_accounts(limit=None, action=action())
 
-	def execute_celestial_maiden_chronicles(self, real_name: str) -> None:  # 优化方法名:添加execute_前缀
-		# grade:1 幼儿园 2 小学 3 初中 4 高中 5 中职 6 高职 7 高校 99 其他
+	def upgrade_to_teacher(self, real_name: str) -> None:
+		"""升级账号为教师身份"""
 		generator = tool.EduDataGenerator()
 		self._edu_motion.execute_upgrade_to_teacher(
 			user_id=int(self._data.ACCOUNT_DATA.id),
@@ -1931,11 +1961,11 @@ class MillenniumEntanglement(ClassUnion):
 			teacher_card_number=generator.generate_teacher_certificate_number(),
 		)
 
-	def execute_batch_handle_account(self, method: Literal["create", "delete", "token"], limit: int | None = 100) -> None:  # 优化方法名:添加execute_前缀
-		"""批量处理教育账号"""
+	def manage_edu_accounts(self, action_type: Literal["create", "delete", "token"], limit: int | None = 100) -> None:
+		"""批量管理教育账号"""
 
 		def _create_students(student_limit: int) -> None:
-			"""创建学生账号内部逻辑"""
+			"""创建学生账号"""
 			class_capacity = 95
 			class_count = (student_limit + class_capacity - 1) // class_capacity
 			generator = tool.EduDataGenerator()
@@ -1951,12 +1981,13 @@ class MillenniumEntanglement(ClassUnion):
 				print("添加学生ing")
 
 		def _delete_students(delete_limit: int | None) -> None:
-			"""删除学生账号内部逻辑"""
-			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)  # 生成器后缀优化
+			"""删除学生账号"""
+			students = self._edu_obtain.fetch_class_students_gen(limit=delete_limit)
 			for student in students:
 				self._edu_motion.delete_student_from_class(stu_id=student["id"])
 
-		def _create_token(token_limit: int) -> list[str]:
+		def _create_token(token_limit: int | None) -> list[str]:
+			"""生成账号token"""
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
@@ -1966,26 +1997,27 @@ class MillenniumEntanglement(ClassUnion):
 				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")
 			return token_list
 
-		if method == "delete":
+		if action_type == "delete":
 			_delete_students(limit)
-		elif method == "create":
+		elif action_type == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
-		elif method == "token":
-			actual_limit = limit or 100
-			_create_token(token_limit=actual_limit)
+		elif action_type == "token":
+			_create_token(token_limit=limit)
 
-	def execute_chalky_brook(self, work_id: int) -> None:
+	def batch_report_work(self, work_id: int) -> None:
+		"""批量举报作品"""
 		hidden_border = 10
 		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: self._work_motion.execute_report_work(describe="", reason="违法违规", work_id=work_id))
 
-	def execute_nanmuona(self, target_id: int, content: str, source: Literal["work", "shop", "post"]) -> None:  # cSpell: ignore nanmuona
-		if source == "post":
+	def create_comment(self, target_id: int, content: str, source_type: Literal["work", "shop", "post"]) -> None:
+		"""创建评论/回复"""
+		if source_type == "post":
 			self._forum_motion.create_post_reply(post_id=target_id, content=content)
-		elif source == "shop":
+		elif source_type == "shop":
 			self._shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
-		elif source == "work":
+		elif source_type == "work":
 			self._work_motion.create_work_comment(work_id=target_id, comment=content)
 		else:
-			msg = f"不支持的源 {source}"
+			msg = f"不支持的来源类型 {source_type}"
 			raise TypeError(msg)

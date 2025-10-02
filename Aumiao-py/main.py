@@ -276,7 +276,7 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	sub_choice = printer.get_valid_input("操作选择", valid_options={"1", "2", "3"})
 	if sub_choice == "1":
 		user_id = printer.get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
-		client.MillenniumEntanglement().execute_chiaroscuro_chronicles(user_id=user_id, method="work")
+		client.MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = printer.get_valid_input("模式 (delete/create/token)", {"delete", "create", "token"})
@@ -288,11 +288,11 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 			valid_options=range(1, 101),  # 限制1-100的范围
 			validator=lambda x: x > 0,
 		)
-		client.MillenniumEntanglement().execute_batch_handle_account(method=mode, limit=limit)
+		client.MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
 		real_name = printer.prompt_input("输入姓名")
-		client.MillenniumEntanglement().execute_celestial_maiden_chronicles(real_name=real_name)
+		client.MillenniumEntanglement().upgrade_to_teacher(real_name=real_name)
 		print(printer.color_text("账号提权完成", "SUCCESS"))
 
 
