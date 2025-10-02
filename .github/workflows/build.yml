@@ -1,7 +1,7 @@
 name: Build and Package with Nuitka
 
 permissions:
-  contents: write
+  contents: write  # 需要 write 权限来创建 release
   actions: write
 
 on:
@@ -112,7 +112,7 @@ jobs:
 
   build:
     permissions:
-      contents: read
+      contents: write  # 这里也需要 write 权限
       actions: write
     runs-on: windows-latest
     timeout-minutes: 30
@@ -297,7 +297,7 @@ jobs:
 
       - name: Create GitHub Release
         if: env.SHOULD_RELEASE == 'true'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2  # 使用 v2 版本
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Aumiao ${{ env.RELEASE_TAG }}"
@@ -307,8 +307,6 @@ jobs:
             build/*.zip
           draft: false
           prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Debug Files
         if: always()
