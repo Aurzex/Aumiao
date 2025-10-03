@@ -159,6 +159,7 @@ class ReportFetcher:
 		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params)
 
 
+@singleton
 class ReportHandler:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
@@ -196,6 +197,7 @@ class ReportHandler:
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
 
+@singleton
 class RequestExtractor:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
