@@ -9,9 +9,9 @@ from typing import Literal, TypeVar, cast
 
 from src import user, whale
 from src.api import community
-from src.core.manage import Index, Motion
-from src.core.process import ReportAuthManager
-from src.core.services import FileUploader, MillenniumEntanglement
+from src.core.base import Index
+from src.core.process import FileProcessor, ReportAuthManager
+from src.core.services import FileUploader, MillenniumEntanglement, Motion, Report
 from src.utils import data, plugin, tool
 
 # 常量定义
@@ -173,7 +173,7 @@ def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-	ReportAuthManager().execute_report_handle(admin_id=admin_id)
+	Report().execute_report_handle(admin_id=admin_id)
 	print(printer.color_text("已成功处理举报", "SUCCESS"))
 
 
@@ -217,7 +217,7 @@ def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noq
 def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传历史"""
 	printer.print_header("上传历史")
-	FileUploader().print_upload_history()
+	FileProcessor().print_upload_history()
 	print(printer.color_text("查看完成", "SUCCESS"))
 
 
