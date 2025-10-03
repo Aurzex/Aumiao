@@ -4,7 +4,7 @@ import ssl
 import string
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 from urllib.parse import quote
 
@@ -332,127 +332,322 @@ class CodeMaoAIChat:
 		self.connected = False
 
 
-def stream_chat(token: str, message: str, timeout: int = 60) -> str:
-	"""
-	直接流式打印AI回复的便捷函数(单次对话)
-	Args:
-		token: 认证token
-		message: 要发送的消息
-		timeout: 超时时间(秒)
-	Returns:
-		完整的回复内容
-	"""
-	client = CodeMaoAIChat(token=token, verbose=False)
-	full_response = []
+class CodeMaoTool:
+	def __init__(self) -> None:
+		pass
 
-	def stream_handler(content: str, event_type: str) -> None:
-		if event_type == "text":
-			print(content, end="", flush=True)
-			full_response.append(content)
-		elif event_type == "end":
-			full_response.append(content)
-			print()  # 换行
+	@staticmethod
+	def stream_chat(token: str, message: str, timeout: int = 60) -> str:
+		"""
+		直接流式打印AI回复的便捷函数(单次对话)
+		Args:
+			token: 认证token
+			message: 要发送的消息
+			timeout: 超时时间(秒)
+		Returns:
+			完整的回复内容
+		"""
+		client = CodeMaoAIChat(token=token, verbose=False)
+		full_response = []
 
-	client.add_stream_callback(stream_handler)
-	try:
-		if client.connect():
-			# 等待初始化
-			time.sleep(2)
-			# 使用新的send_and_wait方法
-			if client.send_and_wait(message, include_history=False, response_timeout=timeout):
-				pass  # 回复已完成
+		def stream_handler(content: str, event_type: str) -> None:
+			if event_type == "text":
+				print(content, end="", flush=True)
+				full_response.append(content)
+			elif event_type == "end":
+				full_response.append(content)
+				print()  # 换行
+
+		client.add_stream_callback(stream_handler)
+		try:
+			if client.connect():
+				# 等待初始化
+				time.sleep(2)
+				# 使用新的send_and_wait方法
+				if client.send_and_wait(message, include_history=False, response_timeout=timeout):
+					pass  # 回复已完成
+				else:
+					print("对话失败")
 			else:
-				print("对话失败")
+				print("连接失败")
+		finally:
+			client.close()
+		return "".join(full_response)
+
+	@staticmethod
+	def create_chat_session(token: str) -> CodeMaoAIChat:
+		"""
+		创建支持连续对话的聊天会话
+		Args:
+			token: 认证token
+		Returns:
+			CodeMaoAIChat 实例
+		"""
+		client = CodeMaoAIChat(token=token, verbose=False)
+		if client.connect():
+			time.sleep(2)  # 等待初始化
+			return client
+		msg = "连接失败"
+		raise ConnectionError(msg)
+
+	def interactive_chat(self, token: str) -> None:
+		"""
+		交互式聊天会话,支持连续对话和新对话创建
+		Args:
+			token: 认证token
+		"""
+		client = self.create_chat_session(token)
+
+		def stream_handler(content: str, event_type: str) -> None:
+			if event_type == "text":
+				print(content, end="", flush=True)
+			elif event_type == "end":
+				print()  # 换行
+
+		client.add_stream_callback(stream_handler)
+		print("=== CodeMao AI 聊天 ===")
+		print("输入消息开始聊天")
+		print("输入 '/new' 创建新对话")
+		print("输入 '/history' 查看对话历史")
+		print("输入 '/quit' 退出")
+		print("=" * 20)
+		try:
+			while True:
+				user_input = input("\n你: ").strip()
+				if not user_input:
+					continue
+				if user_input.lower() in {"/quit", "/exit", "退出"}:
+					break
+				if user_input.lower() == "/new":
+					client.new_conversation()
+					print("🆕 已创建新对话")
+					continue
+				if user_input.lower() == "/history":
+					history = client.get_conversation_history()
+					print(f"对话历史 ({client.get_conversation_count()} 轮):")
+					for i, msg in enumerate(history[-6:], 1):  # 显示最近6条
+						role = "你" if msg["role"] == "user" else "AI"
+						content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]  # noqa: PLR2004
+						print(f"  {i}. {role}: {content_preview}")
+					continue
+				# 发送消息并等待回复 - 使用新的send_and_wait方法
+				print("AI: ", end="", flush=True)
+				if client.send_and_wait(user_input, response_timeout=60):
+					# 回复已完成,继续下一轮
+					pass
+				else:
+					print("\n回复超时或失败")
+		except KeyboardInterrupt:
+			print("\n\n聊天结束")
+		finally:
+			client.close()
+
+	@staticmethod
+	def get_user_quota(token: str) -> dict[str, Any]:
+		"""
+		快速获取用户配额信息
+		Args:
+			token: 认证token
+		Returns:
+			用户配额信息字典
+		"""
+		client = CodeMaoAIChat(token=token, verbose=False)
+		try:
+			if client.connect():
+				# 等待用户信息加载完成
+				time.sleep(3)
+				return client.get_user_info()
+			return {"error": "连接失败"}
+		finally:
+			client.close()
+
+
+class CodeMaoAIClient:
+	"""
+	CodeMao AI Chat Client - 多token管理版本
+	支持token轮换、提示词预设、流式输出
+	"""
+
+	def __init__(self, tokens: list[str], *, verbose: bool = False) -> None:
+		"""
+		初始化多token客户端
+		Args:
+			tokens: token列表
+			verbose: 是否显示详细日志
+		"""
+		self.tokens = tokens
+		self.current_token_index = 0
+		self.verbose = verbose
+		self._clients: dict[str, CodeMaoAIChat] = {}
+
+	def _get_current_token(self) -> str:
+		"""获取当前token"""
+		return self.tokens[self.current_token_index]
+
+	def _switch_to_next_token(self) -> bool:
+		"""切换到下一个token"""
+		if len(self.tokens) <= 1:
+			return False
+		old_index = self.current_token_index
+		self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
+		if self.verbose:
+			print(f"Token切换: 从索引 {old_index} 切换到 {self.current_token_index}")
+		return True
+
+	def _get_or_create_client(self, token: str) -> CodeMaoAIChat:
+		"""获取或创建客户端实例"""
+		if token not in self._clients:
+			self._clients[token] = CodeMaoAIChat(token, verbose=self.verbose)
+		return self._clients[token]
+
+	def _check_token_quota(self, client: CodeMaoAIChat) -> bool:
+		"""
+		检查token配额
+		Returns: True表示配额充足,False表示需要切换token
+		"""
+		try:
+			user_info = client.get_user_info()
+			chat_count = user_info.get("chat_count", 0)
+			if self.verbose:
+				print(f"当前token剩余对话次数: {chat_count}")
+			# 如果剩余次数少于5次,考虑切换token
+			return chat_count >= 1
+		except Exception as e:
+			if self.verbose:
+				print(f"检查配额失败: {e}")
+			return True  # 如果检查失败,继续使用当前token
 		else:
-			print("连接失败")
-	finally:
-		client.close()
-	return "".join(full_response)
+			return chat_count > 5  # noqa: PLR2004
 
-
-def create_chat_session(token: str) -> CodeMaoAIChat:
-	"""
-	创建支持连续对话的聊天会话
-	Args:
-		token: 认证token
-	Returns:
-		CodeMaoAIChat 实例
-	"""
-	client = CodeMaoAIChat(token=token, verbose=False)
-	if client.connect():
-		time.sleep(2)  # 等待初始化
-		return client
-	msg = "连接失败"
-	raise ConnectionError(msg)
-
-
-def interactive_chat(token: str) -> None:
-	"""
-	交互式聊天会话,支持连续对话和新对话创建
-	Args:
-		token: 认证token
-	"""
-	client = create_chat_session(token)
-
-	def stream_handler(content: str, event_type: str) -> None:
-		if event_type == "text":
-			print(content, end="", flush=True)
-		elif event_type == "end":
-			print()  # 换行
-
-	client.add_stream_callback(stream_handler)
-	print("=== CodeMao AI 聊天 ===")
-	print("输入消息开始聊天")
-	print("输入 '/new' 创建新对话")
-	print("输入 '/history' 查看对话历史")
-	print("输入 '/quit' 退出")
-	print("=" * 20)
-	try:
-		while True:
-			user_input = input("\n你: ").strip()
-			if not user_input:
+	def stream_chat_with_prompt(self, message: str, prompt: str = "", timeout: int = 60) -> Iterator[str]:
+		max_retries = len(self.tokens)  # 最大重试次数为token数量
+		for retry in range(max_retries):
+			current_token = self._get_current_token()
+			if self.verbose:
+				print(f"尝试使用token索引 {self.current_token_index} (尝试 {retry + 1}/{max_retries})")
+			client = self._get_or_create_client(current_token)
+			try:
+				# 连接客户端
+				if not client.connect():
+					if self.verbose:
+						print(f"Token {self.current_token_index} 连接失败")
+					self._switch_to_next_token()
+					continue
+				# 等待初始化完成
+				time.sleep(2)
+				# 检查配额
+				if not self._check_token_quota(client):
+					if self.verbose:
+						print(f"Token {self.current_token_index} 配额不足,尝试切换")
+					self._switch_to_next_token()
+					continue
+				# 如果有提示词,先发送提示词
+				if prompt:
+					if self.verbose:
+						print("发送系统提示词...")
+					# 创建新对话确保提示词作为第一条消息
+					client.new_conversation()
+					# 发送提示词并等待完成
+					if not client.send_and_wait(prompt, include_history=False, response_timeout=timeout):
+						if self.verbose:
+							print("提示词发送失败")
+						self._switch_to_next_token()
+						continue
+					# 清空提示词的回复,我们只关心用户消息的回复
+					client.current_response = ""
+				# 发送用户消息并流式返回
+				yield from self._stream_user_message(client, message, timeout)
+			except Exception as e:
+				if self.verbose:
+					print(f"Token {self.current_token_index} 处理失败: {e}")
+				self._switch_to_next_token()
 				continue
-			if user_input.lower() in {"/quit", "/exit", "退出"}:
-				break
-			if user_input.lower() == "/new":
-				client.new_conversation()
-				print("🆕 已创建新对话")
-				continue
-			if user_input.lower() == "/history":
-				history = client.get_conversation_history()
-				print(f"对话历史 ({client.get_conversation_count()} 轮):")
-				for i, msg in enumerate(history[-6:], 1):  # 显示最近6条
-					role = "你" if msg["role"] == "user" else "AI"
-					content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]  # noqa: PLR2004
-					print(f"  {i}. {role}: {content_preview}")
-				continue
-			# 发送消息并等待回复 - 使用新的send_and_wait方法
-			print("AI: ", end="", flush=True)
-			if client.send_and_wait(user_input, response_timeout=60):
-				# 回复已完成,继续下一轮
-				pass
-			else:
-				print("\n回复超时或失败")
-	except KeyboardInterrupt:
-		print("\n\n聊天结束")
-	finally:
-		client.close()
+			finally:
+				client.close()
+		return
+		# 所有token都尝试失败
+		yield f"错误: 所有token都尝试失败,共尝试了 {max_retries} 次"
 
+	def _stream_user_message(self, client: CodeMaoAIChat, message: str, timeout: int) -> Iterator[str]:
+		full_response = []
+		response_complete = threading.Event()
 
-def get_user_quota(token: str) -> dict[str, Any]:
-	"""
-	快速获取用户配额信息
-	Args:
-		token: 认证token
-	Returns:
-		用户配额信息字典
-	"""
-	client = CodeMaoAIChat(token=token, verbose=False)
-	try:
-		if client.connect():
-			# 等待用户信息加载完成
-			time.sleep(3)
-			return client.get_user_info()
-		return {"error": "连接失败"}
-	finally:
-		client.close()
+		def stream_handler(content: str, event_type: str) -> None:
+			if event_type == "text":
+				full_response.append(content)
+				# 这里不直接打印,而是通过yield返回
+			elif event_type == "end":
+				response_complete.set()
+			elif event_type == "error":
+				if self.verbose:
+					print(f"流式输出错误: {content}")
+				response_complete.set()
+
+		client.add_stream_callback(stream_handler)
+		# 发送用户消息
+		if not client.send_message(message, include_history=True):
+			yield "错误: 发送消息失败"
+			return
+		# 等待回复开始
+		if not client.wait_for_response_start(timeout=10):
+			yield "错误: AI未开始回复"
+			return
+		# 流式返回内容
+		start_time = time.time()
+		last_content_length = 0
+		while not response_complete.is_set() and (time.time() - start_time) < timeout:
+			current_content = "".join(full_response)
+			# 只返回新增的内容
+			if len(current_content) > last_content_length:
+				new_content = current_content[last_content_length:]
+				yield new_content
+				last_content_length = len(current_content)
+			time.sleep(0.1)
+		# 确保返回所有内容
+		final_content = "".join(full_response)
+		if len(final_content) > last_content_length:
+			yield final_content[last_content_length:]
+		client.remove_stream_callback(stream_handler)
+
+	def print_stream_response(self, message: str, prompt: str = "", timeout: int = 60) -> str:
+		"""
+		打印流式回复的便捷方法
+		Args:
+			message: 用户消息
+			prompt: 系统提示词
+			timeout: 超时时间
+		Returns:
+			完整回复内容
+		"""
+		full_response = []
+		print("AI: ", end="", flush=True)
+		for chunk in self.stream_chat_with_prompt(message, prompt, timeout):
+			print(chunk, end="", flush=True)
+			full_response.append(chunk)
+		print()  # 换行
+		return "".join(full_response)
+
+	def batch_check_quotas(self) -> dict[str, Any]:
+		"""
+		批量检查所有token的配额
+		Returns:
+			配额信息字典
+		"""
+		quotas = {}
+		for i, token in enumerate(self.tokens):
+			try:
+				client = CodeMaoAIChat(token, verbose=False)
+				if client.connect():
+					time.sleep(2)
+					user_info = client.get_user_info()
+					quotas[f"token_{i}"] = {
+						"chat_count": user_info.get("chat_count", "Unknown"),
+						"user_id": user_info.get("user_id", "Unknown"),
+						"remaining_image_times": user_info.get("remaining_image_times", "Unknown"),
+					}
+				else:
+					quotas[f"token_{i}"] = {"error": "连接失败"}
+				client.close()
+			except Exception as e:
+				quotas[f"token_{i}"] = {"error": str(e)}
+		return quotas
