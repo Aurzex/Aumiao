@@ -1,11 +1,16 @@
 """服务类:认证管理、文件上传、高级服务"""
 
+import operator
+from collections import defaultdict
+from collections.abc import Callable, Generator
+from functools import partial
+from json import loads
 from pathlib import Path
-from typing import Literal
-from urllib.parse import urlparse
+from random import choice
+from typing import ClassVar, Literal, cast
 
-from src.core.base import MAX_SIZE_BYTES, ClassUnion, acquire, data, decorator, tool
-from src.core.manage import Motion
+from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfig, acquire, data, decorator, tool
+from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportProcessor
 from src.core.retrieve import Obtain
 from src.utils.acquire import HTTPSTATUS
 
@@ -14,6 +19,7 @@ from src.utils.acquire import HTTPSTATUS
 class FileUploader(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
+		self.uploader = FileProcessor()
 
 	def upload_file(
 		self,
@@ -36,173 +42,349 @@ class FileUploader(ClassUnion):
 		"""
 		uploader = acquire.FileUploader()
 		if file_path.is_file():
-			return self._handle_file_upload(file_path=file_path, save_path=save_path, method=method, uploader=uploader)
+			return self.uploader.handle_file_upload(file_path=file_path, save_path=save_path, method=method, uploader=uploader)
 		if file_path.is_dir():
-			return self._handle_directory_upload(dir_path=file_path, save_path=save_path, method=method, uploader=uploader, recursive=recursive)
+			return self.uploader.handle_directory_upload(dir_path=file_path, save_path=save_path, method=method, uploader=uploader, recursive=recursive)
 		return None
 
-	def _handle_file_upload(self, file_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader) -> str | None:
-		"""处理单个文件的上传流程"""
-		file_size = file_path.stat().st_size
-		if file_size > MAX_SIZE_BYTES:
-			size_mb = file_size / 1024 / 1024
-			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
-			return None
-		# 使用重构后的统一上传接口
-		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
-		file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
-		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp())
-		self._upload_history.data.history.append(history)
-		self._upload_history.save()
-		return url
 
-	def _handle_directory_upload(
-		self, dir_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader, *, recursive: bool
-	) -> dict[str, str | None]:
-		"""处理整个文件夹的上传流程"""
-		results = {}
-		pattern = "**/*" if recursive else "*"
-		for child_file in dir_path.rglob(pattern):
-			if child_file.is_file():
-				try:
-					# 检查文件大小
-					file_size = child_file.stat().st_size
-					if file_size > MAX_SIZE_BYTES:
-						size_mb = file_size / 1024 / 1024
-						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
-						results[str(child_file)] = None
-						continue
-					# 计算保存路径
-					relative_path = child_file.relative_to(dir_path)
-					child_save_path = str(Path(save_path) / relative_path.parent)
-					# 使用重构后的统一上传接口
-					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
-					# 记录上传历史
-					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
-					history = data.UploadHistory(
-						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp()
-					)
-					self._upload_history.data.history.append(history)
-					results[str(child_file)] = url
-				except Exception as e:
-					results[str(child_file)] = None
-					print(f"上传 {child_file} 失败: {e}")
-		# 保存历史记录
-		self._upload_history.save()
-		return results
+@decorator.singleton
+class Motion(ClassUnion):
+	SOURCE_CONFIG: ClassVar = {
+		"work": SourceConfig(
+			get_items=lambda self=None: self._user_obtain.fetch_user_works_web_gen(self._data.ACCOUNT_DATA.id, limit=None),
+			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "work", "comments"),
+			delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
+			title_key="work_name",
+		),
+		"post": SourceConfig(
+			get_items=lambda self=None: self._forum_obtain.fetch_my_posts_gen("created", limit=None),
+			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "post", "comments"),
+			delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
+			title_key="title",
+		),
+	}
 
-	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
-		"""
-		打印上传历史记录(支持分页、详细查看和链接验证)
+	def clear_comments(
+		self,
+		source: Literal["work", "post"],
+		action_type: Literal["ads", "duplicates", "blacklist"],
+	) -> bool:
+		"""清理评论核心方法
 		Args:
-			limit: 每页显示记录数(默认10条)
-			reverse: 是否按时间倒序显示(最新的在前)
+		source: 数据来源 work=作品评论 post=帖子回复
+		action_type: 处理类型
+			ads=广告评论
+			duplicates=重复刷屏
+			blacklist=黑名单用户
 		"""
-		history_list = self._upload_history.data.history
-		if not history_list:
-			print("暂无上传历史记录")
-			return
-		# 排序历史记录
-		sorted_history = sorted(
-			history_list,
-			key=lambda x: x.upload_time,
-			reverse=reverse,
+		config = self.SOURCE_CONFIG[source]
+		params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
+			"ads": self._data.USER_DATA.ads,
+			"blacklist": self._data.USER_DATA.black_room,
+			"spam_max": self._setting.PARAMETER.spam_del_max,
+		}
+		target_lists = defaultdict(list)
+		for item in config.get_items(self):
+			CommentProcessor().process_item(item, config, action_type, params, target_lists)
+		return self._execute_deletion(
+			target_list=target_lists[action_type],
+			delete_handler=config.delete,
+			label={"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}[action_type],
 		)
-		total_records = len(sorted_history)
-		max_page = (total_records + limit - 1) // limit
-		page = 1
-		while True:
-			# 获取当前页数据
-			start = (page - 1) * limit
-			end = min(start + limit, total_records)
-			page_data = sorted_history[start:end]
-			# 打印当前页
-			self._print_current_page(page, max_page, total_records, start, end, page_data)
-			# 处理用户操作
-			action = input("请输入操作: ").strip().lower()
-			if action == "q":
-				break
-			if action == "n" and page < max_page:
-				page += 1
-			elif action == "p" and page > 1:
-				page -= 1
-			elif action.startswith("d"):
-				try:
-					record_id = int(action[1:])
-					if 1 <= record_id <= total_records:
-						self._show_record_detail(sorted_history[record_id - 1])
-					else:
-						print(f"错误:ID超出范围(1-{total_records})")
-				except ValueError:
-					print("错误:无效的ID格式(正确格式:d1,d2等)")
-			else:
-				print("错误:无效操作或超出页码范围")
 
-	def _print_current_page(self, page: int, max_page: int, total_records: int, start: int, end: int, page_data: list) -> None:
-		"""打印当前分页的所有内容"""
-		print(f"\n上传历史记录(第{page}/{max_page}页):")
-		print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
-		print("-" * 85)
-		for i, record in enumerate(page_data, start + 1):
-			upload_time = record.upload_time
-			if isinstance(upload_time, (int, float)):
-				upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
-			formatted_time = str(upload_time)[:19]
-			file_name = record.file_name.replace("\\", "/")[:25]
-			url = record.save_url.replace("\\", "/")
-			url_type = "[other]"
-			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
-			parsed_url = urlparse(url)
-			host = parsed_url.hostname
-			if host == "static.codemao.cn":
-				cn_index = url.find(".cn")
-				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
-				url_type = "[static]"
-			elif host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):  # cSpell: ignore bcmcdn
-				com_index = url.find(".com")
-				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
-				url_type = "[cdn]"
-			print(f"{i:<3} | {file_name:<25} | {formatted_time:<19} | {url_type}{simplified_url}")
-		print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
-		print("\n操作选项:")
-		print("n:下一页 p:上一页 d[ID]:查看详情(含链接验证) q:退出")
-
-	def _show_record_detail(self, record: data.UploadHistory) -> None:
-		"""显示单条记录的详细信息并验证链接"""
-		# 格式化上传时间
-		upload_time = record.upload_time
-		if isinstance(upload_time, (int, float)):
-			upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
-		print("\n文件上传详情:")
-		print("-" * 60)
-		print(f"文件名: {record.file_name}")
-		print(f"文件大小: {record.file_size}")
-		print(f"上传方式: {record.method}")
-		print(f"上传时间: {upload_time}")
-		print(f"完整URL: {record.save_url}")
-		# 验证链接有效性
-		is_valid = self._validate_url(record.save_url)
-		status = "有效" if is_valid else "无效"
-		print(f"链接状态: {status}")
-		if record.save_url.startswith("http"):
-			print("\n提示:复制上方URL到浏览器可直接访问或下载")
-		print("-" * 60)
-		input("按Enter键返回...")
-
-	def _validate_url(self, url: str) -> bool:
+	@staticmethod
+	@decorator.skip_on_error
+	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
+		"""执行删除操作
+		注意 :由于编程猫社区接口限制,需要先删除回复再删除主评论,
+		通过反转列表实现从后往前删除,避免出现删除父级评论后无法删除子回复的情况
 		"""
-		验证URL链接是否有效
-		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
+		if not target_list:
+			print(f"未发现{label}")
+			return True
+		print(f"\n发现以下{label} (共{len(target_list)}条):")
+		for item in reversed(target_list):
+			print(f" - {item.split(':')[0]}")
+		if input(f"\n确认删除所有{label}? (Y/N)").lower() != "y":
+			print("操作已取消")
+			return True
+		for entry in reversed(target_list):
+			parts = entry.split(":")[0].split(".")
+			item_id, comment_id = map(int, parts)
+			is_reply = ":reply" in entry
+			if not delete_handler(item_id, comment_id, is_reply):
+				print(f"删除失败: {entry}")
+				return False
+			print(f"已删除: {entry}")
+		return True
+
+	def clear_red_point(self, method: Literal["nemo", "web"] = "web") -> bool:
+		"""清除未读消息红点提示
+		Args:
+			method: 处理模式
+			web - 网页端消息类型
+			nemo - 客户端消息类型
+		Returns:
+		bool: 是否全部清除成功
 		"""
-		response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
-		if response.status_code == HTTPSTATUS.OK.value:
-			content_length = response.headers.get("Content-Length")
-			if content_length and int(content_length) > 0:
-				return True
-		response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
-		if response.status_code != HTTPSTATUS.OK.value:
+		method_config = {
+			"web": {
+				"endpoint": "/web/message-record",
+				"message_types": self._setting.PARAMETER.all_read_type,
+				"check_keys": ["count"],
+			},
+			"nemo": {
+				"endpoint": "/nemo/v2/user/message/{type}",
+				"message_types": [1, 3],
+				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
+			},
+		}
+		if method not in method_config:
+			msg = f"不支持的方法类型: {method}"
+			raise ValueError(msg)
+		config = method_config[method]
+		page_size = 200
+		params: dict[str, int | str] = {"limit": page_size, "offset": 0}
+
+		def is_all_cleared(counts: dict) -> bool:
+			if method == "web":
+				return all(count["count"] == 0 for count in counts[:3])
+			return sum(counts[key] for key in config["check_keys"]) == 0
+
+		def send_batch_requests() -> bool:
+			responses = {}
+			for msg_type in config["message_types"]:
+				config["endpoint"] = cast("str", config["endpoint"])
+				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
+				request_params = params.copy()
+				if method == "web":
+					request_params["query_type"] = msg_type
+				response = self._client.send_request(endpoint=endpoint, method="GET", params=request_params)  # 统一客户端调用
+				responses[msg_type] = response.status_code
+			return all(code == HTTPSTATUS.OK.value for code in responses.values())
+
+		try:
+			while True:
+				current_counts = self._community_obtain.fetch_message_count(method)
+				if is_all_cleared(current_counts):
+					return True
+				if not send_batch_requests():
+					return False
+				params["offset"] = cast("int", params["offset"])
+				params["offset"] += page_size
+		except Exception as e:
+			print(f"清除红点过程中发生异常: {e}")
 			return False
-		return bool(next(response.iter_content(chunk_size=1)))
+
+	def like_all_work(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
+		self._work_motion.execute_toggle_follow(user_id=int(user_id))  # 优化方法名:manage→execute_toggle
+		for item in works_list:
+			item["id"] = cast("int", item["id"])
+			self._work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
+			self._work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
+
+	def like_my_novel(self, novel_list: list[dict]) -> None:
+		for item in novel_list:
+			item["id"] = cast("int", item["id"])
+			self._novel_motion.execute_toggle_novel_favorite(item["id"])
+
+	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀  # noqa: PLR0914
+		"""自动回复作品/帖子评论"""
+		formatted_answers = {
+			k: v.format(**self._data.INFO) if isinstance(v, str) else [i.format(**self._data.INFO) for i in v] for answer in self._data.USER_DATA.answers for k, v in answer.items()
+		}
+		formatted_replies = [r.format(**self._data.INFO) for r in self._data.USER_DATA.replies]
+		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
+		new_replies = self._tool.DataProcessor().filter_by_nested_values(
+			data=Obtain().get_new_replies(),
+			id_path="type",
+			target_values=valid_types,
+		)
+		for reply in new_replies:
+			try:
+				content = loads(reply["content"])
+				msg = content["message"]
+				reply_type = reply["type"]
+				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
+				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
+				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
+				comment_ids = [
+					str(item)
+					for item in Obtain().get_comments_detail(
+						com_id=msg["business_id"],
+						source=source_type,
+						method="comment_id",
+					)
+					if isinstance(item, (int, str))
+				]
+				target_id = str(msg.get("reply_id", ""))
+				if reply_type.endswith("_COMMENT"):
+					comment_id = int(reply.get("reference_id", msg.get("comment_id", 0)))
+					parent_id = 0
+				else:
+					parent_id = int(reply.get("reference_id", msg.get("replied_id", 0)))
+					found = self._tool.StringProcessor().find_substrings(
+						text=target_id,
+						candidates=comment_ids,
+					)[0]
+					comment_id = int(found) if found else 0
+				print(f"\n{'=' * 30} 新回复 {'=' * 30}")
+				print(f"类型: {reply_type}")
+				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
+				print(f"提取关键文本: {comment_text}")
+				matched_keyword = None
+				for keyword, resp in formatted_answers.items():
+					if keyword in comment_text:
+						matched_keyword = keyword
+						chosen = choice(resp) if isinstance(resp, list) else resp
+						print(f"匹配到关键字「{keyword}」")
+						break
+				if not matched_keyword:
+					chosen = choice(formatted_replies)
+					print("未匹配关键词,随机选择回复")
+				print(f"最终选择回复: 【{chosen}】")
+				params = (
+					{
+						"work_id": msg["business_id"],
+						"comment_id": comment_id,
+						"parent_id": parent_id,
+						"comment": chosen,
+						"return_data": True,
+					}
+					if source_type == "work"
+					else {
+						"reply_id": comment_id,
+						"parent_id": parent_id,
+						"content": chosen,
+					}
+				)
+				(self._work_motion.create_comment_reply if source_type == "work" else self._forum_motion.create_comment_reply)(
+					**params  # pyright: ignore[reportArgumentType]
+				)  # 优化方法名:reply_to_comment→create_comment_reply
+				print(f"已发送回复到{source_type},评论ID: {comment_id}")
+			except Exception as e:
+				print(f"回复处理失败: {e}")
+				continue
+		return True
+
+	# 常驻置顶
+	def execute_maintain_top(self, method: Literal["shop", "novel"]) -> None:  # 优化方法名:添加execute_前缀
+		if method == "shop":
+			detail = self._shop_obtain.fetch_workshop_details_list()
+			description = self._shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
+			self._shop_motion.update_workshop_details(
+				description=description,
+				workshop_id=detail["id"],
+				name=detail["name"],
+				preview_url=detail["preview_url"],
+			)
+		elif method == "novel":
+			novel_list = self._novel_obtain.fetch_my_novels()
+			for item in novel_list:
+				novel_id = item["id"]
+				novel_detail = self._novel_obtain.fetch_novel_details(novel_id=novel_id)
+				single_chapter_id = novel_detail["data"]["sectionList"][0]["id"]
+				self._novel_motion.publish_chapter(single_chapter_id)
+
+	# 查看账户状态
+	def get_account_status(self) -> str:
+		status = self._user_obtain.fetch_account_details()
+		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
+
+	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
+		details = self._novel_obtain.fetch_novel_details(fiction_id)
+		info = details["data"]["fanficInfo"]
+		print(f"正在下载: {info['title']}-{info['nickname']}")
+		print(f"简介: {info['introduction']}")
+		print(f"类别: {info['fanfic_type_name']}")
+		print(f"词数: {info['total_words']}")
+		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
+		fiction_dir = data.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir.mkdir(parents=True, exist_ok=True)
+		for section in details["data"]["sectionList"]:
+			section_id = section["id"]
+			section_title = section["title"]
+			section_path = fiction_dir / f"{section_title}.txt"
+			content = self._novel_obtain.fetch_chapter_details(chapter_id=section_id)["data"]["section"]["content"]
+			formatted_content = self._tool.DataConverter().html_to_text(content, merge_empty_lines=True)
+			self._file.file_write(path=section_path, content=formatted_content)
+
+	def generate_nemo_code(self, work_id: int) -> None:
+		try:
+			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
+			work_info = self._client.send_request(endpoint=work_info_url, method="GET").json()  # 统一客户端调用
+			bcm_url = work_info["work_urls"][0]
+			payload = {
+				"app_version": "5.9.0",
+				"bcm_version": "0.16.2",
+				"equipment": "Aumiao",
+				"name": work_info["name"],
+				"os": "android",
+				"preview": work_info["preview"],
+				"work_id": work_id,
+				"work_url": bcm_url,
+			}
+			response = self._client.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", payload=payload)  # 统一客户端调用
+			# Process the response
+			if response.ok:
+				result = response.json()
+				miao_code = f"【喵口令】$&{result['token']}&$"
+				print("\nGenerated Miao Code:")
+				print(miao_code)
+			else:
+				print(f"Error: {response.status_code} - {response.text}")
+		except Exception as e:
+			print(f"An error occurred: {e!s}")
+
+	def collect_work_comments(self, limit: int) -> list[dict]:
+		works = Obtain().integrate_work_data(limit=limit)
+		comments = []
+		for single_work in works:
+			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
+			comments.extend(work_comments)
+		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
+		filtered_comments = cast("list[dict]", filtered_comments)
+		user_comments_map = {}
+		for comment in filtered_comments:
+			user_id = comment.get("user_id")
+			content = comment.get("content")
+			nickname = comment.get("nickname")
+			if user_id is None or content is None or nickname is None:
+				continue
+			user_id_str = str(user_id)
+			if user_id_str not in user_comments_map:
+				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
+			user_comments_map[user_id_str]["comments"].append(content)
+			user_comments_map[user_id_str]["comment_count"] += 1
+		# 转换为列表并按评论数从大到小排序
+		result = list(user_comments_map.values())
+		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
+		return result
+
+	@staticmethod
+	def print_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
+		"""打印用户评论统计信息
+		Args:
+			comments_data: 用户评论数据列表
+			min_comments: 最小评论数目阈值, 只有评论数大于等于此值的用户才会被打印
+		"""
+		# 过滤出评论数达到阈值的用户
+		filtered_users = [user for user in comments_data if user["comment_count"] >= min_comments]
+		if not filtered_users:
+			print(f"没有用户评论数达到或超过 {min_comments} 条")
+			return
+		print(f"评论数达到 {min_comments}+ 的用户统计:")
+		print("=" * 60)
+		for user_data in filtered_users:
+			nickname = user_data["nickname"]
+			user_id = user_data["user_id"]
+			comment_count = user_data["comment_count"]
+			print(f"用户 {nickname} (ID: {user_id}) 发送了 {comment_count} 条评论")
+			print("评论内容:")
+			for i, comment in enumerate(user_data["comments"], 1):
+				print(f"  {i}. {comment}")
+			print("*" * 50)
 
 
 @decorator.singleton
@@ -307,3 +489,39 @@ class MillenniumEntanglement(ClassUnion):
 		else:
 			msg = f"不支持的来源类型 {source_type}"
 			raise TypeError(msg)
+
+
+class Report(ClassUnion):
+	def __init__(self) -> None:
+		super().__init__()
+		self.report = ReportAuthManager()
+		self.processor = ReportProcessor()
+
+	def execute_report_handle(self, admin_id: int) -> None:
+		"""举报处理主流程:加载账号 → 循环处理 → 统计结果"""
+		self._printer.print_header("=== 举报处理系统 ===")
+		# 1. 加载学生账号(用于自动举报)
+		self.report.load_student_accounts()
+		# 2. 主处理循环:获取举报 → 批量处理 → 询问是否继续
+		while True:
+			# 获取所有待处理举报(评论/帖子/讨论)
+			self.total_report = self.processor.get_total_reports()
+			# 使用partial绑定参数,创建生成器函数
+			report_gen_func = partial(self.processor.fetch_all_reports)
+			if self.total_report == 0:
+				self._printer.print_message("当前没有待处理的举报", "INFO")
+				break
+			# 批量处理举报
+			self._printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
+			batch_processed = self.processor.process_report_batch(report_gen_func, admin_id)
+			self.processed_count += batch_processed
+			# 本次处理结果
+			self._printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
+			# 询问是否继续检查新举报
+			if self._printer.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+				break
+			self._printer.print_message("重新获取新举报...", "INFO")
+		# 3. 处理结束:统计结果 + 终止会话
+		self._printer.print_header("=== 处理结果统计 ===")
+		self._printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
+		self.report.terminate_session()

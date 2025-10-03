@@ -2,13 +2,16 @@
 
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from functools import partial
+from pathlib import Path
 from random import randint
 from time import sleep
 from typing import Any, ClassVar, Literal, cast
+from urllib.parse import urlparse
 
-from src.core.base import BatchGroup, ClassUnion, ReportRecord, data, decorator, tool
+from src.core.base import MAX_SIZE_BYTES, BatchGroup, ClassUnion, ReportRecord, data, decorator, tool
 from src.core.retrieve import Obtain
+from src.utils import acquire
+from src.utils.acquire import HTTPSTATUS
 
 
 @decorator.singleton
@@ -805,35 +808,6 @@ class ReportAuthManager(ClassUnion):
 		self.printer = tool.Printer()
 		super().__init__()
 
-	def execute_report_handle(self, admin_id: int) -> None:
-		"""举报处理主流程:加载账号 → 循环处理 → 统计结果"""
-		self.printer.print_header("=== 举报处理系统 ===")
-		# 1. 加载学生账号(用于自动举报)
-		self.load_student_accounts()
-		# 2. 主处理循环:获取举报 → 批量处理 → 询问是否继续
-		while True:
-			# 获取所有待处理举报(评论/帖子/讨论)
-			self.total_report = self.processor.get_total_reports()
-			# 使用partial绑定参数,创建生成器函数
-			report_gen_func = partial(self.processor.fetch_all_reports)
-			if self.total_report == 0:
-				self.printer.print_message("当前没有待处理的举报", "INFO")
-				break
-			# 批量处理举报
-			self.printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
-			batch_processed = self.processor.process_report_batch(report_gen_func, admin_id)
-			self.processed_count += batch_processed
-			# 本次处理结果
-			self.printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
-			# 询问是否继续检查新举报
-			if self.printer.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-				break
-			self.printer.print_message("重新获取新举报...", "INFO")
-		# 3. 处理结束:统计结果 + 终止会话
-		self.printer.print_header("=== 处理结果统计 ===")
-		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
-		self.terminate_session()
-
 	def execute_admin_login(self) -> None:
 		"""执行管理员登录(支持Token/账密两种方式)"""
 		self.printer.print_header("=== 登录管理后台 ===")
@@ -961,3 +935,171 @@ class ReportAuthManager(ClassUnion):
 		self._whale_routine.terminate_session()
 		self._restore_admin_account()
 		self.printer.print_message("已终止会话并恢复管理员账号", "INFO")
+
+
+class FileProcessor(ClassUnion):
+	def __init__(self) -> None:
+		super().__init__()
+
+	def handle_file_upload(self, file_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader) -> str | None:
+		"""处理单个文件的上传流程"""
+		file_size = file_path.stat().st_size
+		if file_size > MAX_SIZE_BYTES:
+			size_mb = file_size / 1024 / 1024
+			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+			return None
+		# 使用重构后的统一上传接口
+		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
+		file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
+		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp())
+		self._upload_history.data.history.append(history)
+		self._upload_history.save()
+		return url
+
+	def handle_directory_upload(
+		self, dir_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader, *, recursive: bool
+	) -> dict[str, str | None]:
+		"""处理整个文件夹的上传流程"""
+		results = {}
+		pattern = "**/*" if recursive else "*"
+		for child_file in dir_path.rglob(pattern):
+			if child_file.is_file():
+				try:
+					# 检查文件大小
+					file_size = child_file.stat().st_size
+					if file_size > MAX_SIZE_BYTES:
+						size_mb = file_size / 1024 / 1024
+						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+						results[str(child_file)] = None
+						continue
+					# 计算保存路径
+					relative_path = child_file.relative_to(dir_path)
+					child_save_path = str(Path(save_path) / relative_path.parent)
+					# 使用重构后的统一上传接口
+					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
+					# 记录上传历史
+					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
+					history = data.UploadHistory(
+						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp()
+					)
+					self._upload_history.data.history.append(history)
+					results[str(child_file)] = url
+				except Exception as e:
+					results[str(child_file)] = None
+					print(f"上传 {child_file} 失败: {e}")
+		# 保存历史记录
+		self._upload_history.save()
+		return results
+
+	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
+		"""
+		打印上传历史记录(支持分页、详细查看和链接验证)
+		Args:
+			limit: 每页显示记录数(默认10条)
+			reverse: 是否按时间倒序显示(最新的在前)
+		"""
+		history_list = self._upload_history.data.history
+		if not history_list:
+			print("暂无上传历史记录")
+			return
+		# 排序历史记录
+		sorted_history = sorted(
+			history_list,
+			key=lambda x: x.upload_time,
+			reverse=reverse,
+		)
+		total_records = len(sorted_history)
+		max_page = (total_records + limit - 1) // limit
+		page = 1
+		while True:
+			# 获取当前页数据
+			start = (page - 1) * limit
+			end = min(start + limit, total_records)
+			page_data = sorted_history[start:end]
+			# 打印当前页
+			self._print_current_page(page, max_page, total_records, start, end, page_data)
+			# 处理用户操作
+			action = input("请输入操作: ").strip().lower()
+			if action == "q":
+				break
+			if action == "n" and page < max_page:
+				page += 1
+			elif action == "p" and page > 1:
+				page -= 1
+			elif action.startswith("d"):
+				try:
+					record_id = int(action[1:])
+					if 1 <= record_id <= total_records:
+						self._show_record_detail(sorted_history[record_id - 1])
+					else:
+						print(f"错误:ID超出范围(1-{total_records})")
+				except ValueError:
+					print("错误:无效的ID格式(正确格式:d1,d2等)")
+			else:
+				print("错误:无效操作或超出页码范围")
+
+	def _print_current_page(self, page: int, max_page: int, total_records: int, start: int, end: int, page_data: list) -> None:
+		"""打印当前分页的所有内容"""
+		print(f"\n上传历史记录(第{page}/{max_page}页):")
+		print(f"{'ID':<3} | {'文件名':<25} | {'时间':<19} | {'URL(类型)'}")
+		print("-" * 85)
+		for i, record in enumerate(page_data, start + 1):
+			upload_time = record.upload_time
+			if isinstance(upload_time, (int, float)):
+				upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
+			formatted_time = str(upload_time)[:19]
+			file_name = record.file_name.replace("\\", "/")[:25]
+			url = record.save_url.replace("\\", "/")
+			url_type = "[other]"
+			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
+			parsed_url = urlparse(url)
+			host = parsed_url.hostname
+			if host == "static.codemao.cn":
+				cn_index = url.find(".cn")
+				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
+				url_type = "[static]"
+			elif host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):  # cSpell: ignore bcmcdn
+				com_index = url.find(".com")
+				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
+				url_type = "[cdn]"
+			print(f"{i:<3} | {file_name:<25} | {formatted_time:<19} | {url_type}{simplified_url}")
+		print(f"共 {total_records} 条记录 | 当前显示: {start + 1}-{end}")
+		print("\n操作选项:")
+		print("n:下一页 p:上一页 d[ID]:查看详情(含链接验证) q:退出")
+
+	def _show_record_detail(self, record: data.UploadHistory) -> None:
+		"""显示单条记录的详细信息并验证链接"""
+		# 格式化上传时间
+		upload_time = record.upload_time
+		if isinstance(upload_time, (int, float)):
+			upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
+		print("\n文件上传详情:")
+		print("-" * 60)
+		print(f"文件名: {record.file_name}")
+		print(f"文件大小: {record.file_size}")
+		print(f"上传方式: {record.method}")
+		print(f"上传时间: {upload_time}")
+		print(f"完整URL: {record.save_url}")
+		# 验证链接有效性
+		is_valid = self._validate_url(record.save_url)
+		status = "有效" if is_valid else "无效"
+		print(f"链接状态: {status}")
+		if record.save_url.startswith("http"):
+			print("\n提示:复制上方URL到浏览器可直接访问或下载")
+		print("-" * 60)
+		input("按Enter键返回...")
+
+	def _validate_url(self, url: str) -> bool:
+		"""
+		验证URL链接是否有效
+		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
+		"""
+		response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
+		if response.status_code == HTTPSTATUS.OK.value:
+			content_length = response.headers.get("Content-Length")
+			if content_length and int(content_length) > 0:
+				return True
+		response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
+		if response.status_code != HTTPSTATUS.OK.value:
+			return False
+		return bool(next(response.iter_content(chunk_size=1)))
