@@ -7,7 +7,11 @@ from functools import partial
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 
-from src import client, community, user, whale
+from src import user, whale
+from src.api import community
+from src.core.manage import Index, Motion
+from src.core.process import ReportAuthManager
+from src.core.services import FileUploader, MillenniumEntanglement
 from src.utils import data, plugin, tool
 
 # 常量定义
@@ -137,7 +141,7 @@ def clear_comments(account_data_manager: AccountDataManager) -> None:  # noqa: A
 	action_type = printer.get_valid_input("请输入操作类型 (ads/duplicates/blacklist)", {"ads", "duplicates", "blacklist"})
 	source = cast("Literal['work', 'post']", source)
 	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
-	client.Motion().clear_comments(source=source, action_type=action_type)
+	Motion().clear_comments(source=source, action_type=action_type)
 	print(printer.color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
 
 
@@ -148,7 +152,7 @@ def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: 
 	printer.print_header("清除红点提醒")
 	method = printer.get_valid_input("请输入方法 (nemo/web)", {"nemo", "web"})
 	method = cast("Literal['nemo', 'web']", method)
-	client.Motion().clear_red_point(method=method)
+	Motion().clear_red_point(method=method)
 	print(printer.color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
 
 
@@ -157,7 +161,7 @@ def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: 
 def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""自动回复作品"""
 	printer.print_header("自动回复")
-	client.Motion().execute_auto_reply_work()
+	Motion().execute_auto_reply_work()
 	print(printer.color_text("已成功执行自动回复", "SUCCESS"))
 
 
@@ -165,11 +169,11 @@ def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG00
 def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""处理举报"""
 	printer.print_header("处理举报")
-	client.ReportAuthManager().execute_admin_login()
+	ReportAuthManager().execute_admin_login()
 	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-	client.ReportProcessor().execute_report_handle(admin_id=admin_id)
+	ReportAuthManager().execute_report_handle(admin_id=admin_id)
 	print(printer.color_text("已成功处理举报", "SUCCESS"))
 
 
@@ -178,7 +182,7 @@ def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 def check_account_status(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""检查账户状态"""
 	printer.print_header("账户状态查询")
-	status = client.Motion().get_account_status()
+	status = Motion().get_account_status()
 	print(printer.color_text(f"当前账户状态: {status}", "STATUS"))
 
 
@@ -191,7 +195,7 @@ def download_fiction(account_data_manager: AccountDataManager) -> None:  # noqa:
 		cast_type=int,
 		validator=lambda x: x > 0,  # 确保ID为正数
 	)
-	client.Motion().execute_download_fiction(fiction_id=fiction_id)
+	Motion().execute_download_fiction(fiction_id=fiction_id)
 	print(printer.color_text("小说下载完成", "SUCCESS"))
 
 
@@ -205,7 +209,7 @@ def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noq
 		cast_type=int,
 		validator=lambda x: x > 0,  # 确保ID为正数
 	)
-	client.Motion().generate_nemo_code(work_id=work_id)
+	Motion().generate_nemo_code(work_id=work_id)
 	print(printer.color_text("生成完成", "SUCCESS"))
 
 
@@ -213,7 +217,7 @@ def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noq
 def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传历史"""
 	printer.print_header("上传历史")
-	client.FileUploader().print_upload_history()
+	FileUploader().print_upload_history()
 	print(printer.color_text("查看完成", "SUCCESS"))
 
 
@@ -236,7 +240,7 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 		print(printer.color_text("文件或路径不存在", "ERROR"))
 		return
 	method = cast("Literal['pgaot', 'codemao','codegame']", method)
-	url = client.FileUploader().upload_file(method=method, file_path=file_path)
+	url = FileUploader().upload_file(method=method, file_path=file_path)
 	print(f"保存地址: {url}")
 	print(printer.color_text("文件上传成功", "SUCCESS"))
 
@@ -276,7 +280,7 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	sub_choice = printer.get_valid_input("操作选择", valid_options={"1", "2", "3"})
 	if sub_choice == "1":
 		user_id = printer.get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
-		client.MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
+		MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = printer.get_valid_input("模式 (delete/create/token)", {"delete", "create", "token"})
@@ -288,11 +292,11 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 			valid_options=range(1, 101),  # 限制1-100的范围
 			validator=lambda x: x > 0,
 		)
-		client.MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
+		MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
 		real_name = printer.prompt_input("输入姓名")
-		client.MillenniumEntanglement().upgrade_to_teacher(real_name=real_name)
+		MillenniumEntanglement().upgrade_to_teacher(real_name=real_name)
 		print(printer.color_text("账号提权完成", "SUCCESS"))
 
 
@@ -317,7 +321,7 @@ def display_menu(menu_options: dict[str, MenuOption], account_data_manager: Acco
 def main() -> None:
 	"""主程序入口"""
 	enable_vt_mode()
-	client.Index().index()
+	Index().index()
 	account_data_manager = AccountDataManager()
 	menu_options = {
 		"01": MenuOption(name="用户登录", handler=partial(login, account_data_manager), require_auth=False),
