@@ -14,17 +14,16 @@ _is_compiling: bool = any("nuitka" in arg.lower() for arg in argv) or hasattr(sy
 # 类型检查时显式导入 (仅供 IDE 识别)
 if TYPE_CHECKING or _is_compiling:
 	# 显式导入所有子模块以确保类型系统识别
-	from . import base, manage, process, retrieve, services
+	from . import base, process, retrieve, services
 
 # 模块路径映射 (使用 Final 类型提示)
-_MODULE_PATHS: Final[dict[str, str]] = {"base": ".core.base", "manage": ".core.manage", "process": ".core.process", "retrieve": ".core.retrieve", "services": ".core.services"}
+_MODULE_PATHS: Final[dict[str, str]] = {"base": ".core.base", "process": ".core.process", "retrieve": ".core.retrieve", "services": ".core.services"}
 
 # 导出列表 (根据映射自动生成)
 __all__: list[str] = [  # noqa: PLE0604
 	*list(_MODULE_PATHS.keys()),
 	"__version__",
 	"base",
-	"manage",
 	"process",
 	"retrieve",
 	"services",
