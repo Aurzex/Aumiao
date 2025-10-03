@@ -412,19 +412,15 @@ class CodeMaoAIClient:
 	def _check_token_quota(self, client: CodeMaoAIChat) -> bool:
 		"""检查token配额"""
 		try:
-			if client.connect():
-				user_info = client.get_user_info()
-				chat_count = user_info.get("chat_count", 0)
-				if self.verbose:
-					print(f"当前token剩余对话次数: {chat_count}")
-				return chat_count >= 2  # 剩余次数大于2次认为充足  # noqa: PLR2004
-
+			user_info = client.get_user_info()
+			chat_count = user_info.get("chat_count", 0)
+			if self.verbose:
+				print(f"当前token剩余对话次数: {chat_count}")
+			return chat_count >= 2  # 剩余次数大于等于2次认为充足  # noqa: PLR2004, TRY300
 		except Exception as e:
 			if self.verbose:
 				print(f"检查配额失败: {e}")
-			return True
-		else:
-			return False
+			return True  # 如果检查失败,继续使用当前token
 
 	def stream_chat_with_prompt(self, message: str, prompt: str = "", timeout: int = 60) -> Iterator[str]:
 		max_retries = len(self.tokens)
@@ -440,6 +436,7 @@ class CodeMaoAIClient:
 					self._switch_to_next_token()
 					continue
 				time.sleep(2)
+				# 检查配额
 				if not self._check_token_quota(client):
 					if self.verbose:
 						print(f"Token {self.current_token_index} 配额不足,尝试切换")
@@ -458,13 +455,12 @@ class CodeMaoAIClient:
 					client.current_response = ""
 				# 发送用户消息并流式返回
 				yield from self._stream_user_message(client, message, timeout)
+				return  # 成功则直接返回  # noqa: TRY300
 			except Exception as e:
 				if self.verbose:
 					print(f"Token {self.current_token_index} 处理失败: {e}")
 				self._switch_to_next_token()
 				continue
-			else:
-				return
 			finally:
 				client.close()
 		yield f"错误: 所有token都尝试失败,共尝试了 {max_retries} 次"
