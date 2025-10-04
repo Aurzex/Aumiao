@@ -496,6 +496,7 @@ class Report(ClassUnion):
 		super().__init__()
 		self.report = ReportAuthManager()
 		self.processor = ReportProcessor()
+		self.processed_count = 0
 
 	def execute_report_handle(self, admin_id: int) -> None:
 		"""举报处理主流程:加载账号 → 循环处理 → 统计结果"""

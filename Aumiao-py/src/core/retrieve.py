@@ -68,7 +68,7 @@ class Obtain(ClassUnion):
 		com_id: int,
 		source: Literal["work", "post", "shop"],
 		method: Literal["user_id", "comment_id"],
-		max_limit: int | None = 200,
+		max_limit: int | None = 500,
 	) -> list[str]: ...
 	@overload
 	def get_comments_detail(
@@ -76,7 +76,7 @@ class Obtain(ClassUnion):
 		com_id: int,
 		source: Literal["work", "post", "shop"],
 		method: Literal["comments"],
-		max_limit: int | None = 200,
+		max_limit: int | None = 500,
 	) -> list[dict]: ...
 	@decorator.lru_cache_with_reset(max_calls=3)
 	def get_comments_detail(
@@ -84,7 +84,7 @@ class Obtain(ClassUnion):
 		com_id: int,
 		source: Literal["work", "post", "shop"],
 		method: str = "user_id",
-		max_limit: int | None = 200,
+		max_limit: int | None = 500,
 	) -> list[dict] | list[str]:
 		"""获取结构化评论数据
 		Args:
