@@ -1,10 +1,10 @@
 """基础定义和核心Union类"""
 
 from collections import namedtuple
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Generator
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from src.api import community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
@@ -31,7 +31,7 @@ class ReplyType(Enum):
 
 
 class ReportRecord(TypedDict):
-	item: data.NestedDefaultDict
+	item: "data.NestedDefaultDict"
 	report_type: Literal["comment", "post", "discussion"]
 	item_id: str
 	content: str
@@ -43,11 +43,50 @@ BatchGroup = namedtuple("BatchGroup", ["group_type", "group_key", "record_ids"])
 
 
 @dataclass
-class SourceConfig:
+class ActionConfig:
+	"""操作配置 - 定义每个操作的行为"""
+
+	key: str
+	name: str
+	description: str
+	status: str  # 对应的状态值
+	enabled: bool = True  # 是否启用该操作
+
+
+@dataclass
+class SourceConfigSimple:
 	get_items: Callable[..., Any]
 	get_comments: Callable[..., Any]
 	delete: Callable[..., Any]
 	title_key: str
+
+
+@dataclass
+class SourceConfig:
+	"""举报源配置 - 定义每种举报类型的处理方法"""
+
+	name: str
+	# 数据获取方法
+	fetch_total: Callable[..., dict]
+	fetch_generator: Callable[..., Generator[dict]]
+	# 处理动作方法
+	handle_method: str
+	# 字段映射
+	content_field: str
+	user_field: str
+	source_id_field: str
+	item_id_field: str
+	source_name_field: str | None = None
+	# 特殊检查
+	special_check: Callable[..., bool] = field(default_factory=lambda: lambda: True)
+	# 分块大小
+	chunk_size: int = 100
+	available_actions: list["ActionConfig"] | None = None
+
+	def __post_init__(self) -> None:
+		if self.available_actions is None:
+			self.available_actions = []
+		self.available_actions = cast("list[ActionConfig]", self.available_actions)
 
 
 # 核心Union类

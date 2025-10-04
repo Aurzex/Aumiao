@@ -3,14 +3,13 @@
 import operator
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from functools import partial
 from json import loads
 from pathlib import Path
 from random import choice
 from typing import ClassVar, Literal, cast
 
-from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfig, acquire, data, decorator, tool
-from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportProcessor
+from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, acquire, data, decorator, tool
+from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
 from src.utils.acquire import HTTPSTATUS
 
@@ -51,13 +50,13 @@ class FileUploader(ClassUnion):
 @decorator.singleton
 class Motion(ClassUnion):
 	SOURCE_CONFIG: ClassVar = {
-		"work": SourceConfig(
+		"work": SourceConfigSimple(
 			get_items=lambda self=None: self._user_obtain.fetch_user_works_web_gen(self._data.ACCOUNT_DATA.id, limit=None),
 			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "work", "comments"),
 			delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
 			title_key="work_name",
 		),
-		"post": SourceConfig(
+		"post": SourceConfigSimple(
 			get_items=lambda self=None: self._forum_obtain.fetch_my_posts_gen("created", limit=None),
 			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "post", "comments"),
 			delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
@@ -491,38 +490,41 @@ class MillenniumEntanglement(ClassUnion):
 			raise TypeError(msg)
 
 
+@decorator.singleton
 class Report(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 		self.report = ReportAuthManager()
-		self.processor = ReportProcessor()
+		self.processor = ReportProcessor()  # 使用新的处理器
+		self.fetcher = ReportFetcher()
 		self.processed_count = 0
+		self.printer = tool.Printer()  # 添加打印机实例
 
 	def execute_report_handle(self, admin_id: int) -> None:
 		"""举报处理主流程:加载账号 → 循环处理 → 统计结果"""
-		self._printer.print_header("=== 举报处理系统 ===")
+		self.printer.print_header("=== 举报处理系统 ===")
 		# 1. 加载学生账号(用于自动举报)
 		self.report.load_student_accounts()
-		# 2. 主处理循环:获取举报 → 批量处理 → 询问是否继续
+		# 2. 主处理循环:分块处理 → 询问是否继续
 		while True:
-			# 获取所有待处理举报(评论/帖子/讨论)
-			self.total_report = self.processor.get_total_reports()
-			# 使用partial绑定参数,创建生成器函数
-			report_gen_func = partial(self.processor.fetch_all_reports)
+			# 获取所有待处理举报总数
+			self.total_report = self.fetcher.get_total_reports(status="TOBEDONE")
 			if self.total_report == 0:
-				self._printer.print_message("当前没有待处理的举报", "INFO")
+				self.printer.print_message("当前没有待处理的举报", "INFO")
 				break
-			# 批量处理举报
-			self._printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
-			batch_processed = self.processor.process_report_batch(report_gen_func, admin_id)
+			# 显示待处理举报数量
+			self.printer.print_message(f"发现 {self.total_report} 条待处理举报", "INFO")
+			# 使用新的分块处理方法
+			batch_processed = self.processor.process_all_reports(admin_id)
 			self.processed_count += batch_processed
 			# 本次处理结果
-			self._printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
+			self.printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
 			# 询问是否继续检查新举报
-			if self._printer.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+			continue_choice = self.printer.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper()
+			if continue_choice != "Y":
 				break
-			self._printer.print_message("重新获取新举报...", "INFO")
+			self.printer.print_message("重新获取新举报...", "INFO")
 		# 3. 处理结束:统计结果 + 终止会话
-		self._printer.print_header("=== 处理结果统计 ===")
-		self._printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
+		self.printer.print_header("=== 处理结果统计 ===")
+		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		self.report.terminate_session()

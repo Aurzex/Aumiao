@@ -1,5 +1,4 @@
 """处理器类:评论处理和举报处理"""
-
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -8,7 +7,7 @@ from time import sleep
 from typing import Any, ClassVar, Literal, cast
 from urllib.parse import urlparse
 
-from src.core.base import MAX_SIZE_BYTES, BatchGroup, ClassUnion, ReportRecord, data, decorator, tool
+from src.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, ReportRecord, SourceConfig, data, decorator, tool
 from src.core.retrieve import Obtain
 from src.utils import acquire
 from src.utils.acquire import HTTPSTATUS
@@ -134,33 +133,173 @@ class CommentProcessor:
 		content_map[content_key].append(identifier)
 
 
-@decorator.singleton
-class ReportProcessor(ClassUnion):
-	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
-	DEFAULT_BATCH_CONFIG: ClassVar = {
-		"total_threshold": 15,
-		"duplicate_threshold": 5,
-		"content_threshold": 3,
-	}
-	STATUS_MAP: ClassVar = {
-		"D": "DELETE",
-		"S": "MUTE_SEVEN_DAYS",
-		"T": "MUTE_THREE_MONTHS",
-		"P": "PASS",
-	}
-	SOURCE_TYPE_MAP: ClassVar[dict[Literal["comment", "post", "discussion"], Literal["shop", "post", "discussion"]]] = {
-		"comment": "shop",
-		"post": "post",
-		"discussion": "discussion",
-	}
-
+class ReportTypeRegistry:
+	"""举报类型注册表 - 集中管理所有举报类型的配置"""
 	def __init__(self) -> None:
-		self.batch_config = self.DEFAULT_BATCH_CONFIG.copy()
-		self.processed_count = 0
-		self.total_report = 0
-		self.printer = tool.Printer()
-		self.auth_manager = ReportAuthManager()
+		self._registry: dict[str, SourceConfig] = {}
+		self._setup_default_actions()
+
+	def _setup_default_actions(self) -> None:
+		"""设置默认操作配置"""
+		self.default_actions = {
+			"D": ActionConfig("D", "删除", "删除内容", "DELETE"),
+			"S": ActionConfig("S", "禁言7天", "禁言用户7天", "MUTE_SEVEN_DAYS"),
+			"T": ActionConfig("T", "禁言3月", "禁言用户3个月", "MUTE_THREE_MONTHS"),
+			"P": ActionConfig("P", "通过", "通过举报,不做处理", "PASS"),
+			"C": ActionConfig("C", "查看详情", "查看详细信息", "DETAIL"),
+			"F": ActionConfig("F", "检查违规", "检查其他违规内容", "CHECK_VIOLATION"),
+			"J": ActionConfig("J", "跳过", "跳过当前举报", "SKIP"),
+		}
+
+	def register(self, report_type: str, config: SourceConfig) -> None:
+		"""注册举报类型配置"""
+		# 如果未指定可用操作,使用默认操作
+		if config.available_actions is None or len(config.available_actions) == 0:
+			config.available_actions = list(self.default_actions.values())
+		self._registry[report_type] = config
+
+	def get_config(self, report_type: str) -> SourceConfig:
+		"""获取举报类型配置"""
+		if report_type not in self._registry:
+			msg = f"未知的举报类型: {report_type}"
+			raise ValueError(msg)
+		return self._registry[report_type]
+
+	def get_all_types(self) -> list[str]:
+		"""获取所有注册的举报类型"""
+		return list(self._registry.keys())
+
+	def get_available_actions(self, report_type: str) -> list[ActionConfig]:
+		"""获取指定举报类型的可用操作"""
+		config = self.get_config(report_type)
+		return [action for action in config.available_actions if action.enabled]  # pyright: ignore[reportOptionalIterable]
+
+	def get_action_prompt(self, report_type: str) -> str:
+		"""生成操作提示字符串"""
+		actions = self.get_available_actions(report_type)
+		prompt_parts = [f"{action.key}({action.name})" for action in actions]
+		return "选择操作: " + ", ".join(prompt_parts)
+
+	def is_action_available(self, report_type: str, action_key: str) -> bool:
+		"""检查指定操作是否可用于该举报类型"""
+		actions = self.get_available_actions(report_type)
+		return any(action.key == action_key for action in actions)
+
+	def get_status_mapping(self) -> dict[str, str]:
+		"""获取状态映射"""
+		return {action.key: action.status for action in self.default_actions.values() if action.key in {"D", "S", "T", "P"}}
+
+
+@decorator.singleton
+class ReportFetcher(ClassUnion):
+	"""举报信息获取器 - 支持分块获取和类型扩展"""
+	def __init__(self) -> None:
+		self.registry = ReportTypeRegistry()
+		self._setup_registry()
 		super().__init__()
+
+	def _setup_registry(self) -> None:
+		"""初始化举报类型注册表"""
+		# 评论类型配置
+		self.registry.register(
+			"comment",
+			SourceConfig(
+				name="评论举报",
+				fetch_total=lambda status: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
+				fetch_generator=lambda status: self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
+				handle_method="execute_process_comment_report",
+				content_field="comment_content",
+				user_field="comment_user",
+				source_id_field="comment_source_object_id",
+				source_name_field="comment_source_object_name",
+				item_id_field="comment_id",
+				special_check=lambda item: item["comment_source"] == "WORK_SHOP",
+				chunk_size=100,
+				available_actions=[
+					self.registry.default_actions["D"],  # 删除
+					self.registry.default_actions["S"],  # 禁言7天
+					self.registry.default_actions["T"],  # 禁言3月
+					self.registry.default_actions["P"],  # 通过
+					self.registry.default_actions["C"],  # 查看详情
+					self.registry.default_actions["F"],  # 检查违规
+					self.registry.default_actions["J"],  # 跳过
+				],
+			),
+		)
+		# 帖子类型配置
+		self.registry.register(
+			"post",
+			SourceConfig(
+				name="帖子举报",
+				fetch_total=lambda status: self._whale_obtain.fetch_post_reports_total(status=status),
+				fetch_generator=lambda status: self._whale_obtain.fetch_post_reports_gen(status=status, limit=100),
+				handle_method="execute_process_post_report",
+				content_field="post_title",
+				user_field="post_user",
+				source_id_field="post_id",
+				source_name_field=None,
+				item_id_field="post_id",
+				chunk_size=100,
+				available_actions=[
+					self.registry.default_actions["D"],  # 删除
+					self.registry.default_actions["S"],  # 禁言7天
+					self.registry.default_actions["T"],  # 禁言3月
+					self.registry.default_actions["P"],  # 通过
+					self.registry.default_actions["C"],  # 查看详情
+					self.registry.default_actions["J"],  # 跳过
+				],
+			),
+		)
+		# 讨论类型配置
+		self.registry.register(
+			"discussion",
+			SourceConfig(
+				name="讨论举报",
+				fetch_total=lambda status: self._whale_obtain.fetch_discussion_reports_total(status=status),
+				fetch_generator=lambda status: self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
+				handle_method="execute_process_discussion_report",
+				content_field="discussion_content",
+				user_field="discussion_user",
+				source_id_field="post_id",
+				source_name_field=None,
+				item_id_field="discussion_id",
+				chunk_size=100,
+				available_actions=[
+					self.registry.default_actions["D"],  # 删除
+					self.registry.default_actions["P"],  # 通过
+					self.registry.default_actions["C"],  # 查看详情
+					self.registry.default_actions["J"],  # 跳过
+				],
+			),
+		)
+
+	def fetch_reports_chunked(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator[list[ReportRecord]]:
+		for report_type in self.registry.get_all_types():
+			config = self.registry.get_config(report_type)
+			yield from self._fetch_type_chunked(report_type, config, status)
+
+	@staticmethod
+	def _fetch_type_chunked(report_type: str, config: SourceConfig, status: str) -> Generator[list[ReportRecord]]:
+		chunk: list[ReportRecord] = []
+		for item in config.fetch_generator(status):
+			item_ndd = data.NestedDefaultDict(item)
+			# 创建举报记录
+			record = ReportRecord(
+				item=item_ndd,
+				report_type=report_type,  # pyright: ignore[reportArgumentType]
+				item_id=str(item_ndd[config.item_id_field]),
+				content=item_ndd[config.content_field],
+				processed=False,
+				action=None,
+			)
+			chunk.append(record)
+			# 达到分块大小时返回
+			if len(chunk) >= config.chunk_size:
+				yield chunk
+				chunk = []
+		# 返回剩余记录
+		if chunk:
+			yield chunk
 
 	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
 		"""获取所有举报类型的总数"""
@@ -175,98 +314,123 @@ class ReportProcessor(ClassUnion):
 			total_reports += total_info.get("total", 0)
 		return total_reports
 
-	def fetch_all_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator[ReportRecord]:
-		report_configs: list[tuple[Literal["comment", "post", "discussion"], Callable[[], Generator[dict]]]] = [
-			(
-				"comment",
-				lambda: self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=2000),
-			),
-			(
-				"post",
-				lambda: self._whale_obtain.fetch_post_reports_gen(status=status, limit=2000),
-			),
-			(
-				"discussion",
-				lambda: self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=2000),
-			),
-		]
-		# 处理数据生成器
-		for report_type, gen_func in report_configs:
-			report_generator = gen_func()
-			for item in report_generator:
-				item_ndd = data.NestedDefaultDict(item)
-				type_config = self._get_type_config(report_type, item_ndd)
-				yield ReportRecord(
-					item=item_ndd,
-					report_type=report_type,
-					item_id=str(item_ndd[type_config["item_id_field"]]),
-					content=item_ndd[type_config["content_field"]],
-					processed=False,
-					action=None,
-				)
 
-	@staticmethod
-	def _get_type_config(report_type: str, item_ndd: data.NestedDefaultDict) -> dict:
-		"""动态生成举报类型配置:根据类型返回字段映射、处理方法等"""
-		configs = {
-			"comment": {
-				"content_field": "comment_content",  # 内容字段
-				"user_field": "comment_user",  # 用户字段前缀
-				"handle_method": "execute_process_comment_report",  # 处理方法
-				"source_id_field": "comment_source_object_id",  # 来源ID字段
-				"source_name_field": "comment_source_object_name",  # 来源名称字段
-				"item_id_field": "comment_id",  # 唯一ID字段(评论ID)
-				"special_check": lambda: item_ndd["comment_source"] == "WORK_SHOP",  # 特殊检查(是否为店铺评论)
-			},
-			"post": {
-				"content_field": "post_title",  # 内容字段(帖子标题)
-				"user_field": "post_user",  # 用户字段前缀
-				"handle_method": "execute_process_post_report",  # 处理方法
-				"source_id_field": "post_id",  # 来源ID字段(帖子ID)
-				"item_id_field": "post_id",  # 唯一ID字段(帖子ID)
-				"special_check": lambda: True,  # 帖子无需特殊检查
-			},
-			"discussion": {
-				"content_field": "discussion_content",  # 内容字段(讨论内容)
-				"user_field": "discussion_user",  # 用户字段前缀
-				"handle_method": "execute_process_discussion_report",  # 处理方法
-				"source_id_field": "post_id",  # 来源ID字段(所属帖子ID)
-				"item_id_field": "discussion_id",  # 唯一ID字段(讨论ID)
-				"special_check": lambda: True,  # 讨论无需特殊检查
-			},
-		}
-		return configs[report_type]
+# 其余类保持不变...
+@decorator.singleton
+class BatchActionManager(ClassUnion):
+	"""批量动作管理器 - 负责管理批量处理动作和状态"""
+	def __init__(self) -> None:
+		self.batch_actions: dict[tuple[str, str], str] = {}
+		self.processed_records: set[str] = set()
+		super().__init__()
 
-	def _get_content_key(self, record: ReportRecord) -> tuple:
-		"""生成内容唯一标识:用于分组同内容举报"""
-		type_config = self._get_type_config(record["report_type"], record["item"])
-		item_ndd = record["item"]
-		# 键组成:(内容,举报类型,来源ID)→ 确保同内容不同来源不被误判
-		return (
-			item_ndd[type_config["content_field"]],
-			record["report_type"],
-			item_ndd[type_config["source_id_field"]],
-		)
+	def save_batch_action(self, group_type: str, group_key: str, action: str) -> None:
+		"""保存批量处理动作"""
+		self.batch_actions[group_type, group_key] = action
 
-	def process_report_batch(self, report_gen_func: Callable[[], Generator[ReportRecord]], admin_id: int) -> int:
-		"""批量处理举报:两次遍历生成器,第一次收集分组信息,第二次处理记录"""
+	def get_batch_action(self, group_type: str, group_key: str) -> str | None:
+		"""获取批量处理动作"""
+		return self.batch_actions.get((group_type, group_key))
+
+	def mark_record_processed(self, record_id: str) -> None:
+		"""标记记录为已处理"""
+		self.processed_records.add(record_id)
+
+	def is_record_processed(self, record_id: str) -> bool:
+		"""检查记录是否已处理"""
+		return record_id in self.processed_records
+
+	def clear_processed_records(self) -> None:
+		"""清空已处理记录"""
+		self.processed_records.clear()
+
+
+@decorator.singleton
+class ReportProcessor(ClassUnion):
+	"""举报处理器 - 主处理逻辑"""
+	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
+	DEFAULT_BATCH_CONFIG: ClassVar = {
+		"total_threshold": 15,
+		"duplicate_threshold": 5,
+		"content_threshold": 3,
+	}
+	SOURCE_TYPE_MAP: ClassVar = {
+		"comment": "shop",
+		"post": "post",
+		"discussion": "discussion",
+	}
+
+	def __init__(self) -> None:
+		self.batch_config = self.DEFAULT_BATCH_CONFIG.copy()
+		self.processed_count = 0
+		self.total_report = 0
+		self.printer = tool.Printer()
+		self.auth_manager = ReportAuthManager()
+		self.fetcher = ReportFetcher()
+		self.batch_manager = BatchActionManager()
+		super().__init__()
+
+	@property
+	def STATUS_MAP(self) -> dict[str, str]:  # noqa: N802
+		"""动态获取状态映射"""
+		return self.fetcher.registry.get_status_mapping()
+
+	def process_all_reports(self, admin_id: int) -> int:
+		"""处理所有举报 - 分块处理主入口"""
+		self.printer.print_header("=== 开始处理所有举报 ===")
+		self.batch_manager.clear_processed_records()
+		total_processed = 0
+		chunk_count = 0
+		# 分块获取和处理举报信息
+		for chunk in self.fetcher.fetch_reports_chunked(status="TOBEDONE"):
+			chunk_count += 1  # noqa: SIM113
+			self.printer.print_message(f"处理第 {chunk_count} 块数据,共 {len(chunk)} 条举报", "INFO")
+			# 处理当前块
+			chunk_processed = self._process_chunk(chunk, admin_id)
+			total_processed += chunk_processed
+			self.printer.print_message(f"第 {chunk_count} 块处理完成,处理了 {chunk_processed} 条举报", "SUCCESS")
+			# 询问是否继续处理下一块
+			if len(chunk) == 100:  # 完整块才询问  # noqa: PLR2004
+				continue_choice = self.printer.get_valid_input(prompt="是否继续处理下一块? (Y/N)", valid_options={"Y", "N"}).upper()
+				if continue_choice != "Y":
+					break
+		self.printer.print_message(f"所有举报处理完成,共处理 {total_processed} 条举报", "SUCCESS")
+		return total_processed
+
+	def _process_chunk(self, chunk: list[ReportRecord], admin_id: int) -> int:
+		"""处理单个数据块"""
 		processed_count = 0
-		# 第一次遍历: 收集分组信息(只记录ID和分组键)
-		item_id_groups = defaultdict(list)  # item_id -> list[record_id]
-		content_groups = defaultdict(list)  # content_key -> list[record_id]
-		for record in report_gen_func():
+		# 识别批量处理组
+		batch_groups = self._identify_batch_groups(chunk)
+		# 处理批量组
+		for group in batch_groups:
+			self._handle_batch_group(group, chunk, admin_id)
+			processed_count += len(group.record_ids)
+		# 处理剩余单个项目
+		for record in chunk:
+			record_id = record["item"]["id"]
+			if not record["processed"] and not self.batch_manager.is_record_processed(record_id):
+				self.process_single_item(record, admin_id)
+				processed_count += 1
+				self.batch_manager.mark_record_processed(record_id)
+		return processed_count
+
+	def _identify_batch_groups(self, chunk: list[ReportRecord]) -> list[BatchGroup]:
+		"""识别当前块中的批量处理组"""
+		item_id_groups = defaultdict(list)
+		content_groups = defaultdict(list)
+		for record in chunk:
 			record_id = record["item"]["id"]
 			item_id = record["item_id"]
 			content_key = self._get_content_key(record)
 			item_id_groups[item_id].append(record_id)
 			content_groups[content_key].append(record_id)
-		# 确定批量组,避免重复记录
+		# 构建批量组
 		batch_groups = []
 		processed_record_ids = set()
 		# 同ID分组
 		for item_id, record_ids in item_id_groups.items():
 			if len(record_ids) >= self.batch_config["duplicate_threshold"]:
-				# 将 record_ids 转换为元组,使其可哈希
 				batch_groups.append(BatchGroup("item_id", item_id, tuple(record_ids)))
 				processed_record_ids.update(record_ids)
 		# 同内容分组
@@ -274,327 +438,187 @@ class ReportProcessor(ClassUnion):
 			if len(record_ids) >= self.batch_config["content_threshold"]:
 				filtered_record_ids = [rid for rid in record_ids if rid not in processed_record_ids]
 				if len(filtered_record_ids) >= self.batch_config["content_threshold"]:
-					# 生成内容摘要
-					content_summary = f"{content_key[1]}:{content_key[0][:20]}..."  # content_key: (content, report_type, source_id)
-					# 将 filtered_record_ids 转换为元组
+					content_summary = f"{content_key[1]}:{content_key[0][:20]}..."
 					batch_groups.append(BatchGroup("content", content_summary, tuple(filtered_record_ids)))
 					processed_record_ids.update(filtered_record_ids)
-		# 如果没有批量组,则直接第二次遍历处理所有记录
-		if not batch_groups:
-			for record in report_gen_func():
-				self.process_single_item(record, admin_id)
-				processed_count += 1
-			return processed_count
-		# 构建记录ID到组的映射
-		record_id_to_group = {}
-		for group in batch_groups:
-			for rid in group.record_ids:
-				record_id_to_group[rid] = group
-		# 第二次遍历: 处理记录
-		# 使用字典来存储每个组的记录,键为组的唯一标识
-		groups_records = {}
-		for group in batch_groups:
-			# 使用 (group_type, group_key) 作为唯一标识
-			groups_records[group.group_type, group.group_key] = []
-		for record in report_gen_func():
-			record_id = record["item"]["id"]
-			if record_id in record_id_to_group:
-				group = record_id_to_group[record_id]
-				# 使用 (group_type, group_key) 作为键
-				groups_records[group.group_type, group.group_key].append(record)
-			else:
-				self.process_single_item(record, admin_id)
-				processed_count += 1
-		# 处理批量组
-		for group in batch_groups:
-			group_key = (group.group_type, group.group_key)
-			records = groups_records.get(group_key, [])
-			self._handle_batch_group(group, records, admin_id)
-			processed_count += len(records)
-		return processed_count
-
-	def _handle_batch_group(self, group: BatchGroup, records: list[ReportRecord], admin_id: int) -> None:
-		"""处理一个批量组:首先处理第一个记录,然后应用动作到组内其他记录"""
-		self.printer.print_message(f"处理批量组 [{group.group_type}] {group.group_key} (共{len(records)}条举报)", "INFO")
-		if not records:
-			return
-		# 处理第一个记录
-		first_action = self.process_single_item(records[0], admin_id, batch_mode=True)
-		if first_action is not None:
-			for record in records[1:]:
-				if group.group_type == "item_id":
-					self._apply_action(record, "P", admin_id)  # 同ID分组自动通过
-				else:
-					self._apply_action(record, first_action, admin_id)
-		else:
-			# 如果第一个记录跳过,则处理其余记录为单条
-			for record in records[1:]:
-				self.process_single_item(record, admin_id)
-
-	def _create_batch_groups(
-		self,
-		item_id_map: defaultdict[str, list[ReportRecord]],
-		content_map: defaultdict[tuple, list[ReportRecord]],
-	) -> list[tuple[str, str, list[ReportRecord]]]:
-		"""创建批量处理组:避免重复分组,优先处理ID分组"""
-		batch_groups = []
-		processed_records = set()  # 记录已分组的举报记录ID
-		# 1. 优先处理同ID分组:重复举报同一对象
-		for item_id, records in item_id_map.items():
-			if len(records) >= self.batch_config["duplicate_threshold"]:
-				# 标记这些记录为已处理
-				for record in records:
-					record_id = record["item"]["id"]
-					if record_id != "UNKNOWN":
-						processed_records.add(record_id)
-				batch_groups.append(("item_id", item_id, records))
-		# 2. 处理同内容分组:排除已分组的记录
-		for (content, report_type, _), records in content_map.items():
-			if len(records) >= self.batch_config["content_threshold"]:
-				# 过滤掉已经在ID分组中的记录
-				filtered_records = []
-				for record in records:
-					record_id = record["item"]["id"]
-					if record_id != "UNKNOWN" and record_id not in processed_records:
-						filtered_records.append(record)
-				# 如果过滤后仍然满足阈值,则添加到批量组
-				if len(filtered_records) >= self.batch_config["content_threshold"]:
-					content_summary = f"{report_type}:{content[:20]}..."  # 内容摘要
-					batch_groups.append(("content", content_summary, filtered_records))
-					# 更新已处理的记录
-					for record in filtered_records:
-						record_id = record["item"]["id"]
-						if record_id != "UNKNOWN":
-							processed_records.add(record_id)
 		return batch_groups
 
-	def _handle_batch_groups(self, batch_groups: list, admin_id: int) -> None:
-		"""处理批量分组:展示分组 → 查看详情 → 确认处理 → 自动应用动作"""
-		# 1. 展示批量分组信息
-		self.printer.print_message("发现以下批量处理项:", "INFO")
-		for idx, (group_type, group_key, records) in enumerate(batch_groups, 1):
-			self.printer.print_message(f"{idx}. [{group_type}] {group_key} ({len(records)}次举报)", "INFO")
-		# 2. 查看分组详情(可选)
-		if self.printer.get_valid_input(prompt="是否查看详情?(Y/N)", valid_options={"Y", "N"}).upper() == "Y":
-			for group_type, group_key, records in batch_groups:
-				self.printer.print_header(f"=== {group_type}组: {group_key} ===")
-				# 仅展示前3条详情
-				for record in records[:3]:
-					create_time = record["item"]["created_at"]
-					create_time_str = self._tool.TimeUtils().format_timestamp(create_time) if create_time != "UNKNOWN" else "未知"
-					self.printer.print_message(f"举报ID: {record['item']['id']} | 时间: {create_time_str}", "INFO")
-				# 多于3条时提示省略
-				if len(records) > 3:  # noqa: PLR2004
-					self.printer.print_message(f"...及其他{len(records) - 3}条举报", "INFO")
-		# 3. 确认是否批量处理
-		if self.printer.get_valid_input(prompt="确认批量处理这些项目?(Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			return
-		# 4. 执行批量处理
-		for group_type, group_key, records in batch_groups:
-			self.printer.print_message(f"正在处理 [{group_type}] {group_key}...", "INFO")
-			first_action = None
-			# 处理首个项目(作为同组的模板动作)
-			if records and not records[0]["processed"]:
-				first_action = self.process_single_item(records[0], admin_id, batch_mode=True)
-			# 自动应用动作到同组其他项目
-			if first_action:
-				for record in records[1:]:
-					if not record["processed"]:
-						# 同ID分组:自动通过(同一对象多次举报可能为误报)
-						if group_type == "item_id":
-							self._apply_action(record, "P", admin_id)
-							self.printer.print_message(f"已自动通过举报ID: {record['item']['id']}", "SUCCESS")
-						# 同内容分组:复用首个动作
-						else:
-							self._apply_action(record, first_action, admin_id)
-							self.printer.print_message(f"已自动处理举报ID: {record['item']['id']}", "SUCCESS")
+	def _get_content_key(self, record: ReportRecord) -> tuple:
+		"""生成内容唯一标识"""
+		config = self.fetcher.registry.get_config(record["report_type"])
+		item_ndd = record["item"]
+		return (
+			item_ndd[config.content_field],
+			record["report_type"],
+			item_ndd[config.source_id_field],
+		)
 
-	def process_single_item(self, record: ReportRecord, admin_id: int, *, batch_mode: bool = False, reprocess_mode: bool = False) -> str | None:  # noqa: PLR0912, PLR0915
-		"""处理单个举报项目:展示详情 → 官方账号判断 → 操作选择 → 执行动作"""
-		item_ndd = record["item"]  # NestedDefaultDict 实例
+	def _handle_batch_group(self, group: BatchGroup, chunk: list[ReportRecord], admin_id: int) -> None:
+		"""处理批量组"""
+		self.printer.print_message(f"处理批量组 [{group.group_type}] {group.group_key} (共{len(group.record_ids)}条举报)", "INFO")
+		# 检查是否有保存的批量动作
+		saved_action = self.batch_manager.get_batch_action(group.group_type, group.group_key)
+		if saved_action:
+			# 应用保存的批量动作
+			self.printer.print_message(f"应用保存的批量动作: {self.STATUS_MAP[saved_action]}", "INFO")
+			for record_id in group.record_ids:
+				record = self._find_record_by_id(chunk, record_id)
+				if record and not record["processed"]:
+					self._apply_action(record, saved_action, admin_id)
+					self.batch_manager.mark_record_processed(record_id)
+		else:
+			# 处理第一个记录并保存动作
+			records = [self._find_record_by_id(chunk, rid) for rid in group.record_ids]
+			records = [r for r in records if r and not r["processed"]]
+			if records:
+				first_record = records[0]
+				first_action = self.process_single_item(first_record, admin_id, batch_mode=True)
+				if first_action:
+					# 保存批量动作供后续块使用
+					self.batch_manager.save_batch_action(group.group_type, group.group_key, first_action)
+					# 应用动作到组内其他记录
+					for record in records[1:]:
+						if group.group_type == "item_id":
+							self._apply_action(record, "P", admin_id)
+						# 确保动作对当前记录类型可用
+						elif self.fetcher.registry.is_action_available(record["report_type"], first_action):
+							self._apply_action(record, first_action, admin_id)
+						else:
+							self.printer.print_message(f"动作 {first_action} 对类型 {record['report_type']} 不可用,跳过记录 {record['item']['id']}", "WARNING")
+						self.batch_manager.mark_record_processed(record["item"]["id"])
+
+	@staticmethod
+	def _find_record_by_id(chunk: list[ReportRecord], record_id: str) -> ReportRecord | None:
+		"""根据记录ID在块中查找记录"""
+		for record in chunk:
+			if record["item"]["id"] == record_id:
+				return record
+		return None
+
+	def _apply_action(self, record: ReportRecord, action: str, admin_id: int) -> None:
+		"""应用处理动作到举报记录"""
+		config = self.fetcher.registry.get_config(record["report_type"])
+		# 检查动作是否可用
+		if not self.fetcher.registry.is_action_available(record["report_type"], action):
+			self.printer.print_message(f"动作 {action} 对类型 {record['report_type']} 不可用", "ERROR")
+			return
+		# 执行处理动作
+		handle_method = getattr(self._whale_motion, config.handle_method)
+		handle_method(report_id=record["item"]["id"], resolution=self.STATUS_MAP[action], admin_id=admin_id)
+		record["processed"] = True
+		record["action"] = action
+		action_config = next((ac for ac in config.available_actions if ac.key == action), None)  # pyright: ignore[reportOptionalIterable]
+		action_name = action_config.name if action_config else action
+		self.printer.print_message(f"已应用操作: {action_name}", "SUCCESS")
+
+	def process_single_item(self, record: ReportRecord, admin_id: int, *, batch_mode: bool = False, reprocess_mode: bool = False) -> str | None:
+		"""处理单个举报项目"""
+		item_ndd = record["item"]
 		report_type = record["report_type"]
-		type_config = self._get_type_config(report_type, item_ndd)
-		# 头部信息:区分批量模式/重新处理模式
+		config = self.fetcher.registry.get_config(report_type)
+		# 显示处理头信息
 		if batch_mode:
 			self.printer.print_header("=== 批量处理首个项目 ===")
 		elif reprocess_mode:
 			self.printer.print_header("=== 重新处理项目 ===")
-		# 1. 展示举报详情
+		# 显示举报详情
+		self._display_report_details(item_ndd, report_type, config)
+		# 官方账号检查
+		user_id_str = item_ndd[f"{config.user_field}_id"]
+		user_id = int(user_id_str) if user_id_str != "UNKNOWN" and user_id_str.isdigit() else None
+		if user_id and user_id in self.OFFICIAL_IDS:
+			self.printer.print_message("这是一条官方发布的内容,自动通过", "WARNING")
+			self._apply_action(record, "P", admin_id)
+			return "P"
+		# 获取可用操作
+		available_actions = self.fetcher.registry.get_available_actions(report_type)
+		action_keys = [action.key for action in available_actions]
+		# 操作选择循环
+		while True:
+			prompt = self.fetcher.registry.get_action_prompt(report_type)
+			choice = self.printer.get_valid_input(prompt=prompt, valid_options=set(action_keys)).upper()
+			# 处理状态变更操作
+			if choice in {"D", "S", "T", "P"}:
+				self._apply_action(record, choice, admin_id)
+				return choice
+			# 处理辅助操作
+			if choice == "C":
+				self._show_item_details(item_ndd, report_type, config)
+				# 查看详情后继续选择操作
+				continue
+			if choice == "F":
+				if config.special_check(item_ndd):
+					adjusted_source_type = self.SOURCE_TYPE_MAP[report_type]
+					self._check_violation(
+						source_id=item_ndd[config.source_id_field],
+						source_type=adjusted_source_type,  # pyright: ignore[reportArgumentType]
+						board_name=item_ndd.get("board_name", "UNKNOWN"),
+						user_id=user_id_str,
+					)
+					# 检查违规后继续选择操作,不标记为已处理
+					continue
+				self.printer.print_message("该类型不支持检查违规操作", "ERROR")
+				continue
+			if choice == "J":
+				self.printer.print_message("已跳过该举报", "INFO")
+				# 跳过也不标记为已处理,让用户后续可以重新处理
+				return None
+
+	def _display_report_details(self, item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
+		"""显示举报详情"""
 		self.printer.print_header("=== 举报详情 ===")
-		self.printer.print_message(f"举报ID: {item_ndd['id']}", "INFO")  # 直接访问,缺失返回"UNKNOWN"
+		self.printer.print_message(f"举报ID: {item_ndd['id']}", "INFO")
 		self.printer.print_message(f"举报类型: {report_type}", "INFO")
-		# 2. 展示举报内容(HTML转文本,避免标签干扰)
-		content = item_ndd[type_config["content_field"]]
+		# 显示内容
+		content = item_ndd[config.content_field]
 		if content != "UNKNOWN":
 			content_text = self._tool.DataConverter().html_to_text(content)
 			self.printer.print_message(f"举报内容: {content_text}", "INFO")
 		else:
 			self.printer.print_message("举报内容: 无内容", "INFO")
-		# 3. 展示所属板块(优先取board_name,其次取来源名称)
-		board_name = item_ndd["board_name"]
-		if board_name == "UNKNOWN":
-			board_name = item_ndd[type_config["source_name_field"]] if "source_name_field" in type_config else "UNKNOWN"
+		# 显示板块信息
+		board_name = item_ndd.get("board_name", "UNKNOWN")
+		if board_name == "UNKNOWN" and config.source_name_field:
+			board_name = item_ndd[config.source_name_field]
 		self.printer.print_message(f"所属板块: {board_name}", "INFO")
-		# 4. 展示被举报人信息(昵称 + 是否官方账号)
-		user_field = type_config["user_field"]
-		# 昵称:优先取nick_name,其次取nickname(兼容不同字段名)
-		user_nickname = item_ndd[f"{user_field}_nick_name"]
+		# 显示被举报人信息
+		user_nickname = item_ndd.get(f"{config.user_field}_nick_name", "UNKNOWN")
 		if user_nickname == "UNKNOWN":
-			user_nickname = item_ndd[f"{user_field}_nickname"]
+			user_nickname = item_ndd.get(f"{config.user_field}_nickname", "UNKNOWN")
 		self.printer.print_message(f"被举报人: {user_nickname}", "INFO")
-		# 官方账号判断:如果是官方账号,自动通过(无需处罚)
-		user_id_str = item_ndd[f"{user_field}_id"]
-		user_id = int(user_id_str) if user_id_str != "UNKNOWN" and user_id_str.isdigit() else None
-		if user_id and user_id in self.OFFICIAL_IDS:
-			self.printer.print_message("这是一条官方发布的内容,自动通过", "WARNING")
-			# 执行通过动作
-			handle_method = getattr(self._whale_motion, type_config["handle_method"])
-			handle_method(report_id=item_ndd["id"], resolution="PASS", admin_id=admin_id)
-			record["processed"] = True
-			record["action"] = "P"
-			self.printer.print_message("已通过", "SUCCESS")
-			return "P"
-		# 5. 展示其他详情(举报原因、举报时间、帖子线索)
-		self.printer.print_message(f"举报原因: {item_ndd['reason_content']}", "INFO")
-		# 举报时间:格式化工单时间戳
-		create_time = item_ndd["created_at"]
+		# 显示举报原因和时间
+		self.printer.print_message(f"举报原因: {item_ndd.get('reason_content', 'UNKNOWN')}", "INFO")
+		create_time = item_ndd.get("created_at", "UNKNOWN")
 		if create_time != "UNKNOWN":
 			create_time_str = self._tool.TimeUtils().format_timestamp(create_time)
 			self.printer.print_message(f"举报时间: {create_time_str}", "INFO")
 		else:
 			self.printer.print_message("举报时间: 未知", "INFO")
-		# 帖子类型额外展示线索(其他类型无此字段)
+		# 帖子类型额外信息
 		if report_type == "post":
-			self.printer.print_message(f"举报线索: {item_ndd['description']}", "INFO")
-		# 6. 操作选择循环:直到选择有效动作
-		while True:
-			choice = self.printer.get_valid_input(
-				prompt="选择操作: D(删除), S(禁言7天), T(禁言3月), P(通过), C(查看详情), F(检查违规), J(跳过)", valid_options={"D", "S", "T", "P", "C", "F", "J"}
-			).upper()
-			# 执行处理动作(删除/禁言/通过)
-			if choice in self.STATUS_MAP:
-				handle_method = getattr(self._whale_motion, type_config["handle_method"])
-				handle_method(report_id=item_ndd["id"], resolution=self.STATUS_MAP[choice], admin_id=admin_id)
-				record["processed"] = True
-				record["action"] = choice
-				self.printer.print_message(f"已执行操作: {self.STATUS_MAP[choice]}", "SUCCESS")
-				return choice
-			# 查看详情:展示更多信息(链接、完整内容等)
-			if choice == "C":
-				self._show_item_details(item_ndd, report_type, type_config)
-			# 检查违规:仅满足special_check才执行(如店铺评论需额外检查)
-			elif choice == "F" and type_config["special_check"]():
-				adjusted_source_type: Literal["shop", "discussion", "post"] = self.SOURCE_TYPE_MAP[report_type]
-				self._check_violation(source_id=item_ndd[type_config["source_id_field"]], source_type=adjusted_source_type, board_name=board_name, user_id=user_id_str)
-			# 跳过:不处理当前举报
-			elif choice == "J":
-				self.printer.print_message("已跳过该举报", "INFO")
-				return None
-			# 无效输入:提示重新选择
-			else:
-				self.printer.print_message("无效操作,请重新选择", "ERROR")
+			self.printer.print_message(f"举报线索: {item_ndd.get('description', 'UNKNOWN')}", "INFO")
 
-	def _apply_action(self, record: ReportRecord, action: str, admin_id: int) -> None:
-		"""应用处理动作到举报记录"""
-		type_config = self._get_type_config(record["report_type"], record["item"])
-		handle_method = getattr(self._whale_motion, type_config["handle_method"])
-		handle_method(report_id=record["item"]["id"], resolution=self.STATUS_MAP[action], admin_id=admin_id)
-		record["processed"] = True
-		record["action"] = action
-		self.printer.print_message(f"已应用操作: {self.STATUS_MAP[action]}", "SUCCESS")
-
-	def _show_item_details(self, item_ndd: data.NestedDefaultDict, report_type: Literal["comment", "post", "discussion"], type_config: dict) -> None:
-		"""展示举报项目详细信息:链接、完整内容、用户链接等"""
+	def _show_item_details(self, item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
+		"""展示举报项目详细信息"""
 		self.printer.print_header("=== 详细信息 ===")
-		# 1. 不同类型举报的详情链接
-		if report_type == "comment":
-			# 评论:违规板块链接
-			source_id = item_ndd[type_config["source_id_field"]]
-			if source_id != "UNKNOWN":
-				self.printer.print_message(f"违规板块链接: https://shequ.codemao.cn/work_shop/{source_id}", "INFO")
-		elif report_type == "post":
-			# 帖子:违规帖子链接 + 完整内容
-			post_id = item_ndd[type_config["source_id_field"]]
-			if post_id != "UNKNOWN":
-				self.printer.print_message(f"违规帖子链接: https://shequ.codemao.cn/community/{post_id}", "INFO")
-				# 获取并展示帖子完整内容
-				self.printer.print_header("=== 帖子完整内容 ===")
-				try:
-					post_details = self._forum_obtain.fetch_posts_details(post_ids=int(post_id))
-					post_details_ndd = data.NestedDefaultDict(post_details)
-					post_content = post_details_ndd["items"][0]["content"]
-					content_text = self._tool.DataConverter().html_to_text(post_content)
-					self.printer.print_message(content_text, "INFO")
-				except (KeyError, IndexError, ValueError, TypeError) as e:
-					self.printer.print_message(f"获取帖子内容失败: {e!s}", "ERROR")
+		post_id = item_ndd[config.source_id_field]
+		if post_id != "UNKNOWN":
+			self.printer.print_message(f"违规帖子链接: https://shequ.codemao.cn/community/{post_id}", "INFO")
 		elif report_type == "discussion":
-			# 讨论:所属帖子标题 + 帖主链接 + 所属帖子链接
-			post_title = item_ndd["post_title"]
+			post_title = item_ndd.get("post_title", "UNKNOWN")
 			self.printer.print_message(f"所属帖子标题: {post_title}", "INFO")
-			post_user_id = item_ndd["post_user_id"]
-			if post_user_id != "UNKNOWN":
-				self.printer.print_message(f"所属帖子帖主链接: https://shequ.codemao.cn/user/{post_user_id}", "INFO")
-			source_id = item_ndd[type_config["source_id_field"]]
+			source_id = item_ndd[config.source_id_field]
 			if source_id != "UNKNOWN":
 				self.printer.print_message(f"所属帖子链接: https://shequ.codemao.cn/community/{source_id}", "INFO")
-		# 2. 违规用户链接
-		user_field = type_config["user_field"]
-		user_id = item_ndd[f"{user_field}_id"]
+		# 违规用户链接
+		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
 		if user_id != "UNKNOWN":
 			self.printer.print_message(f"违规用户链接: https://shequ.codemao.cn/user/{user_id}", "INFO")
-		# 3. 展示发送时间(评论/讨论/帖子的时间获取逻辑不同)
-		self._show_item_create_time(item_ndd, report_type, type_config)
 
-	def _show_item_create_time(self, item_ndd: data.NestedDefaultDict, report_type: Literal["comment", "post", "discussion"], type_config: dict) -> None:
-		"""展示举报对象的发送时间:区分评论/讨论/帖子"""
-		try:
-			if report_type in {"comment", "discussion"}:
-				# 评论/讨论:从评论列表中获取发送时间
-				source_type = "shop" if report_type == "comment" and item_ndd["comment_source"] == "WORK_SHOP" else "work"
-				source_id = item_ndd[type_config["source_id_field"]]
-				if source_id == "UNKNOWN":
-					self.printer.print_message("无效的来源ID,无法获取发送时间", "WARNING")
-					return
-				# 获取评论详情列表
-				comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=200)
-				comments_dict = {comment["id"]: comment for comment in comments}
-				comments_ndd = data.NestedDefaultDict(comments_dict)
-				item_id = item_ndd[type_config["item_id_field"]]
-				parent_id = item_ndd["comment_parent_id"]  # 评论的父ID(回复时非0)
-				# 回复类型:父ID非0,需从父评论的回复列表中找
-				if report_type == "comment" and parent_id not in {"0", "UNKNOWN"}:
-					for comment in comments_ndd:
-						if comment["id"] == parent_id:
-							for reply in comment["replies"]:
-								if reply["id"] == item_id:
-									create_time = reply["created_at"]
-									create_time_str = self._tool.TimeUtils().format_timestamp(create_time)
-									self.printer.print_message(f"发送时间: {create_time_str}", "INFO")
-									return
-				# 普通评论/讨论:直接从评论列表中找
-				else:
-					for comment in comments_ndd:
-						if comment["id"] == item_id:
-							create_time = comment["created_at"]
-							create_time_str = self._tool.TimeUtils().format_timestamp(create_time)
-							self.printer.print_message(f"发送时间: {create_time_str}", "INFO")
-							return
-				# 未找到对应评论
-				self.printer.print_message("未找到对应评论/讨论的发送时间", "WARNING")
-			else:  # post 类型:从帖子详情中获取发送时间
-				post_id = item_ndd[type_config["source_id_field"]]
-				if post_id != "UNKNOWN":
-					post_details = self._forum_obtain.fetch_single_post_details(post_id=post_id)
-					post_details_ndd = data.NestedDefaultDict(post_details)
-					create_time = post_details_ndd["created_at"]
-					create_time_str = self._tool.TimeUtils().format_timestamp(create_time)
-					self.printer.print_message(f"发送时间: {create_time_str}", "INFO")
-		except Exception as e:
-			self.printer.print_message(f"获取发送时间失败: {e!s}", "ERROR")
-
-	def _check_violation(self, source_id: ..., source_type: Literal["shop", "work", "discussion", "post"], board_name: str, user_id: str | None) -> None:
-		"""检查举报内容违规:评论违规分析 + 帖子重复检查"""
-		# 转换source_id为int(避免字符串类型)
+	def _check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:  # noqa: ANN401
+		"""检查举报内容违规"""
+		# 这里实现违规检查逻辑,可以从旧版代码移植
+		self.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id:
 			self.printer.print_message("无效的来源ID,无法检查违规", "ERROR")
@@ -645,7 +669,6 @@ class ReportProcessor(ClassUnion):
 				@staticmethod
 				def get_comments(_processor: Callable, _item_id: int) -> list[dict]:
 					return comments  # 返回评论列表
-
 			config = CommentCheckConfig()
 			violation_targets: defaultdict[str, list[str]] = defaultdict(list)  # 违规内容列表
 			# 检查广告、黑名单、重复评论
@@ -669,7 +692,7 @@ class ReportProcessor(ClassUnion):
 		if self.printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			self.printer.print_message("自动举报操作已取消", "INFO")
 			return
-		# 3. 获取举报原因(固定取第7个原因,需确保社区接口返回正常)
+		# 3. 获取举报原因
 		try:
 			report_reasons = self._community_obtain.fetch_report_reasons()
 			report_reasons_ndd = data.NestedDefaultDict(report_reasons)
@@ -677,84 +700,98 @@ class ReportProcessor(ClassUnion):
 		except (KeyError, IndexError) as e:
 			self.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
 			return
-		# 4. 来源类型映射(适配不同模块的举报接口)
+		# 4. 来源类型映射
 		source_key_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {
-			"work": "work",  # 作品 → 作品模块
-			"post": "forum",  # 帖子 → 论坛模块
-			"shop": "shop",  # 店铺 → 店铺模块
+			"work": "work",
+			"post": "forum",
+			"shop": "shop",
 		}
 		source_key = source_key_map[source_type]
-		# 5. 自动举报循环:切换账号 → 执行举报 → 计数
-		report_counter = -1  # 账号切换计数器(-1表示首次切换)
-		# 复制可用账号列表(避免修改原列表)
-		# 修复1:根据 auth_method 复制对应账号列表(而非判断是否为空)
+		# 5. 准备账号管理
+		# 复制可用账号列表,避免修改原列表
 		available_accounts = self.auth_manager.student_accounts.copy() if self.auth_manager.auth_method == "grab" else self.auth_manager.student_tokens.copy()
 		self.printer.print_message(f"开始自动举报(共 {len(violations)} 条违规内容)", "INFO")
+		success_count = 0
+		# 6. 处理每条违规内容
 		for idx, violation in enumerate(violations, 1):
-			# 切换学生账号:达到阈值或首次执行时切换(避免单账号限流)
-			if report_counter >= self._setting.PARAMETER.report_work_max or report_counter == -1:
-				if not available_accounts:
-					self.printer.print_message("所有学生账号已耗尽,自动举报终止", "WARNING")
-					break
-				# 更新账号管理类的可用账号(避免重复使用)
-				if self.auth_manager.auth_method == "grab":
-					self.auth_manager.student_accounts = available_accounts
-				else:
-					self.auth_manager.student_tokens = available_accounts  # pyright: ignore[reportAttributeAccessIssue]
-				# 切换账号:失败则跳过当前违规
-				if not self.auth_manager.switch_to_student_account():
-					continue
-				report_counter = 0  # 重置计数器
-			# 获取当前学生账号ID(用于举报接口)
-			try:
-				user_details = self._user_obtain.fetch_account_details()
-				user_details_ndd = data.NestedDefaultDict(user_details)
-				reporter_id = user_details_ndd["id"]
-				if reporter_id == "UNKNOWN":
-					msg = "获取学生账号ID失败"
-					raise ValueError(msg)  # noqa: TRY301
-			except Exception as e:
-				self.printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
-				report_counter += 1
-				continue
-			# 解析违规内容格式:item_id.comment_id:内容(如 123.456:广告内容)
+			# 解析违规内容格式
 			violation_parts = violation.split(":")
 			if len(violation_parts) < 2:  # noqa: PLR2004
 				self.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
-				report_counter += 1
 				continue
 			item_id_part = violation_parts[0].split(".")
 			if len(item_id_part) < 2:  # noqa: PLR2004
 				self.printer.print_message(f"违规ID格式错误: {violation_parts[0]}", "ERROR")
-				report_counter += 1
 				continue
 			_, comment_id = item_id_part
-			is_reply = "reply" in violation  # 是否为回复(非普通评论)
-			# 查找父评论ID(回复时需传入父ID)
+			is_reply = "reply" in violation
+			# 查找父评论ID
 			parent_id, _ = self._tool.StringProcessor().find_substrings(text=comment_id, candidates=violations)
 			parent_id = int(parent_id) if parent_id and parent_id != "UNKNOWN" else None
-			# 执行举报操作
-			try:
-				if self._execute_report_action(
-					source_key=source_key,
-					target_id=int(comment_id),
-					source_id=source_id,
-					reason_id=7,  # 固定举报原因ID(与之前获取的原因对应)
-					reporter_id=int(reporter_id),
-					reason_content=reason_content,
-					parent_id=parent_id,
-					is_reply=is_reply,
-				):
-					self.printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
+			# 为当前违规项尝试举报
+			violation_success = False
+			retry_count = 0
+			max_retries = min(3, len(available_accounts))  # 最多重试3次或可用账号数
+			while not violation_success and retry_count < max_retries and available_accounts:
+				# 切换学生账号
+				if self.auth_manager.auth_method == "grab":
+					self.auth_manager.student_accounts = available_accounts.copy()
 				else:
-					self.printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
-				report_counter += 1
-			except Exception as e:
-				self.printer.print_message(f"执行举报异常: {e!s}", "ERROR")
-				report_counter += 1
-		# 6. 举报完成:恢复管理员账号
+					self.auth_manager.student_tokens = available_accounts.copy()
+				if not self.auth_manager.switch_to_student_account():
+					# 切换失败,移除当前账号并重试
+					if available_accounts:
+						available_accounts.pop(0)
+					retry_count += 1
+					continue
+				# 获取当前学生账号ID
+				try:
+					user_details = self._user_obtain.fetch_account_details()
+					user_details_ndd = data.NestedDefaultDict(user_details)
+					reporter_id = user_details_ndd["id"]
+					if reporter_id == "UNKNOWN":
+						msg = "获取学生账号ID失败"
+						raise ValueError(msg)  # noqa: TRY301
+				except Exception as e:
+					self.printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
+					# 移除当前账号并重试
+					if available_accounts:
+						available_accounts.pop(0)
+					retry_count += 1
+					continue
+				# 执行举报操作
+				try:
+					if self._execute_report_action(
+						source_key=source_key,
+						target_id=int(comment_id),
+						source_id=source_id,
+						reason_id=7,
+						reporter_id=int(reporter_id),
+						reason_content=reason_content,
+						parent_id=parent_id,
+						is_reply=is_reply,
+					):
+						self.printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
+						success_count += 1
+						violation_success = True
+					else:
+						self.printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
+						# 移除当前账号并重试
+						if available_accounts:
+							available_accounts.pop(0)
+						retry_count += 1
+				except Exception as e:
+					self.printer.print_message(f"[{idx}/{len(violations)}] 执行举报异常: {e!s}", "ERROR")
+					# 移除当前账号并重试
+					if available_accounts:
+						available_accounts.pop(0)
+					retry_count += 1
+			# 如果当前违规项处理失败,记录日志
+			if not violation_success:
+				self.printer.print_message(f"[{idx}/{len(violations)}] 处理失败,跳过: {violation}", "WARNING")
+		# 7. 举报完成:恢复管理员账号
 		self.auth_manager._restore_admin_account()  # noqa: SLF001
-		self.printer.print_message("自动举报完成,已恢复管理员账号", "SUCCESS")
+		self.printer.print_message(f"自动举报完成,成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
 	def _execute_report_action(
 		self,
@@ -824,7 +861,6 @@ class ReportAuthManager(ClassUnion):
 
 	def _handle_password_login(self) -> None:
 		"""处理账密登录:支持验证码重试,优化错误处理"""
-
 		def input_account() -> tuple[str, str]:
 			"""内部函数:获取用户名和密码(统一命名为account)"""
 			username = self.printer.prompt_input("请输入用户名")
@@ -837,7 +873,6 @@ class ReportAuthManager(ClassUnion):
 			cookies = self._whale_routine.fetch_verification_captcha(timestamp=timestamp)
 			captcha = self.printer.prompt_input("请输入验证码")
 			return captcha, cookies
-
 		# 登录循环:直到成功或用户中断(实际可加重试次数限制)
 		timestamp = self._tool.TimeUtils().current_timestamp(13)  # 13位时间戳
 		username, password = input_account()
