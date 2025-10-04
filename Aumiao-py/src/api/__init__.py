@@ -5,7 +5,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Final
 
 # 版本信息 (新增)
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 # Nuitka 编译兼容性处理 --------------------------------------------------------
 # 更可靠的编译环境检测方式 (同时检查 nuitka 参数和 __compiled__ 属性)
@@ -18,6 +18,7 @@ if TYPE_CHECKING or _is_compiling:
 
 # 模块路径映射 (使用 Final 类型提示)
 _MODULE_PATHS: Final[dict[str, str]] = {
+	"coco": ".api.coco",
 	"community": ".api.community",
 	"edu": ".api.edu",
 	"forum": ".api.forum",
@@ -27,7 +28,6 @@ _MODULE_PATHS: Final[dict[str, str]] = {
 	"user": ".api.user",
 	"whale": ".api.whale",
 	"work": ".api.work",
-	"coco": ".api.coco",
 }
 
 # 导出列表 (根据映射自动生成)

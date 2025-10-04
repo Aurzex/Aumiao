@@ -74,6 +74,11 @@ class ForumDataFetcher:
 			limit=limit,
 		)
 
+	# 获取我的帖子或回复的帖子数目
+	def fetch_my_post_num(self) -> dict:
+		response = self._client.send_request(endpoint="/web/forums/posts/mine/count", method="GET")
+		return response.json()
+
 	# 获取论坛帖子各个栏目
 	def fetch_post_boards(self) -> dict:
 		response = self._client.send_request(endpoint="/web/forums/boards/simples/all", method="GET")
@@ -111,16 +116,6 @@ class ForumDataFetcher:
 		)
 		return response.json()
 
-	# 获取社区求帮助帖子
-	def fetch_help_posts(self, limit: int = 20, page: int = 1) -> dict:
-		params = {"limit": limit, "page": page}
-		response = self._client.send_request(
-			endpoint="/web/forums/boards/posts/ask-help",
-			method="GET",
-			params=params,
-		)
-		return response.json()
-
 	# 获取论坛举报原因
 	def fetch_report_reasons(self) -> dict:
 		response = self._client.send_request(endpoint="/web/reports/posts/reasons/all", method="GET")
@@ -135,6 +130,33 @@ class ForumDataFetcher:
 			params=params,
 			limit=limit,
 			config={"amount_key": "limit", "offset_key": "page"},
+		)
+
+	# 获取热门帖子(7天内)
+	def fetch_7day_hot_posts_gen(self, board_id: int = -1, limit: int | None = 15) -> Generator[dict]:
+		# 设置请求参数
+		params = {"page": 1, "limit": 10}
+		# 构建endpoint
+		endpoint = "/web/forums/boards/posts/7dayHot" if board_id == -1 else f"/web/forums/boards/posts/7dayHot?board_id={board_id}"
+		return self._client.fetch_data(
+			endpoint=endpoint,
+			params=params,
+			total_key="total",
+			pagination_method="page",
+			config={"amount_key": "limit", "offset_key": "page"},
+			limit=limit,
+		)
+
+	# 获取求助帖子
+	def fetch_ask_help_posts_gen(self, limit: int | None = 10) -> Generator[dict]:
+		# 设置请求参数
+		params = {"page": 1, "limit": 10}
+		return self._client.fetch_data(
+			endpoint="/web/forums/boards/posts/ask-help",
+			params=params,
+			pagination_method="page",
+			config={"amount_key": "limit", "offset_key": "page"},
+			limit=limit,
 		)
 
 
