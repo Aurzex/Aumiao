@@ -1,4 +1,5 @@
 """处理器类:评论处理和举报处理"""
+
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -135,6 +136,7 @@ class CommentProcessor:
 
 class ReportTypeRegistry:
 	"""举报类型注册表 - 集中管理所有举报类型的配置"""
+
 	def __init__(self) -> None:
 		self._registry: dict[str, SourceConfig] = {}
 		self._setup_default_actions()
@@ -193,6 +195,7 @@ class ReportTypeRegistry:
 @decorator.singleton
 class ReportFetcher(ClassUnion):
 	"""举报信息获取器 - 支持分块获取和类型扩展"""
+
 	def __init__(self) -> None:
 		self.registry = ReportTypeRegistry()
 		self._setup_registry()
@@ -319,6 +322,7 @@ class ReportFetcher(ClassUnion):
 @decorator.singleton
 class BatchActionManager(ClassUnion):
 	"""批量动作管理器 - 负责管理批量处理动作和状态"""
+
 	def __init__(self) -> None:
 		self.batch_actions: dict[tuple[str, str], str] = {}
 		self.processed_records: set[str] = set()
@@ -348,6 +352,7 @@ class BatchActionManager(ClassUnion):
 @decorator.singleton
 class ReportProcessor(ClassUnion):
 	"""举报处理器 - 主处理逻辑"""
+
 	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
 	DEFAULT_BATCH_CONFIG: ClassVar = {
 		"total_threshold": 15,
@@ -669,6 +674,7 @@ class ReportProcessor(ClassUnion):
 				@staticmethod
 				def get_comments(_processor: Callable, _item_id: int) -> list[dict]:
 					return comments  # 返回评论列表
+
 			config = CommentCheckConfig()
 			violation_targets: defaultdict[str, list[str]] = defaultdict(list)  # 违规内容列表
 			# 检查广告、黑名单、重复评论
@@ -861,6 +867,7 @@ class ReportAuthManager(ClassUnion):
 
 	def _handle_password_login(self) -> None:
 		"""处理账密登录:支持验证码重试,优化错误处理"""
+
 		def input_account() -> tuple[str, str]:
 			"""内部函数:获取用户名和密码(统一命名为account)"""
 			username = self.printer.prompt_input("请输入用户名")
@@ -873,6 +880,7 @@ class ReportAuthManager(ClassUnion):
 			cookies = self._whale_routine.fetch_verification_captcha(timestamp=timestamp)
 			captcha = self.printer.prompt_input("请输入验证码")
 			return captcha, cookies
+
 		# 登录循环:直到成功或用户中断(实际可加重试次数限制)
 		timestamp = self._tool.TimeUtils().current_timestamp(13)  # 13位时间戳
 		username, password = input_account()
