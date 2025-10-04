@@ -1,20 +1,22 @@
 [project]
-name = "Aumiao"  # 替换为你的项目名称
+name = "Aumiao"
 email = "aumiao@aurzex.top"
-version = "2.0.0"    # 替换为你的项目版本
+version = "2.2.0"
 authors = [
-    {name = "Aumiao Team", email = "aumiao@aurzex.top"},
-    {name = "DontLoveBy", email = "laya200900@outlook.com"},
-    {name = "Aurzex"},
-    {name = "MoonLeaaaf"},
-    {name = "Nomen"},
-    {name = "MiTao"}
-    ]
-description = "Aumiao 是一款针对于编程猫社区的爬虫(划掉)你说的对,但是《Aumiao》是一款由 Aumiao 开发团队开发的编程猫自动化工具 于 2023 年 5 月 2 日发布,工具以编程猫宇宙为舞台,玩家可以扮演毛毡用户在这个答辩 💩 社区毛线 🧶 坍缩并邂逅各种不同的乐子人 😋。在领悟了《猫站圣经》后,打败强敌扫厕所 😡,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相官方网站:https://aumiao.aurzex.top 联系我们: Aumiao@aurzex.top"
-
-readme = "README.txt"
-requires-python = ">=3.12"
-
-dependencies = [
-    "requests>=2.32",
+    { name = "Aumiao Team", email = "aumiao@aurzex.top" },
+    { name = "DontLoveBy", email = "laya200900@outlook.com" },
+    { name = "Aurzex" },
+    { name = "MoonLeaaaf" },
+    { name = "Nomen" },
+    { name = "MiTao" }
 ]
+description = "Aumiao 是一款针对于编程猫社区的爬虫(划掉)你说的对,但是《Aumiao》是一款由 Aumiao 开发团队开发的编程猫自动化工具 于 2023 年 5 月 2 日发布,工具以编程猫宇宙为舞台,玩家可以扮演毛毡用户在这个答辩 💩 社区毛线 🧶 坍缩并邂逅各种不同的乐子人 😋。在领悟了《猫站圣经》后,打败强敌扫厕所 😡,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相官方网站:https://aumiao.aurzex.top 联系我们: Aumiao@aurzex.top"
+readme = "README.txt"
+requires-python = ">=3.13"
+dependencies = ["requests>=2.32", "websocket-client>=1.8.0"]
+
+[project.scripts]
+aumiao = "main:main"
+
+[dependency-groups]
+dev = ["nuitka>=2.0.0"]

@@ -22,6 +22,7 @@ class OverseaDataClient:
 		return response.json()
 
 
+@singleton
 class UserActionHandler:
 	"""用户操作处理器"""
 
