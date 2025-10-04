@@ -465,6 +465,7 @@ class FileUploader:
 		"""获取codemao上传凭证 - 使用主客户端"""
 		params = {
 			"projectName": kwargs.get("project_name", "community_frontend"),
+			# 有community_fronted和neko两种
 			"filePaths": file_path,
 			"filePath": file_path,
 			"tokensCount": 1,
