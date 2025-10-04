@@ -7,16 +7,12 @@ if sys.stdout.encoding != "utf-8":
 	import io
 
 	sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-
 # 定义 data 文件夹路径
-
 # 获取当前脚本所在的目录,然后在其下创建data文件夹
 data_folder = Path(__file__).parent / "data"
-
 # 检查 data 文件夹是否存在,如果不存在则创建
 if not data_folder.exists():
 	data_folder.mkdir(parents=True)
-
 # 定义 setting.json 的数据
 setting_data = {
 	"PARAMETER": {
@@ -44,7 +40,6 @@ setting_data = {
 		"VERSION": "2.2.0",
 	},
 }
-
 # 定义 data.json 的数据
 data_json_data = {
 	"ACCOUNT_DATA": {"author_level": 1, "create_time": 1800000000, "description": "", "id": "1742185446", "identity": "********", "nickname": "猫猫捏", "password": "******"},
@@ -126,15 +121,12 @@ data_json_data = {
 		],
 	},
 }
-
 # 生成 setting.json 文件
 setting_file_path = data_folder / "setting.json"
 with setting_file_path.open("w", encoding="utf-8") as f:
 	json.dump(setting_data, f, ensure_ascii=False, indent=4)
-
 # 生成 data.json 文件
 data_json_file_path = data_folder / "data.json"
 with data_json_file_path.open("w", encoding="utf-8") as f:
 	json.dump(data_json_data, f, ensure_ascii=False, indent=4)
-
 print("data 文件夹及其中的 setting.json 和 data.json 文件已成功生成。")
