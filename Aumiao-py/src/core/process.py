@@ -804,7 +804,6 @@ class ReportAuthManager(ClassUnion):
 		self.student_accounts = []
 		self.student_tokens = []
 		self.auth_method = "grab"
-		self.processor = ReportProcessor()
 		self.printer = tool.Printer()
 		super().__init__()
 
