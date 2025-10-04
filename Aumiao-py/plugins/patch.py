@@ -15,7 +15,7 @@ class Plugin(BasePlugin):
 
 	@property
 	def PLUGIN_VERSION(self) -> str:
-		return "2.1.0"
+		return "2.2.0"
 
 	@property
 	def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:

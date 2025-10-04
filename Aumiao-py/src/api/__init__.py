@@ -5,7 +5,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Final
 
 # 版本信息 (新增)
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 # Nuitka 编译兼容性处理 --------------------------------------------------------
 # 更可靠的编译环境检测方式 (同时检查 nuitka 参数和 __compiled__ 属性)

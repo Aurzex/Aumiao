@@ -1,7 +1,7 @@
 [project]
 name = "Aumiao"
 email = "aumiao@aurzex.top"
-version = "2.1.0"
+version = "2.2.0"
 authors = [
     { name = "Aumiao Team", email = "aumiao@aurzex.top" },
     { name = "DontLoveBy", email = "laya200900@outlook.com" },
