@@ -249,6 +249,7 @@ class ReportFetcher(ClassUnion):
 					self.registry.default_actions["T"],  # 禁言3月
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
+					self.registry.default_actions["F"],  # 检查违规
 					self.registry.default_actions["J"],  # 跳过
 				],
 			),
@@ -269,8 +270,11 @@ class ReportFetcher(ClassUnion):
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
+					self.registry.default_actions["S"],  # 禁言7天
+					self.registry.default_actions["T"],  # 禁言3月
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
+					self.registry.default_actions["F"],  # 检查违规
 					self.registry.default_actions["J"],  # 跳过
 				],
 			),
