@@ -20,6 +20,9 @@ class ForumDataFetcher:
 			# 如果是单个id,则直接传入
 			params = {"ids": post_ids}
 		elif isinstance(post_ids, list):
+			if len(post_ids) >= 20:  # noqa: PLR2004
+				msg = "数据长度需小于20"
+				raise TypeError(msg)
 			# 如果是多个id,则将id列表转换为字符串
 			params = {"ids": ",".join(map(str, post_ids))}
 		# 发送请求获取帖子信息
@@ -89,8 +92,8 @@ class ForumDataFetcher:
 		response = self._client.send_request(endpoint=f"/web/forums/boards/{board_id}", method="GET")
 		return response.json()
 
-	# 获取社区所有热门帖子
-	def fetch_hot_posts(self) -> dict:
+	# 获取社区所有热门帖子ID
+	def fetch_hot_posts_ids(self) -> dict:
 		response = self._client.send_request(endpoint="/web/forums/posts/hots/all", method="GET")
 		return response.json()
 
