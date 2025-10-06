@@ -61,7 +61,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
+		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works", params=params, limit=limit)
 
 	def fetch_work_reports_total(
 		self,
@@ -73,7 +73,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params)
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works", params=params)
 
 	def fetch_comment_reports_gen(
 		self,
