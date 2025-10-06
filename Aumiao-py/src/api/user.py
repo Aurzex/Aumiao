@@ -112,7 +112,7 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/tiger/user", method="GET")
 		return response.json()
 
-	def fetch_user_scores(self) -> dict:
+	def fetch_account_scores(self) -> dict:
 		"""
 		获取用户评分数据(点赞/再创作/收藏)
 		Returns:
@@ -121,13 +121,18 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/nemo/v3/user/grade/details", method="GET")
 		return response.json()
 
-	def fetch_user_level(self) -> dict:
+	def fetch_account_level(self) -> dict:
 		"""
 		获取用户等级信息
 		Returns:
 			用户等级信息字典
 		"""
 		response = self._client.send_request(endpoint="/nemo/v3/user/level/info", method="GET")
+		return response.json()
+
+	# 获取用户注册时间
+	def fetch_account_register_time(self) -> dict:
+		response = self._client.send_request(endpoint="/nemo/new-people/user-info", method="GET")
 		return response.json()
 
 	# 可能会返回{"code":6404,"msg":"未绑定手机号"},从而可以检测是否绑定手机号
