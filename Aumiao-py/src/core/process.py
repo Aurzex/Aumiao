@@ -305,8 +305,8 @@ class ReportFetcher(ClassUnion):
 
 	def fetch_reports_chunked(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator[list[ReportRecord]]:
 		for report_type in self.registry.get_all_types():
-			config = self.registry.get_config(report_type)
-			yield from self._fetch_type_chunked(report_type, config, status)
+			config = self.registry.get_config(report_type=report_type)
+			yield from self._fetch_type_chunked(report_type=report_type, config=config, status=status)
 
 	@staticmethod
 	def _fetch_type_chunked(report_type: str, config: SourceConfig, status: str) -> Generator[list[ReportRecord]]:
@@ -337,6 +337,7 @@ class ReportFetcher(ClassUnion):
 			("comment", lambda: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
 			("post", lambda: self._whale_obtain.fetch_post_reports_total(status=status)),
 			("discussion", lambda: self._whale_obtain.fetch_discussion_reports_total(status=status)),
+			("work", lambda: self._whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
