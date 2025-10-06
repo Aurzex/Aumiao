@@ -147,6 +147,7 @@ class ReportTypeRegistry:
 			"D": ActionConfig("D", "删除", "删除内容", "DELETE"),
 			"S": ActionConfig("S", "禁言7天", "禁言用户7天", "MUTE_SEVEN_DAYS"),
 			"T": ActionConfig("T", "禁言3月", "禁言用户3个月", "MUTE_THREE_MONTHS"),
+			"U": ActionConfig("U", "取消发布", "取消作品发布", "UNLOAD"),
 			"P": ActionConfig("P", "通过", "通过举报,不做处理", "PASS"),
 			"C": ActionConfig("C", "查看详情", "查看详细信息", "DETAIL"),
 			"F": ActionConfig("F", "检查违规", "检查其他违规内容", "CHECK_VIOLATION"),
@@ -225,6 +226,28 @@ class ReportFetcher(ClassUnion):
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
+					self.registry.default_actions["J"],  # 跳过
+				],
+			),
+		)
+		# 作品类型配置
+		self.registry.register(
+			"work",
+			SourceConfig(
+				name="作品举报",
+				fetch_total=lambda status: self._whale_obtain.fetch_work_reports_total(source_type="ALL", status=status),
+				fetch_generator=lambda status: self._whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
+				handle_method="execute_process_work_report",
+				content_field="work_name",
+				user_field="work_user_nickname",
+				source_id_field="work_id",
+				source_name_field=None,
+				item_id_field="work_id",
+				chunk_size=100,
+				available_actions=[
+					self.registry.default_actions["D"],  # 删除
+					self.registry.default_actions["P"],  # 通过
+					self.registry.default_actions["U"],  # 取消发布
 					self.registry.default_actions["J"],  # 跳过
 				],
 			),
@@ -604,7 +627,7 @@ class ReportProcessor(ClassUnion):
 		else:
 			self.printer.print_message("举报时间: 未知", "INFO")
 		# 帖子类型额外信息
-		if report_type == "post":
+		if report_type in {"post", "work"}:
 			self.printer.print_message(f"举报线索: {item_ndd.get('description', 'UNKNOWN')}", "INFO")
 
 	def _show_item_details(self, item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
@@ -771,7 +794,7 @@ class ReportProcessor(ClassUnion):
 					continue
 				# 执行举报操作
 				try:
-					if self._execute_report_action(
+					if self.execute_report_action(
 						source_key=source_key,
 						target_id=int(comment_id),
 						source_id=source_id,
@@ -803,7 +826,7 @@ class ReportProcessor(ClassUnion):
 		self.auth_manager._restore_admin_account()  # noqa: SLF001
 		self.printer.print_message(f"自动举报完成,成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
-	def _execute_report_action(
+	def execute_report_action(
 		self,
 		source_key: Literal["forum", "work", "shop"],
 		target_id: int,

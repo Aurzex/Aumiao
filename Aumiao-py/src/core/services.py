@@ -362,8 +362,8 @@ class Motion(ClassUnion):
 		return result
 
 	@staticmethod
-	def print_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
-		"""打印用户评论统计信息
+	def check_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
+		"""通过统计作品评论信息查看违规情况
 		Args:
 			comments_data: 用户评论数据列表
 			min_comments: 最小评论数目阈值, 只有评论数大于等于此值的用户才会被打印
@@ -384,6 +384,20 @@ class Motion(ClassUnion):
 			for i, comment in enumerate(user_data["comments"], 1):
 				print(f"  {i}. {comment}")
 			print("*" * 50)
+
+	def batch_report_post(self, timeline: int) -> None:
+		"""
+		实现风纪欲望的小帮手
+		"""
+		token_list = self._file.read_line(data.TOKEN_DIR)
+		_student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
+		print(f"正在查找发布时间在{self._tool.TimeUtils().format_timestamp(timeline)}之后的帖子")
+		post_list: list = self._forum_obtain.fetch_hot_posts_ids()["items"][0:19]
+		posts_details: list[dict] = self._forum_obtain.fetch_posts_details(post_ids=post_list)["items"]
+		for single in posts_details:
+			create_time: int = single["created_at"]
+			if create_time > timeline:
+				print(f"帖子{single['title']}-ID{single['id']}-发布于{self._tool.TimeUtils().format_timestamp(create_time)}")
 
 
 @decorator.singleton
@@ -488,6 +502,47 @@ class MillenniumEntanglement(ClassUnion):
 		else:
 			msg = f"不支持的来源类型 {source_type}"
 			raise TypeError(msg)
+
+	def execute_report_action(
+		self,
+		source_key: Literal["forum", "work", "shop"],
+		target_id: int,
+		source_id: int,
+		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
+		reporter_id: int,
+		reason_content: str,
+		parent_id: int | None = None,
+		*,
+		is_reply: bool = False,
+		description: str = "",
+	) -> bool:
+		"""执行举报操作:根据来源类型调用不同模块的举报接口"""
+		try:
+			match source_key:
+				# 作品模块:举报作品评论
+				case "work":
+					return self._work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
+				# 论坛模块:举报帖子评论/回复
+				case "forum":
+					item_type = "COMMENT" if is_reply else "REPLY"  # 回复/普通评论区分
+					return self._forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
+				# 店铺模块:举报店铺评论/回复
+				case "shop":
+					if is_reply and parent_id is not None:
+						# 回复类型:需传入父评论ID
+						return self._shop_motion.execute_report_comment(
+							comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, comment_parent_id=parent_id, description=description
+						)
+					# 普通评论:无需父ID
+					return self._shop_motion.execute_report_comment(
+						comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, description=description
+					)
+			# 未知来源类型:举报失败
+		except Exception as e:
+			self._printer.print_message(f"举报操作失败: {e!s}", "ERROR")
+			return False
+		else:
+			return False
 
 
 @decorator.singleton
