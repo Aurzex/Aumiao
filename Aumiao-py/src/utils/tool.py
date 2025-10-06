@@ -293,7 +293,6 @@ class DataConverter:
 	) -> str:
 		"""
 		将HTML转换为可配置的纯文本
-
 		:param html_content: 输入的HTML内容
 		:param replace_images: 是否将图片替换为指定格式 (默认True)
 		:param img_format: 图片替换格式,可用{src}占位符 (默认"[图片链接: {src}]")
@@ -949,20 +948,29 @@ class Printer:
 		cast_type: Callable[[str], T] = str,
 		validator: Callable[[T], bool] | None = None,  # 自定义验证函数
 	) -> T:
-		"""获取有效输入并进行类型转换验证.支持范围和自定义验证"""
+		"""获取有效输入并进行类型转换验证。支持范围和自定义验证,自动处理大小写"""
 		while True:
 			try:
 				value_str = self.prompt_input(prompt)
+				# 如果是字符串类型且有有效选项,进行大小写智能处理
+				_original_value_str = value_str
+				if cast_type is str and valid_options is not None and not isinstance(valid_options, range):
+					# 检查有效选项的大小写特征
+					if all(isinstance(opt, str) and opt.islower() for opt in valid_options):
+						value_str = value_str.lower()
+					elif all(isinstance(opt, str) and opt.isupper() for opt in valid_options):
+						value_str = value_str.upper()
 				# 进行类型转换
 				value = cast_type(value_str)
 				# 检查是否在有效选项中
 				if valid_options is not None:
 					if isinstance(valid_options, range):
 						if value not in valid_options:
-							print(self.color_text(f"输入超出范围.有效范围: [{valid_options.start}-{valid_options.stop - 1}]", "ERROR"))
+							print(self.color_text(f"输入超出范围。有效范围: [{valid_options.start}-{valid_options.stop - 1}]", "ERROR"))
 							continue
+					# 对于字符串选项,使用原始转换后的值进行比较
 					elif value not in valid_options:
-						print(self.color_text(f"无效输入.请重试。有效选项: {valid_options}", "ERROR"))
+						print(self.color_text(f"无效输入。请重试。有效选项: {valid_options}", "ERROR"))
 						continue
 				# 执行自定义验证
 				if validator and not validator(value):
