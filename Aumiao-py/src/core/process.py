@@ -414,6 +414,10 @@ class ReportProcessor(ClassUnion):
 		self.batch_manager.clear_processed_records()
 		total_processed = 0
 		chunk_count = 0
+		# 询问是否一键全部通过
+		auto_pass_choice = self.printer.get_valid_input(prompt="是否一键全部通过所有待处理举报? (Y/N)", valid_options={"Y", "N"}).upper()
+		if auto_pass_choice == "Y":  # noqa: S105
+			return self._pass_all_pending_reports(admin_id)
 		# 分块获取和处理举报信息
 		for chunk in self.fetcher.fetch_reports_chunked(status="TOBEDONE"):
 			chunk_count += 1  # noqa: SIM113
@@ -422,13 +426,37 @@ class ReportProcessor(ClassUnion):
 			chunk_processed = self._process_chunk(chunk, admin_id)
 			total_processed += chunk_processed
 			self.printer.print_message(f"第 {chunk_count} 块处理完成,处理了 {chunk_processed} 条举报", "SUCCESS")
-			# 询问是否继续处理下一块
-			if len(chunk) == 100:  # 完整块才询问  # noqa: PLR2004
-				continue_choice = self.printer.get_valid_input(prompt="是否继续处理下一块? (Y/N)", valid_options={"Y", "N"}).upper()
-				if continue_choice != "Y":
-					break
+			# 移除询问是否继续的代码,直接处理下一块
 		self.printer.print_message(f"所有举报处理完成,共处理 {total_processed} 条举报", "SUCCESS")
 		return total_processed
+
+	def _pass_all_pending_reports(self, admin_id: int) -> int:
+		"""一键通过所有待处理举报"""
+		self.printer.print_header("=== 开始一键通过所有待处理举报 ===")
+		total_processed = 0
+		chunk_count = 0
+		for chunk in self.fetcher.fetch_reports_chunked(status="TOBEDONE"):
+			chunk_count += 1  # noqa: SIM113
+			self.printer.print_message(f"处理第 {chunk_count} 块数据,共 {len(chunk)} 条举报", "INFO")
+			# 批量通过当前块中的所有举报
+			chunk_processed = self._pass_chunk_reports(chunk, admin_id)
+			total_processed += chunk_processed
+			self.printer.print_message(f"第 {chunk_count} 块处理完成,通过了 {chunk_processed} 条举报", "SUCCESS")
+		self.printer.print_message(f"一键通过完成,共通过 {total_processed} 条待处理举报", "SUCCESS")
+		return total_processed
+
+	def _pass_chunk_reports(self, chunk: list[ReportRecord], admin_id: int) -> int:
+		"""通过单个数据块中的所有举报"""
+		processed_count = 0
+		for record in chunk:
+			if not record["processed"]:
+				try:
+					self._apply_action(record, "P", admin_id)
+					processed_count += 1
+					self.batch_manager.mark_record_processed(record["item"]["id"])
+				except Exception as e:
+					self.printer.print_message(f"通过举报 {record['item']['id']} 失败: {e!s}", "ERROR")
+		return processed_count
 
 	def _process_chunk(self, chunk: list[ReportRecord], admin_id: int) -> int:
 		"""处理单个数据块"""
@@ -795,7 +823,7 @@ class ReportProcessor(ClassUnion):
 					continue
 				# 执行举报操作
 				try:
-					if self.execute_report_action(
+					if self._execute_report_action(
 						source_key=source_key,
 						target_id=int(comment_id),
 						source_id=source_id,
@@ -827,7 +855,7 @@ class ReportProcessor(ClassUnion):
 		self.auth_manager._restore_admin_account()  # noqa: SLF001
 		self.printer.print_message(f"自动举报完成,成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
-	def execute_report_action(
+	def _execute_report_action(
 		self,
 		source_key: Literal["forum", "work", "shop"],
 		target_id: int,
