@@ -30,7 +30,6 @@ printer = tool.Printer()
 @dataclass
 class MenuOption:
 	"""菜单选项类"""
-
 	name: str
 	handler: Callable[[], None]  # 更精确的类型注解
 	require_auth: bool = False
@@ -42,7 +41,6 @@ def enable_vt_mode() -> None:
 	if platform.system() == "Windows":
 		# 基于系统, 判断是否需要引入ctypes库
 		from ctypes import windll  # noqa: PLC0415
-
 		try:
 			kernel32 = windll.kernel32
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
@@ -53,7 +51,6 @@ def enable_vt_mode() -> None:
 
 def handle_errors(func: Callable) -> Callable:
 	"""统一错误处理装饰器"""
-
 	def wrapper(*args: ..., **kwargs: ...) -> object | None:
 		try:
 			return func(*args, **kwargs)
@@ -62,13 +59,11 @@ def handle_errors(func: Callable) -> Callable:
 		except Exception as e:
 			logger.exception(f"{func.__name__} 执行失败")  # noqa: G004
 			print(printer.color_text(f"操作失败: {e}", "ERROR"))
-
 	return wrapper
 
 
 class AccountDataManager:
 	"""账户数据管理类"""
-
 	def __init__(self) -> None:
 		self.account_data: dict[str, dict] = {}
 		self.is_logged_in = False
@@ -122,13 +117,11 @@ def login(account_data_manager: AccountDataManager) -> None:
 # 修复装饰器类型标注,移除Any类型
 def require_login(func: Callable[[AccountDataManager], None]) -> Callable[[AccountDataManager], None]:
 	"""登录检查装饰器"""
-
 	def wrapper(account_data_manager: AccountDataManager) -> None:
 		if not account_data_manager.is_logged_in:
 			print(printer.color_text("请先登录!", "ERROR"))
 			return None
 		return func(account_data_manager)
-
 	return wrapper
 
 
