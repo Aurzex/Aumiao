@@ -1104,33 +1104,25 @@ class GenericDataViewer:
 		self.printer.print_header(f"=== {title} ===")
 		self.printer.print_message(f"第 {current_page}/{total_pages} 页 (共 {len(data_list)} 条记录)", "INFO")
 		self.printer.print_message("-" * 80, "INFO")
-
 		# 显示表头
 		header = "序号".ljust(6)
 		for field in display_fields:
 			header += f"{field}".ljust(20)
 		self.printer.print_message(header, "INFO")
 		self.printer.print_message("-" * 80, "INFO")
-
 		# 显示数据
 		start_idx = (current_page - 1) * page_size
 		end_idx = min(start_idx + page_size, len(data_list))
-
 		for i in range(start_idx, end_idx):
 			item = data_list[i]
 			row = f"{i - start_idx + 1}".ljust(6)
-
 			for field in display_fields:
 				value = getattr(item, field, "N/A")
-
 				# 使用自定义格式化函数(如果存在)
 				formatted_value = field_formatters[field](value) if field_formatters and field in field_formatters else str(value)
-
 				display_value = self._format_display_value(formatted_value, 18)
 				row += f"{display_value}".ljust(20)
-
 			self.printer.print_message(row, "INFO")
-
 		self.printer.print_message("-" * 80, "INFO")
 
 	@staticmethod
@@ -1145,29 +1137,23 @@ class GenericDataViewer:
 		# 构建选项列表
 		options = []
 		valid_choices = set()
-
 		if current_page < total_pages:
 			options.append(f"{nav_config['next_page']}: 下一页")
 			valid_choices.add(nav_config["next_page"])
 		if current_page > 1:
 			options.append(f"{nav_config['previous_page']}: 上一页")
 			valid_choices.add(nav_config["previous_page"])
-
 		options.append(f"{nav_config['quit']}: 退出")
 		valid_choices.add(nav_config["quit"])
-
 		# 计算当前页的项目数量
 		start_idx = (current_page - 1) * 10
 		current_page_item_count = min(10, len(range(start_idx, min(start_idx + 10, total_pages * 10))))
-
 		if custom_operations and current_page_item_count > 0:
 			options.append("数字: 选择对应项目进行操作")
 			# 添加数字选项到有效选择
 			valid_choices.update(str(i) for i in range(1, current_page_item_count + 1))
-
 		# 显示选项
 		self.printer.print_message(" | ".join(options), "INFO")
-
 		# 使用 Printer 的验证输入功能
 		prompt = "请选择"
 		try:
@@ -1200,28 +1186,22 @@ class GenericDataViewer:
 		if not custom_operations:
 			self.printer.print_message("没有可用的操作", "INFO")
 			return
-
 		item_id = getattr(item, id_field, "未知ID")
 		self.printer.print_header(f"=== 操作项 {item_id} ===")
-
 		while True:
 			self.printer.print_message("可用的操作:", "INFO")
 			operations = list(custom_operations.keys())
 			for i, op_name in enumerate(operations, 1):
 				self.printer.print_message(f"{i}: {op_name}", "INFO")
-
 			self.printer.print_message(f"{nav_config['back']}: 返回上一级", "INFO")
-
 			# 构建有效选项
 			valid_choices = {str(i) for i in range(1, len(operations) + 1)}
 			valid_choices.add(nav_config["back"])
-
 			try:
 				choice = self.printer.get_valid_input(prompt="请选择操作", valid_options=valid_choices, cast_type=str)
 			except (EOFError, KeyboardInterrupt):
 				self.printer.print_message("\n操作已取消", "INFO")
 				break
-
 			if choice == nav_config["back"]:
 				break
 			if choice.isdigit():
