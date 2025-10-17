@@ -108,8 +108,8 @@ pip install -r requirements.txt
 
 ## 📊 项目动态
 
-![更新动态](./Aumiao-py/src/project/更新.png)
-![联动活动](./Aumiao-py/src/project/联动.png)
+![更新动态](./Aumiao-py/resource/images/更新.png)
+![联动活动](./Aumiao-py/resource/images/联动.png)
 
 ## ⭐ Star 历史
 
