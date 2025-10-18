@@ -635,9 +635,9 @@ class ReportProcessor(ClassUnion):
 		content = item_ndd[config.content_field]
 		if content != "UNKNOWN":
 			content_text = self._tool.DataConverter().html_to_text(content)
-			self._printer.print_message(f"举报内容: {content_text}", "INFO")
+			self._printer.print_message(f"举报内容: {content_text}", "SUCCESS")
 		else:
-			self._printer.print_message("举报内容: 无内容", "INFO")
+			self._printer.print_message("举报内容: 无内容", "SUCCESS")
 		# 显示板块信息
 		board_name = item_ndd.get("board_name", "UNKNOWN")
 		if board_name == "UNKNOWN" and config.source_name_field:
