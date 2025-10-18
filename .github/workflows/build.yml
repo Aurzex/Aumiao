@@ -47,9 +47,10 @@ env:
   PRODUCT_NAME: "Aumiao"
   COPYRIGHT_YEAR: "2025"
   
-  # 目录配置 - 使用固定值，避免环境变量相互引用
+  # 目录配置
   PROJECT_DIR: "Aumiao-py"
   BUILD_DIR: "build"
+  DIST_DIR: "build/main.dist"
   
   # 时间配置
   TIMEZONE: "Asia/Shanghai"
@@ -141,7 +142,6 @@ jobs:
     
     env:
       UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
-      DIST_DIR: "${{ env.BUILD_DIR }}/main.dist"
 
     steps:
       - name: Checkout Code
