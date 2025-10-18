@@ -11,7 +11,6 @@ from urllib.parse import urlparse
 from src.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, ReportRecord, SourceConfig, data, decorator
 from src.core.retrieve import Obtain
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
 from src.utils.tool import GenericDataViewer
 
 
@@ -398,7 +397,6 @@ class ReportProcessor(ClassUnion):
 		self.batch_config = self.DEFAULT_BATCH_CONFIG.copy()
 		self.processed_count = 0
 		self.total_report = 0
-
 		self.auth_manager = ReportAuthManager()
 		self.fetcher = ReportFetcher()
 		self.batch_manager = BatchActionManager()
@@ -904,7 +902,6 @@ class ReportAuthManager(ClassUnion):
 		self.student_accounts = []
 		self.student_tokens = []
 		self.auth_method = "grab"
-
 		super().__init__()
 
 	def execute_admin_login(self) -> None:
@@ -1096,7 +1093,7 @@ class FileProcessor(ClassUnion):
 		self._upload_history.save()
 		return results
 
-	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
+	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0915
 		"""
 		打印上传历史记录(使用通用数据查看器)
 		Args:
@@ -1107,15 +1104,14 @@ class FileProcessor(ClassUnion):
 		if not history_list:
 			self._printer.print_message("暂无上传历史记录", "INFO")
 			return
-
 		# 排序历史记录
 		sorted_history = sorted(
 			history_list,
 			key=lambda x: x.upload_time,
 			reverse=reverse,
 		)
-
 		# 定义字段格式化函数
+
 		def format_upload_time(upload_time: float) -> str:
 			"""格式化上传时间"""
 			if isinstance(upload_time, (int, float)):
@@ -1131,7 +1127,6 @@ class FileProcessor(ClassUnion):
 			url = save_url.replace("\\", "/")
 			parsed_url = urlparse(url)
 			host = parsed_url.hostname
-
 			if host == "static.codemao.cn":
 				cn_index = url.find(".cn")
 				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
@@ -1143,14 +1138,25 @@ class FileProcessor(ClassUnion):
 			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
 			return f"[other]{simplified_url}"
 
+		# 批量验证链接函数
+
+		def batch_validate_urls(history_items: list) -> dict[int, str]:
+			"""批量验证链接状态"""
+			results = {}
+			for idx, record in enumerate(history_items):
+				is_valid = self._validate_url(record.save_url)
+				status = "✓有效" if is_valid else "✗无效"
+				results[idx] = status
+			return results
+
 		# 定义自定义操作
+
 		def show_record_detail(record: data.UploadHistory) -> None:
 			"""显示单条记录的详细信息并验证链接"""
 			# 格式化上传时间
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
 				upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
-
 			self._printer.print_header("=== 文件上传详情 ===")
 			self._printer.print_message("-" * 60, "INFO")
 			self._printer.print_message(f"文件名: {record.file_name}", "INFO")
@@ -1158,15 +1164,12 @@ class FileProcessor(ClassUnion):
 			self._printer.print_message(f"上传方式: {record.method}", "INFO")
 			self._printer.print_message(f"上传时间: {upload_time}", "INFO")
 			self._printer.print_message(f"完整URL: {record.save_url}", "INFO")
-
 			# 验证链接有效性
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
 			self._printer.print_message(f"链接状态: {status}", "INFO")
-
 			if record.save_url.startswith("http"):
 				self._printer.print_message("提示: 复制上方URL到浏览器可直接访问或下载", "INFO")
-
 			self._printer.print_message("-" * 60, "INFO")
 			input("按Enter键返回...")
 
@@ -1181,11 +1184,10 @@ class FileProcessor(ClassUnion):
 			"查看详情": show_record_detail,
 			"验证链接": validate_url_only,
 		}
-
 		# 使用通用数据查看器
 		viewer = GenericDataViewer(self._printer)
 		viewer.display_data(
-			data_class=type(sorted_history[0]),  # 获取dataclass类型
+			data_class=type(sorted_history[0]),
 			data_list=sorted_history,
 			page_size=limit,
 			display_fields=["file_name", "upload_time", "save_url"],
@@ -1197,20 +1199,23 @@ class FileProcessor(ClassUnion):
 				"file_name": format_file_name,
 				"save_url": format_url_display,
 			},
+			batch_processor=batch_validate_urls,
 		)
 
-	# 保留原有的验证URL方法
 	def _validate_url(self, url: str) -> bool:
 		"""
 		验证URL链接是否有效
 		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
 		"""
-		response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
-		if response.status_code == HTTPSTATUS.OK.value:
-			content_length = response.headers.get("Content-Length")
-			if content_length and int(content_length) > 0:
-				return True
-		response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
-		if response.status_code != HTTPSTATUS.OK.value:
+		try:
+			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
+			if response.status_code == acquire.HTTPSTATUS.OK.value:  # HTTPSTATUS.OK.value
+				content_length = response.headers.get("Content-Length")
+				if content_length and int(content_length) > 0:
+					return True
+			response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
+			if response.status_code != acquire.HTTPSTATUS.OK.value:  # HTTPSTATUS.OK.value
+				return False
+			return bool(next(response.iter_content(chunk_size=1)))
+		except Exception:
 			return False
-		return bool(next(response.iter_content(chunk_size=1)))
