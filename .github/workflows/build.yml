@@ -34,7 +34,7 @@ env:
   NUITKA_VERSION: "2.3.2"
   
   # 系统工具版本
-  SEVEN_ZIP_VERSION: "2501"
+  SEVEN_ZIP_VERSION: "25.1"
   INNOSETUP_VERSION: "6.5.0"
   
   # 构建参数
@@ -176,6 +176,16 @@ jobs:
               exit 1
           }
 
+      - name: Install 7-Zip via Chocolatey
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install 7zip -y --version ${{ env.SEVEN_ZIP_VERSION }}
+
+      - name: Install Inno Setup via Chocolatey
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install innosetup -y --version ${{ env.INNOSETUP_VERSION }}
+
       - name: Install uv and Python
         uses: astral-sh/setup-uv@v6
         with:
@@ -197,24 +207,6 @@ jobs:
           key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles(format('{0}/{1}', env.PROJECT_DIR, 'pyproject.toml'), format('{0}/{1}', env.PROJECT_DIR, 'uv.lock')) }}
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-
-
-      - name: Install Build Tools
-        shell: pwsh
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          
-          # 安装 7-Zip
-          Write-Host "Installing 7-Zip version ${{ env.SEVEN_ZIP_VERSION }}"
-          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z${{ env.SEVEN_ZIP_VERSION }}-x64.msi" -OutFile "7z-installer.msi"
-          Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
-          "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-
-          # 安装 Inno Setup
-          Write-Host "Installing Inno Setup version ${{ env.INNOSETUP_VERSION }}"
-          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-${{ env.INNOSETUP_VERSION }}.exe" -OutFile "innosetup.exe"
-          Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          Remove-Item "innosetup.exe" -Force
 
       - name: Install Project Dependencies
         working-directory: ./${{ env.PROJECT_DIR }}
