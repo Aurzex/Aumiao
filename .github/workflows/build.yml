@@ -20,11 +20,41 @@ on:
   workflow_dispatch:
 
 env:
+  # 构建配置
   BUILD_TYPE: Release
   COMMIT_INTERVAL: 20
+  
+  # Python 环境
   PYTHON_VERSION: "3.13"
-  UPX_VERSION: "5.0.2"
+  PYTHON_ARCH: "x64"
+  
+  # 工具版本
   UV_VERSION: "0.9.3"
+  UPX_VERSION: "5.0.2"
+  NUITKA_VERSION: "2.3.2"
+  
+  # 系统工具版本
+  SEVEN_ZIP_VERSION: "2501"
+  INNOSETUP_VERSION: "6.5.0"
+  
+  # 构建参数
+  BUILD_JOBS: 4
+  LTO_MODE: "yes"
+  COMPRESSION_LEVEL: "best"
+  
+  # 公司信息
+  COMPANY_NAME: "Aumiao Team"
+  PRODUCT_NAME: "Aumiao"
+  COPYRIGHT_YEAR: "2025"
+  
+  # 目录配置
+  PROJECT_DIR: "Aumiao-py"
+  BUILD_DIR: "build"
+  DIST_DIR: "build/main.dist"
+  CACHE_DIR: "${{ github.workspace }}/.uv-cache"
+  
+  # 时间配置
+  TIMEZONE: "Asia/Shanghai"
 
 jobs:
   check-release-condition:
@@ -92,7 +122,7 @@ jobs:
         uses: orhun/git-cliff-action@v4
         id: git-cliff
         with:
-          config: ./Aumiao-py/cliff.toml
+          config: ./${{ env.PROJECT_DIR }}/cliff.toml
           args: -vv --latest --strip header
         env:
           OUTPUT: CHANGES.md
@@ -112,7 +142,7 @@ jobs:
     needs: check-release-condition
     
     env:
-      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_CACHE_DIR: ${{ env.CACHE_DIR }}
 
     steps:
       - name: Checkout Code
@@ -124,19 +154,19 @@ jobs:
         id: setup-env
         shell: bash
         run: |
-          echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(TZ=${{ env.TIMEZONE }} date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "SHOULD_RELEASE=${{ needs.check-release-condition.outputs.should_release }}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${{ needs.check-release-condition.outputs.release_tag }}" >> $GITHUB_ENV
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Read Project Version
         id: version
         shell: pwsh
         run: |
-          $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw -Encoding UTF8
+          $tomlContent = Get-Content -Path ./${{ env.PROJECT_DIR }}/pyproject.toml -Raw -Encoding UTF8
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
@@ -153,8 +183,8 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: |
-            Aumiao-py/pyproject.toml
-            Aumiao-py/uv.lock
+            ${{ env.PROJECT_DIR }}/pyproject.toml
+            ${{ env.PROJECT_DIR }}/uv.lock
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
@@ -165,7 +195,7 @@ jobs:
           path: |
             ${{ env.UV_CACHE_DIR }}
             upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles('Aumiao-py/pyproject.toml', 'Aumiao-py/uv.lock') }}
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles(env.PROJECT_DIR + '/pyproject.toml', env.PROJECT_DIR + '/uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-
 
@@ -173,37 +203,42 @@ jobs:
         shell: pwsh
         run: |
           $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
+          
+          # 安装 7-Zip
+          Write-Host "Installing 7-Zip version ${{ env.SEVEN_ZIP_VERSION }}"
+          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z${{ env.SEVEN_ZIP_VERSION }}-x64.msi" -OutFile "7z-installer.msi"
           Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
           "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
-          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.5.0.exe" -OutFile "innosetup.exe"
+          # 安装 Inno Setup
+          Write-Host "Installing Inno Setup version ${{ env.INNOSETUP_VERSION }}"
+          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-${{ env.INNOSETUP_VERSION }}.exe" -OutFile "innosetup.exe"
           Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
           "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           Remove-Item "innosetup.exe" -Force
 
       - name: Install Project Dependencies
-        working-directory: ./Aumiao-py
+        working-directory: ./${{ env.PROJECT_DIR }}
         run: |
           uv lock
           uv sync --all-extras --dev
-          uv pip install nuitka
+          uv pip install nuitka==${{ env.NUITKA_VERSION }}
 
       - name: Build with Nuitka
-        working-directory: ./Aumiao-py
+        working-directory: ./${{ env.PROJECT_DIR }}
         run: |
           uv run python -m nuitka `
             --assume-yes-for-downloads `
-            --company-name="Aumiao Team" `
-            --copyright="Copyright © 2025 喵鱼a. All rights reserved." `
+            --company-name="${{ env.COMPANY_NAME }}" `
+            --copyright="Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved." `
             --file-version="${{ env.PROJECT_VERSION }}" `
             --follow-imports `
-            --jobs=4 `
-            --lto=yes `
+            --jobs=${{ env.BUILD_JOBS }} `
+            --lto=${{ env.LTO_MODE }} `
             --mode=standalone `
-            --output-dir=../build `
+            --output-dir=../${{ env.BUILD_DIR }} `
             --output-filename=aumiao `
-            --product-name="Aumiao" `
+            --product-name="${{ env.PRODUCT_NAME }}" `
             --product-version="${{ env.PROJECT_VERSION }}" `
             --show-progress `
             --windows-console-mode=force `
@@ -211,18 +246,18 @@ jobs:
             ./main.py
 
       - name: Run Recovery Script
-        working-directory: ./Aumiao-py
+        working-directory: ./${{ env.PROJECT_DIR }}
         run: uv run python recover.py
 
       - name: Prepare Distribution Files
         shell: pwsh
         run: |
-          $distDir = "build/main.dist"
+          $distDir = "${{ env.DIST_DIR }}"
           New-Item -Path "$distDir/.log" -ItemType Directory -Force
           $essentialFiles = @(
-              "./Aumiao-py/README.md",
-              "./Aumiao-py/DISCLAIMER.txt",
-              "./Aumiao-py/data"
+              "./${{ env.PROJECT_DIR }}/README.md",
+              "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt",
+              "./${{ env.PROJECT_DIR }}/data"
           )
           Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
           
@@ -232,7 +267,13 @@ jobs:
               GitCommit = "${{ env.GIT_SHA }}"
               ReleaseTag = "${{ env.RELEASE_TAG }}"
               CommitCount = "${{ env.COMMIT_COUNT }}"
-          } | ConvertTo-Json
+              PythonVersion = "${{ env.PYTHON_VERSION }}"
+              BuildTools = @{
+                  Nuitka = "${{ env.NUITKA_VERSION }}"
+                  UPX = "${{ env.UPX_VERSION }}"
+                  UV = "${{ env.UV_VERSION }}"
+              }
+          } | ConvertTo-Json -Depth 3
           Set-Content -Path "$distDir/version.json" -Value $versionInfo
 
       - name: Optimize Binaries with UPX
@@ -240,32 +281,35 @@ jobs:
         continue-on-error: true
         run: |
           if (-not (Test-Path "./upx.exe")) {
+              Write-Host "Downloading UPX version ${{ env.UPX_VERSION }}"
               $ProgressPreference = 'SilentlyContinue'
               Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
               Expand-Archive upx.zip -DestinationPath upx_tmp
               Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
               Remove-Item upx_tmp, upx.zip -Recurse -Force
           }
-          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Out-Null
+          Write-Host "Optimizing binaries with UPX (level: ${{ env.COMPRESSION_LEVEL }})"
+          ./upx.exe --${{ env.COMPRESSION_LEVEL }} --lzma ${{ env.DIST_DIR }}/aumiao.exe 2>&1 | Out-Null
 
       - name: Create Portable Zip Package
         shell: pwsh
         run: |
-          $packageName = "Aumiao_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
-          7z a -tzip "build/$packageName" "build/main.dist/*"
+          $packageName = "${{
+ env.PRODUCT_NAME }}_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
+          7z a -tzip "${{ env.BUILD_DIR }}/$packageName" "${{ env.DIST_DIR }}/*"
           Write-Host "Created portable package: $packageName"
 
       - name: Build Installer
         shell: pwsh
         run: |
-          ISCC.exe ./Aumiao-py/resource/aumiao.iss
+          ISCC.exe ./${{ env.PROJECT_DIR }}/resource/aumiao.iss
           Write-Host "Installer built successfully"
 
       - name: Upload Portable Package to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Aumiao-Portable-${{ env.BUILD_DATE }}
-          path: build/*.zip
+          name: ${{ env.PRODUCT_NAME }}-Portable-${{ env.BUILD_DATE }}
+          path: ${{ env.BUILD_DIR }}/*.zip
           retention-days: 30
 
       - name: Minimize UV Cache
@@ -285,24 +329,24 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: Aumiao-Portable-${{ needs.build-application.outputs.build_date }}
+          name: ${{ env.PRODUCT_NAME }}-Portable-${{ needs.build-application.outputs.build_date }}
           path: ./release-assets
 
       - name: Upload Installer to Release
         run: |
           mkdir -p ./release-assets
-          cp ./Aumiao-py/build/installer/*.exe ./release-assets/ 2>/dev/null || echo "Installer not found, continuing..."
+          cp ./${{ env.PROJECT_DIR }}/${{ env.BUILD_DIR }}/installer/*.exe ./release-assets/ 2>/dev/null || echo "Installer not found, continuing..."
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.check-release-condition.outputs.release_tag }}
-          name: "Aumiao ${{ needs.check-release-condition.outputs.release_tag }}"
+          name: "${{ env.PRODUCT_NAME }} ${{ needs.check-release-condition.outputs.release_tag }}"
           body: ${{ needs.generate-changelog.outputs.release_body }}
           files: |
             ./release-assets/*
           draft: false
-          prerelease: false  # 改为正式发布
+          prerelease: false
 
   upload-debug-files:
     name: "Upload Debug Files"
@@ -315,8 +359,8 @@ jobs:
         with:
           name: Build-Debug-Logs-${{ needs.build-application.outputs.build_date }}
           path: |
-            build/**/*.log
-            build/**/*.json
+            ${{ env.BUILD_DIR }}/**/*.log
+            ${{ env.BUILD_DIR }}/**/*.json
             **/nuitka-*.log
           if-no-files-found: ignore
           retention-days: 14
