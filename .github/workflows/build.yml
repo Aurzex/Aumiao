@@ -23,8 +23,8 @@ env:
   BUILD_TYPE: Release
   COMMIT_INTERVAL: 20
   PYTHON_VERSION: "3.13"
-  UPX_VERSION: "4.2.4"
-  UV_VERSION: "0.4.22"
+  UPX_VERSION: "5.0.2"
+  UV_VERSION: "0.9.3"
 
 jobs:
   check-release-condition:
@@ -64,6 +64,7 @@ jobs:
             RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
             
+            # 只在满足条件时创建标签
             git tag $RELEASE_TAG
             git push origin $RELEASE_TAG
             echo "Created and pushed tag: $RELEASE_TAG"
@@ -301,7 +302,7 @@ jobs:
           files: |
             ./release-assets/*
           draft: false
-          prerelease: true
+          prerelease: false  # 改为正式发布
 
   upload-debug-files:
     name: "Upload Debug Files"
