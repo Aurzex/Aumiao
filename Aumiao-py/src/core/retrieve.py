@@ -1,7 +1,8 @@
+import operator
 from collections.abc import Callable, Generator, Iterator
 from random import randint
 from time import sleep
-from typing import Any, Literal, overload
+from typing import Any, Literal, cast, overload
 
 from src.core.base import ClassUnion
 from src.utils import decorator
@@ -178,6 +179,31 @@ class Obtain(ClassUnion):
 			mapping = field_mapping[source]
 			for item in source_data["items"]:
 				yield {target: item.get(source_field) for target, source_field in mapping.items()}
+
+	def collect_work_comments(self, limit: int) -> list[dict]:
+		works = Obtain().integrate_work_data(limit=limit)
+		comments = []
+		for single_work in works:
+			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
+			comments.extend(work_comments)
+		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
+		filtered_comments = cast("list[dict]", filtered_comments)
+		user_comments_map = {}
+		for comment in filtered_comments:
+			user_id = comment.get("user_id")
+			content = comment.get("content")
+			nickname = comment.get("nickname")
+			if user_id is None or content is None or nickname is None:
+				continue
+			user_id_str = str(user_id)
+			if user_id_str not in user_comments_map:
+				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
+			user_comments_map[user_id_str]["comments"].append(content)
+			user_comments_map[user_id_str]["comment_count"] += 1
+		# 转换为列表并按评论数从大到小排序
+		result = list(user_comments_map.values())
+		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
+		return result
 
 	@overload
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator"]) -> Iterator[Any]: ...
