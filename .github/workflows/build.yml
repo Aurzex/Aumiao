@@ -47,11 +47,9 @@ env:
   PRODUCT_NAME: "Aumiao"
   COPYRIGHT_YEAR: "2025"
   
-  # 目录配置
+  # 目录配置 - 使用固定值，避免环境变量相互引用
   PROJECT_DIR: "Aumiao-py"
   BUILD_DIR: "build"
-  DIST_DIR: "build/main.dist"
-  CACHE_DIR: "${{ github.workspace }}/.uv-cache"
   
   # 时间配置
   TIMEZONE: "Asia/Shanghai"
@@ -142,7 +140,8 @@ jobs:
     needs: check-release-condition
     
     env:
-      UV_CACHE_DIR: ${{ env.CACHE_DIR }}
+      UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
+      DIST_DIR: "${{ env.BUILD_DIR }}/main.dist"
 
     steps:
       - name: Checkout Code
@@ -195,7 +194,7 @@ jobs:
           path: |
             ${{ env.UV_CACHE_DIR }}
             upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles(env.PROJECT_DIR + '/pyproject.toml', env.PROJECT_DIR + '/uv.lock') }}
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles(format('{0}/{1}', env.PROJECT_DIR, 'pyproject.toml'), format('{0}/{1}', env.PROJECT_DIR, 'uv.lock')) }}
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-
 
