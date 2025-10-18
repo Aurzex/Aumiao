@@ -35,7 +35,7 @@ env:
   
   # 系统工具版本
   SEVEN_ZIP_VERSION: "25.1"
-  INNOSETUP_VERSION: "6.5.0"
+  INNOSETUP_VERSION: "6.5.4"
   
   # 构建参数
   BUILD_JOBS: 4
@@ -179,12 +179,12 @@ jobs:
       - name: Install 7-Zip via Chocolatey
         uses: crazy-max/ghaction-chocolatey@v3
         with:
-          args: install 7zip -y --version ${{ env.SEVEN_ZIP_VERSION }}
+          args: install 7zip -y --version ${{ env.SEVEN_ZIP_VERSION }} --allow-downgrade
 
       - name: Install Inno Setup via Chocolatey
         uses: crazy-max/ghaction-chocolatey@v3
         with:
-          args: install innosetup -y --version ${{ env.INNOSETUP_VERSION }}
+          args: install innosetup -y --version ${{ env.INNOSETUP_VERSION }} --allow-downgrade
 
       - name: Install uv and Python
         uses: astral-sh/setup-uv@v6
