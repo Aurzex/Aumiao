@@ -483,7 +483,8 @@ class UserManager:
 		Returns:
 			更新是否成功
 		"""
-		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload={"doing": doing, "avatar_url": avatar})
+		data = {key: value for key, value in {"doing": doing, "avatar_url": avatar}.items() if value is not None}
+		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
 		return response.status_code == HTTPSTATUS.OK.value
 
 	def update_username(self, username: str) -> bool:
