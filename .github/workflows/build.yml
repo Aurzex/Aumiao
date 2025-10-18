@@ -294,8 +294,7 @@ jobs:
       - name: Create Portable Zip Package
         shell: pwsh
         run: |
-          $packageName = "${{
- env.PRODUCT_NAME }}_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
+          $packageName = "${{ env.PRODUCT_NAME }}_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
           7z a -tzip "${{ env.BUILD_DIR }}/$packageName" "${{ env.DIST_DIR }}/*"
           Write-Host "Created portable package: $packageName"
 
