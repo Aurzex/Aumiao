@@ -570,22 +570,6 @@ class UserManager:
 		)
 		return response.json()
 
-	def update_profile_basic(self, nickname: str, description: str) -> bool:
-		"""
-		更新个人资料基本信息
-		Args:
-			nickname: 昵称
-			description: 个人描述
-		Returns:
-			更新是否成功
-		"""
-		data = {key: value for key, value in [("nickname", nickname), ("description", description)] if value is not None}
-		if not data:
-			msg = "至少需要传入一个参数"
-			raise ValueError(msg)
-		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
-		return response.status_code == HTTPSTATUS.OK.value
-
 	def delete_avatar_frame(self) -> bool:
 		"""
 		移除头像框

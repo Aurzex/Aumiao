@@ -1,6 +1,5 @@
 """服务类:认证管理、文件上传、高级服务"""
 
-import operator
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from json import loads
@@ -335,31 +334,6 @@ class Motion(ClassUnion):
 				print(f"Error: {response.status_code} - {response.text}")
 		except Exception as e:
 			print(f"An error occurred: {e!s}")
-
-	def collect_work_comments(self, limit: int) -> list[dict]:
-		works = Obtain().integrate_work_data(limit=limit)
-		comments = []
-		for single_work in works:
-			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
-			comments.extend(work_comments)
-		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
-		filtered_comments = cast("list[dict]", filtered_comments)
-		user_comments_map = {}
-		for comment in filtered_comments:
-			user_id = comment.get("user_id")
-			content = comment.get("content")
-			nickname = comment.get("nickname")
-			if user_id is None or content is None or nickname is None:
-				continue
-			user_id_str = str(user_id)
-			if user_id_str not in user_comments_map:
-				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
-			user_comments_map[user_id_str]["comments"].append(content)
-			user_comments_map[user_id_str]["comment_count"] += 1
-		# 转换为列表并按评论数从大到小排序
-		result = list(user_comments_map.values())
-		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
-		return result
 
 	@staticmethod
 	def check_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
