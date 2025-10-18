@@ -15,7 +15,7 @@ class Plugin(BasePlugin):
 
 	@property
 	def PLUGIN_VERSION(self) -> str:
-		return "2.2.0"
+		return "2.3.0"
 
 	@property
 	def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:
@@ -35,10 +35,8 @@ class Plugin(BasePlugin):
 	def on_load(self, config: dict[str, Any]) -> None:
 		super().on_load(config)
 		self.config = config
-
 		# 备份原始函数
 		self._backup_functions()
-
 		if config.get("enable_modification", True):
 			result = self.apply_code_modifications()
 			print(f"代码修改结果: {result}")
@@ -75,12 +73,10 @@ class Plugin(BasePlugin):
 		try:
 			from src import community
 
-			# 方法1: 直接替换（最可靠）
+			# 方法1: 直接替换(最可靠)
 			community.AuthManager().authenticate_with_token = self.new_authenticate_function
-
 			# 方法2: 使用系统的重写功能
 			self.rewrite_function("src.community", "authenticate_with_token", self.new_authenticate_function)
-
 			return "代码修改成功应用"
 		except Exception as e:
 			return f"代码修改失败: {e}"
@@ -100,7 +96,7 @@ class Plugin(BasePlugin):
 
 			# 模拟调用
 			result = community.AuthManager().authenticate_with_token("test_token")
-			return "测试成功，函数已修改"
+			return "测试成功,函数已修改"
 		except Exception as e:
 			return f"测试失败: {e}"
 
