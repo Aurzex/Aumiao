@@ -1,5 +1,6 @@
 """处理器类:评论处理和举报处理"""
 
+import json
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -1219,3 +1220,87 @@ class FileProcessor(ClassUnion):
 			return bool(next(response.iter_content(chunk_size=1)))
 		except Exception:
 			return False
+
+
+class BypassProcessor(ClassUnion):
+	"""审核绕过处理器 - 本地文件版本"""
+
+	def __init__(self, temp_dir: str = "temp") -> None:
+		super().__init__()
+		self.base_url = "https://coco.codemao.cn"
+		self.temp_dir = Path(temp_dir)
+		self.temp_dir.mkdir(exist_ok=True)
+
+	def process_work_id(self, work_id: str, save_path: str = "bypassed") -> str | None:
+		"""处理workId对应的项目"""
+		# 1. 获取项目数据
+		project_data = self._fetch_project_data(work_id)
+		# 2. 处理JSON数据
+		processed_data = self._process_json_data(project_data)
+		# 3. 保存到本地并上传
+		return self._save_and_upload(processed_data, work_id, save_path)
+
+	def _fetch_project_data(self, work_id: str) -> dict[str, Any]:
+		"""获取项目数据"""
+		url = f"{self.base_url}/editor/service/code?id={work_id}"
+		response = self._client.send_request(endpoint=url, method="GET")
+		response.raise_for_status()
+		return response.json()
+
+	def _process_json_data(self, data: dict[str, Any]) -> dict[str, Any]:
+		"""处理JSON数据"""
+		processed = json.loads(json.dumps(data))
+		unsafe_widgets = processed.get("unsafeExtensionWidgetList", [])
+		if unsafe_widgets:
+			# 自动版本策略:保留原始数据
+			processed["bypassAudit"] = {"unsafeExtensionWidgetList": unsafe_widgets}
+			# 手动版本策略:转换组件
+			safe_widgets = []
+			for unsafe_widget in unsafe_widgets:
+				new_type = unsafe_widget["type"].replace("UNSAFE_", "")
+				new_widget = {"id": (len(processed.get("extensionWidgetList", [])) + 1000), "type": new_type, "cdnUrl": f"https://example.com/cdn/{new_type}.jsx"}
+				safe_widgets.append(new_widget)
+			processed["unsafeExtensionWidgetList"] = []
+			if "extensionWidgetList" not in processed:
+				processed["extensionWidgetList"] = []
+			processed["extensionWidgetList"].extend(safe_widgets)
+			# 更新屏幕引用
+			self._update_screen_references(processed, unsafe_widgets)
+		# 全局清理
+		json_str = json.dumps(processed)
+		json_str = json_str.replace(r"UNSAFE_", "")
+		return json.loads(json_str)
+
+	@staticmethod
+	def _update_screen_references(data: dict, unsafe_widgets: list) -> None:
+		"""更新屏幕引用"""
+		if "screens" in data:
+			for screen in data["screens"].values():
+				if "widgets" in screen:
+					for widget in screen["widgets"].values():
+						for unsafe_widget in unsafe_widgets:
+							if widget.get("type") == unsafe_widget["type"]:
+								widget["type"] = unsafe_widget["type"].replace("UNSAFE_", "")
+				if "widgetIds" in screen:
+					for unsafe_widget in unsafe_widgets:
+						old_type = unsafe_widget["type"]
+						new_type = old_type.replace("UNSAFE_", "")
+						screen["widgetIds"] = [_id.replace(old_type, new_type) for _id in screen["widgetIds"]]
+
+	def _save_and_upload(self, data: dict, work_id: str, save_path: str) -> str | None:
+		"""保存到本地并上传"""
+		# 生成本地文件路径
+		filename = f"bypassed_{work_id}.json"
+		local_path = self.temp_dir / filename
+		try:
+			# 保存到本地
+			with Path(local_path).open("w", encoding="utf-8") as f:
+				json.dump(data, f, indent=2, ensure_ascii=False)
+			print(f"文件已保存到: {local_path}")
+			# 使用你的上传函数
+			return acquire.FileUploader().upload(file_path=local_path, save_path=save_path, method="codemao")
+		finally:
+			# 上传完成后删除本地文件
+			if local_path.exists():
+				local_path.unlink()
+				print(f"已清理本地文件: {local_path}")
