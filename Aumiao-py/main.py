@@ -226,10 +226,13 @@ def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
 	"""上传文件"""
 	printer.print_header("上传文件")
-	print(printer.color_text("上传方法说明: ", "COMMENT"))
-	print(printer.color_text("- codemao: 上传到bcmcdn域名", "COMMENT"))
+	print(printer.color_text("上传方法说明: \n", "INFO"))
+	print(printer.color_text("编程猫于10月22日对对象存储进行限制", "INFO"))
+	print(printer.color_text("关闭了文件上传接口, 并更换域名*.codemao.cn -> *.bcmcdn.com", "INFO"))
+	print(printer.color_text("因此现在只能使用codemao选项, 然而保着收集api的原则, 过时的api不会删除, 只标记为弃用\n", "INFO"))
+	print(printer.color_text("- codemao: 上传到bcmcdn域名", "PROMPT"))  # cSpell:ignore bcmcdn
 	print(printer.color_text("- codegame: 上传到static域名", "COMMENT"))
-	print(printer.color_text("- pgaot: 上传到static域名", "COMMENT"))  # cSpell:ignore bcmcdn
+	print(printer.color_text("- pgaot: 上传到static域名", "COMMENT"))
 	method = printer.get_valid_input("请输入方法 (pgaot/codemao/codegame)", {"pgaot", "codemao", "codegame"})
 	file_path_str = printer.prompt_input("请输入文件或文件夹路径")
 	file_path = Path(file_path_str.strip())

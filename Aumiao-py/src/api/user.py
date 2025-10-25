@@ -475,7 +475,7 @@ class UserManager:
 		"""初始化用户管理类"""
 		self._client = acquire.CodeMaoClient()
 
-	def update_status(self, doing: str) -> bool:
+	def update_status(self, doing: str | None, avatar: str | None) -> bool:
 		"""
 		更新用户状态
 		Args:
@@ -483,7 +483,8 @@ class UserManager:
 		Returns:
 			更新是否成功
 		"""
-		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload={"doing": doing})
+		data = {key: value for key, value in {"doing": doing, "avatar_url": avatar}.items() if value is not None}
+		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
 		return response.status_code == HTTPSTATUS.OK.value
 
 	def update_username(self, username: str) -> bool:
@@ -569,22 +570,6 @@ class UserManager:
 			payload=data,
 		)
 		return response.json()
-
-	def update_profile_basic(self, nickname: str, description: str) -> bool:
-		"""
-		更新个人资料基本信息
-		Args:
-			nickname: 昵称
-			description: 个人描述
-		Returns:
-			更新是否成功
-		"""
-		data = {key: value for key, value in [("nickname", nickname), ("description", description)] if value is not None}
-		if not data:
-			msg = "至少需要传入一个参数"
-			raise ValueError(msg)
-		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
-		return response.status_code == HTTPSTATUS.OK.value
 
 	def delete_avatar_frame(self) -> bool:
 		"""
