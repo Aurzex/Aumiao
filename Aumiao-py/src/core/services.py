@@ -446,7 +446,7 @@ class MillenniumEntanglement(ClassUnion):
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
-				response = self._community_login.authenticate_with_password(identity=identity, password=pass_key, status="edu")
+				response = self._community_login.login(identity=identity, password=pass_key, status="edu", prefer_method="password")
 				token = response["auth"]["token"]
 				token_list.append(token)
 				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")

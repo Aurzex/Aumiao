@@ -102,7 +102,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("用户登录")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	community.AuthManager().authenticate_with_token(identity=identity, password=password)
+	community.AuthManager().login(identity=identity, password=password)
 	data_ = user.UserDataFetcher().fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {

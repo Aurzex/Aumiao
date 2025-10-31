@@ -263,7 +263,7 @@ class Obtain(ClassUnion):
 			for identity, password in accounts:
 				print("切换教育账号")
 				sleep(3)
-				self._community_login.authenticate_with_password(identity=identity, password=password, status="edu")
+				self._community_login.login(identity=identity, password=password, status="edu", prefer_method="password")
 				if action:
 					action()
 		except Exception as e:
