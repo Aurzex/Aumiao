@@ -63,6 +63,7 @@ jobs:
       should_release: ${{ steps.check-commits.outputs.should_release }}
       release_tag: ${{ steps.check-commits.outputs.release_tag }}
       commit_count: ${{ steps.check-commits.outputs.commit_count }}
+      latest_tag: ${{ steps.check-commits.outputs.latest_tag }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -73,34 +74,75 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          if git describe --tags --abbrev=0 > /dev/null 2>&1; then
-            LATEST_TAG=$(git describe --tags --abbrev=0)
-            echo "Latest tag: $LATEST_TAG"
-            COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
+          echo "开始提交计数分析"
+          
+          # 获取完整标签历史
+          git fetch --tags --depth=100
+          
+          # 方法1：按版本号排序（适用于时间戳格式）
+          LATEST_TAG_VERSION=$(git tag -l "v*" --sort=-version:refname | head -n 1)
+          echo "版本排序最新标签: $LATEST_TAG_VERSION"
+          
+          # 方法2：按创建时间排序
+          LATEST_TAG_DATE=$(git tag -l "v*" --sort=-creatordate | head -n 1)
+          echo "时间排序最新标签: $LATEST_TAG_DATE"
+          
+          # 选择最可能正确的标签
+          if [ -n "$LATEST_TAG_VERSION" ] && [ -n "$LATEST_TAG_DATE" ]; then
+              if [ "$LATEST_TAG_VERSION" = "$LATEST_TAG_DATE" ]; then
+                  LATEST_TAG="$LATEST_TAG_VERSION"
+                  echo "版本和时间排序一致，使用: $LATEST_TAG"
+              else
+                  LATEST_TAG="$LATEST_TAG_VERSION"
+                  echo "排序结果不一致，优先使用版本排序: $LATEST_TAG"
+              fi
+          elif [ -n "$LATEST_TAG_VERSION" ]; then
+              LATEST_TAG="$LATEST_TAG_VERSION"
+              echo "使用版本排序标签: $LATEST_TAG"
+          elif [ -n "$LATEST_TAG_DATE" ]; then
+              LATEST_TAG="$LATEST_TAG_DATE"
+              echo "使用时间排序标签: $LATEST_TAG"
           else
-            echo "No tags found, counting all commits"
-            LATEST_TAG="initial"
-            COMMIT_COUNT=$(git rev-list --count HEAD)
+              LATEST_TAG=""
+              echo "没有找到任何标签"
           fi
           
-          echo "Commits since last tag: $COMMIT_COUNT"
+          # 计算提交数量
+          if [ -n "$LATEST_TAG" ]; then
+              # 验证标签是否在当前分支历史中
+              if git merge-base --is-ancestor "$LATEST_TAG" HEAD 2>/dev/null; then
+                  COMMIT_COUNT=$(git rev-list --count "$LATEST_TAG..HEAD")
+                  echo "从标签 $LATEST_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
+              else
+                  echo "标签 $LATEST_TAG 不在当前分支历史中，重新计算"
+                  COMMIT_COUNT=$(git rev-list --count HEAD)
+              fi
+          else
+              echo "没有标签，计算所有提交"
+              COMMIT_COUNT=$(git rev-list --count HEAD)
+          fi
+          
+          echo "提交数量: $COMMIT_COUNT"
+          echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
           
+          # 决策逻辑
           if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
-            echo "Reached $COMMIT_COUNT commits (>= ${{ env.COMMIT_INTERVAL }}), triggering release"
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            
-            RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
-            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-            
-            # 只在满足条件时创建标签
-            git tag $RELEASE_TAG
-            git push origin $RELEASE_TAG
-            echo "Created and pushed tag: $RELEASE_TAG"
+              echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              
+              RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
+              echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+              
+              # 创建并推送标签
+              git tag $RELEASE_TAG
+              git push origin $RELEASE_TAG
+              echo "创建并推送新标签: $RELEASE_TAG"
           else
-            echo "Only $COMMIT_COUNT commits (< ${{ env.COMMIT_INTERVAL }}), skipping release"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "release_tag=" >> $GITHUB_OUTPUT
+              echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "release_tag=" >> $GITHUB_OUTPUT
           fi
 
   generate-changelog:
@@ -128,8 +170,13 @@ jobs:
 
       - name: Display Changelog Summary
         run: |
-          echo "Generated changelog:"
-          head -20 CHANGES.md
+          echo "生成的变更日志摘要"
+          if [ -f CHANGES.md ]; then
+            head -20 CHANGES.md
+            echo "变更日志长度: $(wc -l < CHANGES.md) 行"
+          else
+            echo "未生成变更日志文件"
+          fi
 
   build-application:
     name: "Build Application"
@@ -139,6 +186,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     needs: check-release-condition
+    if: |
+      needs.check-release-condition.outputs.should_release == 'true' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request'
     
     env:
       UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
@@ -159,6 +210,7 @@ jobs:
           echo "SHOULD_RELEASE=${{ needs.check-release-condition.outputs.should_release }}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${{ needs.check-release-condition.outputs.release_tag }}" >> $GITHUB_ENV
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
+          echo "LATEST_TAG=${{ needs.check-release-condition.outputs.latest_tag }}" >> $GITHUB_ENV
           echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Read Project Version
@@ -169,10 +221,10 @@ jobs:
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
-              Write-Host "Extracted version: $version"
+              Write-Host "提取的项目版本: $version"
               Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           } else {
-              Write-Error "Version not found in pyproject.toml"
+              Write-Error "在 pyproject.toml 中未找到版本号"
               exit 1
           }
 
@@ -218,6 +270,7 @@ jobs:
       - name: Build with Nuitka
         working-directory: ./${{ env.PROJECT_DIR }}
         run: |
+          echo "开始 Nuitka 编译"
           uv run python -m nuitka `
             --assume-yes-for-downloads `
             --company-name="${{ env.COMPANY_NAME }}" `
@@ -235,65 +288,129 @@ jobs:
             --windows-console-mode=force `
             --windows-icon-from-ico="./resource/icons/favicon.ico" `
             ./main.py
+          echo "Nuitka 编译完成"
 
       - name: Run Recovery Script
         working-directory: ./${{ env.PROJECT_DIR }}
-        run: uv run python recover.py
+        run: |
+          echo "运行恢复脚本"
+          uv run python recover.py
+          echo "恢复脚本执行完成"
 
       - name: Prepare Distribution Files
         shell: pwsh
         run: |
           $distDir = "${{ env.DIST_DIR }}"
+          Write-Host "准备分发文件到: $distDir"
+          
+          # 创建必要的目录
           New-Item -Path "$distDir/.log" -ItemType Directory -Force
+          
+          # 复制必要文件
           $essentialFiles = @(
               "./${{ env.PROJECT_DIR }}/README.md",
               "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt",
               "./${{ env.PROJECT_DIR }}/data"
           )
-          Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
+          foreach ($file in $essentialFiles) {
+              if (Test-Path $file) {
+                  Copy-Item -Path $file -Destination $distDir -Recurse -Force
+                  Write-Host "复制: $file"
+              } else {
+                  Write-Warning "文件不存在: $file"
+              }
+          }
           
+          # 创建版本信息文件
           $versionInfo = @{
               Version = "${{ env.PROJECT_VERSION }}"
               BuildDate = "${{ env.BUILD_DATE }}"
+              BuildTime = "${{ env.BUILD_TIME }}"
               GitCommit = "${{ env.GIT_SHA }}"
               ReleaseTag = "${{ env.RELEASE_TAG }}"
               CommitCount = "${{ env.COMMIT_COUNT }}"
+              PreviousTag = "${{ env.LATEST_TAG }}"
               PythonVersion = "${{ env.PYTHON_VERSION }}"
               BuildTools = @{
                   Nuitka = "${{ env.NUITKA_VERSION }}"
                   UPX = "${{ env.UPX_VERSION }}"
                   UV = "${{ env.UV_VERSION }}"
               }
-          } | ConvertTo-Json -Depth 3
+              BuildInfo = @{
+                  Type = "${{ env.BUILD_TYPE }}"
+                  LTO = "${{ env.LTO_MODE }}"
+                  Jobs = "${{ env.BUILD_JOBS }}"
+              }
+          } | ConvertTo-Json -Depth 4
+          
           Set-Content -Path "$distDir/version.json" -Value $versionInfo
+          Write-Host "创建版本信息文件"
 
       - name: Optimize Binaries with UPX
         shell: pwsh
         continue-on-error: true
         run: |
+          Write-Host "开始 UPX 二进制优化"
           if (-not (Test-Path "./upx.exe")) {
-              Write-Host "Downloading UPX version ${{ env.UPX_VERSION }}"
+              Write-Host "下载 UPX 版本 ${{ env.UPX_VERSION }}"
               $ProgressPreference = 'SilentlyContinue'
-              Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
-              Expand-Archive upx.zip -DestinationPath upx_tmp
-              Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
-              Remove-Item upx_tmp, upx.zip -Recurse -Force
+              try {
+                  Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
+                  Expand-Archive upx.zip -DestinationPath upx_tmp -Force
+                  $upxDir = Get-ChildItem upx_tmp -Directory | Select-Object -First 1
+                  Move-Item "$upxDir/upx.exe" . -Force
+                  Remove-Item upx_tmp, upx.zip -Recurse -Force
+                  Write-Host "UPX 下载完成"
+              } catch {
+                  Write-Warning "UPX 下载失败: $($_.Exception.Message)"
+                  exit 0
+              }
           }
-          Write-Host "Optimizing binaries with UPX (level: ${{ env.COMPRESSION_LEVEL }})"
-          ./upx.exe --${{ env.COMPRESSION_LEVEL }} --lzma ${{ env.DIST_DIR }}/aumiao.exe 2>&1 | Out-Null
+          
+          $exePath = "${{ env.DIST_DIR }}/aumiao.exe"
+          if (Test-Path $exePath) {
+              Write-Host "使用 UPX 压缩: $exePath (级别: ${{ env.COMPRESSION_LEVEL }})"
+              $originalSize = (Get-Item $exePath).Length
+              ./upx.exe --${{ env.COMPRESSION_LEVEL }} --lzma "$exePath"
+              $compressedSize = (Get-Item $exePath).Length
+              $reduction = ($originalSize - $compressedSize) / 1MB
+              Write-Host "压缩完成: 减少了 $([math]::Round($reduction, 2)) MB"
+          } else {
+              Write-Warning "未找到可执行文件: $exePath"
+          }
 
       - name: Create Portable Zip Package
         shell: pwsh
         run: |
+          Write-Host "创建便携版 ZIP 包"
           $packageName = "${{ env.PRODUCT_NAME }}_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
-          7z a -tzip "${{ env.BUILD_DIR }}/$packageName" "${{ env.DIST_DIR }}/*"
-          Write-Host "Created portable package: $packageName"
+          $zipPath = "${{ env.BUILD_DIR }}/$packageName"
+          
+          # 切换到分发目录的父目录
+          Set-Location "${{ env.DIST_DIR }}/.."
+          
+          # 压缩 main.dist 目录内容
+          7z a -tzip "${{ github.workspace }}/$zipPath" "main.dist/*" -mx=9
+          
+          if (Test-Path "${{ github.workspace }}/$zipPath") {
+              $zipSize = (Get-Item "${{ github.workspace }}/$zipPath").Length / 1MB
+              Write-Host "创建便携版包: $packageName ($([math]::Round($zipSize, 2)) MB)"
+          } else {
+              Write-Error "ZIP 包创建失败"
+              exit 1
+          }
 
       - name: Build Installer
         shell: pwsh
         run: |
-          ISCC.exe ./${{ env.PROJECT_DIR }}/resource/aumiao.iss
-          Write-Host "Installer built successfully"
+          Write-Host "构建安装程序"
+          $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
+          if (Test-Path $issPath) {
+              ISCC.exe $issPath
+              Write-Host "安装程序构建成功"
+          } else {
+              Write-Warning "未找到 Inno Setup 脚本: $issPath"
+          }
 
       - name: Upload Portable Package to Artifacts
         uses: actions/upload-artifact@v4
@@ -301,9 +418,19 @@ jobs:
           name: ${{ env.PRODUCT_NAME }}-Portable-${{ env.BUILD_DATE }}
           path: ${{ env.BUILD_DIR }}/*.zip
           retention-days: 30
+        if: success()
+
+      - name: Upload Installer to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT_NAME }}-Installer-${{ env.BUILD_DATE }}
+          path: ${{ env.PROJECT_DIR }}/Output/*.exe
+          retention-days: 30
+        if: success()
 
       - name: Minimize UV Cache
         run: uv cache prune --ci
+        if: always()
 
     outputs:
       build_date: ${{ steps.setup-env.outputs.BUILD_DATE }}
@@ -319,22 +446,34 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.PRODUCT_NAME }}-Portable-${{ needs.build-application.outputs.build_date }}
+          pattern: ${{ env.PRODUCT_NAME }}-*
           path: ./release-assets
+          merge-multiple: true
 
-      - name: Upload Installer to Release
+      - name: List Release Assets
         run: |
-          mkdir -p ./release-assets
-          cp ./${{ env.PROJECT_DIR }}/${{ env.BUILD_DIR }}/installer/*.exe ./release-assets/ 2>/dev/null || echo "Installer not found, continuing..."
+          echo "发布资源列表"
+          find ./release-assets -type f -name "*" | while read file; do
+            size=$(du -h "$file" | cut -f1)
+            echo "资源: $file ($size)"
+          done
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.check-release-condition.outputs.release_tag }}
           name: "${{ env.PRODUCT_NAME }} ${{ needs.check-release-condition.outputs.release_tag }}"
-          body: ${{ needs.generate-changelog.outputs.release_body }}
+          body: |
+            ${{ needs.generate-changelog.outputs.release_body }}
+            
+            ## 构建信息
+            - 版本: ${{ env.PROJECT_VERSION }}
+            - 提交: ${{ env.GIT_SHA }}
+            - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
+            - 提交数量: ${{ env.COMMIT_COUNT }}
+            - 前一个标签: ${{ env.LATEST_TAG }}
           files: |
-            ./release-assets/*
+            ./release-assets/**/*
           draft: false
           prerelease: false
 
@@ -352,5 +491,6 @@ jobs:
             ${{ env.BUILD_DIR }}/**/*.log
             ${{ env.BUILD_DIR }}/**/*.json
             **/nuitka-*.log
+            ${{ env.DIST_DIR }}/version.json
           if-no-files-found: ignore
           retention-days: 14
