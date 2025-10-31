@@ -64,10 +64,10 @@ class AuthManager:
 			if prefer_method == "cookies" and cookies:
 				return self._login_with_cookies(cookies, status)
 			if prefer_method == "password" and identity and password:
-				return self.authenticate_with_password(identity, password, pid, status)
+				return self._authenticate_with_password(identity, password, pid, status)
 			if identity and password:
 				# 默认使用token登录流程
-				return self.authenticate_with_token(identity, password, pid, status)
+				return self.login(identity, password=password, pid=pid, status=status)
 			msg = "凭据不足或选择的登录方式不可用"
 			raise ValueError(msg)  # noqa: TRY301
 		except Exception as e:
@@ -75,7 +75,7 @@ class AuthManager:
 			# 如果首选方式失败,尝试备用方式
 			if prefer_method != "password" and identity and password:
 				print("尝试使用密码登录作为备用方案...")
-				return self.authenticate_with_password(identity, password, pid, status)
+				return self._authenticate_with_password(identity, password, pid, status)
 			raise
 
 	def _login_with_token(self, token: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
@@ -87,14 +87,14 @@ class AuthManager:
 
 	def _login_with_cookies(self, cookies: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
 		"""使用cookies登录的内部方法"""
-		result = self.authenticate_with_cookies(cookies, status)
+		result = self._authenticate_with_cookies(cookies, status)
 		if result is False:
 			msg = "Cookie登录失败"
 			raise ValueError(msg)
 		return {"success": True, "method": "cookies", "message": "Cookie登录成功"}
 
 	# 保留原有的具体登录方法
-	def authenticate_with_password(
+	def _authenticate_with_password(
 		self,
 		identity: str,
 		password: str,
@@ -115,7 +115,7 @@ class AuthManager:
 		self._client.switch_account(token=response.json()["auth"]["token"], identity=status)
 		return {"success": True, "method": "password", "data": response.json(), "message": "密码登录成功"}
 
-	def authenticate_with_token(
+	def _authenticate_with_token(
 		self,
 		identity: str,
 		password: str,
@@ -130,7 +130,7 @@ class AuthManager:
 		self._client.switch_account(token=resp["auth"]["token"], identity=status)
 		return {"success": True, "method": "token", "data": resp, "message": "Token流程登录成功"}
 
-	def authenticate_with_cookies(
+	def _authenticate_with_cookies(
 		self,
 		cookies: str,
 		status: Literal["judgement", "average", "edu"] = "average",

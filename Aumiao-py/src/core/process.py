@@ -1012,7 +1012,7 @@ class ReportAuthManager(ClassUnion):
 				username, password = selected_account
 				self._printer.print_message(f"切换学生账号: {id(username)}", "INFO")
 				sleep(2)  # 避免接口限流
-				self._community_login.authenticate_with_token(
+				self._community_login.login(
 					identity=username,
 					password=password,
 					status="edu",  # 教育账号标识
