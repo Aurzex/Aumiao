@@ -337,9 +337,28 @@ class KittenDecompiler(BaseDecompiler):
 
 	@staticmethod
 	def _get_actor_info(work: dict[str, Any], actor_id: str) -> dict[str, Any]:
-		"""获取角色信息"""
+		"""获取角色信息 - 修复版"""
 		theatre = work["theatre"]
-		return theatre["actors"].get(actor_id, theatre["scenes"][actor_id])
+		# 先尝试从actors中获取
+		if actor_id in theatre["actors"]:
+			return theatre["actors"][actor_id]
+		# 再尝试从scenes中获取
+		if actor_id in theatre["scenes"]:
+			return theatre["scenes"][actor_id]
+		# 如果都找不到,创建一个空的角色信息
+		print(f"警告: 角色ID {actor_id} 在actors和scenes中均未找到,使用空角色信息")
+		return {
+			"id": actor_id,
+			"name": f"未知角色_{actor_id[:8]}",
+			"type": "sprite",
+			"visible": True,
+			"x": 0,
+			"y": 0,
+			"size": 100,
+			"direction": 90,
+			"draggable": False,
+			"rotation_style": "all around",
+		}
 
 	def _update_work_info(self, work: dict[str, Any]) -> None:
 		"""更新作品信息"""
@@ -820,11 +839,6 @@ def decompile_work(work_id: int, output_dir: str = "decompiled") -> str:
 
 
 if __name__ == "__main__":
-	try:
-		work_id = int(input("请输入作品ID: "))
-		output_path = decompile_work(work_id)
-		print(f"✓ 反编译完成: {output_path}")
-	except ValueError:
-		print("错误: 作品ID必须是数字")
-	except Exception as e:
-		print(f"反编译失败: {e}")
+	work_id = int(input("请输入作品ID: "))
+	output_path = decompile_work(work_id)
+	print(f"✓ 反编译完成: {output_path}")
