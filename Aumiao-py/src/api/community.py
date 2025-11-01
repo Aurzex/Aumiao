@@ -11,13 +11,8 @@ from src.utils.decorator import singleton
 @singleton
 class AuthManager:
 	"""
-	概述:用户登录
-	参数:
-	`identity (str)`: 用户身份标识。
-	`password (str)`: 用户密码。
-	`pid (str = "65edCTyg")`: 请求的 PID,用于标识请求来源。
-	返回值:
-	str | None: 函数返回一个字符串,表示登录请求的响应结果。如果请求失败,则返回 None。
+	概述:用户登录管理器
+	提供多种登录方式:密码登录、token登录、cookie登录
 	"""
 
 	def __init__(self) -> None:
@@ -27,23 +22,87 @@ class AuthManager:
 		self.tool = tool
 		self.setting = data.SettingManager().data
 
-	# 密码登录函数
-	def authenticate_with_password(
+	def login(
+		self,
+		identity: str | None = None,
+		password: str | None = None,
+		token: str | None = None,
+		cookies: str | None = None,
+		pid: str = "65edCTyg",
+		status: Literal["judgement", "average", "edu"] = "average",
+		prefer_method: Literal["auto", "password", "token", "cookies"] = "auto",
+	) -> dict[str, Any]:
+		"""
+		整合登录方法
+
+		参数:
+		`identity (str, optional)`: 用户身份标识(手机号/邮箱)
+		`password (str, optional)`: 用户密码
+		`token (str, optional)`: 用户token
+		`cookies (str, optional)`: 用户cookies字符串
+		`pid (str)`: 请求的PID,默认为"65edCTyg"
+		`status (str)`: 账号状态类型
+		`prefer_method (str)`: 优先使用的登录方式,auto为自动选择
+
+		返回值:
+		Dict[str, Any]: 登录结果信息
+		"""
+		# 自动选择登录方式
+		if prefer_method == "auto":
+			if token:
+				prefer_method = "token"
+			elif cookies:
+				prefer_method = "cookies"
+			elif identity and password:
+				prefer_method = "token"  # 优先使用token方式,更安全
+			else:
+				msg = "缺少必要的登录凭据"
+				raise ValueError(msg)
+		try:
+			if prefer_method == "token" and token:
+				return self._login_with_token(token, status)
+			if prefer_method == "cookies" and cookies:
+				return self._login_with_cookies(cookies, status)
+			if prefer_method == "password" and identity and password:
+				return self._authenticate_with_password(identity, password, pid, status)
+			if identity and password:
+				# 默认使用token登录流程
+				return self.login(identity, password=password, pid=pid, status=status)
+			msg = "凭据不足或选择的登录方式不可用"
+			raise ValueError(msg)  # noqa: TRY301
+		except Exception as e:
+			print(f"登录失败: {e}")
+			# 如果首选方式失败,尝试备用方式
+			if prefer_method != "password" and identity and password:
+				print("尝试使用密码登录作为备用方案...")
+				return self._authenticate_with_password(identity, password, pid, status)
+			raise
+
+	def _login_with_token(self, token: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
+		"""使用token登录的内部方法"""
+		# 验证token有效性并获取完整认证信息
+		auth_details = self.fetch_auth_details(token)
+		self._client.switch_account(token=token, identity=status)
+		return {"success": True, "method": "token", "token": token, "auth_details": auth_details, "message": "Token登录成功"}
+
+	def _login_with_cookies(self, cookies: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
+		"""使用cookies登录的内部方法"""
+		result = self._authenticate_with_cookies(cookies, status)
+		if result is False:
+			msg = "Cookie登录失败"
+			raise ValueError(msg)
+		return {"success": True, "method": "cookies", "message": "Cookie登录成功"}
+
+	# 保留原有的具体登录方法
+	def _authenticate_with_password(
 		self,
 		identity: str,
 		password: str,
 		pid: str = "65edCTyg",
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
-		# cookies = utils.dict_from_cookiejar(response.cookies)
-		#   soup = BeautifulSoup(
-		#       send_request("https://shequ.codemao.cn", "GET").text,
-		#       "html.parser",
-		#   )
-		#   见https://api.docs.codemao.work/user/login?id=pid
-		#   pid = loads(soup.find_all("script")[0].string.split("=")[1])["pid"]
-		# 发送登录请求
-		self._client.switch_account(token="", identity="blank")  # 切换账号
+		# 原有的密码登录实现
+		self._client.switch_account(token="", identity="blank")
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/login",
 			method="POST",
@@ -53,76 +112,61 @@ class AuthManager:
 				"pid": pid,
 			},
 		)
-		# 更新cookies
-		# if save_status:
-		# 	self._client.update_cookies(response.cookies)
 		self._client.switch_account(token=response.json()["auth"]["token"], identity=status)
-		return response.json()
+		return {"success": True, "method": "password", "data": response.json(), "message": "密码登录成功"}
 
-	# cookie登录
-	def authenticate_with_cookies(
-		self,
-		cookies: str,
-		status: Literal["judgement", "average", "edu"] = "average",
-	) -> bool | None:
-		try:
-			# 将cookie字符串转换为字典
-			cookie = dict([item.split("=", 1) for item in cookies.split("; ")])
-			# 检查是否合规,不能放到headers中
-		except (KeyError, ValueError) as err:
-			print(f"表达式输入不合法 {err}")
-			return False
-		# 发送登录请求
-		self._client.send_request(
-			endpoint=self.setting.PARAMETER.cookie_check_url,
-			method="POST",
-			payload={},
-			headers={**self._client.headers, "cookie": cookies},
-		)
-		# 更新cookies
-		# self._client.update_cookies(cookie)
-		self._client.switch_account(cookie["authorization"], identity=status)
-		return None
-
-	# token登录(毛毡最新登录方式)
-	def authenticate_with_token(
+	def _authenticate_with_token(
 		self,
 		identity: str,
 		password: str,
 		pid: str = "65edCTyg",
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
+		# 原有的token登录实现
 		timestamp = DataFetcher().fetch_current_timestamp_10()["data"]
 		response = self._get_login_ticket(identity=identity, timestamp=timestamp, pid=pid)
 		ticket = response["ticket"]
 		resp = self._get_login_security_info(identity=identity, password=password, ticket=ticket, pid=pid)
 		self._client.switch_account(token=resp["auth"]["token"], identity=status)
-		return resp
+		return {"success": True, "method": "token", "data": resp, "message": "Token流程登录成功"}
 
-	# 返回完整cookie
+	def _authenticate_with_cookies(
+		self,
+		cookies: str,
+		status: Literal["judgement", "average", "edu"] = "average",
+	) -> bool | None:
+		# 原有的cookie登录实现
+		try:
+			cookie = dict([item.split("=", 1) for item in cookies.split("; ")])
+		except (KeyError, ValueError) as err:
+			print(f"表达式输入不合法 {err}")
+			return False
+		self._client.send_request(
+			endpoint=self.setting.PARAMETER.cookie_check_url,
+			method="POST",
+			payload={},
+			headers={**self._client.headers, "cookie": cookies},
+		)
+		self._client.switch_account(cookie["authorization"], identity=status)
+		return None
+
+	# 保留其他辅助方法
 	def fetch_auth_details(self, token: str) -> dict[str, Any]:
-		# uuid_ca = uuid.uuid1()
-		# token_ca = {"authorization": token, "__ca_uid_key__": str(uuid_ca)}
-		# 无上面这两句会缺少__ca_uid_key__
 		token_ca = {"authorization": token}
-		cookie_str = self.tool.DataConverter().convert_cookie(token_ca)  # 将cookie转换为字符串
-		headers = {**self._client.headers, "cookie": cookie_str}  # 添加cookie到headers中
-		response = self._client.send_request(method="GET", endpoint="/web/users/details", headers=headers)  # 发送请求获取用户详情
-		auth = response.cookies.get_dict()  # pyright: ignore[reportGeneralTypeIssues] # 获取cookie
-		return {**token_ca, **auth}  # 返回完整cookie
+		cookie_str = self.tool.DataConverter().convert_cookie(token_ca)
+		headers = {**self._client.headers, "cookie": cookie_str}
+		response = self._client.send_request(method="GET", endpoint="/web/users/details", headers=headers)
+		auth = response.cookies.get_dict()
+		return {**token_ca, **auth}
 
-	# 退出登录
 	def execute_logout(self, method: Literal["web", "app"]) -> bool:
-		# 发送请求,请求路径为/tiger/v3/{method}/accounts/logout,请求方法为POST,请求体为空
 		response = self._client.send_request(
 			endpoint=f"/tiger/v3/{method}/accounts/logout",
 			method="POST",
 			payload={},
 		)
-		# 返回响应状态码是否为204
 		return response.status_code == HTTPSTATUS.NO_CONTENT.value
 
-	# 登录信息
 	def _get_login_security_info(
 		self,
 		identity: str,
@@ -131,26 +175,20 @@ class AuthManager:
 		pid: str = "65edCTyg",
 		agreement_ids: list = [-1],
 	) -> dict:
-		# 创建一个字典,包含用户名、密码、pid和agreement_ids
 		data = {
 			"identity": identity,
 			"password": password,
 			"pid": pid,
 			"agreement_ids": agreement_ids,
 		}
-		# 发送POST请求,获取登录安全信息
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/login/security",
 			method="POST",
 			payload=data,
 			headers={**self._client.headers, "x-captcha-ticket": ticket},
 		)
-		# 更新cookies
-		# self._client.update_cookies(response.cookies)
-		# 返回响应的json数据
 		return response.json()
 
-	# 登录ticket获取
 	def _get_login_ticket(
 		self,
 		identity: str | int,
@@ -159,11 +197,6 @@ class AuthManager:
 		pid: str = "65edCTyg",
 		deviced: str | None = None,
 	) -> dict:
-		# 可填可不填
-		# uuid_ca = uuid.uuid1()
-		# _ca = {"__ca_uid_key__": str(uuid_ca)}
-		# cookie_str = self.tool_process.convert_cookie_to_str(_ca)
-		# headers = {**self._client.HEADERS, "cookie": cookie_str}
 		data = {
 			"identity": identity,
 			"scene": scene,
@@ -175,9 +208,7 @@ class AuthManager:
 			endpoint="https://open-service.codemao.cn/captcha/rule/v3",
 			method="POST",
 			payload=data,
-			# headers=headers,
 		)
-		# self._client.update_cookies(response.cookies)
 		return response.json()
 
 
