@@ -1,110 +1,117 @@
+import hashlib
 import json
-import pathlib
 import random
 import xml.etree.ElementTree as ET  # noqa: S405
+from pathlib import Path
 from typing import Any, ClassVar
 
 import requests
 
 
-class SimpleDecompiler:
-	"""简化版源码反编译器"""
-
-	def __init__(self) -> None:
-		self.shadow_creator = ShadowCreator()
+class Network:
+	"""网络请求工具类"""
 
 	@staticmethod
-	def http_get_json(url: str) -> ...:
-		"""HTTP GET请求获取JSON"""
+	def fetch_json(url: str) -> ...:
+		"""获取JSON数据"""
 		response = requests.get(url, timeout=30)
-		HTTP_SUCCESS_CODE = 200  # noqa: N806
-		if response.status_code != HTTP_SUCCESS_CODE:
-			error_msg = f"HTTP请求失败: {url}, 状态码: {response.status_code}"
-			raise RequestError(error_msg)
+		response.raise_for_status()
 		return response.json()
 
-	def get_work_info(self, work_id: int) -> dict[str, Any]:
-		"""获取作品信息"""
-		info = self.http_get_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}")
-		return {"id": info["id"], "name": info["work_name"], "type": info["type"], "version": info["bcm_version"]}
-
-	def get_compiled_work_url(self, work_info: dict[str, Any]) -> str:
-		"""获取编译作品URL"""
-		work_type = work_info["type"]
-		work_id = work_info["id"]
-		if work_type in {"KITTEN2", "KITTEN3", "KITTEN4"}:
-			url = f"https://api-creation.codemao.cn/kitten/r2/work/player/load/{work_id}"
-			return self.http_get_json(url)["source_urls"][0]
-		if work_type == "COCO":
-			url = f"https://api-creation.codemao.cn/coconut/web/work/{work_id}/load"
-			return self.http_get_json(url)["data"]["bcmc_url"]
-		error_msg = f"不支持的作品类型: {work_type}"
-		raise ValueError(error_msg)
-
-	def decompile_kitten_work(self, work_info: dict[str, Any], compiled_work: dict[str, Any]) -> dict[str, Any]:
-		"""反编译Kitten作品"""
-		decompiler = KittenWorkDecompiler(work_info, compiled_work, self)
-		return decompiler.start()
+	@staticmethod
+	def fetch_binary(url: str) -> bytes:
+		"""获取二进制数据"""
+		response = requests.get(url, timeout=30)
+		response.raise_for_status()
+		return response.content
 
 	@staticmethod
-	def decompile_coco_work(work_info: dict[str, Any], compiled_work: dict[str, Any]) -> dict[str, Any]:
-		"""反编译CoCo作品"""
-		decompiler = CoCoWorkDecompiler(work_info, compiled_work)
-		return decompiler.start()
+	def fetch_text(url: str) -> str:
+		"""获取文本数据"""
+		response = requests.get(url, timeout=30)
+		response.raise_for_status()
+		return response.text
+
+
+class Crypto:
+	"""加密哈希工具类"""
 
 	@staticmethod
-	def save_source_code(source_code: dict[str, Any], work_type: str, work_name: str, work_id: int) -> str:
-		"""保存源码文件到当前目录"""
-		# 确定文件扩展名
-		extension_map = {"KITTEN4": ".bcm4", "KITTEN3": ".bcm", "KITTEN2": ".bcm", "COCO": ".json"}
-		default_extension = extension_map.get(work_type, ".json")
-		# 清理文件名中的非法字符
-		clean_name = "".join(c for c in work_name if c.isalnum() or c in {" ", "-", "_"}).rstrip()
-		if not clean_name:
-			clean_name = f"work_{work_id}"
-		# 生成文件名
-		filename = f"{clean_name}_{work_id}{default_extension}"
-		file_path = pathlib.Path(filename)
-		# 保存文件
-		with file_path.open("w", encoding="utf-8") as f:
-			json.dump(source_code, f, ensure_ascii=False, indent=2)
-		return str(file_path.absolute())
-
-	def decompile_work(self, work_id: int) -> str:
-		"""反编译作品的主函数"""
-		try:
-			print(f"开始反编译作品 {work_id}...")
-			# 获取作品信息
-			work_info = self.get_work_info(work_id)
-			print(f"✓ 获取作品信息成功: {work_info['name']}")
-			# 获取编译文件URL
-			compiled_work_url = self.get_compiled_work_url(work_info)
-			print("✓ 获取编译文件URL成功")
-			# 获取编译文件
-			compiled_work = self.http_get_json(compiled_work_url)
-			print("✓ 获取编译文件成功")
-			# 选择反编译器
-			if work_info["type"] in {"KITTEN2", "KITTEN3", "KITTEN4"}:
-				source_code = self.decompile_kitten_work(work_info, compiled_work)
-			elif work_info["type"] == "COCO":
-				source_code = self.decompile_coco_work(work_info, compiled_work)
-			else:
-				error_msg = f"不支持的作品类型: {work_info['type']}"
-				raise ValueError(error_msg)  # noqa: TRY301
-			print("✓ 反编译完成")
-			# 保存源码
-			file_path = self.save_source_code(source_code, work_info["type"], work_info["name"], work_id)
-			print(f"✓ 源码已保存到: {file_path}")
-			return file_path  # noqa: TRY300
-		except Exception as e:
-			print(f"✗ 反编译失败: {e}")
-			raise
+	def sha256(data: str | bytes) -> str:
+		"""计算SHA256哈希"""
+		if isinstance(data, str):
+			data = data.encode()
+		return hashlib.sha256(data).hexdigest()
 
 
-class ShadowCreator:
-	"""积木阴影创建器"""
+class WorkInfo:
+	"""作品信息容器"""
 
-	SHADOW_ALL_TYPES: ClassVar[set[str]] = {
+	def __init__(self, data: dict[str, Any]) -> None:
+		self.id = data["id"]
+		self.name = data.get("work_name", data.get("name", "未知作品"))
+		self.type = data.get("type", "NEMO")
+		self.version = data.get("bcm_version", "0.16.2")
+		self.user_id = data.get("user_id", 0)
+		self.preview_url = data.get("preview", "")
+		self.source_urls = data.get("work_urls", [])
+
+	@property
+	def file_extension(self) -> str:
+		"""根据作品类型返回文件扩展名"""
+		extensions = {
+			"KITTEN2": ".bcm",
+			"KITTEN3": ".bcm",
+			"KITTEN4": ".bcm4",
+			"COCO": ".json",
+			"NEMO": "",  # Nemo使用文件夹
+		}
+		return extensions.get(self.type, ".json")
+
+	@property
+	def is_nemo(self) -> bool:
+		"""是否为Nemo作品"""
+		return self.type == "NEMO"
+
+
+class FileHelper:
+	"""文件操作工具类"""
+
+	@staticmethod
+	def safe_filename(name: str, work_id: int, extension: str = "") -> str:
+		"""生成安全文件名"""
+		# 移除非法字符
+		safe_name = "".join(c for c in name if c.isalnum() or c in {" ", "-", "_"}).strip()
+		if not safe_name:
+			safe_name = f"work_{work_id}"
+		# 添加扩展名
+		if extension and not extension.startswith("."):
+			extension = f".{extension}"
+		return f"{safe_name}_{work_id}{extension}"
+
+	@staticmethod
+	def ensure_dir(path: str | Path) -> None:
+		"""确保目录存在"""
+		Path(path).mkdir(parents=True, exist_ok=True)
+
+	@staticmethod
+	def write_json(path: str | Path, data: ...) -> None:
+		"""写入JSON文件"""
+		with Path(path).open("w", encoding="utf-8") as f:
+			json.dump(data, f, ensure_ascii=False, indent=2)
+
+	@staticmethod
+	def write_binary(path: str | Path, data: bytes) -> None:
+		"""写入二进制文件"""
+		with Path(path).open("wb") as f:
+			f.write(data)
+
+
+class ShadowBuilder:
+	"""阴影积木构建器"""
+
+	# 阴影类型定义
+	SHADOW_TYPES: ClassVar[set[str]] = {
 		"broadcast_input",
 		"controller_shadow",
 		"default_value",
@@ -118,111 +125,225 @@ class ShadowCreator:
 		"math_number",
 		"text",
 	}
-	SHADOW_FIELD_ATTRIBUTES_MAP: ClassVar[dict[str, dict[str, str]]] = {
-		"broadcast_input": {"name": "MESSAGE"},
-		"controller_shadow": {"name": "NUM", "constraints": "-Infinity,Infinity,0,false"},
-		"default_value": {"name": "TEXT", "has_been_edited": "false"},
-		"get_audios": {"name": "sound_id"},
-		"get_current_costume": {"name": "style_id"},
-		"get_current_scene": {"name": "scene"},
-		"get_sensing_current_scene": {"name": "scene"},
-		"get_whole_audios": {"name": "sound_id"},
-		"lists_get": {"name": "VAR"},
-		"math_number": {"name": "NUM", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
-		"text": {"name": "TEXT"},
-	}
-	SHADOW_FIELD_TEXT_MAP: ClassVar[dict[str, str]] = {
-		"broadcast_input": "Hi",
-		"controller_shadow": "0",
-		"default_value": "0",
-		"get_audios": "?",
-		"get_current_costume": "",
-		"get_current_scene": "",
-		"get_sensing_current_scene": "",
-		"get_whole_audios": "all",
-		"lists_get": "?",
-		"math_number": "0",
-		"text": "",
+	# 字段属性配置
+	FIELD_CONFIG: ClassVar[dict[str, dict[str, str]]] = {
+		"broadcast_input": {"name": "MESSAGE", "text": "Hi"},
+		"controller_shadow": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,false"},
+		"default_value": {"name": "TEXT", "text": "0", "has_been_edited": "false"},
+		"get_audios": {"name": "sound_id", "text": "?"},
+		"get_current_costume": {"name": "style_id", "text": ""},
+		"get_current_scene": {"name": "scene", "text": ""},
+		"get_sensing_current_scene": {"name": "scene", "text": ""},
+		"get_whole_audios": {"name": "sound_id", "text": "all"},
+		"lists_get": {"name": "VAR", "text": "?"},
+		"math_number": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
+		"text": {"name": "TEXT", "text": ""},
 	}
 
-	def create_shadow(self, shadow_type: str, block_id: str | None = None, text: str | None = None) -> str:
+	@staticmethod
+	def generate_id(length: int = 20) -> str:
+		"""生成随机ID"""
+		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		return "".join(random.choice(chars) for _ in range(length))
+
+	def create(self, shadow_type: str, block_id: str | None = None, text: str | None = None) -> str:
 		"""创建阴影积木"""
 		if shadow_type == "logic_empty":
-			actual_block_id = block_id or self.random_block_id()
-			return f'<empty type="logic_empty" id="{actual_block_id}" visible="visible" editable="false"></empty>'
-		actual_block_id = block_id or self.random_block_id()
-		actual_text = text or self.SHADOW_FIELD_TEXT_MAP.get(shadow_type, "")
-		attrs = self.SHADOW_FIELD_ATTRIBUTES_MAP.get(shadow_type, {})
+			block_id = block_id or self.generate_id()
+			return f'<empty type="logic_empty" id="{block_id}" visible="visible" editable="false"></empty>'
+		config = self.FIELD_CONFIG.get(shadow_type, {})
+		block_id = block_id or self.generate_id()
+		display_text = text or config.get("text", "")
 		shadow = ET.Element("shadow")
 		shadow.set("type", shadow_type)
-		shadow.set("id", actual_block_id)
+		shadow.set("id", block_id)
 		shadow.set("visible", "visible")
 		shadow.set("editable", "true")
 		field = ET.SubElement(shadow, "field")
-		for name, value in attrs.items():
-			field.set(name, value)
-		field.text = str(actual_text)
+		field.set("name", config["name"])
+		field.text = str(display_text)
+		# 添加额外属性
+		for attr in ["constraints", "allow_text", "has_been_edited"]:
+			if attr in config:
+				field.set(attr, config[attr])
 		return ET.tostring(shadow, encoding="unicode")
 
+
+class BaseDecompiler:
+	"""反编译器基类"""
+
+	def __init__(self, work_info: WorkInfo) -> None:
+		self.work_info = work_info
+		self.shadow_builder = ShadowBuilder()
+
+	def decompile(self) -> dict[str, Any] | str:
+		"""反编译作品 - 子类必须实现"""
+		raise NotImplementedError
+
+
+class NemoDecompiler(BaseDecompiler):
+	"""Nemo作品反编译器"""
+
+	def decompile(self) -> str:
+		"""反编译Nemo作品为文件夹结构"""
+		work_id = self.work_info.id
+		# 创建主目录
+		work_dir = Path(f"nemo_work_{work_id}")
+		FileHelper.ensure_dir(work_dir)
+		# 获取作品源数据
+		source_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public")
+		bcm_data = Network.fetch_json(source_info["work_urls"][0])
+		# 创建目录结构
+		dirs = self._create_directories(work_dir, work_id)
+		# 保存核心文件
+		self._save_core_files(dirs, work_id, bcm_data, source_info)
+		# 下载资源文件
+		self._download_resources(dirs, bcm_data)
+		return str(work_dir)
+
 	@staticmethod
-	def random_block_id() -> str:
-		"""生成随机积木ID"""
-		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		return "".join(random.choice(chars) for _ in range(20))
+	def _create_directories(base_dir: Path, work_id: int) -> dict[str, Path]:
+		"""创建目录结构"""
+		dirs = {
+			"material": base_dir / "user_material",
+			"works": base_dir / "user_works" / str(work_id),
+			"record": base_dir / "user_works" / str(work_id) / "record",
+		}
+		for path in dirs.values():
+			FileHelper.ensure_dir(path)
+		return dirs
+
+	def _save_core_files(self, dirs: dict[str, Path], work_id: int, bcm_data: dict[str, Any], source_info: dict[str, Any]) -> None:
+		"""保存核心文件"""
+		# 保存BCM文件
+		bcm_path = dirs["works"] / f"{work_id}.bcm"
+		FileHelper.write_json(bcm_path, bcm_data)
+		# 创建用户图片配置
+		user_images = self._build_user_images(bcm_data)
+		userimg_path = dirs["works"] / f"{work_id}.userimg"
+		FileHelper.write_json(userimg_path, user_images)
+		# 创建元数据
+		meta_data = self._build_metadata(work_id, source_info)
+		meta_path = dirs["works"] / f"{work_id}.meta"
+		FileHelper.write_json(meta_path, meta_data)
+		# 下载封面
+		if source_info.get("preview"):
+			try:
+				cover_data = Network.fetch_binary(source_info["preview"])
+				cover_path = dirs["works"] / f"{work_id}.cover"
+				FileHelper.write_binary(cover_path, cover_data)
+			except Exception as e:
+				print(f"封面下载失败: {e}")
+
+	@staticmethod
+	def _build_user_images(bcm_data: dict[str, Any]) -> dict[str, Any]:
+		"""构建用户图片配置"""
+		user_images = {"user_img_dict": {}}
+		styles = bcm_data.get("styles", {}).get("styles_dict", {})
+		for style_id, style_data in styles.items():
+			image_url = style_data.get("url")
+			if image_url:
+				user_images["user_img_dict"][style_id] = {"id": style_id, "path": f"user_material/{Crypto.sha256(image_url)}.webp"}
+		return user_images
+
+	@staticmethod
+	def _build_metadata(work_id: int, source_info: dict[str, Any]) -> dict[str, Any]:
+		"""构建元数据"""
+		return {
+			"bcm_count": {
+				"block_cnt_without_invisible": 0.0,
+				"block_cnt": 0.0,
+				"entity_cnt": 1.0,
+			},
+			"bcm_name": source_info["name"],
+			"bcm_url": source_info["work_urls"][0],
+			"bcm_version": source_info["bcm_version"],
+			"download_fail": False,
+			"extra_data": {},
+			"have_published_status": False,
+			"have_remote_resources": False,
+			"is_landscape": False,
+			"is_micro_bit": False,
+			"is_valid": False,
+			"mcloud_variable": [],
+			"publish_preview": source_info["preview"],
+			"publish_status": 0,
+			"review_state": 0,
+			"template_id": 0,
+			"term_id": 0,
+			"type": 0,
+			"upload_status": {
+				"work_id": work_id,
+				"have_uploaded": 2,
+			},
+		}
+
+	@staticmethod
+	def _download_resources(dirs: dict[str, Path], bcm_data: dict[str, Any]) -> None:
+		"""下载资源文件"""
+		styles = bcm_data.get("styles", {}).get("styles_dict", {})
+		for style_data in styles.values():
+			image_url = style_data.get("url")
+			if image_url:
+				try:
+					image_data = Network.fetch_binary(image_url)
+					file_name = f"{Crypto.sha256(image_url)}.webp"
+					file_path = dirs["material"] / file_name
+					FileHelper.write_binary(file_path, image_data)
+				except Exception as e:
+					print(f"资源下载失败 {image_url}: {e}")
 
 
-class RequestError(Exception):
-	"""自定义请求异常"""
-
-
-class KittenWorkDecompiler:
+class KittenDecompiler(BaseDecompiler):
 	"""Kitten作品反编译器"""
 
-	def __init__(self, work_info: dict[str, Any], compiled_work: dict[str, Any], parent: SimpleDecompiler) -> None:
-		self.work_info = work_info
-		self.work = compiled_work
+	def __init__(self, work_info: WorkInfo) -> None:
+		super().__init__(work_info)
 		self.functions: dict[str, Any] = {}
-		self.parent = parent
 
-	def start(self) -> dict[str, Any]:
-		"""开始反编译"""
-		# 创建角色反编译器
-		decompilers = []
-		for actor_compiled_blocks in self.work["compile_result"]:
-			actor = ActorDecompiler(self, self.get_actor(actor_compiled_blocks["id"]), actor_compiled_blocks)
-			decompilers.append(actor)
-		# 准备所有的角色
-		for decompiler in decompilers:
-			decompiler.prepare()
-		# 开始反编译所有的角色
-		for decompiler in decompilers:
-			decompiler.start()
-		self.write_work_info()
-		self.clean()
-		return self.work
+	def decompile(self) -> dict[str, Any]:
+		"""反编译Kitten作品"""
+		# 获取编译数据
+		compiled_data = self._fetch_compiled_data()
+		# 反编译作品
+		work = compiled_data.copy()
+		self._decompile_actors(work)
+		self._update_work_info(work)
+		self._clean_work_data(work)
+		return work
 
-	def get_actor(self, actor_id: str) -> dict[str, Any]:
+	def _fetch_compiled_data(self) -> dict[str, Any]:
+		"""获取编译数据"""
+		work_id = self.work_info.id
+		if self.work_info.type in {"KITTEN2", "KITTEN3", "KITTEN4"}:
+			url = f"https://api-creation.codemao.cn/kitten/r2/work/player/load/{work_id}"
+			compiled_url = Network.fetch_json(url)["source_urls"][0]
+		else:
+			compiled_url = self.work_info.source_urls[0]
+		return Network.fetch_json(compiled_url)
+
+	def _decompile_actors(self, work: dict[str, Any]) -> None:
+		"""反编译所有角色"""
+		actors = []
+		for actor_data in work["compile_result"]:
+			actor_info = self._get_actor_info(work, actor_data["id"])
+			actor = ActorProcessor(self, actor_info, actor_data)
+			actors.append(actor)
+		# 准备并执行反编译
+		for actor in actors:
+			actor.prepare()
+		for actor in actors:
+			actor.process()
+
+	@staticmethod
+	def _get_actor_info(work: dict[str, Any], actor_id: str) -> dict[str, Any]:
 		"""获取角色信息"""
-		theatre = self.work["theatre"]
-		try:
-			return theatre["actors"][actor_id]
-		except KeyError:
-			return theatre["scenes"][actor_id]
+		theatre = work["theatre"]
+		return theatre["actors"].get(actor_id, theatre["scenes"][actor_id])
 
-	def clean(self) -> None:
-		"""清理无用数据"""
-		keys_to_remove = ["compile_result", "preview", "author_nickname"]
-		for key in keys_to_remove:
-			if key in self.work:
-				del self.work[key]
-
-	def write_work_info(self) -> None:
-		"""写入作品信息"""
-		self.work["hidden_toolbox"] = {"toolbox": [], "blocks": []}
-		self.work["work_source_label"] = 0
-		self.work["sample_id"] = ""
-		self.work["project_name"] = self.work_info["name"]
-		self.work["toolbox_order"] = self.work["last_toolbox_order"] = [
+	def _update_work_info(self, work: dict[str, Any]) -> None:
+		"""更新作品信息"""
+		toolbox_categories = [
 			"action",
 			"advanced",
 			"ai",
@@ -239,8 +360,8 @@ class KittenWorkDecompiler:
 			"data",
 			"data",
 			"event",
-			"microbit",
-			"midimusic",
+			"micro_bit",
+			"midi_music",
 			"mobile_control",
 			"operator",
 			"pen",
@@ -249,57 +370,72 @@ class KittenWorkDecompiler:
 			"procedure",
 			"sensing",
 			"video",
-			"weeemake",
+			"wee_make",
 			"wood",
 		]
+		work.update(
+			{
+				"hidden_toolbox": {"toolbox": [], "blocks": []},
+				"work_source_label": 0,
+				"sample_id": "",
+				"project_name": self.work_info.name,
+				"toolbox_order": toolbox_categories,
+				"last_toolbox_order": toolbox_categories,
+			}
+		)
+
+	@staticmethod
+	def _clean_work_data(work: dict[str, Any]) -> None:
+		"""清理作品数据"""
+		for key in ["compile_result", "preview", "author_nickname"]:
+			work.pop(key, None)
 
 
-class ActorDecompiler:
-	"""角色反编译器"""
+class ActorProcessor:
+	"""角色处理器"""
 
-	def __init__(self, work: KittenWorkDecompiler, actor: dict[str, Any], compiled_blocks: dict[str, Any]) -> None:
-		self.work = work
-		self.actor = actor
-		self.compiled = compiled_blocks
+	def __init__(self, decompiler: KittenDecompiler, actor_info: dict[str, Any], compiled_data: dict[str, Any]) -> None:
+		self.decompiler = decompiler
+		self.actor_info = actor_info
+		self.compiled_data = compiled_data
 		self.blocks: dict[str, Any] = {}
 		self.connections: dict[str, Any] = {}
 
 	def prepare(self) -> None:
 		"""准备阶段"""
-		# 把积木数据关联到角色
-		self.actor["block_data_json"] = {"blocks": self.blocks, "connections": self.connections, "comments": {}}
+		self.actor_info["block_data_json"] = {"blocks": self.blocks, "connections": self.connections, "comments": {}}
 
-	def start(self) -> None:
-		"""开始反编译"""
-		# 反编译角色所有的函数
-		for name, compiled_function in self.compiled["procedures"].items():
-			self.work.functions[name] = Procedures2DefnoreturnDecompiler(compiled_function, self).start()
-		# 反编译角色其余的积木
-		for compiled_blocks in self.compiled["compiled_block_map"].values():
-			self.get_block_decompiler(compiled_blocks).start()
+	def process(self) -> None:
+		"""处理角色"""
+		# 处理函数
+		for func_name, func_data in self.compiled_data["procedures"].items():
+			processor = FunctionProcessor(func_data, self)
+			self.decompiler.functions[func_name] = processor.process()
+		# 处理积木
+		for block_data in self.compiled_data["compiled_block_map"].values():
+			self.process_block(block_data)
 
-	def get_block_decompiler(self, compiled: dict[str, Any]) -> ...:
-		"""获取积木反编译器"""
+	def process_block(self, compiled: dict[str, Any]) -> dict[str, Any]:
+		"""处理单个积木"""
 		block_type = compiled["type"]
-		decompiler_map = {
-			"ask_and_choose": AskAndChooseDecompiler,
-			"controls_if": ControlsIfDecompiler,
-			"controls_if_no_else": ControlsIfDecompiler,
-			"procedures_2_callnoreturn": Procedures2CallDecompiler,
-			"procedures_2_callreturn": Procedures2CallDecompiler,
-			"procedures_2_defnoreturn": Procedures2DefnoreturnDecompiler,
-			"procedures_2_return_value": Procedures2ReturnValueDecompiler,
-			"text_join": TextJoinDecompiler,
-			"text_select_changeable": TextSelectChangeableDecompiler,
-		}
-		decompiler_class = decompiler_map.get(block_type, BlockDecompiler)
-		return decompiler_class(compiled, self)
+		# 选择处理器
+		if block_type == "controls_if":
+			processor = IfBlockProcessor(compiled, self)
+		elif block_type == "text_join":
+			processor = TextJoinProcessor(compiled, self)
+		elif block_type.startswith("procedures_2_def"):
+			processor = FunctionProcessor(compiled, self)
+		elif block_type.startswith("procedures_2_call"):
+			processor = FunctionCallProcessor(compiled, self)
+		else:
+			processor = BlockProcessor(compiled, self)
+		return processor.process()
 
 
-class BlockDecompiler:
-	"""基础积木反编译器"""
+class BlockProcessor:
+	"""积木处理器基类"""
 
-	def __init__(self, compiled: dict[str, Any], actor: ActorDecompiler) -> None:
+	def __init__(self, compiled: dict[str, Any], actor: ActorProcessor) -> None:
 		self.compiled = compiled
 		self.actor = actor
 		self.block: dict[str, Any] = {}
@@ -307,104 +443,110 @@ class BlockDecompiler:
 		self.shadows: dict[str, Any] = {}
 		self.fields: dict[str, Any] = {}
 
-	def start(self) -> dict[str, Any]:
-		"""开始反编译积木"""
-		self.info()
-		self.process_next()
-		self.process_children()
-		self.process_conditions()
-		self.process_params()
+	def process(self) -> dict[str, Any]:
+		"""处理积木"""
+		self._setup_basic_info()
+		self._process_next()
+		self._process_children()
+		self._process_conditions()
+		self._process_params()
 		return self.block
 
-	def info(self) -> None:
-		"""积木基本信息"""
-		self.id = self.block["id"] = self.compiled["id"]
-		self.type = self.block["type"] = self.compiled["type"]
-		self.block["location"] = [0, 0]
-		self.block["is_shadow"] = self.type in self.actor.work.parent.shadow_creator.SHADOW_ALL_TYPES
-		self.block["collapsed"] = False
-		self.block["disabled"] = False
-		self.block["deletable"] = True
-		self.block["movable"] = True
-		self.block["editable"] = True
-		self.block["visible"] = "visible"
-		self.block["shadows"] = self.shadows
-		self.block["fields"] = self.fields
-		self.block["field_constraints"] = {}
-		self.block["field_extra_attr"] = {}
-		self.block["comment"] = None
-		self.block["mutation"] = ""
-		self.block["is_output"] = self.type in self.actor.work.parent.shadow_creator.SHADOW_ALL_TYPES or self.type in {"logic_boolean", "procedures_2_stable_parameter"}
-		self.block["parent_id"] = None
-		self.actor.connections[self.id] = self.connection
-		self.actor.blocks[self.id] = self.block
+	def _setup_basic_info(self) -> None:
+		"""设置基础信息"""
+		block_id = self.compiled["id"]
+		block_type = self.compiled["type"]
+		shadow_types = self.actor.decompiler.shadow_builder.SHADOW_TYPES
+		self.block.update(
+			{
+				"id": block_id,
+				"type": block_type,
+				"location": [0, 0],
+				"is_shadow": block_type in shadow_types,
+				"collapsed": False,
+				"disabled": False,
+				"deletable": True,
+				"movable": True,
+				"editable": True,
+				"visible": "visible",
+				"shadows": self.shadows,
+				"fields": self.fields,
+				"field_constraints": {},
+				"field_extra_attr": {},
+				"comment": None,
+				"mutation": "",
+				"is_output": (block_type in shadow_types or block_type in {"logic_boolean", "procedures_2_stable_parameter"}),
+				"parent_id": None,
+			}
+		)
+		self.actor.connections[block_id] = self.connection
+		self.actor.blocks[block_id] = self.block
 
-	def process_next(self) -> None:
+	def _process_next(self) -> None:
 		"""处理下一个积木"""
 		if "next_block" in self.compiled:
-			next_block = self.actor.get_block_decompiler(self.compiled["next_block"]).start()
-			next_block["parent_id"] = self.id
+			next_block = self.actor.process_block(self.compiled["next_block"])
+			next_block["parent_id"] = self.block["id"]
 			self.connection[next_block["id"]] = {"type": "next"}
 
-	def process_children(self) -> None:
+	def _process_children(self) -> None:
 		"""处理子积木"""
 		if "child_block" in self.compiled:
-			child_blocks = self.compiled["child_block"]
-			for i, child_data in enumerate(child_blocks):
-				if child_data is not None:
-					child_block = self.actor.get_block_decompiler(child_data).start()
-					child_block["parent_id"] = self.id
-					input_name = self.get_child_input_name(i)
+			for i, child in enumerate(self.compiled["child_block"]):
+				if child is not None:
+					child_block = self.actor.process_block(child)
+					child_block["parent_id"] = self.block["id"]
+					input_name = self._get_child_input_name(i)
 					self.connection[child_block["id"]] = {"type": "input", "input_type": "statement", "input_name": input_name}
 					self.shadows[input_name] = ""
 
-	@staticmethod
-	def get_child_input_name(_count: int) -> str:
-		"""获取子输入名称"""
-		return "DO"
-
-	def process_conditions(self) -> None:
+	def _process_conditions(self) -> None:
 		"""处理条件积木"""
 		if "conditions" in self.compiled:
-			conditions = self.compiled["conditions"]
-			for i, condition_data in enumerate(conditions):
-				condition_block = self.actor.get_block_decompiler(condition_data).start()
-				condition_block["parent_id"] = self.id
+			for i, condition in enumerate(self.compiled["conditions"]):
+				condition_block = self.actor.process_block(condition)
+				condition_block["parent_id"] = self.block["id"]
 				input_name = f"IF{i}"
 				if condition_block["type"] != "logic_empty":
 					self.connection[condition_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
-				self.shadows[input_name] = self.actor.work.parent.shadow_creator.create_shadow("logic_empty", condition_block["id"])
+				shadow = self.actor.decompiler.shadow_builder.create("logic_empty", condition_block["id"])
+				self.shadows[input_name] = shadow
 
-	def process_params(self) -> None:
+	def _process_params(self) -> None:
 		"""处理参数"""
 		for name, value in self.compiled["params"].items():
 			if isinstance(value, dict):
-				param_block = self.actor.get_block_decompiler(value).start()
-				param_block["parent_id"] = self.id
+				param_block = self.actor.process_block(value)
+				param_block["parent_id"] = self.block["id"]
 				param_type = param_block["type"]
-				if param_type in self.actor.work.parent.shadow_creator.SHADOW_ALL_TYPES:
-					# 转换参数信息
+				if param_type in self.actor.decompiler.shadow_builder.SHADOW_TYPES:
 					field_values = list(param_block["fields"].values())
 					field_value = field_values[0] if field_values else ""
-					self.shadows[name] = self.actor.work.parent.shadow_creator.create_shadow(param_type, param_block["id"], field_value)
+					shadow = self.actor.decompiler.shadow_builder.create(param_type, param_block["id"], field_value)
 				else:
-					# 生成参数信息
 					shadow_type = "logic_empty" if name in {"condition", "BOOL"} else "math_number"
-					self.shadows[name] = self.actor.work.parent.shadow_creator.create_shadow(shadow_type)
+					shadow = self.actor.decompiler.shadow_builder.create(shadow_type)
+				self.shadows[name] = shadow
 				self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": name}
 			else:
 				self.fields[name] = value
 
+	@staticmethod
+	def _get_child_input_name(_index: int) -> str:
+		"""获取子输入名称"""
+		return "DO"
 
-class ControlsIfDecompiler(BlockDecompiler):
-	"""条件控制积木反编译器"""
 
-	def start(self) -> dict[str, Any]:
-		block = super().start()
-		child_blocks = self.compiled["child_block"]
-		# 检查是否有else分支
-		MIN_CONDITIONS_FOR_ELSE = 2  # noqa: N806
-		if len(child_blocks) == MIN_CONDITIONS_FOR_ELSE and child_blocks[-1] is None:
+class IfBlockProcessor(BlockProcessor):
+	"""条件积木处理器"""
+
+	MIN_CONDITIONS_FOR_ELSE = 2
+
+	def process(self) -> dict[str, Any]:
+		block = super().process()
+		children = self.compiled["child_block"]
+		# 检查else分支
+		if len(children) == self.MIN_CONDITIONS_FOR_ELSE and children[-1] is None:
 			self.shadows["EXTRA_ADD_ELSE"] = ""
 		else:
 			condition_count = len(self.compiled["conditions"])
@@ -412,132 +554,181 @@ class ControlsIfDecompiler(BlockDecompiler):
 			self.shadows["ELSE_TEXT"] = ""
 		return block
 
-	def get_child_input_name(self, count: int) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+	def _get_child_input_name(self, index: int) -> str:  # type: ignore  # noqa: PGH003
 		conditions_count = len(self.compiled["conditions"])
-		if count < conditions_count:
-			return f"DO{count}"
-		return "ELSE"
+		return f"DO{index}" if index < conditions_count else "ELSE"
 
 
-class AskAndChooseDecompiler(BlockDecompiler):
-	"""询问选择积木反编译器"""
+class TextJoinProcessor(BlockProcessor):
+	"""文本连接积木处理器"""
 
-	def start(self) -> dict[str, Any]:
-		block = super().start()
-		param_count = len(self.compiled["params"])
-		self.block["mutation"] = f'<mutation items="{param_count - 1}"></mutation>'
-		return block
-
-
-class TextJoinDecompiler(BlockDecompiler):
-	"""文本连接积木反编译器"""
-
-	def start(self) -> dict[str, Any]:
-		block = super().start()
+	def process(self) -> dict[str, Any]:
+		block = super().process()
 		param_count = len(self.compiled["params"])
 		self.block["mutation"] = f'<mutation items="{param_count}"></mutation>'
 		return block
 
 
-class TextSelectChangeableDecompiler(BlockDecompiler):
-	"""文本选择积木反编译器"""
+class FunctionProcessor(BlockProcessor):
+	"""函数定义处理器"""
 
-	def start(self) -> dict[str, Any]:
-		block = super().start()
-		param_count = len(self.compiled["params"])
-		self.block["mutation"] = f'<mutation items="{param_count - 1}"></mutation>'
-		return block
-
-
-class Procedures2DefnoreturnDecompiler(BlockDecompiler):
-	"""无返回值函数定义积木反编译器"""
-
-	def start(self) -> dict[str, Any]:
-		self.info()
-		self.process_children()
+	def process(self) -> dict[str, Any]:
+		self._setup_basic_info()
+		self._process_children()
 		self.shadows["PROCEDURES_2_DEFNORETURN_DEFINE"] = ""
 		self.shadows["PROCEDURES_2_DEFNORETURN_MUTATOR"] = ""
 		self.fields["NAME"] = self.compiled["procedure_name"]
 		mutation = ET.Element("mutation")
-		for param_count, (param_name, _param_value) in enumerate(self.compiled["params"].items()):
-			input_name = f"PARAMS{param_count}"
+		for i, (param_name, _) in enumerate(self.compiled["params"].items()):
+			input_name = f"PARAMS{i}"
 			arg = ET.SubElement(mutation, "arg")
 			arg.set("name", input_name)
-			self.shadows[input_name] = self.actor.work.parent.shadow_creator.create_shadow("math_number")
-			param_block = self.actor.get_block_decompiler(
+			shadow = self.actor.decompiler.shadow_builder.create("math_number")
+			self.shadows[input_name] = shadow
+			param_block = self.actor.process_block(
 				{
-					"id": self.actor.work.parent.shadow_creator.random_block_id(),
+					"id": ShadowBuilder.generate_id(),
 					"kind": "domain_block",
 					"type": "procedures_2_stable_parameter",
 					"params": {"param_name": param_name, "param_default_value": ""},
 				}
-			).start()
+			)
 			param_block["parent_id"] = self.block["id"]
 			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
 		self.block["mutation"] = ET.tostring(mutation, encoding="unicode")
 		return self.block
 
 	@staticmethod
-	def get_child_input_name(_count: int) -> str:
+	def _get_child_input_name(_index: int) -> str:
 		return "STACK"
 
 
-class Procedures2ReturnValueDecompiler(BlockDecompiler):
-	"""返回值函数定义积木反编译器"""
+class FunctionCallProcessor(BlockProcessor):
+	"""函数调用处理器"""
 
-	def start(self) -> dict[str, Any]:
-		block = super().start()
-		self.shadows["PROCEDURES_2_DEFRETURN_RETURN"] = ""
-		self.shadows["PROCEDURES_2_DEFRETURN_RETURN_MUTATOR"] = ""
-		param_count = len(self.compiled["params"])
-		self.block["mutation"] = f'<mutation items="{param_count}"></mutation>'
-		return block
-
-
-class Procedures2CallDecompiler(BlockDecompiler):
-	"""函数调用积木反编译器"""
-
-	def start(self) -> dict[str, Any]:
-		self.info()
-		self.process_next()
-		name = self.compiled["procedure_name"]
+	def process(self) -> dict[str, Any]:
+		self._setup_basic_info()
+		self._process_next()
+		func_name = self.compiled["procedure_name"]
+		functions = self.actor.decompiler.functions
 		try:
-			function_id = self.actor.work.functions[name]["id"]
+			func_id = functions[func_name]["id"]
 		except KeyError:
-			function_id = self.actor.work.parent.shadow_creator.random_block_id()
+			func_id = ShadowBuilder.generate_id()
 			self.block["disabled"] = True
 		self.shadows["NAME"] = ""
-		self.fields["NAME"] = name
+		self.fields["NAME"] = func_name
 		mutation = ET.Element("mutation")
-		mutation.set("name", name)
-		mutation.set("def_id", function_id)
-		for param_count, (param_name, param_value) in enumerate(self.compiled["params"].items()):
-			param_block = self.actor.get_block_decompiler(param_value).start()
-			self.shadows[f"ARG{param_count}"] = self.actor.work.parent.shadow_creator.create_shadow("default_value", param_block["id"])
-			param = ET.SubElement(mutation, "procedures_2_parameter_shadow")
-			param.set("name", param_name)
-			param.set("value", "0")
-			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": f"ARG{param_count}"}
+		mutation.set("name", func_name)
+		mutation.set("def_id", func_id)
+		for i, (param_name, param_value) in enumerate(self.compiled["params"].items()):
+			param_block = self.actor.process_block(param_value)
+			shadow = self.actor.decompiler.shadow_builder.create("default_value", param_block["id"])
+			self.shadows[f"ARG{i}"] = shadow
+			param_elem = ET.SubElement(mutation, "procedures_2_parameter_shadow")
+			param_elem.set("name", param_name)
+			param_elem.set("value", "0")
+			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": f"ARG{i}"}
 		self.block["mutation"] = ET.tostring(mutation, encoding="unicode")
 		return self.block
 
 
-class CoCoWorkDecompiler:
+class CocoDecompiler(BaseDecompiler):
 	"""CoCo作品反编译器"""
 
-	def __init__(self, work_info: dict[str, Any], compiled_work: dict[str, Any]) -> None:
-		self.work_info = work_info
-		self.work = compiled_work
+	def decompile(self) -> dict[str, Any]:
+		"""反编译CoCo作品"""
+		compiled_data = self._fetch_compiled_data()
+		work = compiled_data.copy()
+		self._reorganize_data(work)
+		self._clean_data(work)
+		return work
 
-	def start(self) -> dict[str, Any]:
-		"""开始反编译"""
-		self.write_work_info()
-		self.clean()
-		return self.work
+	def _fetch_compiled_data(self) -> dict[str, Any]:
+		"""获取编译数据"""
+		work_id = self.work_info.id
+		url = f"https://api-creation.codemao.cn/coconut/web/work/{work_id}/load"
+		compiled_url = Network.fetch_json(url)["data"]["bcmc_url"]
+		return Network.fetch_json(compiled_url)
 
-	def clean(self) -> None:
-		"""清理无用数据"""
-		keys_to_remove = [
+	def _reorganize_data(self, work: dict[str, Any]) -> None:
+		"""重组数据"""
+		work["authorId"] = self.work_info.user_id
+		work["title"] = self.work_info.name
+		work["screens"] = {}
+		work["screenIds"] = []
+		# 处理屏幕
+		for screen in work["screenList"]:
+			screen_id = screen["id"]
+			screen["snapshot"] = ""
+			work["screens"][screen_id] = screen
+			work["screenIds"].append(screen_id)
+			# 初始化屏幕数据
+			screen.update(
+				{
+					"primitiveVariables": [],
+					"arrayVariables": [],
+					"objectVariables": [],
+					"broadcasts": ["Hi"],
+					"widgets": {},
+				}
+			)
+			# 处理组件
+			for widget_id in screen["widgetIds"] + screen["invisibleWidgetIds"]:
+				screen["widgets"][widget_id] = work["widgetMap"][widget_id]
+				del work["widgetMap"][widget_id]
+		# 处理积木数据
+		work["blockly"] = {}
+		for screen_id, blocks in work["blockJsonMap"].items():
+			work["blockly"][screen_id] = {"screenId": screen_id, "workspaceJson": blocks, "workspaceOffset": {"x": 0, "y": 0}}
+		# 处理资源文件
+		self._process_resources(work)
+		# 处理变量
+		self._process_variables(work)
+		# 设置全局属性
+		work.update(
+			{
+				"globalWidgets": work["widgetMap"],
+				"globalWidgetIds": list(work["widgetMap"].keys()),
+				"sourceTag": 1,
+				"sourceId": "",
+			}
+		)
+
+	@staticmethod
+	def _process_resources(work: dict[str, Any]) -> None:
+		"""处理资源文件"""
+		resource_maps = ["imageFileMap", "soundFileMap", "iconFileMap", "fontFileMap"]
+		for map_name in resource_maps:
+			if map_name in work:
+				list_name = map_name.replace("Map", "List")
+				work[list_name] = list(work[map_name].values())
+
+	@staticmethod
+	def _process_variables(work: dict[str, Any]) -> None:
+		"""处理变量"""
+		counters = {"var": 0, "list": 0, "dict": 0}
+		variable_lists = {
+			"globalVariableList": [],
+			"globalArrayList": [],
+			"globalObjectList": [],
+		}
+		for var_id, value in work["variableMap"].items():
+			if isinstance(value, list):
+				counters["list"] += 1
+				variable_lists["globalArrayList"].append({"id": var_id, "name": f"列表{counters['list']}", "defaultValue": value, "value": value})
+			elif isinstance(value, dict):
+				counters["dict"] += 1
+				variable_lists["globalObjectList"].append({"id": var_id, "name": f"字典{counters['dict']}", "defaultValue": value, "value": value})
+			else:
+				counters["var"] += 1
+				variable_lists["globalVariableList"].append({"id": var_id, "name": f"变量{counters['var']}", "defaultValue": value, "value": value})
+		work.update(variable_lists)
+
+	@staticmethod
+	def _clean_data(work: dict[str, Any]) -> None:
+		"""清理数据"""
+		remove_keys = [
 			"apiToken",
 			"blockCode",
 			"blockJsonMap",
@@ -552,77 +743,87 @@ class CoCoWorkDecompiler:
 			"variableMap",
 			"widgetMap",
 		]
-		for key in keys_to_remove:
-			if key in self.work:
-				del self.work[key]
-
-	def write_work_info(self) -> None:
-		"""写入作品信息"""
-		self.work["authorId"] = self.work_info.get("author", {}).get("id", "")
-		self.work["title"] = self.work_info["name"]
-		self.work["screens"] = {}
-		self.work["screenIds"] = []
-		for screen in self.work["screenList"]:
-			screen_id = screen["id"]
-			screen["snapshot"] = ""
-			self.work["screens"][screen_id] = screen
-			self.work["screenIds"].append(screen_id)
-			screen["primitiveVariables"] = []
-			screen["arrayVariables"] = []
-			screen["objectVariables"] = []
-			screen["broadcasts"] = ["Hi"]
-			screen["widgets"] = {}
-			for widget_id in screen["widgetIds"] + screen["invisibleWidgetIds"]:
-				screen["widgets"][widget_id] = self.work["widgetMap"][widget_id]
-				del self.work["widgetMap"][widget_id]
-		self.work["blockly"] = {}
-		for screen_id, blocks in self.work["blockJsonMap"].items():
-			self.work["blockly"][screen_id] = {"screenId": screen_id, "workspaceJson": blocks, "workspaceOffset": {"x": 0, "y": 0}}
-		self.work["imageFileList"] = list(self.work["imageFileMap"].values())
-		self.work["soundFileList"] = list(self.work["soundFileMap"].values())
-		self.work["iconFileList"] = list(self.work["iconFileMap"].values())
-		self.work["fontFileList"] = list(self.work["fontFileMap"].values())
-		# 处理变量
-		var_count = 0
-		list_count = 0
-		dict_count = 0
-		self.work["globalVariableList"] = []
-		self.work["globalArrayList"] = []
-		self.work["globalObjectList"] = []
-		for var_id, value in self.work["variableMap"].items():
-			if isinstance(value, list):
-				list_count += 1
-				self.work["globalArrayList"].append({"id": var_id, "name": f"列表{list_count}", "defaultValue": value, "value": value})
-			elif isinstance(value, dict):
-				dict_count += 1
-				self.work["globalObjectList"].append({"id": var_id, "name": f"字典{dict_count}", "defaultValue": value, "value": value})
-			else:
-				var_count += 1
-				self.work["globalVariableList"].append({"id": var_id, "name": f"变量{var_count}", "defaultValue": value, "value": value})
-		self.work["globalWidgets"] = self.work["widgetMap"]
-		self.work["globalWidgetIds"] = list(self.work["widgetMap"].keys())
-		self.work["sourceTag"] = 1
-		self.work["sourceId"] = ""
+		for key in remove_keys:
+			work.pop(key, None)
 
 
-# 使用示例
-def decompile_work(work_id: int) -> str:
+class Decompiler:
+	"""反编译器主类"""
+
+	def __init__(self) -> None:
+		self.decompilers = {
+			"NEMO": NemoDecompiler,
+			"KITTEN2": KittenDecompiler,
+			"KITTEN3": KittenDecompiler,
+			"KITTEN4": KittenDecompiler,
+			"COCO": CocoDecompiler,
+		}
+
+	def decompile(self, work_id: int, output_dir: str = "decompiled") -> str:
+		"""
+		反编译作品
+		Args:
+			work_id: 作品ID
+			output_dir: 输出目录
+		Returns:
+			保存的文件路径
+		"""
+		print(f"开始反编译作品 {work_id}...")
+		# 获取作品信息
+		raw_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}")
+		work_info = WorkInfo(raw_info)
+		print(f"✓ 作品: {work_info.name}")
+		print(f"✓ 类型: {work_info.type}")
+		# 选择反编译器
+		decompiler_class = self.decompilers.get(work_info.type)
+		if not decompiler_class:
+			error_msg = f"不支持的作品类型: {work_info.type}"
+			raise ValueError(error_msg)
+		decompiler = decompiler_class(work_info)
+		result = decompiler.decompile()
+		# 保存结果
+		return self._save_result(result, work_info, output_dir)
+
+	@staticmethod
+	def _save_result(result: dict[str, Any] | str, work_info: WorkInfo, output_dir: str) -> str:
+		"""保存反编译结果"""
+		FileHelper.ensure_dir(output_dir)
+		if work_info.is_nemo:
+			# Nemo作品已经是文件夹,直接返回路径
+			if isinstance(result, str):
+				return result
+			msg = "Nemo作品应该返回字符串路径"
+			raise TypeError(msg)
+		# 其他作品保存为文件
+		file_name = FileHelper.safe_filename(work_info.name, work_info.id, work_info.file_extension.lstrip("."))
+		file_path = Path(output_dir) / file_name
+		if isinstance(result, dict):
+			FileHelper.write_json(file_path, result)
+		else:
+			# 对于非Nemo作品,result应该是dict,所以这里不应该发生
+			msg = "非Nemo作品应该返回字典"
+			raise TypeError(msg)
+		return str(file_path)
+
+
+def decompile_work(work_id: int, output_dir: str = "decompiled") -> str:
 	"""
 	反编译作品
 	Args:
 		work_id: 作品ID
+		output_dir: 输出目录
 	Returns:
 		保存的文件路径
 	"""
-	decompiler = SimpleDecompiler()
-	return decompiler.decompile_work(work_id)
+	decompiler = Decompiler()
+	return decompiler.decompile(work_id, output_dir)
 
 
 if __name__ == "__main__":
 	try:
-		work_id = int(input("输入作品ID"))
-		file_path = decompile_work(work_id)
-		print(f"反编译完成,文件已保存到: {file_path}")
+		work_id = int(input("请输入作品ID: "))
+		output_path = decompile_work(work_id)
+		print(f"✓ 反编译完成: {output_path}")
 	except ValueError:
 		print("错误: 作品ID必须是数字")
 	except Exception as e:
