@@ -1,7 +1,7 @@
 import json
 import pathlib
 import random
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 from typing import Any, ClassVar
 
 import requests
@@ -13,10 +13,11 @@ class SimpleDecompiler:
 	def __init__(self) -> None:
 		self.shadow_creator = ShadowCreator()
 
-	def http_get_json(self, url: str) -> Any:
+	@staticmethod
+	def http_get_json(url: str) -> ...:
 		"""HTTP GET请求获取JSON"""
 		response = requests.get(url, timeout=30)
-		HTTP_SUCCESS_CODE = 200
+		HTTP_SUCCESS_CODE = 200  # noqa: N806
 		if response.status_code != HTTP_SUCCESS_CODE:
 			error_msg = f"HTTP请求失败: {url}, 状态码: {response.status_code}"
 			raise RequestError(error_msg)
@@ -45,12 +46,14 @@ class SimpleDecompiler:
 		decompiler = KittenWorkDecompiler(work_info, compiled_work, self)
 		return decompiler.start()
 
-	def decompile_coco_work(self, work_info: dict[str, Any], compiled_work: dict[str, Any]) -> dict[str, Any]:
+	@staticmethod
+	def decompile_coco_work(work_info: dict[str, Any], compiled_work: dict[str, Any]) -> dict[str, Any]:
 		"""反编译CoCo作品"""
 		decompiler = CoCoWorkDecompiler(work_info, compiled_work)
 		return decompiler.start()
 
-	def save_source_code(self, source_code: dict[str, Any], work_type: str, work_name: str, work_id: int) -> str:
+	@staticmethod
+	def save_source_code(source_code: dict[str, Any], work_type: str, work_name: str, work_id: int) -> str:
 		"""保存源码文件到当前目录"""
 		# 确定文件扩展名
 		extension_map = {"KITTEN4": ".bcm4", "KITTEN3": ".bcm", "KITTEN2": ".bcm", "COCO": ".json"}
@@ -87,12 +90,12 @@ class SimpleDecompiler:
 				source_code = self.decompile_coco_work(work_info, compiled_work)
 			else:
 				error_msg = f"不支持的作品类型: {work_info['type']}"
-				raise ValueError(error_msg)
+				raise ValueError(error_msg)  # noqa: TRY301
 			print("✓ 反编译完成")
 			# 保存源码
 			file_path = self.save_source_code(source_code, work_info["type"], work_info["name"], work_id)
 			print(f"✓ 源码已保存到: {file_path}")
-			return file_path
+			return file_path  # noqa: TRY300
 		except Exception as e:
 			print(f"✗ 反编译失败: {e}")
 			raise
@@ -102,44 +105,44 @@ class ShadowCreator:
 	"""积木阴影创建器"""
 
 	SHADOW_ALL_TYPES: ClassVar[set[str]] = {
-		"math_number",
-		"controller_shadow",
-		"text",
-		"logic_empty",
-		"lists_get",
 		"broadcast_input",
-		"get_audios",
-		"get_whole_audios",
-		"get_current_costume",
+		"controller_shadow",
 		"default_value",
+		"get_audios",
+		"get_current_costume",
 		"get_current_scene",
 		"get_sensing_current_scene",
+		"get_whole_audios",
+		"lists_get",
+		"logic_empty",
+		"math_number",
+		"text",
 	}
 	SHADOW_FIELD_ATTRIBUTES_MAP: ClassVar[dict[str, dict[str, str]]] = {
-		"math_number": {"name": "NUM", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
-		"controller_shadow": {"name": "NUM", "constraints": "-Infinity,Infinity,0,false"},
-		"text": {"name": "TEXT"},
-		"lists_get": {"name": "VAR"},
 		"broadcast_input": {"name": "MESSAGE"},
-		"get_audios": {"name": "sound_id"},
-		"get_whole_audios": {"name": "sound_id"},
-		"get_current_costume": {"name": "style_id"},
+		"controller_shadow": {"name": "NUM", "constraints": "-Infinity,Infinity,0,false"},
 		"default_value": {"name": "TEXT", "has_been_edited": "false"},
+		"get_audios": {"name": "sound_id"},
+		"get_current_costume": {"name": "style_id"},
 		"get_current_scene": {"name": "scene"},
 		"get_sensing_current_scene": {"name": "scene"},
+		"get_whole_audios": {"name": "sound_id"},
+		"lists_get": {"name": "VAR"},
+		"math_number": {"name": "NUM", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
+		"text": {"name": "TEXT"},
 	}
 	SHADOW_FIELD_TEXT_MAP: ClassVar[dict[str, str]] = {
-		"math_number": "0",
-		"controller_shadow": "0",
-		"text": "",
-		"lists_get": "?",
 		"broadcast_input": "Hi",
-		"get_audios": "?",
-		"get_whole_audios": "all",
-		"get_current_costume": "",
+		"controller_shadow": "0",
 		"default_value": "0",
+		"get_audios": "?",
+		"get_current_costume": "",
 		"get_current_scene": "",
 		"get_sensing_current_scene": "",
+		"get_whole_audios": "all",
+		"lists_get": "?",
+		"math_number": "0",
+		"text": "",
 	}
 
 	def create_shadow(self, shadow_type: str, block_id: str | None = None, text: str | None = None) -> str:
@@ -220,34 +223,34 @@ class KittenWorkDecompiler:
 		self.work["sample_id"] = ""
 		self.work["project_name"] = self.work_info["name"]
 		self.work["toolbox_order"] = self.work["last_toolbox_order"] = [
-			"event",
-			"control",
 			"action",
+			"advanced",
+			"ai",
+			"ai_game",
+			"ai_lab",
 			"appearance",
+			"arduino",
 			"audio",
-			"pen",
-			"sensing",
-			"operator",
+			"camera",
+			"cloud_list",
+			"cloud_variable",
+			"cognitive",
+			"control",
 			"data",
 			"data",
-			"procedure",
+			"event",
+			"microbit",
+			"midimusic",
 			"mobile_control",
+			"operator",
+			"pen",
 			"physic",
 			"physics2",
-			"cloud_variable",
-			"cloud_list",
-			"advanced",
-			"ai_lab",
-			"ai_game",
-			"cognitive",
-			"camera",
+			"procedure",
+			"sensing",
 			"video",
-			"wood",
-			"arduino",
 			"weeemake",
-			"microbit",
-			"ai",
-			"midimusic",
+			"wood",
 		]
 
 
@@ -275,19 +278,19 @@ class ActorDecompiler:
 		for compiled_blocks in self.compiled["compiled_block_map"].values():
 			self.get_block_decompiler(compiled_blocks).start()
 
-	def get_block_decompiler(self, compiled: dict[str, Any]) -> Any:
+	def get_block_decompiler(self, compiled: dict[str, Any]) -> ...:
 		"""获取积木反编译器"""
 		block_type = compiled["type"]
 		decompiler_map = {
+			"ask_and_choose": AskAndChooseDecompiler,
 			"controls_if": ControlsIfDecompiler,
 			"controls_if_no_else": ControlsIfDecompiler,
-			"ask_and_choose": AskAndChooseDecompiler,
-			"text_join": TextJoinDecompiler,
-			"text_select_changeable": TextSelectChangeableDecompiler,
-			"procedures_2_defnoreturn": Procedures2DefnoreturnDecompiler,
-			"procedures_2_return_value": Procedures2ReturnValueDecompiler,
 			"procedures_2_callnoreturn": Procedures2CallDecompiler,
 			"procedures_2_callreturn": Procedures2CallDecompiler,
+			"procedures_2_defnoreturn": Procedures2DefnoreturnDecompiler,
+			"procedures_2_return_value": Procedures2ReturnValueDecompiler,
+			"text_join": TextJoinDecompiler,
+			"text_select_changeable": TextSelectChangeableDecompiler,
 		}
 		decompiler_class = decompiler_map.get(block_type, BlockDecompiler)
 		return decompiler_class(compiled, self)
@@ -400,7 +403,7 @@ class ControlsIfDecompiler(BlockDecompiler):
 		block = super().start()
 		child_blocks = self.compiled["child_block"]
 		# 检查是否有else分支
-		MIN_CONDITIONS_FOR_ELSE = 2
+		MIN_CONDITIONS_FOR_ELSE = 2  # noqa: N806
 		if len(child_blocks) == MIN_CONDITIONS_FOR_ELSE and child_blocks[-1] is None:
 			self.shadows["EXTRA_ADD_ELSE"] = ""
 		else:
@@ -409,7 +412,7 @@ class ControlsIfDecompiler(BlockDecompiler):
 			self.shadows["ELSE_TEXT"] = ""
 		return block
 
-	def get_child_input_name(self, count: int) -> str:
+	def get_child_input_name(self, count: int) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
 		conditions_count = len(self.compiled["conditions"])
 		if count < conditions_count:
 			return f"DO{count}"
@@ -456,7 +459,7 @@ class Procedures2DefnoreturnDecompiler(BlockDecompiler):
 		self.shadows["PROCEDURES_2_DEFNORETURN_MUTATOR"] = ""
 		self.fields["NAME"] = self.compiled["procedure_name"]
 		mutation = ET.Element("mutation")
-		for param_count, (param_name, param_value) in enumerate(self.compiled["params"].items()):
+		for param_count, (param_name, _param_value) in enumerate(self.compiled["params"].items()):
 			input_name = f"PARAMS{param_count}"
 			arg = ET.SubElement(mutation, "arg")
 			arg.set("name", input_name)
@@ -535,19 +538,19 @@ class CoCoWorkDecompiler:
 	def clean(self) -> None:
 		"""清理无用数据"""
 		keys_to_remove = [
-			"id",
-			"screenList",
-			"widgetMap",
-			"variableMap",
-			"gridMap",
-			"blockJsonMap",
-			"initialScreenId",
 			"apiToken",
-			"imageFileMap",
-			"soundFileMap",
-			"iconFileMap",
-			"fontFileMap",
 			"blockCode",
+			"blockJsonMap",
+			"fontFileMap",
+			"gridMap",
+			"iconFileMap",
+			"id",
+			"imageFileMap",
+			"initialScreenId",
+			"screenList",
+			"soundFileMap",
+			"variableMap",
+			"widgetMap",
 		]
 		for key in keys_to_remove:
 			if key in self.work:
@@ -617,7 +620,7 @@ def decompile_work(work_id: int) -> str:
 
 if __name__ == "__main__":
 	try:
-		work_id = int(input(""))
+		work_id = int(input("输入作品ID"))
 		file_path = decompile_work(work_id)
 		print(f"反编译完成,文件已保存到: {file_path}")
 	except ValueError:
