@@ -62,6 +62,7 @@ jobs:
     outputs:
       should_release: ${{ steps.check-commits.outputs.should_release }}
       release_tag: ${{ steps.check-commits.outputs.release_tag }}
+      full_version: ${{ steps.check-commits.outputs.full_version }}
       commit_count: ${{ steps.check-commits.outputs.commit_count }}
       latest_tag: ${{ steps.check-commits.outputs.latest_tag }}
     steps:
@@ -79,71 +80,71 @@ jobs:
           # 获取完整标签历史
           git fetch --tags --depth=100
           
-          # 方法1：按版本号排序（适用于时间戳格式）
-          LATEST_TAG_VERSION=$(git tag -l "v*" --sort=-version:refname | head -n 1)
-          echo "版本排序最新标签: $LATEST_TAG_VERSION"
+          # 读取项目版本号
+          PROJECT_VERSION=$(grep -Po 'version = "\K[0-9]+\.[0-9]+\.[0-9]+' ./${{ env.PROJECT_DIR }}/pyproject.toml)
+          echo "项目版本: $PROJECT_VERSION"
           
-          # 方法2：按创建时间排序
-          LATEST_TAG_DATE=$(git tag -l "v*" --sort=-creatordate | head -n 1)
-          echo "时间排序最新标签: $LATEST_TAG_DATE"
+          # 获取所有四段式版本标签并按版本号排序
+          ALL_TAGS=$(git tag -l "v*.*.*.*" --sort=-version:refname)
+          echo "所有四段式版本标签: $ALL_TAGS"
           
-          # 选择最可能正确的标签
-          if [ -n "$LATEST_TAG_VERSION" ] && [ -n "$LATEST_TAG_DATE" ]; then
-              if [ "$LATEST_TAG_VERSION" = "$LATEST_TAG_DATE" ]; then
-                  LATEST_TAG="$LATEST_TAG_VERSION"
-                  echo "版本和时间排序一致，使用: $LATEST_TAG"
-              else
-                  LATEST_TAG="$LATEST_TAG_VERSION"
-                  echo "排序结果不一致，优先使用版本排序: $LATEST_TAG"
-              fi
-          elif [ -n "$LATEST_TAG_VERSION" ]; then
-              LATEST_TAG="$LATEST_TAG_VERSION"
-              echo "使用版本排序标签: $LATEST_TAG"
-          elif [ -n "$LATEST_TAG_DATE" ]; then
-              LATEST_TAG="$LATEST_TAG_DATE"
-              echo "使用时间排序标签: $LATEST_TAG"
-          else
-              LATEST_TAG=""
-              echo "没有找到任何标签"
-          fi
+          # 找到最新的四段式版本标签
+          LATEST_FULL_TAG=$(echo "$ALL_TAGS" | head -n 1)
+          echo "最新四段式版本标签: $LATEST_FULL_TAG"
           
-          # 计算提交数量
-          if [ -n "$LATEST_TAG" ]; then
-              # 验证标签是否在当前分支历史中
-              if git merge-base --is-ancestor "$LATEST_TAG" HEAD 2>/dev/null; then
-                  COMMIT_COUNT=$(git rev-list --count "$LATEST_TAG..HEAD")
-                  echo "从标签 $LATEST_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
-              else
-                  echo "标签 $LATEST_TAG 不在当前分支历史中，重新计算"
-                  COMMIT_COUNT=$(git rev-list --count HEAD)
-              fi
-          else
-              echo "没有标签，计算所有提交"
+          # 计算总提交数量（保持原来的20个commit发版逻辑）
+          if [ -n "$LATEST_FULL_TAG" ]; then
+            # 验证标签是否在当前分支历史中
+            if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
+              COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
+              echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
+            else
+              echo "标签 $LATEST_FULL_TAG 不在当前分支历史中，重新计算所有提交"
               COMMIT_COUNT=$(git rev-list --count HEAD)
-          fi
-          
-          echo "提交数量: $COMMIT_COUNT"
-          echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
-          
-          # 决策逻辑
-          if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
-              echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
-              echo "should_release=true" >> $GITHUB_OUTPUT
-              
-              RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
-              echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-              
-              # 创建并推送标签
-              git tag $RELEASE_TAG
-              git push origin $RELEASE_TAG
-              echo "创建并推送新标签: $RELEASE_TAG"
+            fi
           else
-              echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
-              echo "should_release=false" >> $GITHUB_OUTPUT
-              echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "没有找到四段式版本标签，计算所有提交"
+            COMMIT_COUNT=$(git rev-list --count HEAD)
           fi
+          
+          echo "总提交数量: $COMMIT_COUNT"
+          echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
+          
+          # 决策逻辑 - 保持原来的20个commit发版
+          if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
+            echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            
+            # 计算新的四段式版本号
+            if [ -n "$LATEST_FULL_TAG" ]; then
+              # 提取第四位版本号并增加
+              LAST_BUILD_NUMBER=$(echo "$LATEST_FULL_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)' | cut -d. -f4)
+              NEW_BUILD_NUMBER=$((LAST_BUILD_NUMBER + 1))
+            else
+              # 首次发版，从1开始
+              NEW_BUILD_NUMBER=1
+            fi
+            
+            NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
+            RELEASE_TAG="v$NEW_VERSION"
+            
+            echo "新版本号: $NEW_VERSION"
+            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+            echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            
+            # 创建并推送标签
+            git tag $RELEASE_TAG
+            git push origin $RELEASE_TAG
+            echo "创建并推送新标签: $RELEASE_TAG"
+          else
+            echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
 
   generate-changelog:
     name: "Generate Changelog"
@@ -190,7 +191,7 @@ jobs:
       needs.check-release-condition.outputs.should_release == 'true' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'pull_request'
-    
+     
     env:
       UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
 
@@ -211,6 +212,7 @@ jobs:
           echo "RELEASE_TAG=${{ needs.check-release-condition.outputs.release_tag }}" >> $GITHUB_ENV
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
           echo "LATEST_TAG=${{ needs.check-release-condition.outputs.latest_tag }}" >> $GITHUB_ENV
+          echo "FULL_VERSION=${{ needs.check-release-condition.outputs.full_version }}" >> $GITHUB_ENV
           echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Read Project Version
@@ -234,6 +236,7 @@ jobs:
           args: install 7zip -y --version ${{ env.SEVEN_ZIP_VERSION }} --allow-downgrade
 
       - name: Install Inno Setup via Chocolatey
+        if: env.SHOULD_RELEASE == 'true'
         uses: crazy-max/ghaction-chocolatey@v3
         with:
           args: install innosetup -y --version ${{ env.INNOSETUP_VERSION }} --allow-downgrade
@@ -271,11 +274,14 @@ jobs:
         working-directory: ./${{ env.PROJECT_DIR }}
         run: |
           echo "开始 Nuitka 编译"
+          $FULL_VERSION = "${{ env.FULL_VERSION }}"
+          echo "构建版本: $FULL_VERSION"
+          
           uv run python -m nuitka `
             --assume-yes-for-downloads `
             --company-name="${{ env.COMPANY_NAME }}" `
             --copyright="Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved." `
-            --file-version="${{ env.PROJECT_VERSION }}" `
+            --file-version="$FULL_VERSION" `
             --follow-imports `
             --jobs=${{ env.BUILD_JOBS }} `
             --lto=${{ env.LTO_MODE }} `
@@ -283,7 +289,7 @@ jobs:
             --output-dir=../${{ env.BUILD_DIR }} `
             --output-filename=aumiao `
             --product-name="${{ env.PRODUCT_NAME }}" `
-            --product-version="${{ env.PROJECT_VERSION }}" `
+            --product-version="$FULL_VERSION" `
             --show-progress `
             --windows-console-mode=force `
             --windows-icon-from-ico="./resource/icons/favicon.ico" `
@@ -300,30 +306,39 @@ jobs:
       - name: Prepare Distribution Files
         shell: pwsh
         run: |
-          $distDir = "${{ env.DIST_DIR }}"
-          Write-Host "准备分发文件到: $distDir"
+          Write-Host "准备分发文件到: ${{ env.DIST_DIR }}"
           
           # 创建必要的目录
-          New-Item -Path "$distDir/.log" -ItemType Directory -Force
+          New-Item -Path "${{ env.DIST_DIR }}/.log" -ItemType Directory -Force
           
           # 复制必要文件
           $essentialFiles = @(
               "./${{ env.PROJECT_DIR }}/README.md",
-              "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt",
-              "./${{ env.PROJECT_DIR }}/data"
+              "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt"
           )
           foreach ($file in $essentialFiles) {
               if (Test-Path $file) {
-                  Copy-Item -Path $file -Destination $distDir -Recurse -Force
+                  Copy-Item -Path $file -Destination "${{ env.DIST_DIR }}" -Force
                   Write-Host "复制: $file"
               } else {
                   Write-Warning "文件不存在: $file"
               }
           }
           
+          # 复制 data 目录（如果存在）
+          $dataDir = "./${{ env.PROJECT_DIR }}/data"
+          if (Test-Path $dataDir) {
+              Copy-Item -Path $dataDir -Destination "${{ env.DIST_DIR }}" -Recurse -Force
+              Write-Host "复制数据目录: $dataDir"
+          } else {
+              Write-Warning "数据目录不存在: $dataDir"
+          }
+          
           # 创建版本信息文件
           $versionInfo = @{
-              Version = "${{ env.PROJECT_VERSION }}"
+              Version = "${{ env.FULL_VERSION }}"
+              BaseVersion = "${{ env.PROJECT_VERSION }}"
+              BuildNumber = "${{ env.FULL_VERSION }}".Split('.')[3]
               BuildDate = "${{ env.BUILD_DATE }}"
               BuildTime = "${{ env.BUILD_TIME }}"
               GitCommit = "${{ env.GIT_SHA }}"
@@ -343,7 +358,7 @@ jobs:
               }
           } | ConvertTo-Json -Depth 4
           
-          Set-Content -Path "$distDir/version.json" -Value $versionInfo
+          Set-Content -Path "${{ env.DIST_DIR }}/version.json" -Value $versionInfo
           Write-Host "创建版本信息文件"
 
       - name: Optimize Binaries with UPX
@@ -383,7 +398,11 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "创建便携版 ZIP 包"
-          $packageName = "${{ env.PRODUCT_NAME }}_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
+          $fullVersion = "${{ env.FULL_VERSION }}"
+          $buildDate = "${{ env.BUILD_DATE }}"
+          
+          # 优化文件命名：产品名_版本_架构_日期
+          $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}.zip"
           $zipPath = "${{ env.BUILD_DIR }}/$packageName"
           
           # 切换到分发目录的父目录
@@ -401,15 +420,39 @@ jobs:
           }
 
       - name: Build Installer
+        if: env.SHOULD_RELEASE == 'true'
         shell: pwsh
         run: |
           Write-Host "构建安装程序"
+          $fullVersion = "${{ env.FULL_VERSION }}"
+          $buildDate = "${{ env.BUILD_DATE }}"
+          
+          # 确保输出目录存在
+          New-Item -Path "./${{ env.PROJECT_DIR }}/Output" -ItemType Directory -Force -ErrorAction SilentlyContinue
+          
           $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
           if (Test-Path $issPath) {
-              ISCC.exe $issPath
-              Write-Host "安装程序构建成功"
+              Write-Host "使用 Inno Setup 编译安装程序"
+              Write-Host "ISS 文件版本: 2.3.0 (硬编码)"
+              Write-Host "构建版本: $fullVersion"
+              
+              ISCC.exe "$issPath"
+              
+              # 检查是否生成了安装程序
+              $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
+              if ($installerFiles) {
+                  # 重命名安装程序以包含版本信息
+                  $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
+                  Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
+                  Write-Host "安装程序构建成功: $newInstallerName"
+                  Write-Host "注意: ISS 文件中版本号为硬编码 2.3.0，安装程序文件名为 $fullVersion"
+              } else {
+                  Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
+                  exit 1
+              }
           } else {
-              Write-Warning "未找到 Inno Setup 脚本: $issPath"
+              Write-Error "未找到 Inno Setup 脚本: $issPath"
+              exit 1
           }
 
       - name: Upload Portable Package to Artifacts
@@ -421,12 +464,12 @@ jobs:
         if: success()
 
       - name: Upload Installer to Artifacts
+        if: env.SHOULD_RELEASE == 'true' && success()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PRODUCT_NAME }}-Installer-${{ env.BUILD_DATE }}
           path: ${{ env.PROJECT_DIR }}/Output/*.exe
           retention-days: 30
-        if: success()
 
       - name: Minimize UV Cache
         run: uv cache prune --ci
@@ -465,9 +508,9 @@ jobs:
           name: "${{ env.PRODUCT_NAME }} ${{ needs.check-release-condition.outputs.release_tag }}"
           body: |
             ${{ needs.generate-changelog.outputs.release_body }}
-            
+             
             ## 构建信息
-            - 版本: ${{ env.PROJECT_VERSION }}
+            - 版本: ${{ needs.check-release-condition.outputs.full_version }}
             - 提交: ${{ env.GIT_SHA }}
             - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
             - 提交数量: ${{ env.COMMIT_COUNT }}
