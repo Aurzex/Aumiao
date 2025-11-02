@@ -7,7 +7,7 @@
 #define MyAppURL "https://aumiao.aurzex.top/"
 #define MyAppExeName "aumiao.exe"
 #define BuildDir "..\..\build\main.dist"
-#define OutputDir "..\..\build\installer"
+#define OutputDir "..\Output"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -31,7 +31,7 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir={#OutputDir}
 OutputBaseFilename=aumiao_setup
-SetupIconFile=..\..\Aumiao-py\resource\icons\favicon.ico
+SetupIconFile=..\icons\favicon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
