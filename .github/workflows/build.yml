@@ -430,24 +430,53 @@ jobs:
           # 确保输出目录存在
           New-Item -Path "./${{ env.PROJECT_DIR }}/Output" -ItemType Directory -Force -ErrorAction SilentlyContinue
           
+          # 检查图标文件是否存在
+          $iconPath = "./${{ env.PROJECT_DIR }}/resource/icons/favicon.ico"
+          if (-not (Test-Path $iconPath)) {
+              Write-Error "图标文件不存在: $iconPath"
+              Write-Host "当前目录: $(Get-Location)"
+              Write-Host "目录内容:"
+              Get-ChildItem -Path "./${{ env.PROJECT_DIR }}/resource" -Recurse | Format-Table Name, FullName
+              exit 1
+          }
+          
           $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
           if (Test-Path $issPath) {
               Write-Host "使用 Inno Setup 编译安装程序"
               Write-Host "ISS 文件版本: 2.3.0 (硬编码)"
               Write-Host "构建版本: $fullVersion"
+              Write-Host "图标文件路径: $iconPath"
+              Write-Host "图标文件存在: $(Test-Path $iconPath)"
               
-              ISCC.exe "$issPath"
+              # 检查构建目录是否存在
+              $buildDistPath = "./${{ env.BUILD_DIR }}/main.dist"
+              if (-not (Test-Path $buildDistPath)) {
+                  Write-Error "构建目录不存在: $buildDistPath"
+                  exit 1
+              }
               
-              # 检查是否生成了安装程序
-              $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
-              if ($installerFiles) {
-                  # 重命名安装程序以包含版本信息
-                  $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
-                  Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
-                  Write-Host "安装程序构建成功: $newInstallerName"
-                  Write-Host "注意: ISS 文件中版本号为硬编码 2.3.0，安装程序文件名为 $fullVersion"
+              # 运行 Inno Setup 编译
+              $process = Start-Process -FilePath "ISCC.exe" -ArgumentList "`"$issPath`"" -Wait -PassThru -NoNewWindow
+              
+              if ($process.ExitCode -eq 0) {
+                  Write-Host "Inno Setup 编译成功完成"
+                  
+                  # 检查是否生成了安装程序
+                  $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
+                  if ($installerFiles) {
+                      # 重命名安装程序以包含版本信息
+                      $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
+                      Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
+                      Write-Host "安装程序构建成功: $newInstallerName"
+                      Write-Host "注意: ISS 文件中版本号为硬编码 2.3.0，安装程序文件名为 $fullVersion"
+                  } else {
+                      Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
+                      Write-Host "Output 目录内容:"
+                      Get-ChildItem -Path "./${{ env.PROJECT_DIR }}/Output" -ErrorAction SilentlyContinue | Format-Table Name, FullName
+                      exit 1
+                  }
               } else {
-                  Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
+                  Write-Error "Inno Setup 编译失败，退出代码: $($process.ExitCode)"
                   exit 1
               }
           } else {
