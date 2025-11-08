@@ -6,9 +6,12 @@ import xml.etree.ElementTree as ET  # noqa: S405
 from pathlib import Path
 from typing import Any, ClassVar
 
-import requests
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from src.utils import acquire
+
+client = acquire.CodeMaoClient()
 
 
 class BCMKNDecryptor:
@@ -140,31 +143,6 @@ class BCMKNDecryptor:
 			if last_valid > 0:
 				text = text[: last_valid + 1]
 		return text
-
-
-class Network:
-	"""网络请求工具类"""
-
-	@staticmethod
-	def fetch_json(url: str) -> dict[str, Any]:
-		"""获取JSON数据"""
-		response = requests.get(url, timeout=30)
-		response.raise_for_status()
-		return response.json()
-
-	@staticmethod
-	def fetch_binary(url: str) -> bytes:
-		"""获取二进制数据"""
-		response = requests.get(url, timeout=30)
-		response.raise_for_status()
-		return response.content
-
-	@staticmethod
-	def fetch_text(url: str) -> str:
-		"""获取文本数据"""
-		response = requests.get(url, timeout=30)
-		response.raise_for_status()
-		return response.text
 
 
 class Crypto:
@@ -325,7 +303,7 @@ class NekoDecompiler(BaseDecompiler):
 		# 获取作品详情以获取加密文件URL
 		detail_url = f"https://api-creation.codemao.cn/neko/community/player/published-work-detail/{self.work_info.id}"
 		try:
-			detail_data = Network.fetch_json(detail_url)
+			detail_data = client.send_request(endpoint=detail_url, method="GET").json()
 			encrypted_url = detail_data["source_urls"][0]
 			print(f"📥 获取加密文件URL: {encrypted_url}")
 		except Exception as e:
@@ -333,7 +311,7 @@ class NekoDecompiler(BaseDecompiler):
 			raise ValueError(error_msg) from e
 		# 下载加密文件
 		try:
-			encrypted_content = Network.fetch_text(encrypted_url)
+			encrypted_content = client.send_request(endpoint=encrypted_url, method="GET").text
 			print(f"📊 下载加密数据完成,长度: {len(encrypted_content)} 字符")
 		except Exception as e:
 			error_msg = "下载加密文件失败"
@@ -357,8 +335,8 @@ class NemoDecompiler(BaseDecompiler):
 		work_id = self.work_info.id
 		work_dir = Path(f"nemo_work_{work_id}")
 		FileHelper.ensure_dir(work_dir)
-		source_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public")
-		bcm_data = Network.fetch_json(source_info["work_urls"][0])
+		source_info = client.send_request(endpoint=f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public", method="GET").json()
+		bcm_data = client.send_request(endpoint=source_info["work_urls"][0], method="GET").json()
 		dirs = self._create_directories(work_dir, work_id)
 		self._save_core_files(dirs, work_id, bcm_data, source_info)
 		self._download_resources(dirs, bcm_data)
@@ -388,7 +366,7 @@ class NemoDecompiler(BaseDecompiler):
 		FileHelper.write_json(meta_path, meta_data)
 		if source_info.get("preview"):
 			try:
-				cover_data = Network.fetch_binary(source_info["preview"])
+				cover_data = client.send_request(source_info["preview"], method="GET").content
 				cover_path = dirs["works"] / f"{work_id}.cover"
 				FileHelper.write_binary(cover_path, cover_data)
 			except Exception as e:
@@ -445,7 +423,7 @@ class NemoDecompiler(BaseDecompiler):
 			image_url = style_data.get("url")
 			if image_url:
 				try:
-					image_data = Network.fetch_binary(image_url)
+					image_data = client.send_request(endpoint=image_url, method="GET").content
 					file_name = f"{Crypto.sha256(image_url)}.webp"
 					file_path = dirs["material"] / file_name
 					FileHelper.write_binary(file_path, image_data)
@@ -474,10 +452,10 @@ class KittenDecompiler(BaseDecompiler):
 		work_id = self.work_info.id
 		if self.work_info.type in {"KITTEN2", "KITTEN3", "KITTEN4"}:
 			url = f"https://api-creation.codemao.cn/kitten/r2/work/player/load/{work_id}"
-			compiled_url = Network.fetch_json(url)["source_urls"][0]
+			compiled_url = client.send_request(endpoint=url, method="GET").json()["source_urls"][0]
 		else:
 			compiled_url = self.work_info.source_urls[0]
-		return Network.fetch_json(compiled_url)
+		return client.send_request(compiled_url, method="GET").json()
 
 	def _decompile_actors(self, work: dict[str, Any]) -> None:
 		"""反编译所有角色"""
@@ -814,8 +792,8 @@ class CocoDecompiler(BaseDecompiler):
 		"""获取编译数据"""
 		work_id = self.work_info.id
 		url = f"https://api-creation.codemao.cn/coconut/web/work/{work_id}/load"
-		compiled_url = Network.fetch_json(url)["data"]["bcmc_url"]
-		return Network.fetch_json(compiled_url)
+		compiled_url = client.send_request(url, method="GET").json()["data"]["bcmc_url"]
+		return client.send_request(compiled_url, method="GET").json()
 
 	def _reorganize_data(self, work: dict[str, Any]) -> None:
 		"""重组数据"""
@@ -929,7 +907,7 @@ class Decompiler:
 			保存的文件路径
 		"""
 		print(f"开始反编译作品 {work_id}...")
-		raw_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}")
+		raw_info = client.send_request(endpoint=f"https://api.codemao.cn/creation-tools/v1/works/{work_id}", method="GET").json()
 		work_info = WorkInfo(raw_info)
 		print(f"✓ 作品: {work_info.name}")
 		print(f"✓ 类型: {work_info.type}")
@@ -971,9 +949,3 @@ def decompile_work(work_id: int, output_dir: str = "decompiled") -> str:
 	"""
 	decompiler = Decompiler()
 	return decompiler.decompile(work_id, output_dir)
-
-
-if __name__ == "__main__":
-	work_id = int(input("请输入作品ID: "))
-	output_path = decompile_work(work_id)
-	print(f"✓ 反编译完成: {output_path}")
