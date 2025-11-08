@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from src.api import community
 from src.utils import acquire
 
 client = acquire.CodeMaoClient()
@@ -297,13 +298,36 @@ class BaseDecompiler:
 class NekoDecompiler(BaseDecompiler):
 	"""NEKO作品反编译器"""
 
+	@staticmethod
+	def generate_device_auth(timestamp: int, client_id: str | None = None) -> dict:
+		"""
+		生成设备认证数据
+		Args:
+			client_id: 客户端ID,如果为None则随机生成8位
+			timestamp: 时间戳,如果为None则使用当前时间
+		Returns:
+			dict: {sign, timestamp, client_id}
+		"""
+		CLIENT_SECRET = "pBlYqXbJDu"  # noqa: N806, S105
+		if client_id is None:
+			chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+			client_id = "".join(chars[random.randint(0, 35)] for _ in range(8))
+		sign_str = f"{CLIENT_SECRET}{timestamp}{client_id}"
+		sign = hashlib.sha256(sign_str.encode()).hexdigest().upper()
+		return {"sign": sign, "timestamp": timestamp, "client_id": client_id}
+
 	def decompile(self) -> dict[str, Any]:
 		"""反编译NEKO作品"""
 		print(f"🔓 开始解密NEKO作品: {self.work_info.id}")
 		# 获取作品详情以获取加密文件URL
+		timestamp: int = community.DataFetcher().fetch_current_timestamp_10()["data"]
 		detail_url = f"https://api-creation.codemao.cn/neko/community/player/published-work-detail/{self.work_info.id}"
+		# Convert the device auth dict to JSON string
+		device_auth_dict = self.generate_device_auth(timestamp)
+		device_auth_json = json.dumps(device_auth_dict)
+		headers = {"x-creation-tools-device-auth": device_auth_json}
 		try:
-			detail_data = client.send_request(endpoint=detail_url, method="GET").json()
+			detail_data = client.send_request(endpoint=detail_url, method="GET", headers=headers).json()
 			encrypted_url = detail_data["source_urls"][0]
 			print(f"📥 获取加密文件URL: {encrypted_url}")
 		except Exception as e:
