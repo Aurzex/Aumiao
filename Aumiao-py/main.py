@@ -10,6 +10,7 @@ from typing import Literal, TypeVar, cast
 from src import user, whale
 from src.api import community
 from src.core.base import Index
+from src.core.compile import decompile_work
 from src.core.process import FileProcessor, ReportAuthManager
 from src.core.services import FileUploader, MillenniumEntanglement, Motion, Report
 from src.utils import data, plugin, tool
@@ -269,6 +270,14 @@ def plugin_manager(account_data_manager: AccountDataManager) -> None:  # noqa: A
 
 
 @handle_errors
+def decompile_works(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+	printer.print_header("编译作品")
+	work_id = printer.get_valid_input("请输入作品ID", cast_type=int, validator=lambda x: x > 0)
+	output_path = decompile_work(work_id)
+	print(printer.color_text(f"✓ 反编译完成: {output_path}", "SUCCESS"))
+
+
+@handle_errors
 @require_login
 def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
@@ -339,6 +348,7 @@ def main() -> None:
 		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
 		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
 		"12": MenuOption(name="插件管理", handler=partial(plugin_manager, account_data_manager), require_auth=False),
+		"13": MenuOption(name="编译作品", handler=partial(decompile_works, account_data_manager), require_auth=False),
 		"00": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
 		"1106": MenuOption(
 			name="隐藏功能",
