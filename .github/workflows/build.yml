@@ -6,32 +6,32 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [dev]  # 只在 dev 分支触发自动发版
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
       - "Aumiao-py/pyproject.toml"
   pull_request:
-    branches: [main]
+    branches: [main]  # PR 到 main 只做构建验证
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
       - "Aumiao-py/pyproject.toml"
-  workflow_dispatch:
+  workflow_dispatch:  # 手动触发
 
 env:
   # 构建配置
   BUILD_TYPE: Release
-  COMMIT_INTERVAL: 20
+  COMMIT_INTERVAL: 20  # dev 分支累积 20 个提交后自动发版
   
   # Python 环境
   PYTHON_VERSION: "3.13"
   PYTHON_ARCH: "x64"
   
   # 工具版本
-  UV_VERSION: "0.9.3"
+  UV_VERSION: "0.9.8"
   UPX_VERSION: "5.0.2"
-  NUITKA_VERSION: "2.3.2"
+  NUITKA_VERSION: "2.8.4"
   
   # 系统工具版本
   SEVEN_ZIP_VERSION: "25.1"
@@ -65,6 +65,7 @@ jobs:
       full_version: ${{ steps.check-commits.outputs.full_version }}
       commit_count: ${{ steps.check-commits.outputs.commit_count }}
       latest_tag: ${{ steps.check-commits.outputs.latest_tag }}
+      is_manual: ${{ steps.check-commits.outputs.is_manual }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -75,15 +76,37 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          echo "开始 Dev 分支提交计数分析"
+          echo "开始提交计数分析"
+          echo "事件类型: $GITHUB_EVENT_NAME"
+          echo "触发分支: ${GITHUB_REF#refs/heads/}"
           
-          # 检查当前分支
+          # 判断是否为手动触发
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "手动触发工作流"
+            echo "is_manual=true" >> $GITHUB_OUTPUT
+          else
+            echo "自动触发工作流"
+            echo "is_manual=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # 对于 PR 事件，只构建不发版
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "Pull Request 事件 - 仅构建不发布"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "full_version=0.0.0.0" >> $GITHUB_OUTPUT
+            echo "latest_tag=" >> $GITHUB_OUTPUT
+            echo "commit_count=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 获取当前分支
           CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
           echo "当前分支: $CURRENT_BRANCH"
           
-          # 如果不是 dev 分支，跳过发布
-          if [ "$CURRENT_BRANCH" != "dev" ]; then
-            echo "当前分支不是 dev，跳过发布检查"
+          # 只在 dev 分支或手动触发时考虑发版
+          if [ "$CURRENT_BRANCH" != "dev" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "当前分支不是 dev 且非手动触发，跳过发布检查"
             echo "should_release=false" >> $GITHUB_OUTPUT
             echo "release_tag=" >> $GITHUB_OUTPUT
             echo "full_version=0.0.0.0" >> $GITHUB_OUTPUT
@@ -107,7 +130,33 @@ jobs:
           LATEST_FULL_TAG=$(echo "$ALL_TAGS" | head -n 1)
           echo "最新四段式版本标签: $LATEST_FULL_TAG"
           
-          # 计算 dev 分支自上次发布后的提交数量
+          # 手动触发时直接发版
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "手动触发 - 强制发版"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            
+            # 计算新的四段式版本号
+            if [ -n "$LATEST_FULL_TAG" ]; then
+              # 提取第四位版本号并增加
+              LAST_BUILD_NUMBER=$(echo "$LATEST_FULL_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)' | cut -d. -f4)
+              NEW_BUILD_NUMBER=$((LAST_BUILD_NUMBER + 1))
+            else
+              # 首次发版，从1开始
+              NEW_BUILD_NUMBER=1
+            fi
+            
+            NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
+            RELEASE_TAG="v$NEW_VERSION"
+            
+            echo "手动触发新版本号: $NEW_VERSION"
+            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+            echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+            echo "commit_count=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 自动触发：计算 dev 分支自上次发布后的提交数量
           if [ -n "$LATEST_FULL_TAG" ]; then
             # 检查标签是否在当前 dev 分支历史中
             if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
@@ -115,7 +164,7 @@ jobs:
               COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
               echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
             else
-              # 标签不在当前分支历史中（可能是从其他分支创建的标签）
+              # 标签不在当前分支历史中
               echo "标签 $LATEST_FULL_TAG 不在当前 dev 分支历史中"
               
               # 找到 dev 分支上最新的标签
@@ -220,7 +269,7 @@ jobs:
       needs.check-release-condition.outputs.should_release == 'true' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'pull_request'
-     
+    
     env:
       UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
 
@@ -242,8 +291,8 @@ jobs:
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
           echo "LATEST_TAG=${{ needs.check-release-condition.outputs.latest_tag }}" >> $GITHUB_ENV
           echo "FULL_VERSION=${{ needs.check-release-condition.outputs.full_version }}" >> $GITHUB_ENV
+          echo "IS_MANUAL=${{ needs.check-release-condition.outputs.is_manual }}" >> $GITHUB_ENV
           echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
-
       - name: Read Project Version
         id: version
         shell: pwsh
@@ -566,11 +615,12 @@ jobs:
           name: "${{ env.PRODUCT_NAME }} ${{ needs.check-release-condition.outputs.release_tag }}"
           body: |
             ${{ needs.generate-changelog.outputs.release_body }}
-             
+            
             ## 构建信息
             - 版本: ${{ needs.check-release-condition.outputs.full_version }}
             - 提交: ${{ env.GIT_SHA }}
             - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
+            - 触发方式: ${{ env.IS_MANUAL == 'true' && '手动触发' || '自动触发' }}
             - 提交数量: ${{ env.COMMIT_COUNT }}
             - 前一个标签: ${{ env.LATEST_TAG }}
           files: |
