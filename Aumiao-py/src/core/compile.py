@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import random
@@ -6,13 +7,146 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import requests
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+
+class BCMKNDecryptor:
+	"""BCMKN文件解密器 - 用于NEKO类型作品"""
+
+	def __init__(self) -> None:
+		# 固定盐值 - 对应JavaScript中的M.j(31)
+		self.default_salt = bytes(range(31))
+
+	@staticmethod
+	def reverse_string(s: str) -> str:
+		"""字符串反转"""
+		return s[::-1]
+
+	@staticmethod
+	def base64_to_bytes(base64_str: str) -> bytes:
+		"""Base64解码"""
+		try:
+			return base64.b64decode(base64_str)
+		except Exception as e:
+			error_msg = f"Base64解码错误: {e}"
+			raise ValueError(error_msg) from e
+
+	def generate_aes_key(self) -> bytes:
+		"""生成AES密钥 - 使用SHA-256算法"""
+		digest = hashes.Hash(hashes.SHA256())
+		digest.update(self.default_salt)
+		return digest.finalize()
+
+	@staticmethod
+	def decrypt_aes_gcm(encrypted_data: bytes, key: bytes, iv: bytes) -> bytes:
+		"""AES-GCM解密"""
+		try:
+			aesgcm = AESGCM(key)
+			return aesgcm.decrypt(iv, encrypted_data, None)
+		except Exception as e:
+			error_msg = f"AES解密错误: {e}"
+			raise ValueError(error_msg) from e
+
+	def decrypt_data(self, encrypted_content: str) -> dict[str, Any]:
+		"""解密BCMKN数据"""
+		# 步骤1: 字符串反转
+		reversed_data = self.reverse_string(encrypted_content)
+		# 步骤2: Base64解码
+		decoded_data = self.base64_to_bytes(reversed_data)
+		# 步骤3: 分离IV和密文 (IV为前12字节)
+		MIN_DATA_LENGTH = 13  # noqa: N806
+		if len(decoded_data) < MIN_DATA_LENGTH:
+			msg = "数据太短,无法分离IV和密文"
+			raise ValueError(msg)
+		iv = decoded_data[:12]
+		ciphertext = decoded_data[12:]
+		# 步骤4: 生成AES密钥
+		key = self.generate_aes_key()
+		# 步骤5: AES-GCM解密
+		decrypted_bytes = self.decrypt_aes_gcm(ciphertext, key, iv)
+		# 清理和修复JSON数据
+		return self.clean_and_repair_json(decrypted_bytes)
+
+	@staticmethod
+	def find_valid_json_end(text: str) -> int:
+		"""找到有效的JSON结束位置"""
+		stack: list[str] = []
+		in_string = False
+		escape = False
+		for i, char in enumerate(text):
+			if escape:
+				escape = False
+				continue
+			if char == "\\":
+				escape = True
+				continue
+			if char == '"':
+				in_string = not in_string
+				continue
+			if in_string:
+				continue
+			if char in "{[":
+				stack.append(char)
+			elif char in "}]":
+				if not stack:
+					return i
+				opening = stack.pop()
+				if (opening == "{" and char != "}") or (opening == "[" and char != "]"):
+					return i
+				if not stack:
+					return i + 1
+		if stack:
+			for i in range(len(text) - 1, -1, -1):
+				if text[i] in "}]":
+					try:
+						json.loads(text[: i + 1])
+						return i + 1
+					except json.JSONDecodeError:
+						continue
+		return len(text)
+
+	def clean_and_repair_json(self, raw_bytes: bytes) -> dict[str, Any]:
+		"""清理和修复JSON数据"""
+		text_content = raw_bytes.decode("utf-8", errors="ignore")
+		# 查找有效的JSON结束位置
+		valid_end = self.find_valid_json_end(text_content)
+		if valid_end < len(text_content):
+			text_content = text_content[:valid_end]
+		# 尝试解析JSON
+		try:
+			return json.loads(text_content)
+		except json.JSONDecodeError:
+			# 尝试修复常见的JSON问题
+			repaired_content = self.repair_json(text_content)
+			try:
+				return json.loads(repaired_content)
+			except json.JSONDecodeError as decode_error:
+				error_msg = "JSON解析失败,数据可能已损坏"
+				raise ValueError(error_msg) from decode_error
+
+	@staticmethod
+	def repair_json(text: str) -> str:
+		"""尝试修复JSON数据"""
+		# 移除末尾的逗号
+		text = text.rstrip()
+		while text and text[-1] in ", \t\n\r":
+			text = text[:-1]
+		# 确保以 } 或 ] 结束
+		if not text.endswith("}") and not text.endswith("]"):
+			last_brace = text.rfind("}")
+			last_bracket = text.rfind("]")
+			last_valid = max(last_brace, last_bracket)
+			if last_valid > 0:
+				text = text[: last_valid + 1]
+		return text
 
 
 class Network:
 	"""网络请求工具类"""
 
 	@staticmethod
-	def fetch_json(url: str) -> ...:
+	def fetch_json(url: str) -> dict[str, Any]:
 		"""获取JSON数据"""
 		response = requests.get(url, timeout=30)
 		response.raise_for_status()
@@ -54,7 +188,7 @@ class WorkInfo:
 		self.version = data.get("bcm_version", "0.16.2")
 		self.user_id = data.get("user_id", 0)
 		self.preview_url = data.get("preview", "")
-		self.source_urls = data.get("work_urls", [])
+		self.source_urls = data.get("source_urls", data.get("work_urls", []))
 
 	@property
 	def file_extension(self) -> str:
@@ -64,7 +198,8 @@ class WorkInfo:
 			"KITTEN3": ".bcm",
 			"KITTEN4": ".bcm4",
 			"COCO": ".json",
-			"NEMO": "",  # Nemo使用文件夹
+			"NEMO": "",
+			"NEKO": ".json",  # NEKO类型使用JSON格式
 		}
 		return extensions.get(self.type, ".json")
 
@@ -73,6 +208,11 @@ class WorkInfo:
 		"""是否为Nemo作品"""
 		return self.type == "NEMO"
 
+	@property
+	def is_neko(self) -> bool:
+		"""是否为NEKO作品"""
+		return self.type == "NEKO"
+
 
 class FileHelper:
 	"""文件操作工具类"""
@@ -80,11 +220,9 @@ class FileHelper:
 	@staticmethod
 	def safe_filename(name: str, work_id: int, extension: str = "") -> str:
 		"""生成安全文件名"""
-		# 移除非法字符
 		safe_name = "".join(c for c in name if c.isalnum() or c in {" ", "-", "_"}).strip()
 		if not safe_name:
 			safe_name = f"work_{work_id}"
-		# 添加扩展名
 		if extension and not extension.startswith("."):
 			extension = f".{extension}"
 		return f"{safe_name}_{work_id}{extension}"
@@ -95,7 +233,7 @@ class FileHelper:
 		Path(path).mkdir(parents=True, exist_ok=True)
 
 	@staticmethod
-	def write_json(path: str | Path, data: ...) -> None:
+	def write_json(path: str | Path, data: Any) -> None:  # noqa: ANN401
 		"""写入JSON文件"""
 		with Path(path).open("w", encoding="utf-8") as f:
 			json.dump(data, f, ensure_ascii=False, indent=2)
@@ -110,7 +248,6 @@ class FileHelper:
 class ShadowBuilder:
 	"""阴影积木构建器"""
 
-	# 阴影类型定义
 	SHADOW_TYPES: ClassVar[set[str]] = {
 		"broadcast_input",
 		"controller_shadow",
@@ -125,7 +262,6 @@ class ShadowBuilder:
 		"math_number",
 		"text",
 	}
-	# 字段属性配置
 	FIELD_CONFIG: ClassVar[dict[str, dict[str, str]]] = {
 		"broadcast_input": {"name": "MESSAGE", "text": "Hi"},
 		"controller_shadow": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,false"},
@@ -162,7 +298,6 @@ class ShadowBuilder:
 		field = ET.SubElement(shadow, "field")
 		field.set("name", config["name"])
 		field.text = str(display_text)
-		# 添加额外属性
 		for attr in ["constraints", "allow_text", "has_been_edited"]:
 			if attr in config:
 				field.set(attr, config[attr])
@@ -181,23 +316,51 @@ class BaseDecompiler:
 		raise NotImplementedError
 
 
+class NekoDecompiler(BaseDecompiler):
+	"""NEKO作品反编译器"""
+
+	def decompile(self) -> dict[str, Any]:
+		"""反编译NEKO作品"""
+		print(f"🔓 开始解密NEKO作品: {self.work_info.id}")
+		# 获取作品详情以获取加密文件URL
+		detail_url = f"https://api-creation.codemao.cn/neko/community/player/published-work-detail/{self.work_info.id}"
+		try:
+			detail_data = Network.fetch_json(detail_url)
+			encrypted_url = detail_data["source_urls"][0]
+			print(f"📥 获取加密文件URL: {encrypted_url}")
+		except Exception as e:
+			error_msg = "获取作品详情失败"
+			raise ValueError(error_msg) from e
+		# 下载加密文件
+		try:
+			encrypted_content = Network.fetch_text(encrypted_url)
+			print(f"📊 下载加密数据完成,长度: {len(encrypted_content)} 字符")
+		except Exception as e:
+			error_msg = "下载加密文件失败"
+			raise ValueError(error_msg) from e
+		# 解密文件
+		decryptor = BCMKNDecryptor()
+		try:
+			decrypted_data = decryptor.decrypt_data(encrypted_content)
+			print("✅ NEKO作品解密成功!")
+			return decrypted_data  # noqa: TRY300
+		except Exception as e:
+			error_msg = "解密失败"
+			raise ValueError(error_msg) from e
+
+
 class NemoDecompiler(BaseDecompiler):
 	"""Nemo作品反编译器"""
 
 	def decompile(self) -> str:
 		"""反编译Nemo作品为文件夹结构"""
 		work_id = self.work_info.id
-		# 创建主目录
 		work_dir = Path(f"nemo_work_{work_id}")
 		FileHelper.ensure_dir(work_dir)
-		# 获取作品源数据
 		source_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public")
 		bcm_data = Network.fetch_json(source_info["work_urls"][0])
-		# 创建目录结构
 		dirs = self._create_directories(work_dir, work_id)
-		# 保存核心文件
 		self._save_core_files(dirs, work_id, bcm_data, source_info)
-		# 下载资源文件
 		self._download_resources(dirs, bcm_data)
 		return str(work_dir)
 
@@ -215,18 +378,14 @@ class NemoDecompiler(BaseDecompiler):
 
 	def _save_core_files(self, dirs: dict[str, Path], work_id: int, bcm_data: dict[str, Any], source_info: dict[str, Any]) -> None:
 		"""保存核心文件"""
-		# 保存BCM文件
 		bcm_path = dirs["works"] / f"{work_id}.bcm"
 		FileHelper.write_json(bcm_path, bcm_data)
-		# 创建用户图片配置
 		user_images = self._build_user_images(bcm_data)
-		userimg_path = dirs["works"] / f"{work_id}.userimg"
-		FileHelper.write_json(userimg_path, user_images)
-		# 创建元数据
+		user_img_path = dirs["works"] / f"{work_id}.userimg"
+		FileHelper.write_json(user_img_path, user_images)
 		meta_data = self._build_metadata(work_id, source_info)
 		meta_path = dirs["works"] / f"{work_id}.meta"
 		FileHelper.write_json(meta_path, meta_data)
-		# 下载封面
 		if source_info.get("preview"):
 			try:
 				cover_data = Network.fetch_binary(source_info["preview"])
@@ -303,9 +462,7 @@ class KittenDecompiler(BaseDecompiler):
 
 	def decompile(self) -> dict[str, Any]:
 		"""反编译Kitten作品"""
-		# 获取编译数据
 		compiled_data = self._fetch_compiled_data()
-		# 反编译作品
 		work = compiled_data.copy()
 		self._decompile_actors(work)
 		self._update_work_info(work)
@@ -329,7 +486,6 @@ class KittenDecompiler(BaseDecompiler):
 			actor_info = self._get_actor_info(work, actor_data["id"])
 			actor = ActorProcessor(self, actor_info, actor_data)
 			actors.append(actor)
-		# 准备并执行反编译
 		for actor in actors:
 			actor.prepare()
 		for actor in actors:
@@ -337,15 +493,12 @@ class KittenDecompiler(BaseDecompiler):
 
 	@staticmethod
 	def _get_actor_info(work: dict[str, Any], actor_id: str) -> dict[str, Any]:
-		"""获取角色信息 - 修复版"""
+		"""获取角色信息"""
 		theatre = work["theatre"]
-		# 先尝试从actors中获取
 		if actor_id in theatre["actors"]:
 			return theatre["actors"][actor_id]
-		# 再尝试从scenes中获取
 		if actor_id in theatre["scenes"]:
 			return theatre["scenes"][actor_id]
-		# 如果都找不到,创建一个空的角色信息
 		print(f"警告: 角色ID {actor_id} 在actors和scenes中均未找到,使用空角色信息")
 		return {
 			"id": actor_id,
@@ -376,7 +529,6 @@ class KittenDecompiler(BaseDecompiler):
 			"cloud_variable",
 			"cognitive",
 			"control",
-			"data",
 			"data",
 			"event",
 			"micro_bit",
@@ -426,18 +578,15 @@ class ActorProcessor:
 
 	def process(self) -> None:
 		"""处理角色"""
-		# 处理函数
 		for func_name, func_data in self.compiled_data["procedures"].items():
 			processor = FunctionProcessor(func_data, self)
 			self.decompiler.functions[func_name] = processor.process()
-		# 处理积木
 		for block_data in self.compiled_data["compiled_block_map"].values():
 			self.process_block(block_data)
 
 	def process_block(self, compiled: dict[str, Any]) -> dict[str, Any]:
 		"""处理单个积木"""
 		block_type = compiled["type"]
-		# 选择处理器
 		if block_type == "controls_if":
 			processor = IfBlockProcessor(compiled, self)
 		elif block_type == "text_join":
@@ -552,7 +701,6 @@ class BlockProcessor:
 
 	@staticmethod
 	def _get_child_input_name(_index: int) -> str:
-		"""获取子输入名称"""
 		return "DO"
 
 
@@ -564,7 +712,6 @@ class IfBlockProcessor(BlockProcessor):
 	def process(self) -> dict[str, Any]:
 		block = super().process()
 		children = self.compiled["child_block"]
-		# 检查else分支
 		if len(children) == self.MIN_CONDITIONS_FOR_ELSE and children[-1] is None:
 			self.shadows["EXTRA_ADD_ELSE"] = ""
 		else:
@@ -573,7 +720,7 @@ class IfBlockProcessor(BlockProcessor):
 			self.shadows["ELSE_TEXT"] = ""
 		return block
 
-	def _get_child_input_name(self, index: int) -> str:  # type: ignore  # noqa: PGH003
+	def _get_child_input_name(self, index: int) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
 		conditions_count = len(self.compiled["conditions"])
 		return f"DO{index}" if index < conditions_count else "ELSE"
 
@@ -676,13 +823,11 @@ class CocoDecompiler(BaseDecompiler):
 		work["title"] = self.work_info.name
 		work["screens"] = {}
 		work["screenIds"] = []
-		# 处理屏幕
 		for screen in work["screenList"]:
 			screen_id = screen["id"]
 			screen["snapshot"] = ""
 			work["screens"][screen_id] = screen
 			work["screenIds"].append(screen_id)
-			# 初始化屏幕数据
 			screen.update(
 				{
 					"primitiveVariables": [],
@@ -692,19 +837,14 @@ class CocoDecompiler(BaseDecompiler):
 					"widgets": {},
 				}
 			)
-			# 处理组件
 			for widget_id in screen["widgetIds"] + screen["invisibleWidgetIds"]:
 				screen["widgets"][widget_id] = work["widgetMap"][widget_id]
 				del work["widgetMap"][widget_id]
-		# 处理积木数据
 		work["blockly"] = {}
 		for screen_id, blocks in work["blockJsonMap"].items():
 			work["blockly"][screen_id] = {"screenId": screen_id, "workspaceJson": blocks, "workspaceOffset": {"x": 0, "y": 0}}
-		# 处理资源文件
 		self._process_resources(work)
-		# 处理变量
 		self._process_variables(work)
-		# 设置全局属性
 		work.update(
 			{
 				"globalWidgets": work["widgetMap"],
@@ -776,6 +916,7 @@ class Decompiler:
 			"KITTEN3": KittenDecompiler,
 			"KITTEN4": KittenDecompiler,
 			"COCO": CocoDecompiler,
+			"NEKO": NekoDecompiler,  # 添加NEKO支持
 		}
 
 	def decompile(self, work_id: int, output_dir: str = "decompiled") -> str:
@@ -788,19 +929,16 @@ class Decompiler:
 			保存的文件路径
 		"""
 		print(f"开始反编译作品 {work_id}...")
-		# 获取作品信息
 		raw_info = Network.fetch_json(f"https://api.codemao.cn/creation-tools/v1/works/{work_id}")
 		work_info = WorkInfo(raw_info)
 		print(f"✓ 作品: {work_info.name}")
 		print(f"✓ 类型: {work_info.type}")
-		# 选择反编译器
 		decompiler_class = self.decompilers.get(work_info.type)
 		if not decompiler_class:
 			error_msg = f"不支持的作品类型: {work_info.type}"
 			raise ValueError(error_msg)
 		decompiler = decompiler_class(work_info)
 		result = decompiler.decompile()
-		# 保存结果
 		return self._save_result(result, work_info, output_dir)
 
 	@staticmethod
@@ -808,18 +946,15 @@ class Decompiler:
 		"""保存反编译结果"""
 		FileHelper.ensure_dir(output_dir)
 		if work_info.is_nemo:
-			# Nemo作品已经是文件夹,直接返回路径
 			if isinstance(result, str):
 				return result
 			msg = "Nemo作品应该返回字符串路径"
 			raise TypeError(msg)
-		# 其他作品保存为文件
 		file_name = FileHelper.safe_filename(work_info.name, work_info.id, work_info.file_extension.lstrip("."))
 		file_path = Path(output_dir) / file_name
 		if isinstance(result, dict):
 			FileHelper.write_json(file_path, result)
 		else:
-			# 对于非Nemo作品,result应该是dict,所以这里不应该发生
 			msg = "非Nemo作品应该返回字典"
 			raise TypeError(msg)
 		return str(file_path)
