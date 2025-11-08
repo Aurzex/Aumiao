@@ -75,7 +75,22 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          echo "开始提交计数分析"
+          echo "开始 Dev 分支提交计数分析"
+          
+          # 检查当前分支
+          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+          echo "当前分支: $CURRENT_BRANCH"
+          
+          # 如果不是 dev 分支，跳过发布
+          if [ "$CURRENT_BRANCH" != "dev" ]; then
+            echo "当前分支不是 dev，跳过发布检查"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "full_version=0.0.0.0" >> $GITHUB_OUTPUT
+            echo "latest_tag=" >> $GITHUB_OUTPUT
+            echo "commit_count=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
           # 获取完整标签历史
           git fetch --tags --depth=100
@@ -92,15 +107,29 @@ jobs:
           LATEST_FULL_TAG=$(echo "$ALL_TAGS" | head -n 1)
           echo "最新四段式版本标签: $LATEST_FULL_TAG"
           
-          # 计算总提交数量（保持原来的20个commit发版逻辑）
+          # 计算 dev 分支自上次发布后的提交数量
           if [ -n "$LATEST_FULL_TAG" ]; then
-            # 验证标签是否在当前分支历史中
+            # 检查标签是否在当前 dev 分支历史中
             if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
+              # 标签在历史中，计算从标签到 HEAD 的提交
               COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
               echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
             else
-              echo "标签 $LATEST_FULL_TAG 不在当前分支历史中，重新计算所有提交"
-              COMMIT_COUNT=$(git rev-list --count HEAD)
+              # 标签不在当前分支历史中（可能是从其他分支创建的标签）
+              echo "标签 $LATEST_FULL_TAG 不在当前 dev 分支历史中"
+              
+              # 找到 dev 分支上最新的标签
+              BRANCH_TAGS=$(git tag --contains HEAD --sort=-version:refname | grep "v*.*.*.*" | head -n 1)
+              if [ -n "$BRANCH_TAGS" ]; then
+                LATEST_FULL_TAG="$BRANCH_TAGS"
+                COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
+                echo "使用 dev 分支上的最新标签: $LATEST_FULL_TAG"
+                echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
+              else
+                # 没有找到相关标签，计算所有提交
+                echo "没有找到 dev 分支相关标签，计算所有提交"
+                COMMIT_COUNT=$(git rev-list --count HEAD)
+              fi
             fi
           else
             echo "没有找到四段式版本标签，计算所有提交"
@@ -110,7 +139,7 @@ jobs:
           echo "总提交数量: $COMMIT_COUNT"
           echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
           
-          # 决策逻辑 - 保持原来的20个commit发版
+          # 决策逻辑
           if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
             echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
             echo "should_release=true" >> $GITHUB_OUTPUT
