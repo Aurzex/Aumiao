@@ -29,7 +29,7 @@ setting_data = {
 		"HEADERS": {
 			"Accept-Encoding": "gzip, deflate, br, zstd",
 			"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
 		},
 		"MEMBER": "Aurzex, MoonLeaaaf, Nomen, MiTao, DontLoveBy",
 		"SLOGAN": "欢迎使用Aumiao-PY! "
@@ -37,7 +37,7 @@ setting_data = {
 		"工具以编程猫宇宙为舞台,玩家可以扮演扮演毛毡用户,在这个社区毛线坍缩并邂逅各种不同的乐子人 "
 		"在领悟了《猫站圣经》后,打败强敌扫厕所,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相",
 		"TEAM": "Aumiao Team",
-		"VERSION": "2.2.0",
+		"VERSION": "2.3.0",
 	},
 }
 # 定义 data.json 的数据

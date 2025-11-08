@@ -20,11 +20,40 @@ on:
   workflow_dispatch:
 
 env:
+  # 构建配置
   BUILD_TYPE: Release
   COMMIT_INTERVAL: 20
+  
+  # Python 环境
   PYTHON_VERSION: "3.13"
-  UPX_VERSION: "4.2.4"
-  UV_VERSION: "0.4.22"
+  PYTHON_ARCH: "x64"
+  
+  # 工具版本
+  UV_VERSION: "0.9.3"
+  UPX_VERSION: "5.0.2"
+  NUITKA_VERSION: "2.3.2"
+  
+  # 系统工具版本
+  SEVEN_ZIP_VERSION: "25.1"
+  INNOSETUP_VERSION: "6.5.4"
+  
+  # 构建参数
+  BUILD_JOBS: 4
+  LTO_MODE: "yes"
+  COMPRESSION_LEVEL: "best"
+  
+  # 公司信息
+  COMPANY_NAME: "Aumiao Team"
+  PRODUCT_NAME: "Aumiao"
+  COPYRIGHT_YEAR: "2025"
+  
+  # 目录配置
+  PROJECT_DIR: "Aumiao-py"
+  BUILD_DIR: "build"
+  DIST_DIR: "build/main.dist"
+  
+  # 时间配置
+  TIMEZONE: "Asia/Shanghai"
 
 jobs:
   check-release-condition:
@@ -33,7 +62,9 @@ jobs:
     outputs:
       should_release: ${{ steps.check-commits.outputs.should_release }}
       release_tag: ${{ steps.check-commits.outputs.release_tag }}
+      full_version: ${{ steps.check-commits.outputs.full_version }}
       commit_count: ${{ steps.check-commits.outputs.commit_count }}
+      latest_tag: ${{ steps.check-commits.outputs.latest_tag }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -44,34 +75,76 @@ jobs:
       - name: Check Commit Count and Create Release
         id: check-commits
         run: |
-          if git describe --tags --abbrev=0 > /dev/null 2>&1; then
-            LATEST_TAG=$(git describe --tags --abbrev=0)
-            echo "Latest tag: $LATEST_TAG"
-            COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
+          echo "开始提交计数分析"
+          
+          # 获取完整标签历史
+          git fetch --tags --depth=100
+          
+          # 读取项目版本号
+          PROJECT_VERSION=$(grep -Po 'version = "\K[0-9]+\.[0-9]+\.[0-9]+' ./${{ env.PROJECT_DIR }}/pyproject.toml)
+          echo "项目版本: $PROJECT_VERSION"
+          
+          # 获取所有四段式版本标签并按版本号排序
+          ALL_TAGS=$(git tag -l "v*.*.*.*" --sort=-version:refname)
+          echo "所有四段式版本标签: $ALL_TAGS"
+          
+          # 找到最新的四段式版本标签
+          LATEST_FULL_TAG=$(echo "$ALL_TAGS" | head -n 1)
+          echo "最新四段式版本标签: $LATEST_FULL_TAG"
+          
+          # 计算总提交数量（保持原来的20个commit发版逻辑）
+          if [ -n "$LATEST_FULL_TAG" ]; then
+            # 验证标签是否在当前分支历史中
+            if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
+              COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
+              echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
+            else
+              echo "标签 $LATEST_FULL_TAG 不在当前分支历史中，重新计算所有提交"
+              COMMIT_COUNT=$(git rev-list --count HEAD)
+            fi
           else
-            echo "No tags found, counting all commits"
-            LATEST_TAG="initial"
+            echo "没有找到四段式版本标签，计算所有提交"
             COMMIT_COUNT=$(git rev-list --count HEAD)
           fi
           
-          echo "Commits since last tag: $COMMIT_COUNT"
-          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          echo "总提交数量: $COMMIT_COUNT"
+          echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
           
+          # 决策逻辑 - 保持原来的20个commit发版
           if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
-            echo "Reached $COMMIT_COUNT commits (>= ${{ env.COMMIT_INTERVAL }}), triggering release"
+            echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
             echo "should_release=true" >> $GITHUB_OUTPUT
             
-            RELEASE_TAG="v$(date +'%Y%m%d.%H%M%S')"
-            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+            # 计算新的四段式版本号
+            if [ -n "$LATEST_FULL_TAG" ]; then
+              # 提取第四位版本号并增加
+              LAST_BUILD_NUMBER=$(echo "$LATEST_FULL_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)' | cut -d. -f4)
+              NEW_BUILD_NUMBER=$((LAST_BUILD_NUMBER + 1))
+            else
+              # 首次发版，从1开始
+              NEW_BUILD_NUMBER=1
+            fi
             
+            NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
+            RELEASE_TAG="v$NEW_VERSION"
+            
+            echo "新版本号: $NEW_VERSION"
+            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+            echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            
+            # 创建并推送标签
             git tag $RELEASE_TAG
             git push origin $RELEASE_TAG
-            echo "Created and pushed tag: $RELEASE_TAG"
+            echo "创建并推送新标签: $RELEASE_TAG"
           else
-            echo "Only $COMMIT_COUNT commits (< ${{ env.COMMIT_INTERVAL }}), skipping release"
+            echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
             echo "should_release=false" >> $GITHUB_OUTPUT
             echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
           fi
+          
+          echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
 
   generate-changelog:
     name: "Generate Changelog"
@@ -91,15 +164,20 @@ jobs:
         uses: orhun/git-cliff-action@v4
         id: git-cliff
         with:
-          config: ./Aumiao-py/cliff.toml
+          config: ./${{ env.PROJECT_DIR }}/cliff.toml
           args: -vv --latest --strip header
         env:
           OUTPUT: CHANGES.md
 
       - name: Display Changelog Summary
         run: |
-          echo "Generated changelog:"
-          head -20 CHANGES.md
+          echo "生成的变更日志摘要"
+          if [ -f CHANGES.md ]; then
+            head -20 CHANGES.md
+            echo "变更日志长度: $(wc -l < CHANGES.md) 行"
+          else
+            echo "未生成变更日志文件"
+          fi
 
   build-application:
     name: "Build Application"
@@ -109,9 +187,13 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     needs: check-release-condition
-    
+    if: |
+      needs.check-release-condition.outputs.should_release == 'true' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request'
+     
     env:
-      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+      UV_CACHE_DIR: "${{ github.workspace }}/.uv-cache"
 
     steps:
       - name: Checkout Code
@@ -123,28 +205,41 @@ jobs:
         id: setup-env
         shell: bash
         run: |
-          echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(TZ=Asia/Shanghai date +'%H%M%S')" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(TZ=${{ env.TIMEZONE }} date +'%H%M%S')" >> $GITHUB_ENV
           echo "GIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "SHOULD_RELEASE=${{ needs.check-release-condition.outputs.should_release }}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${{ needs.check-release-condition.outputs.release_tag }}" >> $GITHUB_ENV
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(TZ=Asia/Shanghai date +'%y%m%d')" >> $GITHUB_OUTPUT
+          echo "LATEST_TAG=${{ needs.check-release-condition.outputs.latest_tag }}" >> $GITHUB_ENV
+          echo "FULL_VERSION=${{ needs.check-release-condition.outputs.full_version }}" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
 
       - name: Read Project Version
         id: version
         shell: pwsh
         run: |
-          $tomlContent = Get-Content -Path ./Aumiao-py/pyproject.toml -Raw -Encoding UTF8
+          $tomlContent = Get-Content -Path ./${{ env.PROJECT_DIR }}/pyproject.toml -Raw -Encoding UTF8
           $versionLine = $tomlContent | Select-String -Pattern 'version\s*=\s*"([\d.]+)"'
           if ($versionLine) {
               $version = $versionLine.Matches.Groups[1].Value
-              Write-Host "Extracted version: $version"
+              Write-Host "提取的项目版本: $version"
               Write-Output "PROJECT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           } else {
-              Write-Error "Version not found in pyproject.toml"
+              Write-Error "在 pyproject.toml 中未找到版本号"
               exit 1
           }
+
+      - name: Install 7-Zip via Chocolatey
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install 7zip -y --version ${{ env.SEVEN_ZIP_VERSION }} --allow-downgrade
+
+      - name: Install Inno Setup via Chocolatey
+        if: env.SHOULD_RELEASE == 'true'
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install innosetup -y --version ${{ env.INNOSETUP_VERSION }} --allow-downgrade
 
       - name: Install uv and Python
         uses: astral-sh/setup-uv@v6
@@ -152,8 +247,8 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: |
-            Aumiao-py/pyproject.toml
-            Aumiao-py/uv.lock
+            ${{ env.PROJECT_DIR }}/pyproject.toml
+            ${{ env.PROJECT_DIR }}/uv.lock
 
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
@@ -164,111 +259,250 @@ jobs:
           path: |
             ${{ env.UV_CACHE_DIR }}
             upx.exe
-          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles('Aumiao-py/pyproject.toml', 'Aumiao-py/uv.lock') }}
+          key: ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-${{ hashFiles(format('{0}/{1}', env.PROJECT_DIR, 'pyproject.toml'), format('{0}/{1}', env.PROJECT_DIR, 'uv.lock')) }}
           restore-keys: |
             ${{ runner.os }}-py${{ env.PYTHON_VERSION }}-uv-${{ env.UV_VERSION }}-
 
-      - name: Install Build Tools
-        shell: pwsh
-        run: |
-          $ProgressPreference = 'SilentlyContinue'
-          Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2409-x64.msi" -OutFile "7z-installer.msi"
-          Start-Process msiexec.exe -ArgumentList "/i 7z-installer.msi /quiet" -Wait
-          "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-
-          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.5.0.exe" -OutFile "innosetup.exe"
-          Start-Process -FilePath "innosetup.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
-          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-          Remove-Item "innosetup.exe" -Force
-
       - name: Install Project Dependencies
-        working-directory: ./Aumiao-py
+        working-directory: ./${{ env.PROJECT_DIR }}
         run: |
           uv lock
           uv sync --all-extras --dev
-          uv pip install nuitka
+          uv pip install nuitka==${{ env.NUITKA_VERSION }}
 
       - name: Build with Nuitka
-        working-directory: ./Aumiao-py
+        working-directory: ./${{ env.PROJECT_DIR }}
         run: |
+          echo "开始 Nuitka 编译"
+          $FULL_VERSION = "${{ env.FULL_VERSION }}"
+          echo "构建版本: $FULL_VERSION"
+          
           uv run python -m nuitka `
             --assume-yes-for-downloads `
-            --company-name="Aumiao Team" `
-            --copyright="Copyright © 2025 喵鱼a. All rights reserved." `
-            --file-version="${{ env.PROJECT_VERSION }}" `
+            --company-name="${{ env.COMPANY_NAME }}" `
+            --copyright="Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved." `
+            --file-version="$FULL_VERSION" `
             --follow-imports `
-            --jobs=4 `
-            --lto=yes `
+            --jobs=${{ env.BUILD_JOBS }} `
+            --lto=${{ env.LTO_MODE }} `
             --mode=standalone `
-            --output-dir=../build `
+            --output-dir=../${{ env.BUILD_DIR }} `
             --output-filename=aumiao `
-            --product-name="Aumiao" `
-            --product-version="${{ env.PROJECT_VERSION }}" `
+            --product-name="${{ env.PRODUCT_NAME }}" `
+            --product-version="$FULL_VERSION" `
             --show-progress `
             --windows-console-mode=force `
             --windows-icon-from-ico="./resource/icons/favicon.ico" `
             ./main.py
+          echo "Nuitka 编译完成"
 
       - name: Run Recovery Script
-        working-directory: ./Aumiao-py
-        run: uv run python recover.py
+        working-directory: ./${{ env.PROJECT_DIR }}
+        run: |
+          echo "运行恢复脚本"
+          uv run python recover.py
+          echo "恢复脚本执行完成"
 
       - name: Prepare Distribution Files
         shell: pwsh
         run: |
-          $distDir = "build/main.dist"
-          New-Item -Path "$distDir/.log" -ItemType Directory -Force
-          $essentialFiles = @(
-              "./Aumiao-py/README.md",
-              "./Aumiao-py/DISCLAIMER.txt",
-              "./Aumiao-py/data"
-          )
-          Copy-Item -Path $essentialFiles -Destination $distDir -Recurse -Force
+          Write-Host "准备分发文件到: ${{ env.DIST_DIR }}"
           
+          # 创建必要的目录
+          New-Item -Path "${{ env.DIST_DIR }}/.log" -ItemType Directory -Force
+          
+          # 复制必要文件
+          $essentialFiles = @(
+              "./${{ env.PROJECT_DIR }}/README.md",
+              "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt"
+          )
+          foreach ($file in $essentialFiles) {
+              if (Test-Path $file) {
+                  Copy-Item -Path $file -Destination "${{ env.DIST_DIR }}" -Force
+                  Write-Host "复制: $file"
+              } else {
+                  Write-Warning "文件不存在: $file"
+              }
+          }
+          
+          # 复制 data 目录（如果存在）
+          $dataDir = "./${{ env.PROJECT_DIR }}/data"
+          if (Test-Path $dataDir) {
+              Copy-Item -Path $dataDir -Destination "${{ env.DIST_DIR }}" -Recurse -Force
+              Write-Host "复制数据目录: $dataDir"
+          } else {
+              Write-Warning "数据目录不存在: $dataDir"
+          }
+          
+          # 创建版本信息文件
           $versionInfo = @{
-              Version = "${{ env.PROJECT_VERSION }}"
+              Version = "${{ env.FULL_VERSION }}"
+              BaseVersion = "${{ env.PROJECT_VERSION }}"
+              BuildNumber = "${{ env.FULL_VERSION }}".Split('.')[3]
               BuildDate = "${{ env.BUILD_DATE }}"
+              BuildTime = "${{ env.BUILD_TIME }}"
               GitCommit = "${{ env.GIT_SHA }}"
               ReleaseTag = "${{ env.RELEASE_TAG }}"
               CommitCount = "${{ env.COMMIT_COUNT }}"
-          } | ConvertTo-Json
-          Set-Content -Path "$distDir/version.json" -Value $versionInfo
+              PreviousTag = "${{ env.LATEST_TAG }}"
+              PythonVersion = "${{ env.PYTHON_VERSION }}"
+              BuildTools = @{
+                  Nuitka = "${{ env.NUITKA_VERSION }}"
+                  UPX = "${{ env.UPX_VERSION }}"
+                  UV = "${{ env.UV_VERSION }}"
+              }
+              BuildInfo = @{
+                  Type = "${{ env.BUILD_TYPE }}"
+                  LTO = "${{ env.LTO_MODE }}"
+                  Jobs = "${{ env.BUILD_JOBS }}"
+              }
+          } | ConvertTo-Json -Depth 4
+          
+          Set-Content -Path "${{ env.DIST_DIR }}/version.json" -Value $versionInfo
+          Write-Host "创建版本信息文件"
 
       - name: Optimize Binaries with UPX
         shell: pwsh
         continue-on-error: true
         run: |
+          Write-Host "开始 UPX 二进制优化"
           if (-not (Test-Path "./upx.exe")) {
+              Write-Host "下载 UPX 版本 ${{ env.UPX_VERSION }}"
               $ProgressPreference = 'SilentlyContinue'
-              Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
-              Expand-Archive upx.zip -DestinationPath upx_tmp
-              Move-Item upx_tmp/upx*/upx.exe . -ErrorAction SilentlyContinue
-              Remove-Item upx_tmp, upx.zip -Recurse -Force
+              try {
+                  Invoke-WebRequest "https://github.com/upx/upx/releases/download/v${{ env.UPX_VERSION }}/upx-${{ env.UPX_VERSION }}-win64.zip" -OutFile upx.zip
+                  Expand-Archive upx.zip -DestinationPath upx_tmp -Force
+                  $upxDir = Get-ChildItem upx_tmp -Directory | Select-Object -First 1
+                  Move-Item "$upxDir/upx.exe" . -Force
+                  Remove-Item upx_tmp, upx.zip -Recurse -Force
+                  Write-Host "UPX 下载完成"
+              } catch {
+                  Write-Warning "UPX 下载失败: $($_.Exception.Message)"
+                  exit 0
+              }
           }
-          ./upx.exe --best --lzma ./build/main.dist/aumiao.exe 2>&1 | Out-Null
+          
+          $exePath = "${{ env.DIST_DIR }}/aumiao.exe"
+          if (Test-Path $exePath) {
+              Write-Host "使用 UPX 压缩: $exePath (级别: ${{ env.COMPRESSION_LEVEL }})"
+              $originalSize = (Get-Item $exePath).Length
+              ./upx.exe --${{ env.COMPRESSION_LEVEL }} --lzma "$exePath"
+              $compressedSize = (Get-Item $exePath).Length
+              $reduction = ($originalSize - $compressedSize) / 1MB
+              Write-Host "压缩完成: 减少了 $([math]::Round($reduction, 2)) MB"
+          } else {
+              Write-Warning "未找到可执行文件: $exePath"
+          }
 
       - name: Create Portable Zip Package
         shell: pwsh
         run: |
-          $packageName = "Aumiao_Portable_v${{ env.PROJECT_VERSION }}.${{ env.BUILD_DATE }}.zip"
-          7z a -tzip "build/$packageName" "build/main.dist/*"
-          Write-Host "Created portable package: $packageName"
+          Write-Host "创建便携版 ZIP 包"
+          $fullVersion = "${{ env.FULL_VERSION }}"
+          $buildDate = "${{ env.BUILD_DATE }}"
+          
+          # 优化文件命名：产品名_版本_架构_日期
+          $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}.zip"
+          $zipPath = "${{ env.BUILD_DIR }}/$packageName"
+          
+          # 切换到分发目录的父目录
+          Set-Location "${{ env.DIST_DIR }}/.."
+          
+          # 压缩 main.dist 目录内容
+          7z a -tzip "${{ github.workspace }}/$zipPath" "main.dist/*" -mx=9
+          
+          if (Test-Path "${{ github.workspace }}/$zipPath") {
+              $zipSize = (Get-Item "${{ github.workspace }}/$zipPath").Length / 1MB
+              Write-Host "创建便携版包: $packageName ($([math]::Round($zipSize, 2)) MB)"
+          } else {
+              Write-Error "ZIP 包创建失败"
+              exit 1
+          }
 
       - name: Build Installer
+        if: env.SHOULD_RELEASE == 'true'
         shell: pwsh
         run: |
-          ISCC.exe ./Aumiao-py/resource/aumiao.iss
-          Write-Host "Installer built successfully"
+          Write-Host "构建安装程序"
+          $fullVersion = "${{ env.FULL_VERSION }}"
+          $buildDate = "${{ env.BUILD_DATE }}"
+          
+          # 确保输出目录存在
+          New-Item -Path "./${{ env.PROJECT_DIR }}/Output" -ItemType Directory -Force -ErrorAction SilentlyContinue
+          
+          # 检查图标文件是否存在
+          $iconPath = "./${{ env.PROJECT_DIR }}/resource/icons/favicon.ico"
+          if (-not (Test-Path $iconPath)) {
+              Write-Error "图标文件不存在: $iconPath"
+              Write-Host "当前目录: $(Get-Location)"
+              Write-Host "目录内容:"
+              Get-ChildItem -Path "./${{ env.PROJECT_DIR }}/resource" -Recurse | Format-Table Name, FullName
+              exit 1
+          }
+          
+          $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
+          if (Test-Path $issPath) {
+              Write-Host "使用 Inno Setup 编译安装程序"
+              Write-Host "ISS 文件版本: 2.3.0 (硬编码)"
+              Write-Host "构建版本: $fullVersion"
+              Write-Host "图标文件路径: $iconPath"
+              Write-Host "图标文件存在: $(Test-Path $iconPath)"
+              
+              # 检查构建目录是否存在
+              $buildDistPath = "./${{ env.BUILD_DIR }}/main.dist"
+              if (-not (Test-Path $buildDistPath)) {
+                  Write-Error "构建目录不存在: $buildDistPath"
+                  exit 1
+              }
+              
+              # 运行 Inno Setup 编译
+              $process = Start-Process -FilePath "ISCC.exe" -ArgumentList "`"$issPath`"" -Wait -PassThru -NoNewWindow
+              
+              if ($process.ExitCode -eq 0) {
+                  Write-Host "Inno Setup 编译成功完成"
+                  
+                  # 检查是否生成了安装程序
+                  $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
+                  if ($installerFiles) {
+                      # 重命名安装程序以包含版本信息
+                      $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
+                      Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
+                      Write-Host "安装程序构建成功: $newInstallerName"
+                      Write-Host "注意: ISS 文件中版本号为硬编码 2.3.0，安装程序文件名为 $fullVersion"
+                  } else {
+                      Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
+                      Write-Host "Output 目录内容:"
+                      Get-ChildItem -Path "./${{ env.PROJECT_DIR }}/Output" -ErrorAction SilentlyContinue | Format-Table Name, FullName
+                      exit 1
+                  }
+              } else {
+                  Write-Error "Inno Setup 编译失败，退出代码: $($process.ExitCode)"
+                  exit 1
+              }
+          } else {
+              Write-Error "未找到 Inno Setup 脚本: $issPath"
+              exit 1
+          }
 
       - name: Upload Portable Package to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Aumiao-Portable-${{ env.BUILD_DATE }}
-          path: build/*.zip
+          name: ${{ env.PRODUCT_NAME }}-Portable-${{ env.BUILD_DATE }}
+          path: ${{ env.BUILD_DIR }}/*.zip
+          retention-days: 30
+        if: success()
+
+      - name: Upload Installer to Artifacts
+        if: env.SHOULD_RELEASE == 'true' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT_NAME }}-Installer-${{ env.BUILD_DATE }}
+          path: ${{ env.PROJECT_DIR }}/Output/*.exe
           retention-days: 30
 
       - name: Minimize UV Cache
         run: uv cache prune --ci
+        if: always()
 
     outputs:
       build_date: ${{ steps.setup-env.outputs.BUILD_DATE }}
@@ -284,24 +518,36 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: Aumiao-Portable-${{ needs.build-application.outputs.build_date }}
+          pattern: ${{ env.PRODUCT_NAME }}-*
           path: ./release-assets
+          merge-multiple: true
 
-      - name: Upload Installer to Release
+      - name: List Release Assets
         run: |
-          mkdir -p ./release-assets
-          cp ./Aumiao-py/build/installer/*.exe ./release-assets/ 2>/dev/null || echo "Installer not found, continuing..."
+          echo "发布资源列表"
+          find ./release-assets -type f -name "*" | while read file; do
+            size=$(du -h "$file" | cut -f1)
+            echo "资源: $file ($size)"
+          done
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.check-release-condition.outputs.release_tag }}
-          name: "Aumiao ${{ needs.check-release-condition.outputs.release_tag }}"
-          body: ${{ needs.generate-changelog.outputs.release_body }}
+          name: "${{ env.PRODUCT_NAME }} ${{ needs.check-release-condition.outputs.release_tag }}"
+          body: |
+            ${{ needs.generate-changelog.outputs.release_body }}
+             
+            ## 构建信息
+            - 版本: ${{ needs.check-release-condition.outputs.full_version }}
+            - 提交: ${{ env.GIT_SHA }}
+            - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
+            - 提交数量: ${{ env.COMMIT_COUNT }}
+            - 前一个标签: ${{ env.LATEST_TAG }}
           files: |
-            ./release-assets/*
+            ./release-assets/**/*
           draft: false
-          prerelease: true
+          prerelease: false
 
   upload-debug-files:
     name: "Upload Debug Files"
@@ -314,8 +560,9 @@ jobs:
         with:
           name: Build-Debug-Logs-${{ needs.build-application.outputs.build_date }}
           path: |
-            build/**/*.log
-            build/**/*.json
+            ${{ env.BUILD_DIR }}/**/*.log
+            ${{ env.BUILD_DIR }}/**/*.json
             **/nuitka-*.log
+            ${{ env.DIST_DIR }}/version.json
           if-no-files-found: ignore
           retention-days: 14

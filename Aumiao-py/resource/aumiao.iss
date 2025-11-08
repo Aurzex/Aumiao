@@ -2,12 +2,12 @@
 ; Generated automatically by GitHub Actions
 
 #define MyAppName "Aumiao"
-#define MyAppVersion "2.2.0"
+#define MyAppVersion "2.3.0"
 #define MyAppPublisher "Aumiao Team"
 #define MyAppURL "https://aumiao.aurzex.top/"
 #define MyAppExeName "aumiao.exe"
 #define BuildDir "..\..\build\main.dist"
-#define OutputDir "..\..\build\installer"
+#define OutputDir "..\Output"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
