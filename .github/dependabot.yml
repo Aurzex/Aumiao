@@ -1,14 +1,14 @@
 version: 2
 updates:
-  # Python 依赖 - 使用 uv（如果项目使用 uv）
+  # Python 依赖 - 使用 uv（现代工具）
   - package-ecosystem: "uv"
-    directory: "/"
+    directory: "/Aumiao-py"
     schedule:
       interval: "daily"
     pull-request-branch-name:
       separator: "-"
     commit-message:
-      prefix: "chore(deps):"
+      prefix: "chore(deps-py):"
     groups:
       python-packages:
         patterns: ["*"]
@@ -18,13 +18,13 @@ updates:
 
   # TypeScript/JavaScript 依赖
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/Aumiao-ts"
     schedule:
       interval: "daily"
     pull-request-branch-name:
       separator: "-"
     commit-message:
-      prefix: "chore(deps):"
+      prefix: "chore(deps-ts):"
     groups:
       npm-packages:
         patterns: ["*"]
