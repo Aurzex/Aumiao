@@ -345,6 +345,11 @@ class NekoDecompiler(BaseDecompiler):
 		try:
 			decrypted_data = decryptor.decrypt_data(encrypted_content)
 			print("✅ NEKO作品解密成功!")
+			print("食用教程:")
+			print("首先确保你有ROOT权限或者MT管理器")
+			print("将反编译的文件复制到NEMO客户端数据目录")
+			print("一般为 /data/data/com.codemao.nemo/files/nemo_users_db")
+			print("重启客户端, 打开并保存一次")
 			return decrypted_data  # noqa: TRY300
 		except Exception as e:
 			error_msg = "解密失败"
