@@ -345,6 +345,11 @@ class NekoDecompiler(BaseDecompiler):
 		try:
 			decrypted_data = decryptor.decrypt_data(encrypted_content)
 			print("✅ NEKO作品解密成功!")
+			print("食用教程:")
+			print("首先确保你有ROOT权限或者MT管理器")
+			print("将反编译的文件复制到NEMO客户端数据目录")
+			print("一般为 /data/data/com.codemao.nemo/files/nemo_users_db")
+			print("重启客户端, 打开并保存一次")
 			return decrypted_data  # noqa: TRY300
 		except Exception as e:
 			error_msg = "解密失败"
@@ -503,16 +508,16 @@ class KittenDecompiler(BaseDecompiler):
 			return theatre["scenes"][actor_id]
 		print(f"警告: 角色ID {actor_id} 在actors和scenes中均未找到,使用空角色信息")
 		return {
+			"direction": 90,
+			"draggable": False,
 			"id": actor_id,
 			"name": f"未知角色_{actor_id[:8]}",
+			"rotation_style": "all around",
+			"size": 100,
 			"type": "sprite",
 			"visible": True,
 			"x": 0,
 			"y": 0,
-			"size": 100,
-			"direction": 90,
-			"draggable": False,
-			"rotation_style": "all around",
 		}
 
 	def _update_work_info(self, work: dict[str, Any]) -> None:
@@ -629,24 +634,24 @@ class BlockProcessor:
 		shadow_types = self.actor.decompiler.shadow_builder.SHADOW_TYPES
 		self.block.update(
 			{
-				"id": block_id,
-				"type": block_type,
-				"location": [0, 0],
-				"is_shadow": block_type in shadow_types,
 				"collapsed": False,
-				"disabled": False,
+				"comment": None,
 				"deletable": True,
-				"movable": True,
+				"disabled": False,
 				"editable": True,
-				"visible": "visible",
-				"shadows": self.shadows,
-				"fields": self.fields,
 				"field_constraints": {},
 				"field_extra_attr": {},
-				"comment": None,
-				"mutation": "",
+				"fields": self.fields,
+				"id": block_id,
 				"is_output": (block_type in shadow_types or block_type in {"logic_boolean", "procedures_2_stable_parameter"}),
+				"is_shadow": block_type in shadow_types,
+				"location": [0, 0],
+				"movable": True,
+				"mutation": "",
 				"parent_id": None,
+				"shadows": self.shadows,
+				"type": block_type,
+				"visible": "visible",
 			}
 		)
 		self.actor.connections[block_id] = self.connection
@@ -757,8 +762,8 @@ class FunctionProcessor(BlockProcessor):
 				{
 					"id": ShadowBuilder.generate_id(),
 					"kind": "domain_block",
-					"type": "procedures_2_stable_parameter",
 					"params": {"param_name": param_name, "param_default_value": ""},
+					"type": "procedures_2_stable_parameter",
 				}
 			)
 			param_block["parent_id"] = self.block["id"]
@@ -832,10 +837,10 @@ class CocoDecompiler(BaseDecompiler):
 			work["screenIds"].append(screen_id)
 			screen.update(
 				{
-					"primitiveVariables": [],
 					"arrayVariables": [],
-					"objectVariables": [],
 					"broadcasts": ["Hi"],
+					"objectVariables": [],
+					"primitiveVariables": [],
 					"widgets": {},
 				}
 			)
@@ -849,10 +854,10 @@ class CocoDecompiler(BaseDecompiler):
 		self._process_variables(work)
 		work.update(
 			{
-				"globalWidgets": work["widgetMap"],
 				"globalWidgetIds": list(work["widgetMap"].keys()),
-				"sourceTag": 1,
+				"globalWidgets": work["widgetMap"],
 				"sourceId": "",
+				"sourceTag": 1,
 			}
 		)
 
@@ -870,9 +875,9 @@ class CocoDecompiler(BaseDecompiler):
 		"""处理变量"""
 		counters = {"var": 0, "list": 0, "dict": 0}
 		variable_lists = {
-			"globalVariableList": [],
 			"globalArrayList": [],
 			"globalObjectList": [],
+			"globalVariableList": [],
 		}
 		for var_id, value in work["variableMap"].items():
 			if isinstance(value, list):
@@ -913,12 +918,12 @@ class Decompiler:
 
 	def __init__(self) -> None:
 		self.decompilers = {
-			"NEMO": NemoDecompiler,
+			"COCO": CocoDecompiler,
 			"KITTEN2": KittenDecompiler,
 			"KITTEN3": KittenDecompiler,
 			"KITTEN4": KittenDecompiler,
-			"COCO": CocoDecompiler,
 			"NEKO": NekoDecompiler,  # 添加NEKO支持
+			"NEMO": NemoDecompiler,
 		}
 
 	def decompile(self, work_id: int, output_dir: str = "decompiled") -> str:
