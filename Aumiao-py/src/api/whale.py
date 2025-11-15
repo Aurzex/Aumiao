@@ -40,7 +40,7 @@ class AuthManager:
 		return response.json()
 
 	def configure_authentication_token(self, token: str) -> None:
-		self._client.switch_identity(token, "judgement")
+		self._client.switch_identity(token=token, identity="judgement")
 
 
 @singleton

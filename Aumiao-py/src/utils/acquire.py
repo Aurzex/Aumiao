@@ -206,7 +206,7 @@ class BaseHTTPClient(IHTTPClient):
 		payload: dict[str, Any] | None = None,
 		files: dict[str, Any] | None = None,
 		headers: dict[str, str] | None = None,
-		retries: int | None = None,
+		retries: int | None = 1,
 		backoff_factor: float = 0.3,
 		timeout: float | None = None,
 		*,

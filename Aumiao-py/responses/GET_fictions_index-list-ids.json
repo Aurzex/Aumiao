@@ -1,0 +1,13 @@
+{
+  "data": {
+    "items": [
+      "65655",
+      "70059",
+      "70943",
+      "89818"
+    ]
+  },
+  "method": "GET",
+  "status_code": 200,
+  "url": "https://api-whale.codemao.cn/fictions/index-list-ids"
+}
