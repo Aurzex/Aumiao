@@ -1,0 +1,22 @@
+host: {
+  iris: "https://static-am.codemao.cn/iris/iris.js",
+  whitepaw: "https://shequ.codemao.cn",
+  commerce: "https://hi.codemao.cn",
+  mobile: "https://mobile.codemao.cn",
+  ide: "https://kitten.codemao.cn",
+  ide4: "https://kitten4.codemao.cn",
+  ide_preview: "https://preview-kitten.codemao.cn",
+  idestable: "https://idestable.codemao.cn",
+  box1: "https://v1.box.game",
+  box2: "https://box.codemao.cn",
+  box3: "https://box3.codemao.cn",
+  wood: "https://python.codemao.cn",
+  wood_ide: "https://turtle.codemao.cn",
+  shequ: "https://shequ.codemao.cn",
+  nemo: "https://nemo.codemao.cn",
+  player: "https://player.codemao.cn",
+  lucky_share_pre: "https://bfc.codemao.group",
+  coco: "https://coco.codemao.cn",
+  kn: "https://kn.codemao.cn",
+  cancel_account: "https://lbk-mobile.codemao.cn/cancel-account/center"
+}
