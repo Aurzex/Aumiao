@@ -1,5 +1,5 @@
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -20,4 +20,4 @@ class CookieManager:
 		"""
 		payload = {"cookie": cookies, "do": "apply"}
 		response = self._client.send_request(endpoint="https://shequ.pgaot.com/?mod=bcmcookieout", method="POST", payload=payload)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value

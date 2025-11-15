@@ -93,7 +93,7 @@ class SourceConfig:
 @decorator.singleton
 class Union:
 	def __init__(self) -> None:
-		self._client = acquire.CodeMaoClient()
+		self._client = acquire.ClientFactory().create_codemao_client()
 		self._community_login = community.AuthManager()
 		self._community_motion = community.UserAction()
 		self._community_obtain = community.DataFetcher()

@@ -1,10 +1,10 @@
 from collections.abc import Generator
 from typing import Literal
 
-from requests import Response
+from httpx import Response
 
 from src.utils import acquire, tool
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -23,7 +23,7 @@ class UserAction:
 			method="GET",
 			params=params,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def create_class(self, name: str) -> dict:
 		data = {"name": name}
@@ -42,7 +42,7 @@ class UserAction:
 			method="DELETE",
 			params=params,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def add_students_to_class(self, name: list[str], class_id: int) -> bool:
 		data = {"student_names": name}
@@ -51,7 +51,7 @@ class UserAction:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def reset_student_password(self, stu_id: int) -> dict:
 		response = self._client.send_request(
@@ -74,7 +74,7 @@ class UserAction:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def create_or_update_lesson_package(
 		self,
@@ -91,7 +91,7 @@ class UserAction:
 			method=method,
 			payload=data,
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	def delete_work(self, work_id: int) -> bool:
 		response = self._client.send_request(
@@ -99,7 +99,7 @@ class UserAction:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_transfer_to_unassigned(self, class_id: int, stu_id: int) -> bool:
 		params = {"student_ids[]": stu_id}
@@ -108,7 +108,7 @@ class UserAction:
 			method="DELETE",
 			params=params,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def fetch_activity_package_details(self, package_id: int) -> dict:
 		payload = {"packageId": package_id}
@@ -133,7 +133,7 @@ class UserAction:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_grade_student_work(
 		self,
@@ -159,7 +159,7 @@ class UserAction:
 			method="PATCH",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_invite_to_class(
 		self,
@@ -173,7 +173,7 @@ class UserAction:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_accept_class_invite(self, message_id: int) -> bool:
 		response = self._client.send_request(
@@ -181,7 +181,7 @@ class UserAction:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_upgrade_to_teacher(
 		self,
@@ -215,7 +215,7 @@ class UserAction:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 
 @singleton
@@ -257,7 +257,7 @@ class DataFetcher:
 	def fetch_notices_gen(self, limit: int | None = 10) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "limit": 10, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/system/message/list",
 			params=params,
 			pagination_method="page",
@@ -268,7 +268,7 @@ class DataFetcher:
 	def fetch_reminders_gen(self, limit: int | None = 10) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "limit": 10, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/invite/teacher/messages",
 			params=params,
 			pagination_method="page",
@@ -296,7 +296,7 @@ class DataFetcher:
 		if method == "detail":
 			timestamp = self.tool.TimeUtils().current_timestamp(13)
 			params = {"page": 1, "TIME": timestamp}
-			return self._client.fetch_data(
+			return self._client.fetch_paginated_data(
 				endpoint="https://eduzone.codemao.cn/edu/zone/classes/",
 				params=params,
 				pagination_method="page",
@@ -308,7 +308,7 @@ class DataFetcher:
 	def fetch_student_removal_records_gen(self, limit: int | None = 20) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "limit": 10, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/student/remove/record",
 			params=params,
 			pagination_method="page",
@@ -319,11 +319,11 @@ class DataFetcher:
 	def fetch_class_students_gen(self, invalid: int = 1, limit: int | None = 100) -> Generator[dict]:
 		data = {"invalid": invalid}
 		params = {"page": 1, "limit": 100}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/students",
 			params=params,
 			payload=data,
-			fetch_method="POST",
+			method="POST",
 			pagination_method="page",
 			config={"amount_key": "limit", "offset_key": "page"},
 			limit=limit,
@@ -454,7 +454,7 @@ class DataFetcher:
 	def fetch_all_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/student/works",
 			params=params,
 			pagination_method="page",
@@ -469,7 +469,7 @@ class DataFetcher:
 	def fetch_managed_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/works",
 			params=params,
 			pagination_method="page",
@@ -483,7 +483,7 @@ class DataFetcher:
 	def fetch_personal_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/work/manager/self/works",
 			params=params,
 			pagination_method="page",
@@ -512,7 +512,7 @@ class DataFetcher:
 	def fetch_teaching_records_gen(self, limit: int | None = 10) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp, "limit": 10}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/teaching/record/list",
 			params=params,
 			pagination_method="page",
@@ -551,7 +551,7 @@ class DataFetcher:
 			"page": 1,
 			"limit": 150,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/lesson/offical/packages",
 			params=params,
 			pagination_method="page",
@@ -582,7 +582,7 @@ class DataFetcher:
 	def fetch_custom_lesson_packages_gen(self, limit: int | None = 100) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"TIME": timestamp, "page": 1, "limit": 100}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://eduzone.codemao.cn/edu/zone/lesson/offical/packages",
 			params=params,
 			pagination_method="page",
@@ -598,7 +598,7 @@ class DataFetcher:
 			method=method,
 			params=params,
 		)
-		return response.json() if method == "GET" else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if method == "GET" else response.status_code == HTTPStatus.OK.value
 
 	def fetch_custom_package_contents(self, package_id: int, limit: int) -> dict:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)

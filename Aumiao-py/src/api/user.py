@@ -2,7 +2,7 @@ from collections.abc import Generator
 from typing import Literal, cast
 
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -161,7 +161,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 5,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v2/user/center/work-list",
 			params=params,
 			total_key="total",
@@ -213,7 +213,7 @@ class UserDataFetcher:
 			作品生成器
 		"""
 		params = {"limit": 15, "offset": 0}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/nemo/v2/works/list/user/{method}",
 			params=params,
 			limit=limit,
@@ -244,7 +244,7 @@ class UserDataFetcher:
 		params = {"offset": 0, "limit": 15}
 		params = cast("dict", params)
 		params.update(extra_params or {})
-		return self._client.fetch_data(endpoint=url, params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint=url, params=params, limit=limit)
 
 	def fetch_kitten_works_gen(
 		self,
@@ -270,7 +270,7 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/kitten/common/work/list2",
 			params=params,
 			limit=limit,
@@ -286,7 +286,7 @@ class UserDataFetcher:
 			Nemo作品生成器
 		"""
 		params = {"offset": 0, "limit": 30, "published_status": status}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/works/list",
 			params=params,
 			limit=limit,
@@ -316,7 +316,7 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/wood/comm/work/list",
 			params=params,
 			limit=limit,
@@ -338,7 +338,7 @@ class UserDataFetcher:
 			"work_status": work_status,
 			"published_status": status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/box/v2/work/list",
 			params=params,
 			limit=limit,
@@ -354,7 +354,7 @@ class UserDataFetcher:
 			小说生成器
 		"""
 		params = {"offset": 0, "limit": 30, "fiction_status": fiction_status}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/web/fanfic/my/new",
 			params=params,
 			limit=limit,
@@ -376,7 +376,7 @@ class UserDataFetcher:
 			"status": status,
 			"published": published,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/coconut/web/work/list",
 			params=params,
 			data_key="data.items",
@@ -398,7 +398,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 15,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/user/fans",
 			params=params,
 			total_key="total",
@@ -419,7 +419,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 15,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/user/followers",
 			params=params,
 			total_key="total",
@@ -440,7 +440,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 5,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/user/center/collect/list",
 			params=params,
 			total_key="total",
@@ -485,7 +485,7 @@ class UserManager:
 		"""
 		data = {key: value for key, value in {"doing": doing, "avatar_url": avatar}.items() if value is not None}
 		response = self._client.send_request(endpoint="/nemo/v2/user/basic", method="PUT", payload=data)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def update_username(self, username: str) -> bool:
 		"""
@@ -502,7 +502,7 @@ class UserManager:
 			method="PATCH",
 			payload={"username": username},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def validate_phone_number(self, phone_num: int) -> dict:
 		"""
@@ -535,7 +535,7 @@ class UserManager:
 			method="PATCH",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_request_phone_change_verification(self, old_phonenum: int, new_phonenum: int) -> bool:
 		"""
@@ -552,7 +552,7 @@ class UserManager:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def update_phone_number(self, captcha: int, phonenum: int) -> bool:
 		"""
@@ -581,7 +581,7 @@ class UserManager:
 			endpoint="/creation-tools/v1/user/avatar-frame/cancel",
 			method="PUT",
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_apply_avatar_frame(self, frame_id: Literal[2, 3, 4]) -> bool:
 		"""
@@ -595,7 +595,7 @@ class UserManager:
 			endpoint=f"/creation-tools/v1/user/avatar-frame/{frame_id}",
 			method="PUT",
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def update_profile_details(
 		self,
@@ -634,7 +634,7 @@ class UserManager:
 			method="PATCH",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def update_profile_cover(self, cover_url: str) -> bool:
 		"""
@@ -654,12 +654,12 @@ class UserManager:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def delete_user(self, reason: str, *, return_data: bool = False) -> dict | bool:
 		data = {"closeReason": reason}
 		response = self._client.send_request(endpoint="/tiger/v3/web/accounts/close", method="POST", payload=data)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK
+		return response.json() if return_data else response.status_code == HTTPStatus.OK
 
 
 # TODO@Aurzex: 待完善

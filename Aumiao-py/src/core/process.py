@@ -966,7 +966,7 @@ class ReportAuthManager(ClassUnion):
 	def load_student_accounts(self) -> None:
 		"""加载学生账号:用于自动举报,支持实时获取/文件加载"""
 		# 切换到普通账号上下文(加载学生账号需普通权限)
-		self._client.switch_account(token=self._client.token.average, identity="average")
+		self._client.switch_identity(token=self._client.token.average, identity="average")
 		# 询问是否加载学生账号
 		if self._printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			self._printer.print_message("未加载学生账号,自动举报功能不可用", "WARNING")
@@ -1021,7 +1021,7 @@ class ReportAuthManager(ClassUnion):
 				# 文件加载的账号:用Token切换
 				token = cast("str", selected_account)
 				self._printer.print_message(f"切换学生账号: {id(token)}", "INFO")
-				self._client.switch_account(token=token, identity="edu")
+				self._client.switch_identity(token=token, identity="edu")
 		except Exception as e:
 			self._printer.print_message(f"学生账号切换失败: {e!s}", "ERROR")
 			return False  # 切换失败
@@ -1030,7 +1030,7 @@ class ReportAuthManager(ClassUnion):
 
 	def _restore_admin_account(self) -> None:
 		"""恢复管理员账号:封装重复切换逻辑,避免代码冗余"""
-		self._client.switch_account(token=self._client.token.judgement, identity="judgement")
+		self._client.switch_identity(token=self._client.token.judgement, identity="judgement")
 
 	def terminate_session(self) -> None:
 		"""终止当前会话:清理资源并恢复管理员账号"""
@@ -1209,12 +1209,12 @@ class FileProcessor(ClassUnion):
 		"""
 		try:
 			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
-			if response.status_code == acquire.HTTPSTATUS.OK.value:  # HTTPSTATUS.OK.value
+			if response.status_code == acquire.HTTPStatus.OK.value:  # HTTPStatus.OK.value
 				content_length = response.headers.get("Content-Length")
 				if content_length and int(content_length) > 0:
 					return True
 			response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
-			if response.status_code != acquire.HTTPSTATUS.OK.value:  # HTTPSTATUS.OK.value
+			if response.status_code != acquire.HTTPStatus.OK.value:  # HTTPStatus.OK.value
 				return False
 			return bool(next(response.iter_content(chunk_size=1)))
 		except Exception:

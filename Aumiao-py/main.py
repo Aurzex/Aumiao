@@ -11,6 +11,7 @@ from src import user, whale
 from src.api import community
 from src.core.base import Index
 from src.core.compile import decompile_work
+from src.core.deepser import CodeMaoTool
 from src.core.process import FileProcessor, ReportAuthManager
 from src.core.services import FileUploader, MillenniumEntanglement, Motion, Report
 from src.utils import data, plugin, tool
@@ -72,6 +73,7 @@ class AccountDataManager:
 
 	def __init__(self) -> None:
 		self.account_data: dict[str, dict] = {}
+		self.token: str = ""
 		self.is_logged_in = False
 
 	def update(self, data: dict[str, dict]) -> None:
@@ -82,6 +84,7 @@ class AccountDataManager:
 	def clear(self) -> None:
 		"""清除账户数据"""
 		self.account_data = {}
+		self.token: str = ""
 		self.is_logged_in = False
 
 	def get_account_id(self) -> str | None:
@@ -103,7 +106,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("用户登录")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	community.AuthManager().login(identity=identity, password=password)
+	response = community.AuthManager().login(identity=identity, password=password)
 	data_ = user.UserDataFetcher().fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {
@@ -117,6 +120,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 		},
 	}
 	account_data_manager.update(account_data)
+	account_data_manager.token = response["data"]["auth"]["token"]
 	print_account_info(account_data)
 
 
@@ -279,6 +283,14 @@ def decompile_works(account_data_manager: AccountDataManager) -> None:  # noqa: 
 
 @handle_errors
 @require_login
+def interactive_chat(account_data_manager: AccountDataManager) -> None:
+	printer.print_header("AI聊天")
+	token = account_data_manager.token
+	CodeMaoTool().interactive_chat(token)
+
+
+@handle_errors
+@require_login
 def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
 	# if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
@@ -349,6 +361,7 @@ def main() -> None:
 		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
 		"12": MenuOption(name="插件管理", handler=partial(plugin_manager, account_data_manager), require_auth=False),
 		"13": MenuOption(name="编译作品", handler=partial(decompile_works, account_data_manager), require_auth=False),
+		"14": MenuOption(name="助手对话", handler=partial(interactive_chat, account_data_manager), require_auth=True),
 		"00": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
 		"1106": MenuOption(
 			name="隐藏功能",

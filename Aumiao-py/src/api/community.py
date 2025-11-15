@@ -3,7 +3,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from src.utils import acquire, data, tool
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -67,7 +67,7 @@ class AuthManager:
 				return self._authenticate_with_password(identity, password, pid, status)
 			if identity and password:
 				# 默认使用token登录流程
-				return self.login(identity, password=password, pid=pid, status=status)
+				return self._authenticate_with_token(identity, password=password, pid=pid, status=status)
 			msg = "凭据不足或选择的登录方式不可用"
 			raise ValueError(msg)  # noqa: TRY301
 		except Exception as e:
@@ -82,7 +82,7 @@ class AuthManager:
 		"""使用token登录的内部方法"""
 		# 验证token有效性并获取完整认证信息
 		auth_details = self.fetch_auth_details(token)
-		self._client.switch_account(token=token, identity=status)
+		self._client.switch_identity(token=token, identity=status)
 		return {"success": True, "method": "token", "token": token, "auth_details": auth_details, "message": "Token登录成功"}
 
 	def _login_with_cookies(self, cookies: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
@@ -102,7 +102,7 @@ class AuthManager:
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> dict:
 		# 原有的密码登录实现
-		self._client.switch_account(token="", identity="blank")
+		self._client.switch_identity(token="", identity="blank")
 		response = self._client.send_request(
 			endpoint="/tiger/v3/web/accounts/login",
 			method="POST",
@@ -112,7 +112,7 @@ class AuthManager:
 				"pid": pid,
 			},
 		)
-		self._client.switch_account(token=response.json()["auth"]["token"], identity=status)
+		self._client.switch_identity(token=response.json()["auth"]["token"], identity=status)
 		return {"success": True, "method": "password", "data": response.json(), "message": "密码登录成功"}
 
 	def _authenticate_with_token(
@@ -127,7 +127,7 @@ class AuthManager:
 		response = self._get_login_ticket(identity=identity, timestamp=timestamp, pid=pid)
 		ticket = response["ticket"]
 		resp = self._get_login_security_info(identity=identity, password=password, ticket=ticket, pid=pid)
-		self._client.switch_account(token=resp["auth"]["token"], identity=status)
+		self._client.switch_identity(token=resp["auth"]["token"], identity=status)
 		return {"success": True, "method": "token", "data": resp, "message": "Token流程登录成功"}
 
 	def _authenticate_with_cookies(
@@ -147,7 +147,7 @@ class AuthManager:
 			payload={},
 			headers={**self._client.headers, "cookie": cookies},
 		)
-		self._client.switch_account(cookie["authorization"], identity=status)
+		self._client.switch_identity(token=cookie["authorization"], identity=status)
 		return None
 
 	# 保留其他辅助方法
@@ -156,7 +156,7 @@ class AuthManager:
 		cookie_str = self.tool.DataConverter().convert_cookie(token_ca)
 		headers = {**self._client.headers, "cookie": cookie_str}
 		response = self._client.send_request(method="GET", endpoint="/web/users/details", headers=headers)
-		auth = response.cookies.get_dict()
+		auth = dict(response.cookies)
 		return {**token_ca, **auth}
 
 	def execute_logout(self, method: Literal["web", "app"]) -> bool:
@@ -165,7 +165,7 @@ class AuthManager:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def _get_login_security_info(
 		self,
@@ -412,7 +412,7 @@ class DataFetcher:
 	# 获取KN公开课
 	def fetch_public_courses_gen(self, limit: int | None = 10) -> Generator[dict]:
 		params = {"limit": 10, "offset": 0}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/neko/course/publish/list",
 			params=params,
 			limit=limit,
@@ -445,7 +445,7 @@ class DataFetcher:
 	# 获取nemo端教程合集
 	def fetch_course_packages_gen(self, platform: int = 1, limit: int | None = 50) -> Generator[dict]:
 		params = {"limit": 50, "offset": 0, "platform": platform}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/course/package/list",
 			params=params,
 			limit=limit,
@@ -459,7 +459,7 @@ class DataFetcher:
 			"limit": 50,
 			"offset": 0,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/creation-tools/v1/course/list/search",
 			params=params,
 			data_key="course_page.items",
@@ -471,7 +471,7 @@ class DataFetcher:
 	# TODO @Aurzex: 未知
 	def fetch_teaching_plans_gen(self, limit: int = 100) -> Generator[dict]:
 		params = {"limit": limit, "offset": 0}
-		return self._client.fetch_data(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/team", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/team", params=params, limit=limit)
 
 
 @singleton
@@ -483,7 +483,7 @@ class UserAction:
 	# 签订友好协议
 	def execute_sign_agreement(self) -> bool:
 		response = self._client.send_request(endpoint="/nemo/v3/user/level/signature", method="POST")
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 获取用户协议
 	def fetch_agreements(self) -> dict:
@@ -519,4 +519,4 @@ class UserAction:
 			endpoint=f"/web/message-record/{message_id}",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value

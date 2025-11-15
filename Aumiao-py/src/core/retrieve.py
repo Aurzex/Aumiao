@@ -225,7 +225,7 @@ class Obtain(ClassUnion):
 			# 定义处理函数
 
 			def process_student(student: dict) -> tuple[Any, Any]:
-				self._client.switch_account(token=self._client.token.average, identity="average")
+				self._client.switch_identity(token=self._client.token.average, identity="average")
 				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
 
 			# 根据返回方式处理
@@ -258,7 +258,7 @@ class Obtain(ClassUnion):
 		:param action: 登录成功后执行的回调函数
 		"""
 		try:
-			self._client.switch_account(token=self._client.token.average, identity="average")
+			self._client.switch_identity(token=self._client.token.average, identity="average")
 			accounts = self.switch_edu_account(limit=limit, return_method="list")
 			for identity, password in accounts:
 				print("切换教育账号")
@@ -269,4 +269,4 @@ class Obtain(ClassUnion):
 		except Exception as e:
 			print(f"教育账号处理失败: {e}")
 		finally:
-			self._client.switch_account(token=self._client.token.average, identity="average")
+			self._client.switch_identity(token=self._client.token.average, identity="average")
