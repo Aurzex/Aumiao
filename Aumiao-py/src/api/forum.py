@@ -2,7 +2,7 @@ from collections.abc import Generator
 from typing import Literal, overload
 
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -41,7 +41,7 @@ class ForumDataFetcher:
 		# 设置请求参数
 		params = {"page": 1, "limit": 10, "sort": sort}
 		# 发送请求获取帖子回帖
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/web/forums/posts/{post_id}/replies",
 			params=params,
 			total_key="total",
@@ -58,7 +58,7 @@ class ForumDataFetcher:
 	) -> Generator[dict]:
 		# 设置请求参数
 		params = {"page": 1, "limit": 10}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/web/forums/replies/{reply_id}/comments",
 			params=params,
 			limit=limit,
@@ -69,7 +69,7 @@ class ForumDataFetcher:
 	# 获取我的帖子或回复的帖子
 	def fetch_my_posts_gen(self, post_type: Literal["created", "replied"], limit: int | None = 10) -> Generator[dict]:
 		params = {"page": 1, "limit": 10}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/web/forums/posts/mine/{post_type}",
 			params=params,
 			pagination_method="page",
@@ -127,7 +127,7 @@ class ForumDataFetcher:
 	# 通过标题搜索帖子
 	def search_posts_gen(self, title: str, limit: int | None = 20) -> Generator[dict]:
 		params = {"title": title, "limit": 20, "page": 1}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/web/forums/posts/search",
 			pagination_method="page",
 			params=params,
@@ -141,7 +141,7 @@ class ForumDataFetcher:
 		params = {"page": 1, "limit": 10}
 		# 构建endpoint
 		endpoint = "/web/forums/boards/posts/7dayHot" if board_id == -1 else f"/web/forums/boards/posts/7dayHot?board_id={board_id}"
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=endpoint,
 			params=params,
 			total_key="total",
@@ -154,7 +154,7 @@ class ForumDataFetcher:
 	def fetch_ask_help_posts_gen(self, limit: int | None = 10) -> Generator[dict]:
 		# 设置请求参数
 		params = {"page": 1, "limit": 10}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/web/forums/boards/posts/ask-help",
 			params=params,
 			pagination_method="page",
@@ -185,7 +185,7 @@ class ForumActionHandler:
 			payload=data,
 		)
 		# 返回响应数据或状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 对某个回帖评论进行回复
 	def create_comment_reply(self, reply_id: int, parent_id: int, content: str, *, return_data: bool = False) -> dict | bool:
@@ -193,7 +193,7 @@ class ForumActionHandler:
 		data = {"content": content, "parent_id": parent_id}
 		response = self._client.send_request(endpoint=f"/web/forums/replies/{reply_id}/comments", method="POST", payload=data)
 		# 返回响应数据或状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 点赞某个回帖或评论
 	def execute_toggle_like(
@@ -211,7 +211,7 @@ class ForumActionHandler:
 			params=params,
 		)
 		# 返回状态码
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	@overload
 	def report_item(
@@ -256,7 +256,7 @@ class ForumActionHandler:
 			payload=data,
 		)
 		# 返回响应数据或状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 举报某个帖子
 	def report_post(
@@ -279,7 +279,7 @@ class ForumActionHandler:
 			payload=data,
 		)
 		# 返回响应数据或状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 删除某个回帖或评论或帖子
 	def delete_item(self, item_id: int, item_type: Literal["reply", "comment", "post"]) -> bool:
@@ -289,7 +289,7 @@ class ForumActionHandler:
 			method="DELETE",
 		)
 		# 返回状态码
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 置顶某个回帖
 	def execute_toggle_comment_top_status(self, comment_id: int, *, should_top: bool) -> bool:
@@ -299,7 +299,7 @@ class ForumActionHandler:
 			method=method,
 		)
 		# 返回状态码
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 发布帖子
 	def create_post(
@@ -333,4 +333,4 @@ class ForumActionHandler:
 			payload=data,
 		)
 		# 返回响应数据或状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value

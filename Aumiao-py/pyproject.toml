@@ -1,6 +1,5 @@
 [project]
 name = "Aumiao"
-email = "aumiao@aurzex.top"
 version = "2.3.0"
 authors = [
     { name = "Aumiao Team", email = "aumiao@aurzex.top" },
@@ -15,9 +14,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=46.0.3",
-    "requests>=2.32",
+    "httpx>=0.28.1",
     "websocket-client>=1.9.0",
-
 ]
 
 [project.scripts]

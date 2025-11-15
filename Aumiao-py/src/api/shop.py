@@ -2,7 +2,7 @@ from collections.abc import Generator
 from typing import Literal
 
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -52,7 +52,7 @@ class WorkshopDataFetcher:
 	# 获取工作室成员
 	def fetch_workshop_members_gen(self, workshop_id: int, limit: int | None = 40) -> Generator[dict]:
 		params = {"limit": 40, "offset": 0}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/web/shops/{workshop_id}/users",
 			params=params,
 			total_key="total",
@@ -91,12 +91,12 @@ class WorkshopDataFetcher:
 		limit: int | None = 15,
 	) -> Generator[dict]:
 		params = {"source": source, "sort": sort, "limit": 20, "offset": 0}
-		return self._client.fetch_data(endpoint=f"/web/discussions/{shop_id}/comments", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint=f"/web/discussions/{shop_id}/comments", params=params, limit=limit)
 
 	# 获取工作室投稿作品
 	def fetch_workshop_works_gen(self, workshop_id: int, user_id: int, sort: str = "-created_at,-id", limit: int | None = 20) -> Generator[dict]:
 		params = {"limit": 20, "offset": 0, "sort": sort, "user_id": user_id, "work_subject_id": workshop_id}
-		return self._client.fetch_data(endpoint=f"/web/works/subjects/{workshop_id}/works", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint=f"/web/works/subjects/{workshop_id}/works", params=params, limit=limit)
 
 	# 获取与工作室关系
 	def fetch_workshop_relation(self, relation_id: int) -> dict:
@@ -107,7 +107,7 @@ class WorkshopDataFetcher:
 	# 获取工作室讨论区的帖子
 	def fetch_workshop_posts_gen(self, label_id: int, limit: int | None = 20) -> Generator[dict]:
 		params = {"limit": 20, "offset": 0}
-		return self._client.fetch_data(endpoint=f"/web/works/subjects/labels/{label_id}/posts", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint=f"/web/works/subjects/labels/{label_id}/posts", params=params, limit=limit)
 
 	# 获取工作室待审核成员
 	def fetch_workshop_unaudited_member(self, workshop_id: int, limit: int = 40, offset: int = 0) -> dict:
@@ -135,8 +135,8 @@ class WorkshopActionHandler:
 				"preview_url": preview_url,
 			},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 创建工作室
 	def create_workshop(self, name: str, description: str, preview_url: str) -> dict:
@@ -161,8 +161,8 @@ class WorkshopActionHandler:
 			method="POST",
 			payload={"id": workshop_id},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 在指定工作室投稿作品
 	def create_work_contribution(self, workshop_id: int, work_id: int) -> bool:
@@ -172,8 +172,8 @@ class WorkshopActionHandler:
 			method="POST",
 			payload={"id": workshop_id, "work_id": work_id},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 在指定工作室删除作品
 	def delete_workshop_work(self, workshop_id: int, work_id: int) -> bool:
@@ -183,8 +183,8 @@ class WorkshopActionHandler:
 			method="POST",
 			payload={"id": workshop_id, "work_id": work_id},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 申请加入工作室
 	def execute_apply_to_join(self, workshop_id: int, qq: str | None = None) -> bool:
@@ -194,8 +194,8 @@ class WorkshopActionHandler:
 			method="POST",
 			payload={"id": workshop_id, "qq": qq},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 审核已经申请加入工作室的用户
 	def execute_review_join_application(self, workshop_id: int, status: Literal["UNACCEPTED", "ACCEPTED"], user_id: int) -> bool:
@@ -205,8 +205,8 @@ class WorkshopActionHandler:
 			method="POST",
 			payload={"id": workshop_id, "status": status, "user_id": user_id},
 		)
-		# 返回请求状态码是否为 HTTPSTATUS.OK.value
-		return response.status_code == HTTPSTATUS.OK.value
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	# 举报讨论区下的评论
 	def execute_report_comment(
@@ -232,7 +232,7 @@ class WorkshopActionHandler:
 				"comment_source": comment_source,
 			},
 		)
-		return response.status_code == HTTPSTATUS.CREATED.value
+		return response.status_code == HTTPStatus.CREATED.value
 
 	# 回复评论
 	def create_comment_reply(
@@ -254,7 +254,7 @@ class WorkshopActionHandler:
 				"source": source,
 			},
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 删除回复
 	def delete_reply(self, comment_id: int, source: Literal["WORK_SHOP"] = "WORK_SHOP") -> bool:
@@ -263,7 +263,7 @@ class WorkshopActionHandler:
 			method="DELETE",
 			params={"source": source},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 评论
 	def create_comment(self, workshop_id: int, content: str, rich_content: str, source: Literal["WORK_SHOP"] = "WORK_SHOP", *, return_data: bool = False) -> dict | bool:
@@ -276,7 +276,7 @@ class WorkshopActionHandler:
 				"source": source,
 			},
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	# 删除评论
 	def delete_comment(self, comment_id: int, source: Literal["WORK_SHOP"] = "WORK_SHOP") -> bool:
@@ -285,4 +285,4 @@ class WorkshopActionHandler:
 			method="DELETE",
 			params={"source": source},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value

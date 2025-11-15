@@ -1,7 +1,7 @@
 from typing import Literal
 
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -158,7 +158,7 @@ class NovelActionHandler:
 			},
 		)
 		# 如果return_data为True,则返回response的json数据,否则返回response的状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 点赞/取消点赞小说评论
 	def execute_toggle_comment_like(self, comment_id: int, *, like: bool = True, return_data: bool = False) -> bool | dict:
@@ -169,7 +169,7 @@ class NovelActionHandler:
 			method=method,
 		)
 		# 如果return_data为True,则返回response的json数据,否则返回response的状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 删除小说评论
 	def delete_novel_comment(self, comment_id: int, *, return_data: bool = False) -> bool | dict:
@@ -178,7 +178,7 @@ class NovelActionHandler:
 			method="DELETE",
 		)
 		# 如果return_data为True,则返回response的json数据,否则返回返回response的状态码
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 更新章节
 	def update_chapter(self, chapter_id: int, title: str, content: str, words_num: int) -> bool:
@@ -192,12 +192,12 @@ class NovelActionHandler:
 			method="PUT",
 			payload=payload,
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 发布章节
 	def publish_chapter(self, chapter_id: int) -> bool:
 		response = self._client.send_request(endpoint=f"/web/fanfic/section/{chapter_id}/publish", method="PUT", payload={})
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 更新小说
 	def update_novel(self, novel_id: int, title: str, introduction: str, category_id: int, status: int, *, return_data: bool = True) -> bool | dict:
@@ -212,7 +212,7 @@ class NovelActionHandler:
 			method="PUT",
 			payload=payload,
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 创建小说
 	def create_novel(self, title: str, section_title: str, draft: str, cover_pic: str, words_num: int, *, return_data: bool = True) -> bool | dict:
@@ -228,7 +228,7 @@ class NovelActionHandler:
 			method="POST",
 			payload=payload,
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 删除小说
 	def delete_novel(self, novel_id: int) -> bool:
@@ -236,7 +236,7 @@ class NovelActionHandler:
 			endpoint=f"/web/fanfic/{novel_id}",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 
 @singleton
@@ -294,4 +294,4 @@ class BookActionHandler:
 			endpoint=f"/api/sprite/praise/{book_id}",
 			method=method,
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.OK.value
+		return response.json() if return_data else response.status_code == HTTPStatus.OK.value

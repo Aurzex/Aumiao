@@ -3,10 +3,8 @@ from pathlib import Path
 from re import findall
 from typing import ClassVar, Literal
 
-from requests.cookies import RequestsCookieJar
-
 from src.utils import acquire, data, file
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 CAPTCHA_DIR: Path = data.CURRENT_DIR / "captcha.jpg"
@@ -26,11 +24,11 @@ class AuthManager:
 
 	def terminate_session(self) -> bool:
 		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/logout", method="DELETE")
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
-	def fetch_verification_captcha(self, timestamp: int) -> RequestsCookieJar:
+	def fetch_verification_captcha(self, timestamp: int) -> ...:
 		response = self._client.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
-		if response.status_code == HTTPSTATUS.OK.value:
+		if response.status_code == HTTPStatus.OK.value:
 			file.CodeMaoFile().file_write(path=self._captcha_img_path, content=response.content, method="wb")
 			print(f"请到 {CAPTCHA_DIR} 查看验证码")
 		else:
@@ -42,7 +40,7 @@ class AuthManager:
 		return response.json()
 
 	def configure_authentication_token(self, token: str) -> None:
-		self._client.switch_account(token, "judgement")
+		self._client.switch_identity(token, "judgement")
 
 
 @singleton
@@ -61,7 +59,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/works", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/works", params=params, limit=limit)
 
 	def fetch_work_reports_total(
 		self,
@@ -86,7 +84,7 @@ class ReportFetcher:
 		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
 
 	def fetch_comment_reports_total(
 		self,
@@ -113,7 +111,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
 
 	def fetch_post_reports_total(
 		self,
@@ -142,7 +140,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
 
 	def fetch_discussion_reports_total(
 		self,
@@ -170,7 +168,7 @@ class ReportHandler:
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
@@ -178,7 +176,7 @@ class ReportHandler:
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
@@ -186,7 +184,7 @@ class ReportHandler:
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
@@ -194,7 +192,7 @@ class ReportHandler:
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 
 @singleton
@@ -277,7 +275,7 @@ class RequestExtractor:
 		for item in self.js_module:
 			js_path = JS_DIR / f"{item['num']}.{item['hash']}.js"
 			response = self._client.send_request(endpoint=f"https://whale.codemao.cn/static/js/{item['num']}.{item['hash']}.js", method="GET", log=False)
-			if response.status_code == HTTPSTATUS.OK.value:
+			if response.status_code == HTTPStatus.OK.value:
 				file.CodeMaoFile().file_write(path=js_path, content=response.content, method="wb")
 			else:
 				print(f"获取js-{item['func']}失败! ")

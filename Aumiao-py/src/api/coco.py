@@ -29,7 +29,7 @@ class CoconutDataClient:
 			生成器,每次生成一个控件信息字典
 		"""
 		params = {"current_page": 1, "page_size": 100}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/coconut/web/widget/list",
 			params=params,
 			total_key="data.total",

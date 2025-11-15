@@ -2,7 +2,7 @@ from collections.abc import Generator
 from typing import Literal
 
 from src.utils import acquire
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 # 定义HTTP方法选择类型
@@ -111,7 +111,7 @@ class WorkManager:
 			method="PUT",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def create_kn_work(
 		self,
@@ -212,7 +212,7 @@ class WorkManager:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_toggle_follow(self, user_id: int, method: SelectMethod = "POST") -> bool:
 		"""
@@ -228,7 +228,7 @@ class WorkManager:
 			method=method,
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_toggle_collection(self, work_id: int, method: SelectMethod = "POST") -> bool:
 		"""
@@ -244,7 +244,7 @@ class WorkManager:
 			method=method,
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_toggle_like(self, work_id: int, method: SelectMethod = "POST") -> bool:
 		"""
@@ -260,7 +260,7 @@ class WorkManager:
 			method=method,
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_share_work(self, work_id: int) -> bool:
 		"""
@@ -275,7 +275,7 @@ class WorkManager:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def create_work_comment(self, work_id: int, comment: str, emoji: str | None = None, *, return_data: bool = False) -> bool | dict:
 		"""
@@ -296,7 +296,7 @@ class WorkManager:
 				"emoji_content": emoji,
 			},
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	def create_comment_reply(
 		self,
@@ -324,7 +324,7 @@ class WorkManager:
 			method="POST",
 			payload=data,
 		)
-		return response.json() if return_data else response.status_code == HTTPSTATUS.CREATED.value
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
 	def delete_comment(self, work_id: int, comment_id: int, **_: object) -> bool:
 		"""
@@ -339,7 +339,7 @@ class WorkManager:
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_report_work(self, describe: str, reason: str, work_id: int) -> bool:
 		"""
@@ -357,7 +357,7 @@ class WorkManager:
 			"report_describe": describe,
 		}
 		response = self._client.send_request(endpoint="/nemo/v2/report/work", method="POST", payload=data)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_toggle_comment_pin(
 		self,
@@ -378,7 +378,7 @@ class WorkManager:
 			操作结果(成功状态或完整响应数据)
 		"""
 		response = self._client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
-		return response.json() if return_data else response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.json() if return_data else response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_toggle_comment_like(self, work_id: int, comment_id: int, method: SelectMethod = "POST") -> bool:
 		"""
@@ -395,7 +395,7 @@ class WorkManager:
 			method=method,
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.CREATED.value
+		return response.status_code == HTTPStatus.CREATED.value
 
 	def execute_report_comment(self, work_id: int, comment_id: int, reason: str) -> bool:
 		"""
@@ -416,7 +416,7 @@ class WorkManager:
 			method="POST",
 			payload=data,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_enable_collaboration(self, work_id: int) -> bool:
 		"""
@@ -431,7 +431,7 @@ class WorkManager:
 			method="POST",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def delete_kitten_draft(self, work_id: int) -> bool:
 		"""
@@ -445,7 +445,7 @@ class WorkManager:
 			endpoint=f"https://api-creation.codemao.cn/kitten/common/work/{work_id}/temporarily",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def delete_kn_draft(self, work_id: int, force: Literal[1, 2]) -> bool:
 		"""
@@ -462,7 +462,7 @@ class WorkManager:
 			method="DELETE",
 			params=params,
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_unpublish_work(self, work_id: int) -> bool:
 		"""
@@ -477,7 +477,7 @@ class WorkManager:
 			method="PATCH",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_unpublish_work_web(self, work_id: int) -> bool:
 		"""
@@ -492,7 +492,7 @@ class WorkManager:
 			method="PUT",
 			payload={},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_unpublish_kn_work(self, work_id: int) -> bool:
 		"""
@@ -506,7 +506,7 @@ class WorkManager:
 			endpoint=f"https://api-creation.codemao.cn/neko/community/work/unpublish/{work_id}",
 			method="PUT",
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def execute_empty_kitten_trash(self) -> bool:
 		"""
@@ -518,7 +518,7 @@ class WorkManager:
 			endpoint="https://api-creation.codemao.cn/work/user/works/permanently",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_empty_kn_trash(self) -> bool:
 		"""
@@ -530,7 +530,7 @@ class WorkManager:
 			endpoint="https://api-creation.codemao.cn/neko/works/permanently",
 			method="DELETE",
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 	def update_work_name(
 		self,
@@ -555,7 +555,7 @@ class WorkManager:
 			method="PATCH",
 			params={"is_check_name": is_check_name, "name": name, "work_type": work_type},
 		)
-		return response.status_code == HTTPSTATUS.OK.value
+		return response.status_code == HTTPStatus.OK.value
 
 
 @singleton
@@ -574,7 +574,7 @@ class WorkDataFetcher:
 			评论数据生成器
 		"""
 		params = {"limit": 15, "offset": 0}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comments",
 			params=params,
 			total_key="page_total",
@@ -919,7 +919,7 @@ class WorkDataFetcher:
 			协作者列表生成器
 		"""
 		params = {"current_page": 1, "page_size": 100}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/collaborator/{work_id}",
 			params=params,
 			total_key="data.total",
@@ -995,7 +995,7 @@ class WorkDataFetcher:
 			"version_no": version_no,
 			"work_status": work_status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/tiger/work/recycle/list",
 			params=params,
 			limit=limit,
@@ -1019,7 +1019,7 @@ class WorkDataFetcher:
 			"work_status": work_status,
 			"published_status": published_status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/wood/comm/work/list",
 			params=params,
 			limit=limit,
@@ -1039,7 +1039,7 @@ class WorkDataFetcher:
 			"offset": 0,
 			"work_status": work_status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/box/v2/work/list",
 			params=params,
 			limit=limit,
@@ -1059,7 +1059,7 @@ class WorkDataFetcher:
 			"offset": 0,
 			"fiction_status": fiction_status,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="/web/fanfic/my/new",
 			params=params,
 			limit=limit,
@@ -1082,7 +1082,7 @@ class WorkDataFetcher:
 			"status": -99,
 			"work_business_classify": work_business_classify,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/v2/list/user",
 			params=params,
 			limit=limit,
@@ -1106,7 +1106,7 @@ class WorkDataFetcher:
 			"status": status,
 			"work_business_classify": work_business_classify,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/v2/list/user",
 			params=params,
 			limit=limit,
@@ -1128,7 +1128,7 @@ class WorkDataFetcher:
 			"offset": 0,
 			"work_business_classify": work_business_classify,
 		}
-		return self._client.fetch_data(
+		return self._client.fetch_paginated_data(
 			endpoint="https://api-creation.codemao.cn/neko/works/list/user/published",
 			params=params,
 			limit=limit,

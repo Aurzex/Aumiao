@@ -10,7 +10,7 @@ from typing import ClassVar, Literal, cast
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, acquire, data, decorator, tool
 from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
-from src.utils.acquire import HTTPSTATUS
+from src.utils.acquire import HTTPStatus
 
 
 @decorator.singleton
@@ -160,7 +160,7 @@ class Motion(ClassUnion):
 					request_params["query_type"] = msg_type
 				response = self._client.send_request(endpoint=endpoint, method="GET", params=request_params)  # 统一客户端调用
 				responses[msg_type] = response.status_code
-			return all(code == HTTPSTATUS.OK.value for code in responses.values())
+			return all(code == HTTPStatus.OK.value for code in responses.values())
 
 		try:
 			while True:
@@ -325,7 +325,7 @@ class Motion(ClassUnion):
 			}
 			response = self._client.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", payload=payload)  # 统一客户端调用
 			# Process the response
-			if response.ok:
+			if response:
 				result = response.json()
 				miao_code = f"【喵口令】$&{result['token']}&$"
 				print("\nGenerated Miao Code:")

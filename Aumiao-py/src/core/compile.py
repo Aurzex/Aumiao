@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from src.api import community
 from src.utils import acquire
 
-client = acquire.CodeMaoClient()
+client = acquire.ClientFactory().create_codemao_client()
 
 
 class BCMKNDecryptor:
@@ -395,7 +395,7 @@ class NemoDecompiler(BaseDecompiler):
 		FileHelper.write_json(meta_path, meta_data)
 		if source_info.get("preview"):
 			try:
-				cover_data = client.send_request(source_info["preview"], method="GET").content
+				cover_data = client.send_request(endpoint=source_info["preview"], method="GET").content
 				cover_path = dirs["works"] / f"{work_id}.cover"
 				FileHelper.write_binary(cover_path, cover_data)
 			except Exception as e:
@@ -484,7 +484,7 @@ class KittenDecompiler(BaseDecompiler):
 			compiled_url = client.send_request(endpoint=url, method="GET").json()["source_urls"][0]
 		else:
 			compiled_url = self.work_info.source_urls[0]
-		return client.send_request(compiled_url, method="GET").json()
+		return client.send_request(endpoint=compiled_url, method="GET").json()
 
 	def _decompile_actors(self, work: dict[str, Any]) -> None:
 		"""反编译所有角色"""
@@ -821,8 +821,8 @@ class CocoDecompiler(BaseDecompiler):
 		"""获取编译数据"""
 		work_id = self.work_info.id
 		url = f"https://api-creation.codemao.cn/coconut/web/work/{work_id}/load"
-		compiled_url = client.send_request(url, method="GET").json()["data"]["bcmc_url"]
-		return client.send_request(compiled_url, method="GET").json()
+		compiled_url = client.send_request(endpoint=url, method="GET").json()["data"]["bcmc_url"]
+		return client.send_request(endpoint=compiled_url, method="GET").json()
 
 	def _reorganize_data(self, work: dict[str, Any]) -> None:
 		"""重组数据"""

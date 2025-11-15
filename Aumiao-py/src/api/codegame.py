@@ -42,7 +42,7 @@ class UserActionHandler:
 		"""
 		payload = {"email": email, "language": language, "password": password, "pid": pid}
 		response = self._client.send_request(endpoint="https://oversea-api.code.game/tiger/accounts/register/email", method="POST", payload=payload)
-		return response.status_code == acquire.HTTPSTATUS.CREATED.value
+		return response.status_code == acquire.HTTPStatus.CREATED.value
 
 	def authenticate_with_credentials(self, identity: str, password: str, pid: str = "LHnQoPMr") -> bool:
 		"""
@@ -56,4 +56,4 @@ class UserActionHandler:
 		"""
 		payload = {"identity": identity, "password": password, "pid": pid}
 		response = self._client.send_request(endpoint="https://oversea-api.code.game/tiger/accounts/login", method="POST", payload=payload)
-		return response.status_code == acquire.HTTPSTATUS.OK.value
+		return response.status_code == acquire.HTTPStatus.OK.value
