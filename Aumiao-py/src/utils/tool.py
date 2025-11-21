@@ -177,7 +177,7 @@ class DataProcessor:
 			{}
 			>>> DataProcessor.filter_data(data, exclude=[])  # 返回所有字段
 			{'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
-		"""
+		"""  # noqa: DOC502
 		if include is not None and exclude is not None:
 			msg = "不能同时指定包含和排除字段"
 			raise ValueError(msg)
@@ -270,7 +270,7 @@ class DataConverter:
 			...	 name: str
 			>>> DataConverter.to_serializable(User("Alice"))
 			{'name': 'Alice'}
-		"""
+		"""  # noqa: DOC502
 		if isinstance(data, dict):
 			return data.copy()
 		if is_dataclass_instance(data):
