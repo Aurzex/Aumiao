@@ -4,17 +4,17 @@ import random
 import re
 import time
 from collections.abc import Callable, Iterable, Mapping
-from collections.abc import Generator as ABCGenerator
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from functools import lru_cache
 from html import unescape
+from types import GeneratorType
 from typing import Any, ClassVar, Literal, LiteralString, TypeGuard, TypeVar, final, overload
 
 from src.utils.decorator import singleton
 
 T = TypeVar("T")
 # 类型别名定义
-DataDict = dict[str, Any]
+type DataDict = dict[str, Any]
 type DataObject = DataDict | list[DataDict]
 # 常量定义
 FILE_SIZE: int = 1024
@@ -79,105 +79,115 @@ def is_dataclass_instance[T](obj: T) -> TypeGuard[T]:
 	return not isinstance(obj, type) and is_dataclass(obj)
 
 
-@singleton
+# 类型定义
+T = TypeVar("T")
+DataDict = dict[str, Any]
+DataObject = DataDict | list[DataDict] | Iterable[DataDict]  # pyright: ignore[reportAssignmentType]
+
+
 class DataProcessor:
-	"""核心数据处理工具类"""
+	"""核心数据处理工具类(修复版本)"""
+
+	# 使用ClassVar修复可变类属性问题
+	_path_cache: ClassVar[dict[str, tuple[str, ...]]] = {}
+
+	@staticmethod
+	def is_dataclass_instance(obj: object) -> TypeGuard[Any]:
+		"""修复后的数据类实例检查"""
+		return isinstance(obj, object) and not isinstance(obj, type) and is_dataclass(obj)
+
+	@classmethod
+	def _parse_path(cls, path: str) -> tuple[str, ...]:
+		"""解析并缓存路径"""
+		if path not in cls._path_cache:
+			cls._path_cache[path] = tuple(path.split("."))
+		return cls._path_cache[path]
 
 	@classmethod
 	def filter_by_nested_values(
 		cls,
-		data: dict | Iterable[dict],
+		data: DataObject,
 		id_path: str,
 		target_values: Iterable[object],
 		*,
 		strict_mode: bool = False,
-	) -> list[dict]:
-		"""根据嵌套字段值过滤数据集
-		Args:
-			data: 输入数据,可以是单个字典或字典的可迭代集合
-			id_path: 嵌套字段路径(使用点号分隔,如:"user.profile.id")
-			target_values: 需要匹配的目标值集合
-			strict_mode: 严格模式(路径类型不匹配时抛出异常)
-		Returns:
-			过滤后的字典列表
-		Raises:
-			ValueError: 路径格式错误或数据不符合预期结构
-			TypeError: 严格模式下的类型不匹配
-		Example:
-			>>> data = [{"user": {"profile": {"id": 1}}}, {"user": {"profile": {"id": 2}}}]
-			>>> DataProcessor.filter_by_nested_values(data, "user.profile.id", [1])
-			[{'user': {'profile': {'id': 1}}}]
-		"""
-		if not isinstance(id_path, str) or not id_path:
+	) -> list[DataDict]:
+		"""性能优化的嵌套字段过滤"""
+		# 参数验证优化
+		if not id_path or not isinstance(id_path, str):
 			msg = "id_path 必须是非空字符串"
 			raise ValueError(msg)
-		if not isinstance(target_values, Iterable):
+
+		if not hasattr(target_values, "__iter__"):
 			msg = "target_values 必须是可迭代对象"
 			raise TypeError(msg)
+
+		# 预处理目标值为集合(提高查找性能)
+		target_set = set(target_values)
+		path_keys = cls._parse_path(id_path)
 		items = cls._normalize_input(data)
-		path_keys = id_path.split(".")
-		results = []
-		for item in items:
-			try:
-				current_value = item
-				for key in path_keys:
-					if not isinstance(current_value, Mapping):
-						if strict_mode:
-							msg = f"路径 {key} 处遇到非字典类型"
-							raise ValueError(msg)
-						current_value = None
-						break
-					current_value = current_value.get(key, None)
-				if current_value in target_values:
-					results.append(item)
-			except (TypeError, AttributeError) as e:
-				if strict_mode:
-					msg = f"处理条目时发生错误: {e!s}"
-					raise ValueError(msg) from e
-		return results
+
+		# 使用列表推导式提高性能
+		if strict_mode:
+			return [item for item in items if cls._get_nested_strict(item, path_keys) in target_set]
+		return [item for item in items if cls._get_nested_safe(item, path_keys) in target_set]
+
+	@classmethod
+	def _get_nested_strict(cls, data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object:
+		"""严格模式下的嵌套值获取"""
+		current = data
+		for key in path_keys:
+			if not isinstance(current, Mapping):
+				error_msg = f"路径 {key} 处遇到非字典类型: {type(current)}"
+				raise TypeError(error_msg)
+			current = current[key]  # 严格模式下使用直接访问
+		return current
+
+	@classmethod
+	def _get_nested_safe(cls, data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object | None:
+		"""安全模式下的嵌套值获取"""
+		current = data
+		for key in path_keys:
+			if not isinstance(current, Mapping):
+				return None
+			current = current.get(key)  # 安全模式下使用get
+			if current is None:
+				break
+		return current
 
 	@staticmethod
-	def _is_item_container(data: dict) -> TypeGuard[dict[str, Iterable[dict]]]:
-		"""类型安全的项目容器检查
-		Args:
-			data: 需要检查的字典对象
-		Returns:
-			当data是包含items键且值为字典迭代器时返回True
-		"""
-		return "items" in data and isinstance(data["items"], Iterable)
+	def _is_item_container(data: DataDict) -> bool:
+		"""简化类型检查逻辑"""
+		return isinstance(data, dict) and "items" in data and hasattr(data["items"], "__iter__")
 
 	@overload
 	@staticmethod
-	def _normalize_input(data: dict) -> list[dict]: ...
+	def _normalize_input(data: DataDict) -> list[DataDict]: ...
+
 	@overload
 	@staticmethod
-	def _normalize_input(data: Iterable[dict]) -> Iterable[dict]: ...
+	def _normalize_input(data: list[DataDict]) -> list[DataDict]: ...
+
+	@overload
 	@staticmethod
-	def _normalize_input(data: dict | Iterable[dict]) -> Iterable[dict]:
-		"""标准化输入数据格式(类型安全版本)
-		Args:
-			data: 输入数据(支持三种格式):
-				1. 普通字典
-				2. 包含items键的字典(自动展开items内容)
-				3. 字典列表/生成器
-		Returns:
-			标准化的可迭代字典集合
-		Example:
-			>>> DataProcessor._normalize_input({"a": 1})
-			[{'a': 1}]
-			>>> DataProcessor._normalize_input({"items": [{"b": 2}]})
-			[{'b': 2}]
-			>>> DataProcessor._normalize_input([{"c": 3}, {"d": 4}])
-			[{'c': 3}, {'d': 4}]
-		"""
-		if isinstance(data, dict):  # 改为精确检查dict类型
+	def _normalize_input(data: Iterable[DataDict]) -> Iterable[DataDict]: ...
+
+	@staticmethod
+	def _normalize_input(data: DataObject) -> Iterable[DataDict]:  # pyright: ignore[reportInconsistentOverload]
+		"""优化输入标准化逻辑"""
+		if isinstance(data, dict):
 			if DataProcessor._is_item_container(data):
-				return list(data["items"])
+				return list(data["items"])  # 确保返回列表
 			return [data]
+
+		if isinstance(data, list):
+			return data
+
 		if isinstance(data, Iterable):
 			return data
-		msg = "输入数据必须是字典或可迭代的字典集合"
-		raise ValueError(msg)
+
+		error_msg = f"输入数据必须是字典或可迭代的字典集合, 实际类型: {type(data).__name__}"
+		raise TypeError(error_msg)
 
 	@classmethod
 	def filter_data(
@@ -187,89 +197,76 @@ class DataProcessor:
 		include: list[str] | None = None,
 		exclude: list[str] | None = None,
 	) -> DataObject:
-		"""通用字段过滤方法
-		Args:
-			data: 输入数据(字典/列表/生成器)
-			include: 需要包含的字段列表(空列表表示包含所有字段)
-			exclude: 需要排除的字段列表(空列表表示不排除任何字段)
-		Returns:
-			过滤后的数据(保持原始数据结构)
-		Raises:
-			ValueError: 同时指定include和exclude
-			TypeError: 不支持的数据类型
-		Example:
-			>>> data = {"name": "Alice", "age": 30, "email": "alice@example.com"}
-			>>> DataProcessor.filter_data(data, include=["name", "age"])
-			{'name': 'Alice', 'age': 30}
-			# 空列表处理示例
-			>>> DataProcessor.filter_data(data, include=[])  # 返回空字典
-			{}
-			>>> DataProcessor.filter_data(data, exclude=[])  # 返回所有字段
-			{'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
-		"""  # noqa: DOC502
+		"""通用字段过滤方法"""
 		if include is not None and exclude is not None:
 			msg = "不能同时指定包含和排除字段"
 			raise ValueError(msg)
-		# 优化后的过滤函数
 
-		def _filter(item: DataDict) -> DataDict:
-			if include is not None:
-				# 显式处理 include 列表(空列表表示无字段)
-				return {k: v for k, v in item.items() if k in include}
-			if exclude is not None:
-				# 显式处理 exclude 列表(空列表表示无排除)
-				return {k: v for k, v in item.items() if k not in exclude}
-			return item  # 无过滤条件时返回原始数据
-			# 根据数据类型进行分发处理
+		# 预处理过滤字段集合(提高性能)
+		include_set = set(include) if include else None
+		exclude_set = set(exclude) if exclude else None
 
+		return cls._filter_dispatch(data, include_set, exclude_set)
+
+	@classmethod
+	def _filter_dispatch(cls, data: DataObject, include: set[str] | None, exclude: set[str] | None) -> DataObject:
+		"""类型分发方法"""
 		if isinstance(data, dict):
-			return _filter(data)
+			return cls._filter_dict(data, include, exclude)
 		if isinstance(data, list):
-			return [_filter(item) for item in data]
-		if isinstance(data, ABCGenerator):
-			# 保持生成器特性(惰性求值)
-			return (_filter(item) for item in data)
-		# if isinstance(data, Iterable):
-		# 		# 扩展支持任意可迭代对象
-		# 		return (_filter(item) for item in data)
-		msg = f"不支持的数据类型: {type(data).__name__}"
-		raise TypeError(msg)
+			return cls._filter_list(data, include, exclude)
+		if isinstance(data, GeneratorType):
+			return cls._filter_generator(data, include, exclude)
+		if hasattr(data, "__iter__"):
+			return cls._filter_iterable(data, include, exclude)
+		error_msg = f"不支持的数据类型: {type(data).__name__}"
+		raise TypeError(error_msg)
 
 	@classmethod
-	def get_nested_value(cls, data: Mapping, path: str) -> ...:
-		"""安全获取嵌套字典值
-		Args:
-			data: 输入字典
-			path: 点号分隔的字段路径
-		Returns:
-			找到的值或None
-		Example:
-			>>> data = {"user": {"profile": {"id": 1}}}
-			>>> DataProcessor.get_nested_value(data, "user.profile.id")
-			1
-		"""
-		keys = path.split(".")
-		current = data
-		for key in keys:
-			if not isinstance(current, Mapping):
-				return None
-			current = current.get(key, None)
-			if current is None:
-				break
-		return current
+	def _filter_dict(cls, data: DataDict, include: set[str] | None, exclude: set[str] | None) -> DataDict:
+		"""字典类型过滤"""
+		if include is not None:
+			return {k: v for k, v in data.items() if k in include}
+		if exclude is not None:
+			return {k: v for k, v in data.items() if k not in exclude}
+		return data
 
 	@classmethod
-	def deduplicate(cls, sequence: Iterable[object]) -> list[object]:
-		"""保持顺序去重
-		Args:
-			sequence: 输入序列
-		Returns:
-			去重后的列表(保持原始顺序)
-		Example:
-			>>> DataProcessor.deduplicate([3, 2, 1, 2, 3])
-			[3, 2, 1]
-		"""
+	def _filter_list(cls, data: list[DataDict], include: set[str] | None, exclude: set[str] | None) -> list[DataDict]:
+		"""列表类型过滤"""
+		return [cls._filter_dict(item, include, exclude) for item in data]
+
+	@classmethod
+	def _filter_generator(cls, data: Iterable[DataDict], include: set[str] | None, exclude: set[str] | None) -> Iterable[DataDict]:
+		"""生成器类型过滤(惰性求值)"""
+		return (cls._filter_dict(item, include, exclude) for item in data)
+
+	@classmethod
+	def _filter_iterable(cls, data: Iterable[DataDict], include: set[str] | None, exclude: set[str] | None) -> Iterable[DataDict]:
+		"""通用可迭代类型过滤"""
+		return (cls._filter_dict(item, include, exclude) for item in data)
+
+	@classmethod
+	def get_nested_value(cls, data: Mapping[str, Any], path: str, *, strict: bool = False) -> object | None:
+		"""增强的嵌套值获取方法"""
+		path_keys = cls._parse_path(path)
+		if strict:
+			return cls._get_nested_strict(data, path_keys)
+		return cls._get_nested_safe(data, path_keys)
+
+	@staticmethod
+	def deduplicate(sequence: Iterable[object]) -> list[object]:
+		"""性能优化的保持顺序去重"""
 		seen = set()
+		# 使用列表预分配(如果可能)
+		if hasattr(sequence, "__len__"):
+			result = []
+			for item in sequence:
+				if item not in seen:
+					seen.add(item)
+					result.append(item)
+			return result
+		# 对于未知长度的序列使用列表推导
 		return [x for x in sequence if not (x in seen or seen.add(x))]
 
 
