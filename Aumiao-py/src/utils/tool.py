@@ -5,7 +5,7 @@ import re
 import time
 from collections.abc import Callable, Iterable, Mapping
 from collections.abc import Generator as ABCGenerator
-from dataclasses import asdict, fields, is_dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from html import unescape
 from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
 
@@ -983,12 +983,205 @@ class Printer:
 				return value
 
 
+T = TypeVar("T")
+
+
+@dataclass
+class DisplayConfig:
+	"""显示配置"""
+
+	page_size: int = 10
+	display_fields: list[str] | None = None
+	title: str = "数据列表"
+	id_field: str = "id"
+	navigation_config: dict[str, str] | None = None
+	field_formatters: dict[str, Callable[[Any], str]] | None = None
+
+
+@dataclass
+class OperationConfig:
+	"""操作配置"""
+
+	custom_operations: dict[str, Callable[[Any], None]] | None = None
+	batch_processor: Callable[[list[Any]], dict[int, str]] | None = None
+
+
+class DisplayRenderer:
+	"""负责数据渲染显示"""
+
+	def __init__(self, printer: Any) -> None:  # noqa: ANN401
+		self.printer = printer
+
+	def render_page(
+		self, data: list[Any], field_info: dict[str, Any], page_info: dict[str, Any], batch_results: dict[int, str] | None = None, operations: dict[str, str] | None = None
+	) -> None:
+		"""渲染单页数据"""
+		self._render_header(page_info)
+		self._render_table_header(field_info, batch_results)
+		self._render_data_rows(data, field_info, batch_results, operations, page_info)
+		self._render_footer(field_info, batch_results)
+
+	def _render_header(self, page_info: dict[str, Any]) -> None:
+		"""渲染页眉"""
+		self.printer.print_header(f"=== {page_info['title']} ===")
+		self.printer.print_message(f"第 {page_info['current_page']}/{page_info['total_pages']} 页 (共 {page_info['total_items']} 条记录)", "INFO")
+
+	def _render_table_header(self, field_info: dict[str, Any], batch_results: dict[int, str] | None) -> None:
+		"""渲染表头"""
+		header_parts = ["操作".ljust(10), "序号".ljust(6)]
+		header_parts.extend(f"{field}".ljust(20) for field in field_info["fields"])
+		if batch_results:
+			header_parts.append("状态".ljust(15))
+		header = "".join(header_parts)
+		separator = "-" * len(header)
+		self.printer.print_message(separator, "INFO")
+		self.printer.print_message(header, "INFO")
+		self.printer.print_message(separator, "INFO")
+
+	def _render_data_rows(
+		self, data: list[Any], field_info: dict[str, Any], batch_results: dict[int, str] | None, operations: dict[str, str] | None, page_info: dict[str, Any]
+	) -> None:
+		"""渲染数据行"""
+		start_idx = (page_info["current_page"] - 1) * page_info["page_size"]
+		for i, item in enumerate(data):
+			local_index = i + 1
+			global_index = start_idx + i
+			# 操作列
+			operation_display = self._format_operations(operations, local_index)
+			row = operation_display.ljust(10)
+			# 序号列
+			row += f"{local_index}".ljust(6)
+			# 数据字段
+			formatted_values = self._batch_format_values(item, field_info)
+			for field in field_info["fields"]:
+				display_value = self._format_display_value(formatted_values[field], 18)
+				row += f"{display_value}".ljust(20)
+			# 批量处理状态
+			if batch_results and global_index in batch_results:
+				row += f"{batch_results[global_index]}".ljust(15)
+			self.printer.print_message(row, "INFO")
+
+	def _render_footer(self, field_info: dict[str, Any], batch_results: dict[int, str] | None) -> None:
+		"""渲染页脚"""
+		footer_parts = [""] * (2 + len(field_info["fields"]) + (1 if batch_results else 0))
+		footer = "".join(part.ljust(20) for part in footer_parts)
+		separator = "-" * len(footer) if footer else "-" * 100
+		self.printer.print_message(separator, "INFO")
+
+	@staticmethod
+	def _format_operations(operations: dict[str, str] | None, local_index: int) -> str:
+		"""格式化操作显示"""
+		if not operations:
+			return ""
+		operation_display = ""
+		for shortcut in operations:
+			operation_display += f"{shortcut}{local_index} "
+		return operation_display.strip()
+
+	def _batch_format_values(self, item: Any, field_info: dict[str, Any]) -> dict[str, str]:  # noqa: ANN401
+		"""批量格式化字段值"""
+		formatted = {}
+		for field in field_info["fields"]:
+			value = self._safe_get_attribute(item, field)
+			if field in field_info["formatters"]:
+				formatted[field] = field_info["formatters"][field](value)
+			else:
+				formatted[field] = str(value)
+		return formatted
+
+	def _safe_get_attribute(self, item: Any, field: str) -> Any:  # noqa: ANN401
+		"""安全获取属性"""
+		try:
+			return getattr(item, field, "N/A")
+		except Exception as e:
+			self.printer.print_message(f"获取字段 {field} 时出错: {e}", "DEBUG")
+			return "ERROR"
+
+	@staticmethod
+	def _format_display_value(value: str, max_length: int = 18) -> str:
+		"""格式化显示值,处理长文本"""
+		if len(value) > max_length:
+			return value[: max_length - 3] + "..."
+		return value
+
+
+class InputProcessor:
+	"""负责处理用户输入"""
+
+	def __init__(self, printer: Any) -> None:  # noqa: ANN401
+		self.printer = printer
+
+	def get_user_choice(
+		self,
+		current_page: int,
+		total_pages: int,
+		custom_operations: dict[str, Callable[[Any], None]] | None,
+		nav_config: dict[str, str],
+		current_page_item_count: int,
+		operation_shortcuts: dict[str, str],
+	) -> str:
+		"""获取用户选择"""
+		valid_choices = self._build_valid_choices(current_page, total_pages, nav_config, current_page_item_count, operation_shortcuts)
+		options = self._build_options_display(current_page, total_pages, nav_config, custom_operations, operation_shortcuts)
+		self.printer.print_message(" | ".join(options), "INFO")
+		try:
+			return self.printer.get_valid_input(prompt="请选择", valid_options=valid_choices, cast_type=str)
+		except (EOFError, KeyboardInterrupt):
+			self.printer.print_message("\n操作已取消", "INFO")
+			return nav_config["quit"]
+
+	@staticmethod
+	def _build_valid_choices(
+		current_page: int,
+		total_pages: int,
+		nav_config: dict[str, str],
+		current_page_item_count: int,
+		operation_shortcuts: dict[str, str],
+	) -> set[str]:
+		"""构建有效选择集合"""
+		valid_choices = set()
+		# 导航选项
+		if current_page < total_pages:
+			valid_choices.add(nav_config["next_page"])
+		if current_page > 1:
+			valid_choices.add(nav_config["previous_page"])
+		valid_choices.add(nav_config["quit"])
+		# 操作选项
+		if operation_shortcuts and current_page_item_count > 0:
+			for shortcut in operation_shortcuts:
+				valid_choices.update(f"{shortcut}{i}" for i in range(1, current_page_item_count + 1))
+		return valid_choices
+
+	@staticmethod
+	def _build_options_display(
+		current_page: int,
+		total_pages: int,
+		nav_config: dict[str, str],
+		custom_operations: dict[str, Callable[[Any], None]] | None,
+		operation_shortcuts: dict[str, str],
+	) -> list[str]:
+		"""构建选项显示列表"""
+		options = []
+		# 导航选项
+		if current_page < total_pages:
+			options.append(f"{nav_config['next_page']}:下一页")
+		if current_page > 1:
+			options.append(f"{nav_config['previous_page']}:上一页")
+		options.append(f"{nav_config['quit']}:退出")
+		# 操作选项
+		if custom_operations and operation_shortcuts:
+			op_descriptions = [f"{shortcut}数字:{op_name}" for shortcut, op_name in operation_shortcuts.items()]
+			options.extend(op_descriptions)
+		return options
+
+
 class GenericDataViewer:
 	"""通用的数据查看器"""
 
-	def __init__(self, printer: ...) -> None:
+	def __init__(self, printer: Any) -> None:  # noqa: ANN401
 		self.printer = printer
-		# 默认导航配置
+		self.renderer = DisplayRenderer(printer)
+		self.input_processor = InputProcessor(printer)
 		self.default_navigation = {"next_page": "n", "previous_page": "p", "quit": "q", "back": "b"}
 
 	def display_data(
@@ -1025,164 +1218,108 @@ class GenericDataViewer:
 		if not data_list:
 			self.printer.print_message("没有数据可显示", "WARNING")
 			return
-		# 获取要显示的字段
-		available_fields = self._get_available_fields(data_class, display_fields)
-		total_pages = (len(data_list) + page_size - 1) // page_size
-		current_page = 1
-		# 预计算批量处理结果(如果提供了批量处理函数)
-		batch_results: dict[int, str] = {}
-		if batch_processor:
-			batch_results = batch_processor(data_list)
-		# 为操作分配快捷键
-		operation_shortcuts = self._assign_operation_shortcuts(custom_operations)
-		while True:
-			self._display_page(data_list, available_fields, current_page, page_size, total_pages, title, field_formatters, batch_results, operation_shortcuts)
-			# 获取用户输入
-			choice = self._get_user_choice(current_page, total_pages, custom_operations, nav_config, len(data_list), page_size, operation_shortcuts)
-			if choice == nav_config["next_page"] and current_page < total_pages:
-				current_page += 1
-			elif choice == nav_config["previous_page"] and current_page > 1:
-				current_page -= 1
-			elif choice == nav_config["quit"]:
-				break
-			elif self._is_operation_choice(choice, operation_shortcuts, page_size, len(data_list), current_page):
-				# 处理操作选择
-				shortcut = choice[0]
-				item_num = int(choice[1:])
-				# 计算实际索引
-				start_idx = (current_page - 1) * page_size
-				actual_index = start_idx + item_num - 1
-				if 0 <= actual_index < len(data_list):
-					selected_item = data_list[actual_index]
-					op_name = operation_shortcuts[shortcut]
-					# 修复:检查 custom_operations 是否为 None
-					if custom_operations is not None:
-						op_function = custom_operations[op_name]
-						try:
-							op_function(selected_item)
-						except Exception as e:
-							self.printer.print_message(f"操作 '{op_name}' 执行失败: {e}", "ERROR")
-					else:
-						self.printer.print_message("没有可用的操作", "ERROR")
-				else:
-					self.printer.print_message("无效的选择", "ERROR")
-			else:
-				self.printer.print_message("无效的输入", "ERROR")
+		# 预计算和初始化
+		field_info = self._precompute_field_info(data_class, display_fields, field_formatters)
+		operation_shortcuts = self._assign_operation_shortcuts(custom_operations, list(nav_config.values()))
+		batch_results = batch_processor(data_list) if batch_processor else {}
+		# 主显示循环
+		self._display_loop(data_list, field_info, operation_shortcuts, batch_results, page_size, title, nav_config, custom_operations)
 
-	@staticmethod
-	def _assign_operation_shortcuts(custom_operations: dict[str, Callable[[T], None]] | None) -> dict[str, str]:
-		"""为操作分配快捷键"""
-		if not custom_operations:
-			return {}
-		shortcuts = {}
-		operations = list(custom_operations.keys())
-		# 使用字母 a, b, c... 作为操作快捷键
-		for i, op_name in enumerate(operations):
-			shortcut = chr(ord("a") + i)
-			shortcuts[shortcut] = op_name
-		return shortcuts
-
-	def _display_page(
+	def _display_loop(
 		self,
 		data_list: list[T],
-		display_fields: list[str],
-		current_page: int,
-		page_size: int,
-		total_pages: int,
-		title: str,
-		field_formatters: dict[str, Callable[[Any], str]] | None = None,
-		batch_results: dict[int, str] | None = None,
-		operation_shortcuts: dict[str, str] | None = None,
-	) -> None:
-		"""显示当前页的数据"""
-		self.printer.print_header(f"=== {title} ===")
-		self.printer.print_message(f"第 {current_page}/{total_pages} 页 (共 {len(data_list)} 条记录)", "INFO")
-		self.printer.print_message("-" * 100, "INFO")
-		# 显示表头
-		header = "操作".ljust(10) + "序号".ljust(6)
-		for field in display_fields:
-			header += f"{field}".ljust(20)
-		if batch_results:
-			header += "状态".ljust(15)
-		self.printer.print_message(header, "INFO")
-		self.printer.print_message("-" * 100, "INFO")
-		# 显示数据
-		start_idx = (current_page - 1) * page_size
-		end_idx = min(start_idx + page_size, len(data_list))
-		for i in range(start_idx, end_idx):
-			item = data_list[i]
-			local_index = i - start_idx + 1
-			# 操作列 (显示所有可用的操作快捷键)
-			operation_display = ""
-			if operation_shortcuts:
-				for shortcut in operation_shortcuts:
-					operation_display += f"{shortcut}{local_index} "
-			row = operation_display.ljust(10)
-			# 序号列
-			row += f"{local_index}".ljust(6)
-			# 数据字段
-			for field in display_fields:
-				value = getattr(item, field, "N/A")
-				formatted_value = field_formatters[field](value) if field_formatters and field in field_formatters else str(value)
-				display_value = self._format_display_value(formatted_value, 18)
-				row += f"{display_value}".ljust(20)
-			# 批量处理状态信息
-			if batch_results and i in batch_results:
-				status = batch_results[i]
-				row += f"{status}".ljust(15)
-			self.printer.print_message(row, "INFO")
-		self.printer.print_message("-" * 100, "INFO")
-
-	def _get_user_choice(
-		self,
-		current_page: int,
-		total_pages: int,
-		custom_operations: dict[str, Callable[[T], None]] | None,
-		nav_config: dict[str, str],
-		total_items: int,
-		page_size: int,
+		field_info: dict[str, Any],
 		operation_shortcuts: dict[str, str],
-	) -> str:
-		"""获取用户选择"""
-		# 构建选项列表
-		options = []
-		valid_choices = set()
-		# 导航选项
-		if current_page < total_pages:
-			options.append(f"{nav_config['next_page']}:下一页")
-			valid_choices.add(nav_config["next_page"])
-		if current_page > 1:
-			options.append(f"{nav_config['previous_page']}:上一页")
-			valid_choices.add(nav_config["previous_page"])
-		options.append(f"{nav_config['quit']}:退出")
-		valid_choices.add(nav_config["quit"])
-		# 计算当前页的项目数量
-		start_idx = (current_page - 1) * page_size
-		current_page_item_count = min(page_size, total_items - start_idx)
-		# 操作选项 (a1, b2 等)
-		# 修复:检查 custom_operations 是否为 None
-		if custom_operations is not None and current_page_item_count > 0:
-			# 显示操作说明
-			op_descriptions = []
-			for shortcut, op_name in operation_shortcuts.items():
-				op_descriptions.append(f"{shortcut}数字:{op_name}")
-				# 添加所有可能的操作选择到有效选项
-				valid_choices.update(f"{shortcut}{i}" for i in range(1, current_page_item_count + 1))
-			options.extend(op_descriptions)
-		# 显示选项
-		self.printer.print_message(" | ".join(options), "INFO")
-		# 使用 Printer 的验证输入功能
-		prompt = "请选择"
-		try:
-			return self.printer.get_valid_input(prompt=prompt, valid_options=valid_choices, cast_type=str)
-		except (EOFError, KeyboardInterrupt):
-			self.printer.print_message("\n操作已取消", "INFO")
-			return nav_config["quit"]
+		batch_results: dict[int, str],
+		page_size: int,
+		title: str,
+		nav_config: dict[str, str],
+		custom_operations: dict[str, Callable[[T], None]] | None,
+	) -> None:
+		"""主显示循环"""
+		current_page = 1
+		total_pages = (len(data_list) + page_size - 1) // page_size
+		while True:
+			# 获取当前页数据
+			current_page_items = self._get_current_page_items(data_list, current_page, page_size)
+			page_info = self._build_page_info(title, current_page, total_pages, len(data_list), page_size)
+			# 显示当前页
+			self.renderer.render_page(current_page_items, field_info, page_info, batch_results, operation_shortcuts)
+			# 获取用户输入
+			choice = self.input_processor.get_user_choice(current_page, total_pages, custom_operations, nav_config, len(current_page_items), operation_shortcuts)
+			# 处理用户选择
+			result = self._process_user_choice(choice, current_page, total_pages, nav_config, operation_shortcuts, current_page_items, custom_operations)
+			if result == "quit":
+				break
+			if isinstance(result, int):
+				current_page = result
 
 	@staticmethod
-	def _is_operation_choice(choice: str, operation_shortcuts: dict[str, str], page_size: int, total_items: int, current_page: int) -> bool:
+	def _get_current_page_items(data_list: list[T], current_page: int, page_size: int) -> list[T]:
+		"""获取当前页数据"""
+		start_idx = (current_page - 1) * page_size
+		end_idx = min(start_idx + page_size, len(data_list))
+		return data_list[start_idx:end_idx]
+
+	@staticmethod
+	def _build_page_info(title: str, current_page: int, total_pages: int, total_items: int, page_size: int) -> dict[str, Any]:
+		"""构建页面信息"""
+		return {"title": title, "current_page": current_page, "total_pages": total_pages, "total_items": total_items, "page_size": page_size}
+
+	def _process_user_choice(
+		self,
+		choice: str,
+		current_page: int,
+		total_pages: int,
+		nav_config: dict[str, str],
+		operation_shortcuts: dict[str, str],
+		current_page_items: list[T],
+		custom_operations: dict[str, Callable[[T], None]] | None,
+	) -> int | str:
+		"""处理用户选择"""
+		# 导航操作
+		if choice == nav_config["next_page"] and current_page < total_pages:
+			return current_page + 1
+		if choice == nav_config["previous_page"] and current_page > 1:
+			return current_page - 1
+		if choice == nav_config["quit"]:
+			return "quit"
+		# 自定义操作
+		if self._is_operation_choice(choice, operation_shortcuts, len(current_page_items)):
+			self._execute_operation(choice, operation_shortcuts, current_page_items, custom_operations)
+			return current_page  # 操作后停留在当前页
+		self.printer.print_message("无效的输入", "ERROR")
+		return current_page
+
+	def _execute_operation(
+		self,
+		choice: str,
+		operation_shortcuts: dict[str, str],
+		current_page_items: list[T],
+		custom_operations: dict[str, Callable[[T], None]] | None,
+	) -> None:
+		"""执行操作"""
+		shortcut = choice[0]
+		item_num = int(choice[1:]) - 1  # 转换为0-based索引
+		if 0 <= item_num < len(current_page_items):
+			selected_item = current_page_items[item_num]
+			op_name = operation_shortcuts[shortcut]
+			if custom_operations and op_name in custom_operations:
+				try:
+					custom_operations[op_name](selected_item)
+					self.printer.print_message(f"操作 '{op_name}' 执行成功", "SUCCESS")
+				except Exception as e:
+					self.printer.print_message(f"操作 '{op_name}' 执行失败: {e}", "ERROR")
+			else:
+				self.printer.print_message("没有可用的操作", "ERROR")
+		else:
+			self.printer.print_message("无效的选择", "ERROR")
+
+	@staticmethod
+	def _is_operation_choice(choice: str, operation_shortcuts: dict[str, str], current_item_count: int) -> bool:
 		"""检查是否为操作选择"""
-		if len(choice) < 2:  # noqa: PLR2004
+		MIN_CHOICE_LENGTH = 2  # noqa: N806
+		if len(choice) < MIN_CHOICE_LENGTH:
 			return False
 		shortcut = choice[0]
 		number_part = choice[1:]
@@ -1191,41 +1328,70 @@ class GenericDataViewer:
 		if not number_part.isdigit():
 			return False
 		item_num = int(number_part)
-		start_idx = (current_page - 1) * page_size
-		current_page_item_count = min(page_size, total_items - start_idx)
-		return 1 <= item_num <= current_page_item_count
+		return 1 <= item_num <= current_item_count
 
-	def _validate_parameters(self, data_class: type[T], data_list: list[T], page_size: int, display_fields: list[str] | None, id_field: str, nav_config: dict[str, str]) -> None:
+	def _validate_parameters(
+		self,
+		data_class: type[T],
+		data_list: list[T],
+		page_size: int,
+		display_fields: list[str] | None,
+		id_field: str,
+		nav_config: dict[str, str],
+	) -> None:
 		"""验证输入参数"""
-		if not is_dataclass(data_class):
-			msg = "data_class 必须是一个 dataclass"
-			raise ValueError(msg)
-		if not isinstance(data_list, list):
-			msg = "data_list 必须是一个列表"
-			raise TypeError(msg)
-		if page_size <= 0:
-			msg = "page_size 必须大于 0"
-			raise ValueError(msg)
-		if display_fields is not None and not isinstance(display_fields, list):
-			msg = "display_fields 必须是一个列表或 None"
-			raise ValueError(msg)
-		# 检查导航键配置
-		required_nav_keys = ["next_page", "previous_page", "quit", "back"]
-		for key in required_nav_keys:
-			if key not in nav_config:
-				msg = f"导航配置缺少必需的键: {key}"
-				raise ValueError(msg)
-			if not isinstance(nav_config[key], str) or len(nav_config[key]) != 1:
-				msg = f"导航键 '{key}' 必须是单个字符"
-				raise ValueError(msg)
-		# 检查导航键是否冲突
-		nav_values = list(nav_config.values())
-		if len(nav_values) != len(set(nav_values)):
-			msg = "导航键配置中存在重复的字符"
-			raise ValueError(msg)
-		# 检查 id_field 是否存在
-		if not any(field.name == id_field for field in fields(data_class)):
-			self.printer.print_message(f"警告: dataclass 中没有找到字段 '{id_field}'", "WARNING")
+		validation_checks = [
+			(not is_dataclass(data_class), "data_class 必须是一个 dataclass"),
+			(not isinstance(data_list, list), "data_list 必须是一个列表"),
+			(page_size <= 0, "page_size 必须大于 0"),
+			(display_fields is not None and not isinstance(display_fields, list), "display_fields 必须是一个列表或 None"),
+		]
+		for condition, error_msg in validation_checks:
+			if condition:
+				raise ValueError(error_msg)
+		self._validate_navigation_config(nav_config)
+		self._validate_id_field(data_class, id_field)
+
+	@staticmethod
+	def _validate_navigation_config(nav_config: dict[str, str]) -> None:
+		"""验证导航配置"""
+		required_keys = ["next_page", "previous_page", "quit", "back"]
+		missing_keys = [key for key in required_keys if key not in nav_config]
+		if missing_keys:
+			error_msg = f"导航配置缺少必需的键: {', '.join(missing_keys)}"
+			raise ValueError(error_msg)
+		# 检查字符唯一性
+		nav_chars = [nav_config[key] for key in required_keys]
+		if len(nav_chars) != len(set(nav_chars)):
+			error_msg = "导航键配置中存在重复的字符"
+			raise ValueError(error_msg)
+
+	def _validate_id_field(self, data_class: type[T], id_field: str) -> None:
+		"""验证ID字段"""
+		try:
+			# 使用 is_dataclass 检查并安全获取字段
+			if is_dataclass(data_class):
+				field_names = [field.name for field in fields(data_class)]
+				if id_field not in field_names:
+					self.printer.print_message(f"警告: dataclass 中没有找到字段 '{id_field}'", "WARNING")
+			else:
+				self.printer.print_message("警告: 提供的类不是 dataclass", "WARNING")
+		except (TypeError, AttributeError):
+			# 如果 fields() 调用失败,说明不是有效的 dataclass
+			self.printer.print_message(f"警告: 无法验证字段 '{id_field}',请确保是有效的 dataclass", "WARNING")
+
+	def _precompute_field_info(
+		self,
+		data_class: type[T],
+		display_fields: list[str] | None,
+		field_formatters: dict[str, Callable[[Any], str]] | None,
+	) -> dict[str, Any]:
+		"""预计算字段信息"""
+		available_fields = self._get_available_fields(data_class, display_fields)
+		return {
+			"fields": available_fields,
+			"formatters": field_formatters or {},
+		}
 
 	def _get_available_fields(self, data_class: type[T], display_fields: list[str] | None) -> list[str]:
 		"""获取可用的字段列表"""
@@ -1243,8 +1409,24 @@ class GenericDataViewer:
 		return available_fields or all_fields
 
 	@staticmethod
-	def _format_display_value(value: str, max_length: int = 18) -> str:
-		"""格式化显示值,处理长文本"""
-		if len(value) > max_length:
-			return value[: max_length - 3] + "..."
-		return value
+	def _assign_operation_shortcuts(
+		custom_operations: dict[str, Callable[[T], None]] | None,
+		existing_shortcuts: list[str],
+	) -> dict[str, str]:
+		"""为操作分配快捷键"""
+		if not custom_operations:
+			return {}
+		shortcuts = {}
+		operations = list(custom_operations.keys())
+		# 使用可用的字母作为操作快捷键(避免与导航键冲突)
+		available_letters = [chr(i) for i in range(ord("a"), ord("z") + 1)]
+		available_letters = [letter for letter in available_letters if letter not in existing_shortcuts]
+		for i, op_name in enumerate(operations):
+			if i < len(available_letters):
+				shortcut = available_letters[i]
+				shortcuts[shortcut] = op_name
+			else:
+				# 如果字母不够用,使用数字作为后备
+				shortcut = str(i - len(available_letters))
+				shortcuts[shortcut] = op_name
+		return shortcuts

@@ -1145,7 +1145,7 @@ class FileProcessor(ClassUnion):
 			results = {}
 			for idx, record in enumerate(history_items):
 				is_valid = self._validate_url(record.save_url)
-				status = "✓有效" if is_valid else "✗无效"
+				status = "有效" if is_valid else "✗无效"
 				results[idx] = status
 			return results
 
@@ -1208,14 +1208,19 @@ class FileProcessor(ClassUnion):
 		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
 		"""
 		try:
-			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5)
-			if response.status_code == acquire.HTTPStatus.OK.value:  # HTTPStatus.OK.value
+			# 首先尝试HEAD请求
+			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
+			if response.status_code == acquire.HTTPStatus.OK.value:  # 直接使用200状态码
 				content_length = response.headers.get("Content-Length")
-				if content_length and int(content_length) > 0:
+				# 如果有Content-Length且大于0,或者没有Content-Length都认为是有效的
+				if not content_length or int(content_length) > 0:
 					return True
-			response = self._client.send_request(endpoint=url, method="GET", stream=True, timeout=5)
-			if response.status_code != acquire.HTTPStatus.OK.value:  # HTTPStatus.OK.value
+			# HEAD请求失败或内容长度为0,尝试GET请求
+			response = self._client.send_request(endpoint=url, method="GET", timeout=5, log=False)
+			if response.status_code != acquire.HTTPStatus.OK.value:
 				return False
-			return bool(next(response.iter_content(chunk_size=1)))
+			# 检查响应内容是否非空
+			content = response.content
+			return len(content) > 0 if content else False
 		except Exception:
 			return False
