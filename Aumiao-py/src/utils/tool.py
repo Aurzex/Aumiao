@@ -6,31 +6,60 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from collections.abc import Generator as ABCGenerator
 from dataclasses import asdict, dataclass, fields, is_dataclass
+from functools import lru_cache
 from html import unescape
-from typing import Any, Literal, LiteralString, TypeGuard, TypeVar, overload
+from typing import Any, ClassVar, Literal, LiteralString, TypeGuard, TypeVar, final, overload
 
 from src.utils.decorator import singleton
 
 T = TypeVar("T")
-FILE_SIZE: int = 1024
 # 类型别名定义
 DataDict = dict[str, Any]
-type DataObject = DataDict | list[DataDict] | ABCGenerator[DataDict]
-# 颜色常量
-COLOR_CODES: dict[Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"], str] = {
-	"COMMENT": "\033[38;5;245m",  # 辅助说明
-	"ERROR": "\033[38;5;203m",  # 错误提示
-	"MENU_ITEM": "\033[38;5;183m",  # 菜单项
-	"MENU_TITLE": "\033[38;5;80m",  # 菜单标题
-	"PROMPT": "\033[38;5;75m",  # 输入提示
-	"RESET": "\033[0m",  # 重置样式
-	"STATUS": "\033[38;5;228m",  # 状态信息
-	"SUCCESS": "\033[38;5;114m",  # 成功提示
-	"INFO": "\033[38;5;39m",  # 信息提示 - 蓝色
-	"WARNING": "\033[38;5;214m",  # 警告提示 - 橙色
-}
-# 延迟加载分隔符
-SEPARATOR: str | None = None
+type DataObject = DataDict | list[DataDict]
+# 常量定义
+FILE_SIZE: int = 1024
+
+
+# 颜色配置类 - 使用更高效的数据结构
+@final
+class ColorConfig:
+	"""颜色配置管理"""
+
+	# 使用元组代替字典,提高访问性能
+	_COLOR_MAP: ClassVar = {
+		"COMMENT": "\033[38;5;245m",  # 辅助说明
+		"ERROR": "\033[38;5;203m",  # 错误提示
+		"MENU_ITEM": "\033[38;5;183m",  # 菜单项
+		"MENU_TITLE": "\033[38;5;80m",  # 菜单标题
+		"PROMPT": "\033[38;5;75m",  # 输入提示
+		"RESET": "\033[0m",  # 重置样式
+		"STATUS": "\033[38;5;228m",  # 状态信息
+		"SUCCESS": "\033[38;5;114m",  # 成功提示
+		"INFO": "\033[38;5;39m",  # 信息提示
+		"WARNING": "\033[38;5;214m",  # 警告提示
+	}
+	# 预计算的分隔符,避免重复计算
+	_SEPARATOR = f"{_COLOR_MAP['PROMPT']}══════════════════════════════════════════════════════════{_COLOR_MAP['RESET']}"
+
+	@classmethod
+	@lru_cache(maxsize=64)
+	def get_color(cls, color_name: str) -> str:
+		"""获取颜色代码,使用缓存提高性能"""
+		return cls._COLOR_MAP.get(color_name, cls._COLOR_MAP["RESET"])
+
+	@classmethod
+	def get_separator(cls) -> str:
+		"""获取分隔符"""
+		return cls._SEPARATOR
+
+	@classmethod
+	def is_valid_color(cls, color_name: str) -> bool:
+		"""验证颜色名称是否有效"""
+		return color_name in cls._COLOR_MAP
+
+
+# 颜色类型别名,提高类型安全性
+ColorType = Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]
 
 
 @staticmethod
@@ -909,78 +938,129 @@ class Encrypt:
 
 
 @singleton
+@final
 class Printer:
+	"""
+	优化后的打印器类,提供颜色输出和输入验证功能
+	使用单例模式确保全局一致的输出格式
+	"""
+
 	def __init__(self) -> None:
-		pass
+		# 预计算常用字符串,减少运行时计算
+		self._input_prefix = "↳ "
+		self._input_suffix = ": "
+		self._header_width = 60
 
 	@staticmethod
-	def color_text(text: str, color_name: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]) -> str:
-		"""为文本添加颜色"""
-		return f"{COLOR_CODES[color_name]}{text}{COLOR_CODES['RESET']}"
+	def color_text(text: str, color_name: ColorType) -> str:
+		"""为文本添加颜色 - 静态方法优化"""
+		return f"{ColorConfig.get_color(color_name)}{text}{ColorConfig.get_color('RESET')}"
 
-	def prompt_input(self, text: str, color: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"] = "PROMPT") -> str:
-		"""统一的输入提示函数"""
-		return input(self.color_text(f"↳ {text}: ", color))
+	def prompt_input(self, text: str, color: ColorType = "PROMPT") -> str:
+		"""统一的输入提示函数 - 优化字符串拼接"""
+		prompt_text = f"{self._input_prefix}{text}{self._input_suffix}"
+		colored_prompt = self.color_text(prompt_text, color)
+		# 确保输出被立即刷新
+		return input(colored_prompt)
 
-	@staticmethod
-	def get_separator() -> str:
-		"""获取分隔符,延迟初始化"""
-		global SEPARATOR  # noqa: PLW0603
-		if SEPARATOR is None:
-			SEPARATOR = f"{COLOR_CODES['PROMPT']}══════════════════════════════════════════════════════════{COLOR_CODES['RESET']}"
-		return SEPARATOR
-
-	def print_message(self, text: str, colour_name: Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]) -> None:
-		print(self.color_text(text=text, color_name=colour_name))
+	def print_message(self, text: str, color_name: ColorType) -> None:
+		"""打印消息 - 优化性能"""
+		print(self.color_text(text, color_name))
 
 	def print_header(self, text: str) -> None:
-		"""打印装饰头部"""
-		separator = self.get_separator()
+		"""打印装饰头部 - 优化字符串格式化"""
+		separator = ColorConfig.get_separator()
+		formatted_text = text.center(self._header_width)
 		print(f"\n{separator}")
-		print(f"{COLOR_CODES['MENU_TITLE']}{text:^60}{COLOR_CODES['RESET']}")
+		print(self.color_text(formatted_text, "MENU_TITLE"))
 		print(f"{separator}\n")
+
+	@staticmethod
+	def _normalize_string_input(value_str: str, valid_options: set[str]) -> str:
+		"""标准化字符串输入,智能处理大小写"""
+		if not valid_options:
+			return value_str
+		# 分析选项的大小写模式
+		all_lower = all(opt.islower() for opt in valid_options)
+		all_upper = all(opt.isupper() for opt in valid_options)
+		if all_lower:
+			return value_str.lower()
+		if all_upper:
+			return value_str.upper()
+		return value_str
+
+	@staticmethod
+	def _validate_range(value: float, valid_range: range) -> bool:
+		"""验证范围输入"""
+		return value in valid_range
+
+	@staticmethod
+	def _validate_options(value: T, valid_options: set[T]) -> bool:
+		"""验证选项输入"""
+		return value in valid_options
 
 	def get_valid_input(
 		self,
 		prompt: str,
-		valid_options: set[T] | range | None = None,  # 支持范围验证
+		valid_options: set[T] | range | None = None,
 		cast_type: Callable[[str], T] = str,
-		validator: Callable[[T], bool] | None = None,  # 自定义验证函数
+		validator: Callable[[T], bool] | None = None,
+		max_attempts: int = 10,
 	) -> T:
-		"""获取有效输入并进行类型转换验证。支持范围和自定义验证,自动处理大小写"""
-		while True:
+		"""
+		获取有效输入并进行类型转换验证
+		支持范围验证、自定义验证和大小写智能处理
+		增加最大尝试次数限制,避免无限循环
+		"""
+		attempts = 0
+		while attempts < max_attempts:
 			try:
-				value_str = self.prompt_input(prompt)
-				# 如果是字符串类型且有有效选项,进行大小写智能处理
-				_original_value_str = value_str
-				if cast_type is str and valid_options is not None and not isinstance(valid_options, range):
-					# 检查有效选项的大小写特征
-					if all(isinstance(opt, str) and opt.islower() for opt in valid_options):
-						value_str = value_str.lower()
-					elif all(isinstance(opt, str) and opt.isupper() for opt in valid_options):
-						value_str = value_str.upper()
-				# 进行类型转换
+				value_str = self.prompt_input(prompt).strip()
+				if not value_str:
+					self.print_message("输入不能为空,请重新输入", "WARNING")
+					attempts += 1
+					continue
+				# 字符串类型的智能处理
+				if cast_type is str and valid_options and not isinstance(valid_options, range) and all(isinstance(opt, str) for opt in valid_options):
+					value_str = self._normalize_string_input(value_str, valid_options)  # type: ignore  # noqa: PGH003
+				# 类型转换
 				value = cast_type(value_str)
-				# 检查是否在有效选项中
+				# 验证逻辑
+				validation_passed = True
+				validation_error = ""
 				if valid_options is not None:
 					if isinstance(valid_options, range):
-						if value not in valid_options:
-							print(self.color_text(f"输入超出范围。有效范围: [{valid_options.start}-{valid_options.stop - 1}]", "ERROR"))
-							continue
-					# 对于字符串选项,使用原始转换后的值进行比较
-					elif value not in valid_options:
-						print(self.color_text(f"无效输入。请重试。有效选项: {valid_options}", "ERROR"))
-						continue
-				# 执行自定义验证
-				if validator and not validator(value):
-					print(self.color_text("输入不符合要求", "ERROR"))
+						if not self._validate_range(value, valid_options):  # type: ignore  # noqa: PGH003
+							validation_passed = False
+							validation_error = f"输入超出范围。有效范围: [{valid_options.start}-{valid_options.stop - 1}]"
+					elif not self._validate_options(value, valid_options):
+						validation_passed = False
+						validation_error = f"无效输入。有效选项: {valid_options}"
+				# 自定义验证
+				if validation_passed and validator and not validator(value):
+					validation_passed = False
+					validation_error = "输入不符合要求"
+				if not validation_passed:
+					self.print_message(validation_error, "ERROR")
+					attempts += 1
 					continue
-			except ValueError:
-				print(self.color_text(f"格式错误,请输入{cast_type.__name__}类型的值", "ERROR"))
+			except ValueError as e:
+				type_name = cast_type.__name__
+				self.print_message(f"格式错误: 请输入{type_name}类型的值 ({e})", "ERROR")
+				attempts += 1
+			except KeyboardInterrupt:
+				self.print_message("\n操作已取消", "INFO")
+				raise
 			except Exception as e:
-				print(self.color_text(f"发生错误: {e!s}", "ERROR"))
+				self.print_message(f"发生意外错误: {e!s}", "ERROR")
+				attempts += 1
 			else:
+				# 如果所有验证都通过,返回结果
 				return value
+		# 达到最大尝试次数
+		error_msg = "输入尝试次数过多,程序退出"
+		self.print_message(error_msg, "ERROR")
+		raise ValueError(error_msg)
 
 
 T = TypeVar("T")

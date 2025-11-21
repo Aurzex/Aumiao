@@ -429,15 +429,18 @@ class MenuSystem:
 		return menu_options
 
 	def display(self) -> None:
-		"""显示菜单"""
+		"""显示菜单 - 高性能版本"""
 		printer.print_header("主菜单")
+		# 预计算格式字符串减少重复计算
+		menu_format = f"{{:>{config.MAX_MENU_KEY_LENGTH}}}. {{}}"
 		for key, option in self.menu_options.items():
 			if not option.visible:
 				continue
-			color = tool.COLOR_CODES["MENU_ITEM"]
-			if option.require_auth and not self.account_data_manager.is_logged_in:
-				color = tool.COLOR_CODES["COMMENT"]
-			print(f"{color}{key.rjust(config.MAX_MENU_KEY_LENGTH)}. {option.name}{tool.COLOR_CODES['RESET']}")
+			# 格式化菜单文本
+			menu_text = menu_format.format(key, option.name)
+			# 选择颜色
+			color_type = "COMMENT" if (option.require_auth and not self.account_data_manager.is_logged_in) else "MENU_ITEM"
+			print(printer.color_text(menu_text, color_type))
 
 	def handle_choice(self, choice: str) -> bool:
 		"""处理菜单选择,返回是否继续运行"""
