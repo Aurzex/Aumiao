@@ -1,8 +1,3 @@
-"""
-重构后的云数据管理系统
-优化了架构设计、类型注解和错误处理
-"""
-
 import cmd
 import hashlib
 import json
@@ -164,6 +159,42 @@ class DisplayHelper:
 		# 对于长字符串,截取前后部分
 		half_length = max_length // 2 - len(TRUNCATED_SUFFIX) // 2
 		return f"{str_value[:half_length]}{TRUNCATED_SUFFIX}{str_value[-half_length:]}"
+
+
+class WorkInfo:
+	"""作品信息容器"""
+
+	def __init__(self, data: dict[str, Any]) -> None:
+		self.id = data["id"]
+		self.name = data.get("work_name", data.get("name", "未知作品"))
+		self.type = data.get("type", "NEMO")
+		self.version = data.get("bcm_version", "0.16.2")
+		self.user_id = data.get("user_id", 0)
+		self.preview_url = data.get("preview", "")
+		self.source_urls = data.get("source_urls", data.get("work_urls", []))
+
+	@property
+	def file_extension(self) -> str:
+		"""根据作品类型返回文件扩展名"""
+		extensions = {
+			"KITTEN2": ".bcm",
+			"KITTEN3": ".bcm",
+			"KITTEN4": ".bcm4",
+			"COCO": ".json",
+			"NEMO": "",
+			"NEKO": ".json",  # NEKO类型使用JSON格式
+		}
+		return extensions.get(self.type, ".json")
+
+	@property
+	def is_nemo(self) -> bool:
+		"""是否为Nemo作品"""
+		return self.type == "NEMO"
+
+	@property
+	def is_neko(self) -> bool:
+		"""是否为NEKO作品"""
+		return self.type == "NEKO"
 
 
 class CloudAuthenticator:
@@ -459,7 +490,7 @@ class CloudList(CloudDataItem):
 class CloudConnection:
 	"""云连接核心类,负责WebSocket连接和消息处理"""
 
-	def __init__(self, work_id: int, editor: EditorType = EditorType.KITTEN, authorization_token: str | None = None) -> None:
+	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self.work_id = work_id
 		self.editor = editor
 		self.authenticator = CloudAuthenticator(authorization_token)
@@ -487,6 +518,40 @@ class CloudConnection:
 		self._pending_ranking_requests: list[PrivateCloudVariable] = []
 		self._ping_active = False
 		self._join_sent = False
+		self._work_info: WorkInfo | None = None
+
+	def _get_work_info(self) -> WorkInfo:
+		"""获取作品信息"""
+		if self._work_info is None:
+			try:
+				raw_info = httpx.get(
+					f"https://api.codemao.cn/creation-tools/v1/works/{self.work_id}",
+					headers={"Cookie": f"Authorization={self.authenticator.authorization_token}"} if self.authenticator.authorization_token else {},
+				).json()
+				self._work_info = WorkInfo(raw_info)
+				print(f"✓ 作品: {self._work_info.name}")
+				print(f"✓ 类型: {self._work_info.type}")
+			except Exception as e:
+				print(f"获取作品信息失败: {e}")
+				# 默认使用KITTEN类型
+				self._work_info = WorkInfo({"id": self.work_id, "name": "未知作品", "type": "KITTEN"})
+		return self._work_info
+
+	def _determine_editor_type(self) -> EditorType:
+		"""根据作品类型确定编辑器类型"""
+		work_info = self._get_work_info()
+		work_type = work_info.type
+		# 根据作品类型映射到对应的编辑器类型
+		editor_mapping = {
+			"KITTEN": EditorType.KITTEN,
+			"KITTEN2": EditorType.KITTEN,
+			"KITTEN3": EditorType.KITTEN,
+			"KITTEN4": EditorType.KITTEN,
+			"NEKO": EditorType.KITTEN_N,
+			"NEMO": EditorType.NEMO,
+			"COCO": EditorType.COCO,
+		}
+		return editor_mapping.get(work_type, EditorType.KITTEN)
 
 	def on(self, event: str, callback: Callable[..., None]) -> None:
 		"""注册事件回调"""
@@ -516,11 +581,14 @@ class CloudConnection:
 
 	def _get_websocket_url(self) -> str:
 		"""获取WebSocket连接URL"""
+		# 如果未指定编辑器类型,自动根据作品类型确定
+		if self.editor is None:
+			self.editor = self._determine_editor_type()
 		editor_params = {
-			EditorType.NEMO: {"authorization_type": 5, "stag": 2},
-			EditorType.KITTEN: {"authorization_type": 1, "stag": 1},
-			EditorType.KITTEN_N: {"authorization_type": 5, "stag": 3, "token": ""},
-			EditorType.COCO: {"authorization_type": 1, "stag": 1},
+			EditorType.NEMO: {"authorization_type": "5", "stag": "2"},
+			EditorType.KITTEN: {"authorization_type": "1", "stag": "1"},
+			EditorType.KITTEN_N: {"authorization_type": "5", "stag": "3", "token": ""},
+			EditorType.COCO: {"authorization_type": "1", "stag": "1"},
 		}
 		params = editor_params.get(self.editor, editor_params[EditorType.KITTEN])
 		params["EIO"] = "3"
@@ -677,7 +745,7 @@ class CloudConnection:
 			cloud_variable_id = item.get("cvid")
 			name = item.get("name")
 			value = item.get("value")
-			data_type = item.get("type")
+			data_type = cast("int", item.get("type"))
 			if not all([cloud_variable_id, name, value is not None, data_type is not None]):
 				print(f"数据项缺少必要字段: {DisplayHelper.truncate_value(item)}")
 				return
@@ -819,9 +887,10 @@ class CloudConnection:
 			self.online_users = data["total"]
 			self._emit_event("online_users_change", old_count, self.online_users)
 
-	def _handle_illegal_event(self, data: Any) -> None:
+	@staticmethod
+	def _handle_illegal_event(_data: Any) -> None:
 		"""处理非法事件消息"""
-		print(f"非法事件: {DisplayHelper.truncate_value(data)}")
+		print("检测到非法事件")
 
 	def _on_open(self, _ws: websocket.WebSocketApp) -> None:
 		"""WebSocket连接打开回调"""
@@ -1098,7 +1167,7 @@ class CloudConnection:
 class CloudManager:
 	"""云数据管理器,提供高级API"""
 
-	def __init__(self, work_id: int, editor: EditorType = EditorType.KITTEN, authorization_token: str | None = None):
+	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None):
 		self.connection = CloudConnection(work_id, editor, authorization_token)
 
 	def connect(self, wait_for_data: bool = True) -> bool:
@@ -1176,7 +1245,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 				print()
 				break
 
-	def do_status(self, arg: str) -> None:
+	def do_status(self, _arg: str) -> None:
 		"""查看连接状态和数据状态"""
 		print(f"连接状态: {'已连接' if self.connection.connected else '未连接'}")
 		print(f"数据就绪: {'是' if self.connection.data_ready else '否'}")
@@ -1330,13 +1399,14 @@ class CloudCommandLineInterface(cmd.Cmd):
 			print(f"错误: 设置公有变量失败, 请检查变量名 '{name}'")
 			print("使用 'available' 查看可用公有变量")
 
-	def _parse_value(self, value: str) -> int | str:
+	@staticmethod
+	def _parse_value(value: str) -> int | str:
 		"""解析输入的值,尝试转换为整数"""
 		try:
 			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 				return int(value)
-		except Exception:
-			pass
+		except Exception as e:
+			print(f"解析数值时出错: {e}")
 		return value
 
 	def do_list_operations(self, arg: str) -> None:
@@ -1393,7 +1463,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		else:
 			print("添加元素失败")
 
-	def _handle_list_pop(self, cloud_list: CloudList, args: list[str]) -> None:
+	def _handle_list_pop(self, cloud_list: CloudList, _args: list[str]) -> None:
 		"""处理列表pop操作"""
 		if self.connection.list_pop(cloud_list.name):
 			print(f"成功从列表 {cloud_list.name} 弹出最后一个元素")
@@ -1411,7 +1481,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		else:
 			print("添加元素失败")
 
-	def _handle_list_shift(self, cloud_list: CloudList, args: list[str]) -> None:
+	def _handle_list_shift(self, cloud_list: CloudList, _args: list[str]) -> None:
 		"""处理列表shift操作"""
 		if self.connection.list_shift(cloud_list.name):
 			print(f"成功从列表 {cloud_list.name} 移除第一个元素")
@@ -1462,14 +1532,15 @@ class CloudCommandLineInterface(cmd.Cmd):
 		except ValueError:
 			print("错误: 位置必须是整数")
 
-	def _handle_list_clear(self, cloud_list: CloudList, args: list[str]) -> None:
+	def _handle_list_clear(self, cloud_list: CloudList, _args: list[str]) -> None:
 		"""处理列表clear操作"""
 		if self.connection.list_clear(cloud_list.name):
 			print(f"成功清空列表 {cloud_list.name}")
 		else:
 			print("清空列表失败")
 
-	def _handle_list_get(self, cloud_list: CloudList, args: list[str]) -> None:
+	@staticmethod
+	def _handle_list_get(cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表get操作"""
 		if len(args) < 1:
 			print("错误: 需要提供位置")
@@ -1484,7 +1555,8 @@ class CloudCommandLineInterface(cmd.Cmd):
 		except ValueError:
 			print("错误: 位置必须是整数")
 
-	def help_list_operations(self) -> None:
+	@staticmethod
+	def help_list_operations() -> None:
 		"""显示列表操作帮助"""
 		print("""
 列表操作命令:
@@ -1538,28 +1610,28 @@ list_operations get <列表名> <位置>     - 获取指定位置的元素
 		print(f"获取 {name} 的排行榜...")
 		self.connection.get_private_variable_ranking(name, limit, order)
 
-	def do_refresh(self, arg: str) -> None:
+	def do_refresh(self, _arg: str) -> None:
 		"""刷新显示所有数据"""
 		self.connection.print_all_data()
 
-	def do_online(self, arg: str) -> None:
+	def do_online(self, _arg: str) -> None:
 		"""查看在线用户数"""
 		print(f"当前在线用户: {self.connection.online_users}")
 
-	def do_exit(self, arg: str) -> bool:
+	def do_exit(self, _arg: str) -> bool:
 		"""退出程序"""
 		print("正在关闭连接...")
 		self.manager.close()
 		return True
 
-	def do_quit(self, arg: str) -> bool:
+	def do_quit(self, _arg: str) -> bool:
 		"""退出程序"""
-		return self.do_exit(arg)
+		return self.do_exit(_arg)
 
-	def do_EOF(self, arg: str) -> bool:
+	def do_eof(self, _arg: str) -> bool:
 		"""Ctrl+D 退出"""
 		print()
-		return self.do_exit(arg)
+		return self.do_exit(_arg)
 
 
 def main() -> None:
@@ -1578,7 +1650,7 @@ def main() -> None:
 		print("作品ID必须是数字")
 		return
 	# 创建云管理器
-	cloud_manager = CloudManager(work_id=work_id, editor=EditorType.KITTEN, authorization_token=authorization_token)
+	cloud_manager = CloudManager(work_id=work_id, editor=None, authorization_token=authorization_token)
 
 	def on_data_ready() -> None:
 		"""数据就绪回调"""
