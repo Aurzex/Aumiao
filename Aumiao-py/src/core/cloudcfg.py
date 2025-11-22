@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Callable
 from contextlib import suppress
 from enum import Enum
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import httpx
 import websocket
@@ -53,6 +53,14 @@ LAST_ELEMENT_INDEX = -1
 MIN_LIST_INDEX = 0
 MAX_LIST_DISPLAY_ELEMENTS = 6
 PARTIAL_LIST_DISPLAY_COUNT = 3
+# 新增常量修复魔法数值问题
+MIN_LIST_OPERATION_ARGS = 2
+MIN_SET_ARGS = 2
+MIN_INSERT_ARGS = 2
+MIN_REMOVE_ARGS = 1
+MIN_REPLACE_ARGS = 2
+MIN_GET_ARGS = 1
+MIN_RANKING_ARGS = 1
 # 错误消息常量
 ERROR_CALLBACK_EXECUTION = "回调执行错误"
 ERROR_CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
@@ -125,7 +133,7 @@ class SendMessageType(Enum):
 # ==============================
 # 类型别名定义
 # ==============================
-CloudValueType = Union[int, str]
+CloudValueType = int | str
 CloudListValueType = list[CloudValueType]
 ChangeCallbackType = Callable[[CloudValueType, CloudValueType, str], None]
 ListOperationCallbackType = Callable[..., None]
@@ -142,7 +150,7 @@ class DisplayHelper:
 	"""显示辅助类,处理长文本截断和格式化显示"""
 
 	@staticmethod
-	def truncate_value(value: Any, max_length: int = MAX_DISPLAY_LENGTH) -> str:
+	def truncate_value(value: Any, max_length: int = MAX_DISPLAY_LENGTH) -> str:  # noqa: ANN401
 		"""截断过长的值用于显示"""
 		if isinstance(value, (int, float, bool)):
 			return str(value)
@@ -211,10 +219,10 @@ class CloudAuthenticator:
 		try:
 			response = httpx.get("https://api.codemao.cn/coconut/clouddb/currentTime", timeout=REQUEST_TIMEOUT)
 			if response.status_code == HTTP_SUCCESS_CODE:
-				data = response.json()
+				data: dict | str = response.json()
 				if isinstance(data, dict) and "data" in data:
 					return data["data"]
-				return cast("int", data)
+				return int(cast("str", data))
 		except Exception as error:
 			print(f"{ERROR_GET_SERVER_TIME}: {error}")
 		return int(time.time())
@@ -274,7 +282,7 @@ class CloudVariable(CloudDataItem):
 
 	def get(self) -> CloudValueType:
 		"""获取变量值"""
-		return cast("CloudValueType", self.value)
+		return self.value
 
 	def set(self, value: CloudValueType) -> bool:
 		"""设置变量值"""
@@ -282,7 +290,7 @@ class CloudVariable(CloudDataItem):
 			raise TypeError(ERROR_INVALID_VARIABLE_TYPE)
 		old_value = self.value
 		self.value = value
-		self.emit_change(cast("CloudValueType", old_value), value, "local")
+		self.emit_change(old_value, value, "local")
 		return True
 
 	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
@@ -290,8 +298,8 @@ class CloudVariable(CloudDataItem):
 		if not isinstance(old_value, (int, str)) or not isinstance(new_value, (int, str)):
 			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
-		old_value_cast = cast("CloudValueType", old_value)
-		new_value_cast = cast("CloudValueType", new_value)
+		old_value_cast = old_value
+		new_value_cast = new_value
 		for callback in self._change_callbacks:
 			try:
 				callback(old_value_cast, new_value_cast, source)
@@ -354,7 +362,7 @@ class CloudList(CloudDataItem):
 		if operation in self._operation_callbacks:
 			self._operation_callbacks[operation].append(callback)
 
-	def _emit_operation(self, operation: str, *args: Any) -> None:
+	def _emit_operation(self, operation: str, *args: object) -> None:
 		"""触发列表操作回调"""
 		for callback in self._operation_callbacks[operation]:
 			try:
@@ -570,7 +578,7 @@ class CloudConnection:
 		"""注册排行榜数据接收回调"""
 		self._callbacks["ranking_received"].append(callback)
 
-	def _emit_event(self, event: str, *args: Any) -> None:
+	def _emit_event(self, event: str, *args: object) -> None:
 		"""触发事件回调"""
 		if event in self._callbacks:
 			for callback in self._callbacks[event]:
@@ -656,7 +664,7 @@ class CloudConnection:
 		data_str = message[MESSAGE_TYPE_LENGTH:]
 		try:
 			data_list = json.loads(data_str)
-			if isinstance(data_list, list) and len(data_list) >= 2:
+			if isinstance(data_list, list) and len(data_list) >= 2:  # noqa: PLR2004
 				message_type = data_list[0]
 				message_data = data_list[1]
 				print(f"处理云消息: {message_type}, 数据: {DisplayHelper.truncate_value(message_data)}")
@@ -722,12 +730,12 @@ class CloudConnection:
 			traceback.print_exc()
 			self._emit_event("error", error)
 
-	def _handle_join_message(self, data: Any) -> None:
+	def _handle_join_message(self, _data: object) -> None:
 		"""处理加入消息"""
 		print("连接加入成功, 请求所有数据...")
 		self.send_message(SendMessageType.GET_ALL_DATA, {})
 
-	def _handle_receive_all_data(self, data: list[dict[str, Any]] | Any) -> None:
+	def _handle_receive_all_data(self, data: list[dict[str, Any]] | object) -> None:
 		"""处理接收完整数据消息"""
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
 		if not isinstance(data, list):
@@ -744,8 +752,8 @@ class CloudConnection:
 		try:
 			cloud_variable_id = item.get("cvid")
 			name = item.get("name")
-			value = item.get("value")
-			data_type = cast("int", item.get("type"))
+			value = cast("CloudValueType", item.get("value"))
+			data_type: int = cast("int", item.get("type"))
 			if not all([cloud_variable_id, name, value is not None, data_type is not None]):
 				print(f"数据项缺少必要字段: {DisplayHelper.truncate_value(item)}")
 				return
@@ -762,27 +770,27 @@ class CloudConnection:
 		except Exception as error:
 			print(f"{ERROR_CREATE_DATA_ITEM}: {error}, 数据: {DisplayHelper.truncate_value(item)}")
 
-	def _create_private_variable(self, cloud_variable_id: str, name: str, value: Any) -> None:
+	def _create_private_variable(self, cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		"""创建私有变量"""
-		variable = PrivateCloudVariable(self, cloud_variable_id, name, cast("CloudValueType", value))
+		variable = PrivateCloudVariable(self, cloud_variable_id, name, value)
 		self.private_variables[name] = variable
 		self.private_variables[cloud_variable_id] = variable
 
-	def _create_public_variable(self, cloud_variable_id: str, name: str, value: Any) -> None:
+	def _create_public_variable(self, cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		"""创建公有变量"""
-		variable = PublicCloudVariable(self, cloud_variable_id, name, cast("CloudValueType", value))
+		variable = PublicCloudVariable(self, cloud_variable_id, name, value)
 		self.public_variables[name] = variable
 		self.public_variables[cloud_variable_id] = variable
 
-	def _create_cloud_list(self, cloud_variable_id: str, name: str, value: Any) -> None:
+	def _create_cloud_list(self, cloud_variable_id: str, name: str, value: object) -> None:
 		"""创建云列表"""
 		if not isinstance(value, list):
 			value = []
-		cloud_list = CloudList(self, cloud_variable_id, name, cast("CloudListValueType", value))
+		cloud_list = CloudList(self, cloud_variable_id, name, value)
 		self.lists[name] = cloud_list
 		self.lists[cloud_variable_id] = cloud_list
 
-	def _handle_update_private_variable(self, data: dict[str, Any] | Any) -> None:
+	def _handle_update_private_variable(self, data: dict[str, Any] | object) -> None:
 		"""处理更新私有变量消息"""
 		if isinstance(data, dict) and "cvid" in data and "value" in data:
 			cloud_variable_id = data["cvid"]
@@ -790,11 +798,11 @@ class CloudConnection:
 			for variable in self.private_variables.values():
 				if variable.cloud_variable_id == cloud_variable_id:
 					old_value = variable.value
-					variable.value = cast("CloudValueType", new_value)
+					variable.value = new_value
 					variable.emit_change(old_value, new_value, "cloud")
 					break
 
-	def _handle_receive_ranking_list(self, data: dict[str, Any] | Any) -> None:
+	def _handle_receive_ranking_list(self, data: dict[str, Any] | object) -> None:
 		"""处理接收排行榜列表消息"""
 		if not self._pending_ranking_requests:
 			print(ERROR_NO_PENDING_REQUESTS)
@@ -811,7 +819,7 @@ class CloudConnection:
 		variable.emit_ranking(ranking_data)
 		self._emit_event("ranking_received", variable, ranking_data)
 
-	def _handle_update_public_variable(self, data: Any) -> None:
+	def _handle_update_public_variable(self, data: object) -> None:
 		"""处理更新公有变量消息"""
 		if data == "fail":
 			return
@@ -823,11 +831,11 @@ class CloudConnection:
 					for variable in self.public_variables.values():
 						if variable.cloud_variable_id == cloud_variable_id:
 							old_value = variable.value
-							variable.value = cast("CloudValueType", new_value)
+							variable.value = new_value
 							variable.emit_change(old_value, new_value, "cloud")
 							break
 
-	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]] | Any) -> None:
+	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]] | object) -> None:
 		"""处理更新列表消息"""
 		if not isinstance(data, dict):
 			return
@@ -847,9 +855,9 @@ class CloudConnection:
 		"""执行列表操作"""
 		action = operation["action"]
 		operation_handlers = {
-			"append": lambda: cloud_list.push(cast("CloudValueType", operation["value"])),
-			"unshift": lambda: cloud_list.unshift(cast("CloudValueType", operation["value"])),
-			"insert": lambda: cloud_list.insert(cast("int", operation["nth"]) - 1, cast("CloudValueType", operation["value"])),
+			"append": lambda: cloud_list.push(operation["value"]),
+			"unshift": lambda: cloud_list.unshift(operation["value"]),
+			"insert": lambda: cloud_list.insert(operation["nth"] - 1, operation["value"]),
 			"delete": lambda: self._handle_delete_operation(cloud_list, operation),
 			"replace": lambda: self._handle_replace_operation(cloud_list, operation),
 		}
@@ -873,14 +881,14 @@ class CloudConnection:
 	def _handle_replace_operation(cloud_list: CloudList, operation: dict[str, Any]) -> None:
 		"""处理替换操作"""
 		nth = operation["nth"]
-		value = cast("CloudValueType", operation["value"])
+		value = operation["value"]
 		if nth == "last":
 			cloud_list.replace_last(value)
 		elif isinstance(nth, int):
 			index = nth - 1
 			cloud_list.replace(index, value)
 
-	def _handle_update_online_users(self, data: dict[str, Any] | Any) -> None:
+	def _handle_update_online_users(self, data: dict[str, Any] | object) -> None:
 		"""处理更新在线用户数消息"""
 		if isinstance(data, dict) and "total" in data and isinstance(data["total"], int):
 			old_count = self.online_users
@@ -888,7 +896,7 @@ class CloudConnection:
 			self._emit_event("online_users_change", old_count, self.online_users)
 
 	@staticmethod
-	def _handle_illegal_event(_data: Any) -> None:
+	def _handle_illegal_event(_data: object) -> None:
 		"""处理非法事件消息"""
 		print("检测到非法事件")
 
@@ -981,7 +989,7 @@ class CloudConnection:
 			if self.connected:
 				return True
 			current_time = time.time()
-			if current_time - last_log_time >= 3:
+			if current_time - last_log_time >= 3:  # noqa: PLR2004
 				elapsed = current_time - start_time
 				print(f"等待连接中... 已等待 {elapsed:.1f} 秒")
 				last_log_time = current_time
@@ -998,7 +1006,7 @@ class CloudConnection:
 				print("数据加载完成!")
 				return True
 			current_time = time.time()
-			if current_time - last_log_time >= 5:
+			if current_time - last_log_time >= 5:  # noqa: PLR2004
 				elapsed = current_time - start_time
 				print(f"等待数据中... 已等待 {elapsed:.1f} 秒, 连接状态: {self.connected}")
 				last_log_time = current_time
@@ -1167,10 +1175,10 @@ class CloudConnection:
 class CloudManager:
 	"""云数据管理器,提供高级API"""
 
-	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None):
+	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self.connection = CloudConnection(work_id, editor, authorization_token)
 
-	def connect(self, wait_for_data: bool = True) -> bool:
+	def connect(self, *, wait_for_data: bool = True) -> bool:
 		"""连接并等待数据就绪"""
 		self.connection.connect()
 		if not self.connection.wait_for_connection():
@@ -1257,14 +1265,14 @@ class CloudCommandLineInterface(cmd.Cmd):
 			print(f"  公有变量: {len(available['public_variables'])} 个")
 			print(f"  云列表: {len(available['lists'])} 个")
 
-	def do_available(self, arg: str) -> None:
+	def do_available(self, arg: str) -> None:  # noqa: PLR0912
 		"""显示所有可用变量和列表
 		用法: available [详细]"""
 		if not self.connection.data_ready:
 			print("数据尚未就绪, 请等待连接完成")
 			return
 		available = self.manager.get_available_variables()
-		show_details = arg.strip().lower() in ["详细", "detail", "verbose"]
+		show_details = arg.strip().lower() in {"详细", "detail", "verbose"}
 		print("\n" + "=" * 40)
 		print("可用数据列表")
 		print("=" * 40)
@@ -1369,7 +1377,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		"""设置私有变量的值
 		用法: set_private <变量名> <值>"""
 		args = shlex.split(arg)
-		if len(args) < 2:
+		if len(args) < MIN_SET_ARGS:
 			print("错误: 用法: set_private <变量名> <值>")
 			print("使用 'available' 查看可用私有变量")
 			return
@@ -1386,7 +1394,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		"""设置公有变量的值
 		用法: set_public <变量名> <值>"""
 		args = shlex.split(arg)
-		if len(args) < 2:
+		if len(args) < MIN_SET_ARGS:
 			print("错误: 用法: set_public <变量名> <值>")
 			print("使用 'available' 查看可用公有变量")
 			return
@@ -1405,8 +1413,8 @@ class CloudCommandLineInterface(cmd.Cmd):
 		try:
 			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 				return int(value)
-		except Exception as e:
-			print(f"解析数值时出错: {e}")
+		except Exception:  # noqa: S110
+			pass
 		return value
 
 	def do_list_operations(self, arg: str) -> None:
@@ -1423,7 +1431,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 			list_operations get <列表名> <位置>     # 获取指定位置元素
 		"""
 		args = shlex.split(arg)
-		if len(args) < 2:
+		if len(args) < MIN_LIST_OPERATION_ARGS:
 			print("错误: 参数不足")
 			self.help_list_operations()
 			return
@@ -1454,7 +1462,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_push(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表push操作"""
-		if len(args) < 1:
+		if len(args) < MIN_GET_ARGS:
 			print("错误: 需要提供要添加的值")
 			return
 		value = self._parse_value(args[0])
@@ -1472,7 +1480,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_unshift(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表unshift操作"""
-		if len(args) < 1:
+		if len(args) < MIN_GET_ARGS:
 			print("错误: 需要提供要添加的值")
 			return
 		value = self._parse_value(args[0])
@@ -1490,7 +1498,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_insert(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表insert操作"""
-		if len(args) < 2:
+		if len(args) < MIN_INSERT_ARGS:
 			print("错误: 需要提供位置和值")
 			return
 		try:
@@ -1505,7 +1513,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_remove(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表remove操作"""
-		if len(args) < 1:
+		if len(args) < MIN_REMOVE_ARGS:
 			print("错误: 需要提供位置")
 			return
 		try:
@@ -1519,7 +1527,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_replace(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表replace操作"""
-		if len(args) < 2:
+		if len(args) < MIN_REPLACE_ARGS:
 			print("错误: 需要提供位置和值")
 			return
 		try:
@@ -1542,7 +1550,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 	@staticmethod
 	def _handle_list_get(cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表get操作"""
-		if len(args) < 1:
+		if len(args) < MIN_GET_ARGS:
 			print("错误: 需要提供位置")
 			return
 		try:
@@ -1559,17 +1567,17 @@ class CloudCommandLineInterface(cmd.Cmd):
 	def help_list_operations() -> None:
 		"""显示列表操作帮助"""
 		print("""
-			列表操作命令:
-			list_operations push <列表名> <值>      - 向列表末尾添加元素
-			list_operations pop <列表名>            - 移除并返回列表最后一个元素
-			list_operations unshift <列表名> <值>   - 向列表开头添加元素
-			list_operations shift <列表名>          - 移除并返回列表第一个元素
-			list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
-			list_operations remove <列表名> <位置>  - 移除指定位置的元素
-			list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
-			list_operations clear <列表名>          - 清空列表所有元素
-			list_operations get <列表名> <位置>     - 获取指定位置的元素
-		""")
+        列表操作命令:
+        list_operations push <列表名> <值>      - 向列表末尾添加元素
+        list_operations pop <列表名>            - 移除并返回列表最后一个元素
+        list_operations unshift <列表名> <值>   - 向列表开头添加元素
+        list_operations shift <列表名>          - 移除并返回列表第一个元素
+        list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
+        list_operations remove <列表名> <位置>  - 移除指定位置的元素
+        list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
+        list_operations clear <列表名>          - 清空列表所有元素
+        list_operations get <列表名> <位置>     - 获取指定位置的元素
+        """)
 
 	def do_ranking(self, arg: str) -> None:
 		"""获取私有变量的排行榜
@@ -1593,7 +1601,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 			except ValueError:
 				print("错误: 数量必须是数字")
 				return
-		if len(args) > 2:
+		if len(args) > 2:  # noqa: PLR2004
 			try:
 				order = int(args[2])
 				if order not in {ASCENDING_ORDER, DESCENDING_ORDER}:
