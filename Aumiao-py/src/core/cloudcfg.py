@@ -11,6 +11,47 @@ from typing import Any, cast
 import httpx
 import websocket
 
+# 常量定义
+HTTP_SUCCESS_CODE = 200
+WEBSOCKET_PING_MESSAGE = "2"
+WEBSOCKET_PONG_MESSAGE = "3"
+WEBSOCKET_CONNECT_MESSAGE = "40"
+WEBSOCKET_CONNECTED_MESSAGE = "40"
+WEBSOCKET_EVENT_MESSAGE_PREFIX = "42"
+WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX = "0"
+# 错误消息常量
+ERROR_CALLBACK_EXECUTION = "回调执行错误"
+ERROR_CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
+ERROR_RANKING_CALLBACK = "排行榜回调执行错误"
+ERROR_OPERATION_CALLBACK = "操作回调执行错误"
+ERROR_EVENT_CALLBACK = "事件回调执行错误"
+ERROR_SEND_MESSAGE = "发送消息错误"
+ERROR_CONNECTION = "连接错误"
+ERROR_WEB_SOCKET_RUN = "WebSocket运行错误"
+ERROR_CLOSE_CONNECTION = "关闭连接时出错"
+ERROR_GET_SERVER_TIME = "获取服务器时间失败"
+ERROR_HANDSHAKE_DATA_PARSE = "握手数据解析失败"
+ERROR_HANDSHAKE_PROCESSING = "握手处理错误"
+ERROR_JSON_PARSE = "JSON解析错误"
+ERROR_CLOUD_MESSAGE_PROCESSING = "云消息处理错误"
+ERROR_CREATE_DATA_ITEM = "创建数据项时出错"
+ERROR_INVALID_RANKING_DATA = "无效的排行榜数据格式"
+ERROR_PING_SEND = "发送 ping 失败"
+ERROR_NO_PENDING_REQUESTS = "收到排行榜数据但没有待处理的请求"
+# 魔法数值常量
+DEFAULT_RANKING_LIMIT = 31
+MAX_RECONNECT_ATTEMPTS = 5
+RECONNECT_INTERVAL = 8
+PING_INTERVAL_MS = 25000
+PING_TIMEOUT_MS = 5000
+WEBSOCKET_PING_INTERVAL = 20
+WEBSOCKET_PING_TIMEOUT = 10
+CONNECTION_TIMEOUT = 30
+DATA_TIMEOUT = 30
+WAIT_TIMEOUT = 30
+MESSAGE_TYPE_LENGTH = 2
+WEBSOCKET_TRANSPORT_TYPE = 3  # 修复类型错误
+
 
 class CodemaoWorkEditor(Enum):
 	NEMO = "NEMO"
@@ -48,50 +89,6 @@ class KittenCloudSendMessageType(Enum):
 # 定义类型别名
 CloudValueType = int | str
 CloudListValueType = list[CloudValueType]
-# 常量定义
-HTTP_SUCCESS_CODE = 200
-WEBSOCKET_PING_MESSAGE = "2"
-WEBSOCKET_PONG_MESSAGE = "3"
-WEBSOCKET_CONNECT_MESSAGE = "40"
-WEBSOCKET_CONNECTED_MESSAGE = "40"
-WEBSOCKET_EVENT_MESSAGE_PREFIX = "42"
-WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX = "0"
-
-
-# 错误消息常量
-class ErrorMessages:
-	CALLBACK_EXECUTION = "回调执行错误"
-	CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
-	RANKING_CALLBACK = "排行榜回调执行错误"
-	OPERATION_CALLBACK = "操作回调执行错误"
-	EVENT_CALLBACK = "事件回调执行错误"
-	SEND_MESSAGE = "发送消息错误"
-	CONNECTION = "连接错误"
-	WEB_SOCKET_RUN = "WebSocket运行错误"
-	CLOSE_CONNECTION = "关闭连接时出错"
-	GET_SERVER_TIME = "获取服务器时间失败"
-	HANDSHAKE_DATA_PARSE = "握手数据解析失败"
-	HANDSHAKE_PROCESSING = "握手处理错误"
-	JSON_PARSE = "JSON解析错误"
-	CLOUD_MESSAGE_PROCESSING = "云消息处理错误"
-	CREATE_DATA_ITEM = "创建数据项时出错"
-	INVALID_RANKING_DATA = "无效的排行榜数据格式"
-	PING_SEND = "发送 ping 失败"
-	NO_PENDING_REQUESTS = "收到排行榜数据但没有待处理的请求"
-
-
-# 魔法数值常量
-class MagicNumbers:
-	DEFAULT_RANKING_LIMIT = 31
-	MAX_RECONNECT_ATTEMPTS = 5
-	RECONNECT_INTERVAL = 8
-	PING_INTERVAL_MS = 25000
-	PING_TIMEOUT_MS = 5000
-	WEBSOCKET_PING_INTERVAL = 20
-	WEBSOCKET_PING_TIMEOUT = 10
-	CONNECTION_TIMEOUT = 30
-	DATA_TIMEOUT = 30
-	WAIT_TIMEOUT = 30
 
 
 class CodemaoAuth:
@@ -110,7 +107,8 @@ class CodemaoAuth:
 					return data["data"]
 				return cast("int", data)
 		except Exception as e:
-			print(f"{ErrorMessages.GET_SERVER_TIME}: {e}")
+			error_msg = f"{ERROR_GET_SERVER_TIME}: {e}"
+			print(error_msg)
 		return int(time.time())
 
 	def get_calibrated_timestamp(self) -> int:
@@ -143,7 +141,8 @@ class KittenCloudData:
 			try:
 				callback(old_value, new_value, source)
 			except Exception as e:
-				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {e}")
+				error_msg = f"{ERROR_CALLBACK_EXECUTION}: {e}"
+				print(error_msg)
 
 
 class KittenCloudVariable(KittenCloudData):
@@ -165,12 +164,19 @@ class KittenCloudVariable(KittenCloudData):
 		self.emit_change(cast("CloudValueType", old_value), value, "local")
 		return True
 
-	def emit_change(self, old_value: CloudValueType, new_value: CloudValueType, source: str) -> None:
+	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
+		"""修复方法重写不兼容问题"""
+		if not isinstance(old_value, (int, str)) or not isinstance(new_value, (int, str)):
+			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
+			return
+		old_value_cast = cast("CloudValueType", old_value)
+		new_value_cast = cast("CloudValueType", new_value)
 		for callback in self._change_callbacks:
 			try:
-				callback(old_value, new_value, source)
+				callback(old_value_cast, new_value_cast, source)
 			except Exception as e:
-				print(f"{ErrorMessages.CLOUD_VARIABLE_CALLBACK}: {e}")
+				error_msg = f"{ERROR_CLOUD_VARIABLE_CALLBACK}: {e}"
+				print(error_msg)
 
 
 class KittenCloudPrivateVariable(KittenCloudVariable):
@@ -186,15 +192,16 @@ class KittenCloudPrivateVariable(KittenCloudVariable):
 			try:
 				callback(ranking_data)
 			except Exception as e:
-				print(f"{ErrorMessages.RANKING_CALLBACK}: {e}")
+				error_msg = f"{ERROR_RANKING_CALLBACK}: {e}"
+				print(error_msg)
 
-	def get_ranking_list(self, limit: int = MagicNumbers.DEFAULT_RANKING_LIMIT, order: int = -1) -> None:
+	def get_ranking_list(self, limit: int = DEFAULT_RANKING_LIMIT, order: int = -1) -> None:
 		if not isinstance(limit, int) or limit <= 0:
 			raise ValueError("限制数量必须是正整数")
 		if order not in {1, -1}:
 			raise ValueError("排序顺序必须是1(正序)或-1(逆序)")
 		request_data = {"cvid": self.cvid, "limit": limit, "order_type": order}
-		self.connection._send_message(KittenCloudSendMessageType.GET_PRIVATE_VARIABLE_RANKING_LIST, request_data)
+		self.connection.send_message(KittenCloudSendMessageType.GET_PRIVATE_VARIABLE_RANKING_LIST, request_data)
 
 
 class KittenCloudPublicVariable(KittenCloudVariable):
@@ -225,7 +232,8 @@ class KittenCloudList(KittenCloudData):
 			try:
 				callback(*args)
 			except Exception as e:
-				print(f"{ErrorMessages.OPERATION_CALLBACK}: {e}")
+				error_msg = f"{ERROR_OPERATION_CALLBACK}: {e}"
+				print(error_msg)
 
 	def get(self, index: int) -> CloudValueType | None:
 		if 0 <= index < len(self.value):
@@ -343,9 +351,9 @@ class KittenCloudFunction:
 		self.ws: websocket.WebSocketApp | None = None
 		self.connected = False
 		self.auto_reconnect = True
-		self.reconnect_interval = MagicNumbers.RECONNECT_INTERVAL
+		self.reconnect_interval = RECONNECT_INTERVAL
 		self.reconnect_attempts = 0
-		self.max_reconnect_attempts = MagicNumbers.MAX_RECONNECT_ATTEMPTS
+		self.max_reconnect_attempts = MAX_RECONNECT_ATTEMPTS
 		self.private_variables: dict[str, KittenCloudPrivateVariable] = {}
 		self.public_variables: dict[str, KittenCloudPublicVariable] = {}
 		self.lists: dict[str, KittenCloudList] = {}
@@ -362,6 +370,8 @@ class KittenCloudFunction:
 		self.online_users = 0
 		self.data_ready = False
 		self._pending_ranking_requests: list[KittenCloudPrivateVariable] = []
+		self._ping_active = False
+		self._join_sent = False  # 新增:标记是否已发送JOIN消息
 
 	def on(self, event: str, callback: Callable[..., None]) -> None:
 		if event in self._callbacks:
@@ -382,7 +392,8 @@ class KittenCloudFunction:
 				try:
 					callback(*args)
 				except Exception as e:
-					print(f"{ErrorMessages.EVENT_CALLBACK}: {e}")
+					error_msg = f"{ERROR_EVENT_CALLBACK}: {e}"
+					print(error_msg)
 
 	def _get_websocket_url(self) -> str:
 		base_params = {
@@ -392,7 +403,7 @@ class KittenCloudFunction:
 			CodemaoWorkEditor.COCO: {"authorization_type": 1, "stag": 1},
 		}
 		params = base_params.get(self.editor, base_params[CodemaoWorkEditor.KITTEN])
-		params["EIO"] = 3
+		params["EIO"] = WEBSOCKET_TRANSPORT_TYPE  # 修复类型错误
 		params["transport"] = "websocket"
 		params_str = "&".join([f"{k}={v}" for k, v in params.items()])
 		return f"wss://socketcv.codemao.cn:9096/cloudstorage/?session_id={self.work_id}&{params_str}"
@@ -405,135 +416,173 @@ class KittenCloudFunction:
 			headers["Cookie"] = f"Authorization={self.auth.authorization_token}"
 		return headers
 
-	def _on_message(self, _ws: websocket.WebSocketApp, message: str) -> None:
-		# 添加调试信息
-		# print(f"收到消息: {message}")  # 取消注释这行来查看所有消息
-		# 处理 ping 消息
+	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
+		if isinstance(message, bytes):
+			message = message.decode("utf-8")
+		# 处理ping-pong
 		if message == WEBSOCKET_PING_MESSAGE:
 			if self.ws:
 				self.ws.send(WEBSOCKET_PONG_MESSAGE)
 			return
-		# 处理握手消息 - 需要解析握手数据并启动 ping
+		# 处理握手
 		if message.startswith(WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX):
 			try:
-				# 解析握手数据,获取 ping 间隔和超时时间
-				handshake_data = json.loads(message[1:])  # 去掉前缀 "0"
-				ping_interval = handshake_data.get("pingInterval", MagicNumbers.PING_INTERVAL_MS)
-				ping_timeout = handshake_data.get("pingTimeout", MagicNumbers.PING_TIMEOUT_MS)
-				print(f"握手成功,ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")  # 调试信息
-				# 启动 ping 保活机制
+				handshake_data = json.loads(message[1:])
+				ping_interval = handshake_data.get("pingInterval", PING_INTERVAL_MS)
+				ping_timeout = handshake_data.get("pingTimeout", PING_TIMEOUT_MS)
+				print(f"握手成功,ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")
 				self._start_ping(ping_interval, ping_timeout)
 				# 发送连接请求
 				if self.ws:
 					self.ws.send(WEBSOCKET_CONNECT_MESSAGE)
-					print("已发送连接请求")  # 调试信息
-			except json.JSONDecodeError as e:
-				print(f"{ErrorMessages.HANDSHAKE_DATA_PARSE}: {e}, 消息: {message}")
+					print("已发送连接请求")
 			except Exception as e:
-				print(f"{ErrorMessages.HANDSHAKE_PROCESSING}: {e}")
+				error_msg = f"握手处理错误: {e}"
+				print(error_msg)
 			return
-		# 处理连接确认消息
+		# 处理连接确认
 		if message == WEBSOCKET_CONNECTED_MESSAGE:
 			self.connected = True
-			print("连接确认收到")  # 调试信息
+			print("连接确认收到")
 			self._emit_event("open")
-			# 连接建立后发送加入消息
-			self._send_message(KittenCloudSendMessageType.JOIN, str(self.work_id))
+			# 延迟发送JOIN消息,确保连接稳定
+			if not self._join_sent:
+				self._join_sent = True
+				threading.Timer(0.5, self._send_join_message).start()
 			return
 		# 处理事件消息
 		if message.startswith(WEBSOCKET_EVENT_MESSAGE_PREFIX):
-			data_str = message[2:]  # 去掉前缀 "42"
+			data_str = message[MESSAGE_TYPE_LENGTH:]
 			try:
 				data_list = json.loads(data_str)
 				if isinstance(data_list, list) and len(data_list) >= 2:
 					message_type = data_list[0]
 					message_data = data_list[1]
-					print(f"处理云消息: {message_type}, 数据: {message_data}")  # 调试信息
+					print(f"处理云消息: {message_type}, 数据: {message_data}")
 					self._handle_cloud_message(message_type, message_data)
 			except json.JSONDecodeError as e:
-				print(f"{ErrorMessages.JSON_PARSE}: {e}, 数据: {data_str}")
+				error_msg = f"JSON解析错误: {e}, 数据: {data_str}"
+				print(error_msg)
 			return
 
-	def _start_ping(self, interval: int, _time_out: int) -> None:
+	def _send_join_message(self) -> None:
+		"""发送JOIN消息"""
+		if self.connected and self.ws:
+			print("发送JOIN消息...")
+			self.send_message(KittenCloudSendMessageType.JOIN, str(self.work_id))
+
+	def _start_ping(self, interval: int, _timeout: int) -> None:
 		"""启动 ping-pong 保活机制"""
-		ping_active = True
+		if self._ping_thread is not None:
+			self._ping_active = False
+			self._ping_thread.join(timeout=1.0)
+		self._ping_active = True
 
 		def ping_task() -> None:
-			nonlocal ping_active
-			while ping_active and self.connected:
-				time.sleep(interval / 1000)  # 转换为秒
-				if ping_active and self.connected and self.ws:
+			while self._ping_active and self.connected:
+				time.sleep(interval / 1000)
+				if self._ping_active and self.connected and self.ws:
 					try:
-						self.ws.send(WEBSOCKET_PING_MESSAGE)  # 发送 "2"
-						print(f"发送 ping, 间隔: {interval}ms")  # 调试用
+						self.ws.send(WEBSOCKET_PING_MESSAGE)
+						print(f"发送 ping, 间隔: {interval}ms")
 					except Exception as e:
-						print(f"{ErrorMessages.PING_SEND}: {e}")
+						error_msg = f"{ERROR_PING_SEND}: {e}"
+						print(error_msg)
 						break
 
-		# 停止之前的 ping 线程
-		if self._ping_thread is not None:
-			ping_active = False
-			self._ping_thread = None
-		ping_active = True
 		self._ping_thread = threading.Thread(target=ping_task, daemon=True)
 		self._ping_thread.start()
-		print(f"Ping 线程已启动,间隔: {interval}ms")  # 调试信息
+		print(f"Ping 线程已启动,间隔: {interval}ms")
 
-	def _handle_cloud_message(self, message_type: str, data: Any) -> None:
+	def _stop_ping(self) -> None:
+		"""停止 ping 线程"""
+		self._ping_active = False
+		if self._ping_thread is not None:
+			self._ping_thread.join(timeout=2.0)
+			self._ping_thread = None
+
+	def _handle_cloud_message(self, message_type: str, data: dict[str, Any] | list[Any] | str) -> None:
 		try:
+			print(f"处理云消息: {message_type}, 数据: {data}")
 			if message_type == KittenCloudReceiveMessageType.JOIN.value:
-				self._send_message(KittenCloudSendMessageType.GET_ALL_DATA, {})
+				print("连接加入成功,请求所有数据...")
+				self.send_message(KittenCloudSendMessageType.GET_ALL_DATA, {})
 			elif message_type == KittenCloudReceiveMessageType.RECEIVE_ALL_DATA.value:
+				print("收到完整数据响应")
 				self._handle_receive_all_data(data)
 			elif message_type == KittenCloudReceiveMessageType.UPDATE_PRIVATE_VARIABLE.value:
+				print("更新私有变量")
 				self._handle_update_private_variable(data)
 			elif message_type == KittenCloudReceiveMessageType.RECEIVE_PRIVATE_VARIABLE_RANKING_LIST.value:
+				print("收到排行榜数据")
 				self._handle_receive_ranking_list(data)
 			elif message_type == KittenCloudReceiveMessageType.UPDATE_PUBLIC_VARIABLE.value:
+				print("更新公有变量")
 				self._handle_update_public_variable(data)
 			elif message_type == KittenCloudReceiveMessageType.UPDATE_LIST.value:
+				print("更新列表")
 				self._handle_update_list(data)
 			elif message_type == KittenCloudReceiveMessageType.UPDATE_ONLINE_USER_NUMBER.value:
+				print("更新在线用户数")
 				self._handle_update_online_users(data)
 			elif message_type == KittenCloudReceiveMessageType.ILLEGAL_EVENT.value:
 				print(f"非法事件: {data}")
+			else:
+				print(f"未知消息类型: {message_type}, 数据: {data}")
 		except Exception as e:
-			print(f"{ErrorMessages.CLOUD_MESSAGE_PROCESSING}: {e}")
+			error_msg = f"云消息处理错误: {e}"
+			print(error_msg)
+			import traceback
+
+			traceback.print_exc()
 			self._emit_event("error", e)
 
-	def _handle_receive_all_data(self, data: list[dict[str, Any]]) -> None:
+	def _handle_receive_all_data(self, data: list[dict[str, Any]] | Any) -> None:
+		"""完善的数据接收处理"""
+		print(f"收到完整数据: {data}")
+		if not isinstance(data, list):
+			print(f"数据格式错误,期望列表,得到: {type(data)}")
+			return
 		for item in data:
 			if not isinstance(item, dict):
-				continue
-			cvid = item.get("cvid")
-			name = item.get("name")
-			value = item.get("value")
-			data_type = item.get("type")
-			if not all([cvid, name, value is not None, data_type is not None]):
+				print(f"数据项格式错误: {item}")
 				continue
 			try:
+				cvid = item.get("cvid")
+				name = item.get("name")
+				value = item.get("value")
+				data_type = item.get("type")
+				if not all([cvid, name, value is not None, data_type is not None]):
+					print(f"数据项缺少必要字段: {item}")
+					continue
+				print(f"处理数据项: {name}({cvid}) = {value}, 类型: {data_type}")
 				if data_type == KittenCloudDataType.PRIVATE_VARIABLE.value:
 					variable = KittenCloudPrivateVariable(self, str(cvid), str(name), cast("CloudValueType", value))
 					self.private_variables[str(name)] = variable
 					self.private_variables[str(cvid)] = variable
+					print(f"创建私有变量: {name}")
 				elif data_type == KittenCloudDataType.PUBLIC_VARIABLE.value:
 					variable = KittenCloudPublicVariable(self, str(cvid), str(name), cast("CloudValueType", value))
 					self.public_variables[str(name)] = variable
 					self.public_variables[str(cvid)] = variable
+					print(f"创建公有变量: {name}")
 				elif data_type == KittenCloudDataType.LIST.value:
 					if not isinstance(value, list):
 						value = []
 					cloud_list = KittenCloudList(self, str(cvid), str(name), cast("CloudListValueType", value))
 					self.lists[str(name)] = cloud_list
 					self.lists[str(cvid)] = cloud_list
+					print(f"创建云列表: {name}, 长度: {len(value)}")
 			except Exception as e:
-				print(f"{ErrorMessages.CREATE_DATA_ITEM}: {e}")
+				error_msg = f"{ERROR_CREATE_DATA_ITEM}: {e}, 数据: {item}"
+				print(error_msg)
 				continue
 		self.data_ready = True
+		print(f"数据准备完成! 私有变量: {len(self.private_variables)}, 公有变量: {len(self.public_variables)}, 列表: {len(self.lists)}")
 		self._emit_event("data_ready")
 
-	def _handle_update_private_variable(self, data: dict[str, Any]) -> None:
-		if "cvid" in data and "value" in data:
+	def _handle_update_private_variable(self, data: dict[str, Any] | Any) -> None:
+		if isinstance(data, dict) and "cvid" in data and "value" in data:
 			cvid = data["cvid"]
 			new_value = data["value"]
 			for var in self.private_variables.values():
@@ -543,13 +592,14 @@ class KittenCloudFunction:
 					var.emit_change(old_value, new_value, "cloud")
 					break
 
-	def _handle_receive_ranking_list(self, data: Any) -> None:
+	def _handle_receive_ranking_list(self, data: dict[str, Any] | Any) -> None:
 		if not self._pending_ranking_requests:
-			print(ErrorMessages.NO_PENDING_REQUESTS)
+			print(ERROR_NO_PENDING_REQUESTS)
 			return
 		variable = self._pending_ranking_requests.pop(0)
 		if not isinstance(data, dict) or "items" not in data or not isinstance(data["items"], list):
-			print(f"{ErrorMessages.INVALID_RANKING_DATA}: {data}")
+			error_msg = f"{ERROR_INVALID_RANKING_DATA}: {data}"
+			print(error_msg)
 			return
 		ranking_data = [
 			{"value": item["value"], "user": {"id": int(item["identifier"]), "nickname": item["nickname"], "avatar_url": item["avatar_url"]}}
@@ -574,8 +624,10 @@ class KittenCloudFunction:
 							var.emit_change(old_value, new_value, "cloud")
 							break
 
-	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]]) -> None:
+	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]] | Any) -> None:
 		"""处理列表更新操作"""
+		if not isinstance(data, dict):
+			return
 		for cvid, operations in data.items():
 			if cvid in self.lists:
 				cloud_list = self.lists[cvid]
@@ -626,8 +678,8 @@ class KittenCloudFunction:
 			index = nth - 1
 			cloud_list.replace(index, value)
 
-	def _handle_update_online_users(self, data: dict[str, Any]) -> None:
-		if "total" in data and isinstance(data["total"], int):
+	def _handle_update_online_users(self, data: dict[str, Any] | Any) -> None:
+		if isinstance(data, dict) and "total" in data and isinstance(data["total"], int):
 			old_count = self.online_users
 			self.online_users = data["total"]
 			self._emit_event("online_users_change", old_count, self.online_users)
@@ -639,6 +691,8 @@ class KittenCloudFunction:
 	def _on_close(self, _ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
 		self.connected = False
 		self.data_ready = False
+		self._join_sent = False  # 重置JOIN标记
+		self._stop_ping()
 		self._emit_event("close", close_status_code, close_msg)
 		if self.auto_reconnect and self.reconnect_attempts < self.max_reconnect_attempts:
 			self.reconnect_attempts += 1
@@ -647,80 +701,103 @@ class KittenCloudFunction:
 	def _on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
 		self._emit_event("error", error)
 
-	def _send_message(self, message_type: KittenCloudSendMessageType, data: Any) -> None:
+	def send_message(self, message_type: KittenCloudSendMessageType, data: dict[str, Any] | list[Any] | str) -> None:
 		if self.ws and self.connected:
-			# 正确的 Socket.IO 消息格式:42["message_type", data]
+			# 使用正确的Socket.IO格式
 			message_content = [message_type.value, data]
 			message = f"{WEBSOCKET_EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
 			try:
-				print(f"发送消息: {message}")  # 调试用 - 取消注释这行
+				print(f"发送消息: {message}")
 				self.ws.send(message)
 			except Exception as e:
-				print(f"{ErrorMessages.SEND_MESSAGE}: {e}")
+				error_msg = f"{ERROR_SEND_MESSAGE}: {e}"
+				print(error_msg)
 				self._emit_event("error", e)
 		else:
 			print(f"无法发送消息,连接状态: {self.connected}, WebSocket: {self.ws is not None}")
 
 	def connect(self) -> None:
+		"""改进的连接方法"""
 		try:
-			# 重置连接状态
 			self.connected = False
 			self.data_ready = False
+			self._join_sent = False  # 重置JOIN标记
+			self.private_variables.clear()
+			self.public_variables.clear()
+			self.lists.clear()
 			if self.ws:
 				with suppress(Exception):
 					self.ws.close()
 			url = self._get_websocket_url()
 			headers = self._get_websocket_headers()
-			print(f"正在连接到: {url}")  # 调试信息
+			print(f"正在连接到: {url}")
+			print(f"请求头: {headers}")
 			self.ws = websocket.WebSocketApp(url, header=headers, on_open=self._on_open, on_message=self._on_message, on_close=self._on_close, on_error=self._on_error)
 
 			def run_ws() -> None:
 				try:
 					if self.ws:
-						# 设置 ping 参数,启用更详细的日志
 						self.ws.run_forever(
-							ping_interval=MagicNumbers.WEBSOCKET_PING_INTERVAL,  # 20秒发送一次ping
-							ping_timeout=MagicNumbers.WEBSOCKET_PING_TIMEOUT,  # 10秒超时
+							ping_interval=30,
+							ping_timeout=10,
+							skip_utf8_validation=True,
 						)
 				except Exception as e:
-					print(f"{ErrorMessages.WEB_SOCKET_RUN}: {e}")
+					error_msg = f"{ERROR_WEB_SOCKET_RUN}: {e}"
+					print(error_msg)
 
 			thread = threading.Thread(target=run_ws, daemon=True)
 			thread.start()
 		except Exception as e:
-			print(f"{ErrorMessages.CONNECTION}: {e}")
+			error_msg = f"{ERROR_CONNECTION}: {e}"
+			print(error_msg)
 			self._emit_event("error", e)
-			if self.auto_reconnect and self.reconnect_attempts < self.max_reconnect_attempts:
-				self.reconnect_attempts += 1
-				print(f"尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts})...")
-				threading.Timer(self.reconnect_interval, self.connect).start()
 
 	def close(self) -> None:
 		self.auto_reconnect = False
 		self.connected = False
-		# 停止 ping 线程
-		if self._ping_thread is not None:
-			self._ping_thread = None
+		self._stop_ping()
 		if self.ws:
 			try:
 				self.ws.close()
 			except Exception as e:
-				print(f"{ErrorMessages.CLOSE_CONNECTION}: {e}")
+				error_msg = f"{ERROR_CLOSE_CONNECTION}: {e}"
+				print(error_msg)
 
-	def wait_for_connection(self, timeout: int = MagicNumbers.CONNECTION_TIMEOUT) -> bool:
+	def wait_for_connection(self, timeout: int = CONNECTION_TIMEOUT) -> bool:
+		"""等待连接建立完成"""
 		start_time = time.time()
+		last_log_time = start_time
 		while time.time() - start_time < timeout:
 			if self.connected:
 				return True
+			# 每3秒输出一次状态
+			current_time = time.time()
+			if current_time - last_log_time >= 3:
+				elapsed = current_time - start_time
+				print(f"等待连接中... 已等待 {elapsed:.1f} 秒")
+				last_log_time = current_time
 			time.sleep(0.1)
+		print(f"连接超时,等待 {timeout} 秒后仍未建立连接")
 		return False
 
-	def wait_for_data(self, timeout: int = MagicNumbers.DATA_TIMEOUT) -> bool:
+	def wait_for_data(self, timeout: int = DATA_TIMEOUT) -> bool:
+		"""等待数据加载完成,带详细日志"""
 		start_time = time.time()
+		last_log_time = start_time
 		while time.time() - start_time < timeout:
 			if self.data_ready:
+				print("数据加载完成!")
 				return True
+			# 每5秒输出一次状态
+			current_time = time.time()
+			if current_time - last_log_time >= 5:
+				elapsed = current_time - start_time
+				print(f"等待数据中... 已等待 {elapsed:.1f} 秒, 连接状态: {self.connected}")
+				last_log_time = current_time
 			time.sleep(0.1)
+		print(f"数据加载超时,等待 {timeout} 秒后仍未收到数据")
+		print(f"最终状态 - 连接: {self.connected}, 数据就绪: {self.data_ready}")
 		return False
 
 	def get_private_variable(self, name: str) -> KittenCloudPrivateVariable | None:
@@ -744,7 +821,7 @@ class KittenCloudFunction:
 	def set_private_variable(self, name: str, value: int | str) -> bool:
 		variable = self.get_private_variable(name)
 		if variable and variable.set(value):
-			self._send_message(
+			self.send_message(
 				KittenCloudSendMessageType.UPDATE_PRIVATE_VARIABLE, [{"cvid": variable.cvid, "value": value, "param_type": "number" if isinstance(value, int) else "string"}]
 			)
 			return True
@@ -753,14 +830,14 @@ class KittenCloudFunction:
 	def set_public_variable(self, name: str, value: int | str) -> bool:
 		variable = self.get_public_variable(name)
 		if variable and variable.set(value):
-			self._send_message(
+			self.send_message(
 				KittenCloudSendMessageType.UPDATE_PUBLIC_VARIABLE,
 				[{"action": "set", "cvid": variable.cvid, "value": value, "param_type": "number" if isinstance(value, int) else "string"}],
 			)
 			return True
 		return False
 
-	def get_private_variable_ranking(self, name: str, limit: int = MagicNumbers.DEFAULT_RANKING_LIMIT, order: int = -1) -> None:
+	def get_private_variable_ranking(self, name: str, limit: int = DEFAULT_RANKING_LIMIT, order: int = -1) -> None:
 		variable = self.get_private_variable(name)
 		if variable:
 			self._pending_ranking_requests.append(variable)
@@ -769,56 +846,56 @@ class KittenCloudFunction:
 	def list_push(self, name: str, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.push(value):
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "append", "value": value}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "append", "value": value}]})
 			return True
 		return False
 
 	def list_pop(self, name: str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.pop() is not None:
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": "last"}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": "last"}]})
 			return True
 		return False
 
 	def list_unshift(self, name: str, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.unshift(value):
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "unshift", "value": value}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "unshift", "value": value}]})
 			return True
 		return False
 
 	def list_insert(self, name: str, index: int, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.insert(index, value):
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "insert", "nth": index + 1, "value": value}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "insert", "nth": index + 1, "value": value}]})
 			return True
 		return False
 
 	def list_remove(self, name: str, index: int) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.remove(index) is not None:
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": index + 1}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": index + 1}]})
 			return True
 		return False
 
 	def list_replace(self, name: str, index: int, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.replace(index, value):
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "replace", "nth": index + 1, "value": value}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "replace", "nth": index + 1, "value": value}]})
 			return True
 		return False
 
 	def list_replace_last(self, name: str, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.replace_last(value):
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "replace", "nth": "last", "value": value}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "replace", "nth": "last", "value": value}]})
 			return True
 		return False
 
 	def list_clear(self, name: str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.clear():
-			self._send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": "all"}]})
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": "all"}]})
 			return True
 		return False
 
@@ -898,9 +975,9 @@ def main() -> None:
 	print("正在连接...")
 	cloud.connect()
 	print("等待连接建立...")
-	if cloud.wait_for_connection(timeout=MagicNumbers.WAIT_TIMEOUT):
+	if cloud.wait_for_connection(timeout=WAIT_TIMEOUT):
 		print("连接建立成功,等待数据...")
-		if cloud.wait_for_data(timeout=MagicNumbers.WAIT_TIMEOUT):
+		if cloud.wait_for_data(timeout=WAIT_TIMEOUT):
 			print("数据加载完成!")
 			private_vars = cloud.get_all_private_variables()
 			if private_vars:
@@ -920,37 +997,5 @@ def main() -> None:
 		cloud.close()
 
 
-def simple_test() -> None:
-	"""简单的测试函数"""
-	# 注意:这里使用了示例token,实际使用时应该从环境变量或输入获取
-	authorization_token = "your_token_here"  # 替换为实际的token
-	work_id = 57074555
-	cloud = KittenCloudFunction(work_id, authorization_token=authorization_token)
-
-	def on_open() -> None:
-		print("✅ 连接成功")
-
-	def on_data_ready() -> None:
-		print("✅ 数据加载完成")
-		print(f"私有变量数量: {len(cloud.private_variables)}")
-		print(f"公有变量数量: {len(cloud.public_variables)}")
-		print(f"云列表数量: {len(cloud.lists)}")
-		cloud.print_all_data()
-
-	cloud.on("open", on_open)
-	cloud.on_data_ready(on_data_ready)
-	cloud.connect()
-	# 等待更长时间
-	time.sleep(10)
-	if not cloud.data_ready:
-		print("❌ 数据仍未加载,可能原因:")
-		print("   - 作品不存在云变量")
-		print("   - token权限不足")
-		print("   - 网络问题")
-		print("   - 作品ID错误")
-
-
 if __name__ == "__main__":
-	# 可以选择运行简单测试或完整的主函数
-	# simple_test()
 	main()
