@@ -695,7 +695,7 @@ class ReportProcessor(ClassUnion):
 		if source_type == "post" and user_id and user_id != "UNKNOWN":
 			try:
 				# 搜索同标题的帖子
-				post_results = self._forum_obtain.search_posts_gen(title=board_name, limit=None)
+				post_results = list(self._forum_obtain.search_posts_gen(title=board_name, limit=None))
 				# 筛选当前用户发布的帖子
 				user_posts = self._tool.DataProcessor().filter_by_nested_values(
 					data=post_results,

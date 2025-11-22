@@ -296,7 +296,7 @@ class DataConverter:
 			...	 name: str
 			>>> DataConverter.to_serializable(User("Alice"))
 			{'name': 'Alice'}
-		"""  # noqa: DOC502
+		"""
 		if isinstance(data, dict):
 			return data.copy()
 		if is_dataclass_instance(data):

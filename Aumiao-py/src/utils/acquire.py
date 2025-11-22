@@ -186,8 +186,11 @@ class IdentityManager:
 
 
 # ==================== 基础实现 ====================
-class BaseHTTPClient(IHTTPClient):
-	"""基础HTTP客户端 - 整合原版分页逻辑"""
+class BaseHTTPClient:
+	"""基础HTTP客户端 - 优化版"""
+
+	_DEFAULT_PAGE_SIZE = 15
+	_MIN_PAGE_SIZE = 1
 
 	def __init__(self, config: ClientConfig) -> None:
 		self.config = config
@@ -196,6 +199,7 @@ class BaseHTTPClient(IHTTPClient):
 		self._file_handler = file.CodeMaoFile()
 		self._data_processor = tool.DataProcessor()
 		self.log_file = Path.cwd() / "logs" / f"requests_{tool.TimeUtils().current_timestamp()}.txt"
+		self._pagination_config: PaginationConfig = {}
 
 	def send_request(
 		self,
@@ -276,6 +280,43 @@ class BaseHTTPClient(IHTTPClient):
 		"""更新请求头"""
 		self._http_client.headers.update(headers)
 
+	def _merge_pagination_config(self, config: PaginationConfig | None) -> PaginationConfig:
+		"""合并分页配置"""
+		if config is None:
+			return self._pagination_config
+		return {**self._pagination_config, **config}
+
+	def _prepare_pagination_params(self, params: dict[str, Any], amount_key: str, *, include_first_page: bool) -> dict[str, Any]:
+		"""准备分页请求参数"""
+		request_params = params.copy()
+		# 如果不包含第一页数据,使用较小页面大小快速获取元数据
+		if not include_first_page and amount_key in request_params:
+			request_params[amount_key] = self._DEFAULT_PAGE_SIZE
+		return request_params
+
+	def _safe_extract_total(self, data: dict[str, Any], total_key: str) -> int:
+		"""安全提取总数"""
+		total_raw = self._get_nested_value(data, total_key)
+		try:
+			return int(total_raw) if total_raw is not None else 0
+		except (ValueError, TypeError):
+			return 0
+
+	def _calculate_items_per_page(self, response_data: dict[str, Any], request_params: dict[str, Any], config: PaginationConfig) -> int:
+		"""计算每页项目数"""
+		# 优先级: 请求参数 > 响应参数 > 默认值
+		amount_key = config.get("amount_key", "")
+		response_amount_key = config.get("response_amount_key", "")
+		items_per_page = request_params.get(amount_key) or response_data.get(response_amount_key) or self._DEFAULT_PAGE_SIZE
+		return max(items_per_page, self._MIN_PAGE_SIZE)
+
+	def _extract_first_page(self, response_data: dict[str, Any], data_key: str, *, include_first_page: bool) -> list[dict[str, Any]]:
+		"""提取第一页数据"""
+		if not include_first_page:
+			return []
+		first_page_raw = self._get_nested_value(response_data, data_key)
+		return first_page_raw if isinstance(first_page_raw, list) else []
+
 	def _get_pagination_info(
 		self,
 		endpoint: str,
@@ -288,50 +329,26 @@ class BaseHTTPClient(IHTTPClient):
 		*,
 		include_first_page: bool = False,
 	) -> tuple[int, int, list[dict[str, Any]], dict[str, Any]]:
-		"""获取分页信息 - 原版逻辑"""
-		config_ = {"amount_key": "limit", "offset_key": "offset", "response_amount_key": "limit", "response_offset_key": "offset", **(config or {})}
-		amount_key = str(config_.get("amount_key", "limit"))  # 确保是字符串
-		page_size_key = str(config_.get("response_amount_key", "limit"))  # 确保是字符串
-		base_params = params.copy()
-		original_limit = 0
-		# 调整参数获取第一页
-		if not include_first_page and amount_key in base_params:
-			original_limit = base_params[amount_key]
-			base_params[amount_key] = 15
-		# 发送初始请求
-		initial_response = self.send_request(fetch_method, endpoint, params=base_params, payload=payload)
-		if initial_response.status_code != HTTPStatus.OK.value:
+		"""获取分页信息 - 优化版"""
+		# 合并配置
+		config_ = self._merge_pagination_config(config)
+		# 准备请求参数
+		amount_key = config_.get("amount_key", "")
+		request_params = self._prepare_pagination_params(params=params, amount_key=amount_key, include_first_page=include_first_page)
+		# 发送请求
+		response = self.send_request(fetch_method, endpoint, params=request_params, payload=payload)
+		if response.status_code != HTTPStatus.OK.value:
 			return 0, 0, [], {}
-		initial_data = initial_response.json()
-		# 提取总数
-		total_items_raw = self._get_nested_value(initial_data, total_key)
-		try:
-			total_items = int(total_items_raw) if total_items_raw is not None else 0
-		except (ValueError, TypeError):
-			total_items = 0
-		# 确定每页数量
-		items_per_page_param = base_params.get(amount_key)
-		items_per_page_response = initial_data.get(page_size_key)
-		if items_per_page_param and items_per_page_param > 0:
-			items_per_page = items_per_page_param
-		elif items_per_page_response and items_per_page_response > 0:
-			items_per_page = items_per_page_response
-		else:
-			items_per_page = 15
-		if items_per_page <= 0:
-			items_per_page = 1
-		# 提取第一页数据
-		first_page: list[dict[str, Any]] = []
-		if include_first_page:
-			first_page_raw = self._get_nested_value(initial_data, data_key)
-			first_page = first_page_raw if isinstance(first_page_raw, list) else []
-		elif not include_first_page and amount_key in base_params:
-			base_params[amount_key] = original_limit
-		return total_items, items_per_page, first_page, initial_data
+		response_data = response.json()
+		# 提取关键信息
+		total_items = self._safe_extract_total(response_data, total_key)
+		items_per_page = self._calculate_items_per_page(response_data, request_params, config_)
+		first_page = self._extract_first_page(response_data=response_data, data_key=data_key, include_first_page=include_first_page)
+		return total_items, items_per_page, first_page, response_data
 
 	@staticmethod
-	def _get_nested_value(data: dict[str, Any], key: str) -> Any:  # noqa: ANN401
-		"""获取嵌套值 - 替代原版的DataProcessor"""
+	def _get_nested_value(data: dict[str, Any], key: str) -> Any | None:  # noqa: ANN401
+		"""获取嵌套值"""
 		if not key or not isinstance(data, dict):
 			return None
 		keys = key.split(".")
@@ -342,6 +359,83 @@ class BaseHTTPClient(IHTTPClient):
 			else:
 				return None
 		return current
+
+	@staticmethod
+	def _reached_limit(current_count: int, limit: int | None) -> bool:
+		"""检查是否达到限制"""
+		return limit is not None and current_count >= limit
+
+	@staticmethod
+	def _calculate_remaining_items(total_items: int, first_page_count: int, limit: int | None, yielded_count: int) -> int:
+		"""计算剩余需要获取的项目数"""
+		remaining_from_total = total_items - first_page_count
+		if limit is None:
+			return remaining_from_total
+		return min(remaining_from_total, limit - yielded_count)
+
+	@staticmethod
+	def _build_page_params(
+		base_params: dict[str, Any],
+		offset_key: str,
+		page_idx: int,
+		items_per_page: int,
+		first_page_size: int,
+		pagination_method: Literal["offset", "page"],
+	) -> dict[str, Any]:
+		"""构建页面请求参数"""
+		page_params = base_params.copy()
+		if pagination_method == "offset":
+			page_params[offset_key] = first_page_size + (page_idx - 1) * items_per_page
+		elif pagination_method == "page":
+			page_params[offset_key] = page_idx + 1  # 第一页已经获取,从第二页开始
+		else:
+			error_msg = f"不支持的分页方式: {pagination_method}"
+			raise ValueError(error_msg)
+		return page_params
+
+	def _fetch_single_page(
+		self,
+		endpoint: str,
+		method: FetchMethod,
+		params: dict[str, Any],
+		payload: dict[str, Any] | None,
+		data_key: str,
+	) -> list[dict[str, Any]]:
+		"""获取单个页面的数据"""
+		response = self.send_request(method, endpoint, params=params, payload=payload)
+		if response.status_code != HTTPStatus.OK.value:
+			return []
+		page_data_raw = self._get_nested_value(response.json(), data_key)
+		return page_data_raw if isinstance(page_data_raw, list) else []
+
+	def _fetch_remaining_pages(
+		self,
+		endpoint: str,
+		base_params: dict[str, Any],
+		payload: dict[str, Any] | None,
+		method: FetchMethod,
+		data_key: str,
+		pagination_method: Literal["offset", "page"],
+		config: PaginationConfig,
+		items_per_page: int,
+		first_page_size: int,
+		remaining_to_fetch: int,
+		current_count: int,
+		limit: int | None,
+	) -> Generator[dict[str, Any]]:
+		total_pages = (remaining_to_fetch + items_per_page - 1) // items_per_page
+		yielded_count = current_count
+		offset_key = config.get("offset_key", "")
+		for page_idx in range(1, total_pages + 1):
+			page_params = self._build_page_params(base_params, offset_key, page_idx, items_per_page, first_page_size, pagination_method)
+			page_data = self._fetch_single_page(endpoint, method, page_params, payload, data_key)
+			if not page_data:
+				continue
+			for item in page_data:
+				yield item
+				yielded_count += 1
+				if self._reached_limit(yielded_count, limit):
+					return
 
 	def fetch_paginated_data(
 		self,
@@ -359,47 +453,41 @@ class BaseHTTPClient(IHTTPClient):
 		total_items, items_per_page, first_page, _ = self._get_pagination_info(
 			endpoint=endpoint, params=params, payload=payload, fetch_method=method, total_key=total_key, data_key=data_key, config=config, include_first_page=True
 		)
-		config_ = {"offset_key": "offset", **(config or {})}
-		offset_param_key = str(config_.get("offset_key", "offset"))  # 确保是字符串
+		config_ = self._merge_pagination_config(config)
 		base_params = params.copy()
+		# 生成第一页数据
 		yielded_count = 0
-		# 处理第一页数据
 		for item in first_page:
 			yield item
 			yielded_count += 1
-			if limit and yielded_count >= limit:
+			if self._reached_limit(yielded_count, limit):
 				return
-		# 如果没有更多数据,直接返回
-		if total_items <= len(first_page):
+		# 计算剩余需要获取的数据
+		remaining_to_fetch = self._calculate_remaining_items(total_items, len(first_page), limit, yielded_count)
+		if remaining_to_fetch <= 0:
 			return
-		# 计算剩余数据量
-		remaining_items = total_items - len(first_page)
-		if limit:
-			remaining_items = min(remaining_items, limit - yielded_count)
-		if remaining_items <= 0:
-			return
-		# 计算总页数
-		total_pages = (remaining_items + items_per_page - 1) // items_per_page
-		# 获取后续页面数据
-		for page_idx in range(1, total_pages + 1):
-			page_params = base_params.copy()
-			if pagination_method == "offset":
-				page_params[offset_param_key] = page_idx * items_per_page
-			elif pagination_method == "page":
-				page_params[offset_param_key] = page_idx + 1
-			else:
-				error_msg = f"不支持的分页方式: {pagination_method}"
-				raise ValueError(error_msg)
-			page_response = self.send_request(method, endpoint, params=page_params, payload=payload)
-			if page_response.status_code != HTTPStatus.OK.value:
-				continue
-			page_data_raw = self._get_nested_value(page_response.json(), data_key)
-			page_data = page_data_raw if isinstance(page_data_raw, list) else []
-			for item in page_data:
-				yield item
-				yielded_count += 1
-				if limit and yielded_count >= limit:
-					return
+		# 分批获取剩余数据
+		yield from self._fetch_remaining_pages(
+			endpoint=endpoint,
+			base_params=base_params,
+			payload=payload,
+			method=method,
+			data_key=data_key,
+			pagination_method=pagination_method,
+			config=config_,
+			items_per_page=items_per_page,
+			first_page_size=len(first_page),
+			remaining_to_fetch=remaining_to_fetch,
+			current_count=yielded_count,
+			limit=limit,
+		)
+
+	@staticmethod
+	def _calculate_total_pages(total_items: int, items_per_page: int) -> int:
+		"""计算总页数"""
+		if total_items == 0:
+			return 0
+		return (total_items + items_per_page - 1) // items_per_page
 
 	def get_pagination_total(
 		self,
@@ -411,9 +499,9 @@ class BaseHTTPClient(IHTTPClient):
 		data_key: str = "items",
 		config: PaginationConfig | None = None,
 	) -> dict[Literal["total", "total_pages"], int]:
-		"""获取分页总数 - 原版逻辑"""
+		"""获取分页总数 - 优化版"""
 		total_items, items_per_page, _, _ = self._get_pagination_info(endpoint, params, payload, fetch_method, total_key, data_key, config, include_first_page=False)
-		total_pages = 0 if total_items == 0 else (total_items + items_per_page - 1) // items_per_page
+		total_pages = self._calculate_total_pages(total_items, items_per_page)
 		return {"total": total_items, "total_pages": total_pages}
 
 	def _log_request(self, response: Response) -> None:
@@ -426,7 +514,6 @@ class BaseHTTPClient(IHTTPClient):
 			f"Response: {response.text}\n"
 			f"{'=' * 50}\n\n"
 		)
-
 		self._file_handler.file_write(path=self.log_file, content=log_entry, method="a")
 
 	def close(self) -> None:
@@ -484,7 +571,6 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 			)
 			self._connected = True
 			print(f"WebSocket连接已建立: {url}")
-
 		except Exception as e:
 			print(f"WebSocket连接失败: {e}")
 			self._connected = False
@@ -510,7 +596,6 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 			if isinstance(message, dict):
 				message = dumps(message, ensure_ascii=False)
 			self._ws_app.send(message)
-
 		except Exception as e:
 			print(f"发送WebSocket消息失败: {e}")
 			return False
@@ -524,7 +609,6 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 		try:
 			self._ws_app.settimeout(timeout)
 			message = self._ws_app.recv()
-
 		except websocket.WebSocketTimeoutException:
 			print("接收WebSocket消息超时")
 			return None
