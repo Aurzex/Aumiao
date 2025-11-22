@@ -1,5 +1,7 @@
+import cmd
 import hashlib
 import json
+import shlex
 import threading
 import time
 import uuid
@@ -930,6 +932,328 @@ class KittenCloudFunction:
 		print("=" * 50)
 
 
+class CloudCLI(cmd.Cmd):
+	"""云数据交互式命令行界面"""
+
+	def __init__(self, cloud):
+		super().__init__()
+		self.cloud = cloud
+		self.prompt = "云数据> "
+		self.intro = "欢迎使用云数据交互式命令行!输入 help 或 ? 查看可用命令。"
+
+	def preloop(self):
+		"""在循环开始前检查连接状态"""
+		if not self.cloud.connected:
+			print("警告:云连接未建立,请先等待连接成功")
+
+	def do_status(self, arg):
+		"""查看连接状态和数据状态"""
+		print(f"连接状态: {'已连接' if self.cloud.connected else '未连接'}")
+		print(f"数据就绪: {'是' if self.cloud.data_ready else '否'}")
+		print(f"在线用户: {self.cloud.online_users}")
+
+	def do_list(self, arg):
+		"""列出所有数据
+		用法: list [type]
+		type: private(私有变量) / public(公有变量) / lists(列表) / all(全部)"""
+		args = shlex.split(arg)
+		show_type = args[0] if args else "all"
+		if show_type in ["all", "private"]:
+			print("\n=== 私有变量 ===")
+			private_vars = self.cloud.get_all_private_variables()
+			if private_vars:
+				for name, var in private_vars.items():
+					print(f"  {name}: {var.get()}")
+			else:
+				print("  无私有变量")
+		if show_type in ["all", "public"]:
+			print("\n=== 公有变量 ===")
+			public_vars = self.cloud.get_all_public_variables()
+			if public_vars:
+				for name, var in public_vars.items():
+					print(f"  {name}: {var.get()}")
+			else:
+				print("  无公有变量")
+		if show_type in ["all", "lists"]:
+			print("\n=== 云列表 ===")
+			lists = self.cloud.get_all_lists()
+			if lists:
+				for name, cloud_list in lists.items():
+					print(f"  {name}: {cloud_list.value} (长度: {cloud_list.length()})")
+			else:
+				print("  无云列表")
+
+	def do_get(self, arg):
+		"""获取特定变量的值
+		用法: get <变量名>"""
+		if not arg:
+			print("错误:请指定变量名")
+			return
+		name = arg.strip()
+		# 尝试在私有变量中查找
+		private_var = self.cloud.get_private_variable(name)
+		if private_var:
+			print(f"私有变量 {name}: {private_var.get()}")
+			return
+		# 尝试在公有变量中查找
+		public_var = self.cloud.get_public_variable(name)
+		if public_var:
+			print(f"公有变量 {name}: {public_var.get()}")
+			return
+		# 尝试在列表中查找
+		cloud_list = self.cloud.get_list(name)
+		if cloud_list:
+			print(f"云列表 {name}: {cloud_list.value} (长度: {cloud_list.length()})")
+			return
+		print(f"错误:未找到变量或列表 '{name}'")
+
+	def do_set_private(self, arg):
+		"""设置私有变量的值
+		用法: set_private <变量名> <值>"""
+		args = shlex.split(arg)
+		if len(args) < 2:
+			print("错误:用法: set_private <变量名> <值>")
+			return
+		name = args[0]
+		value = args[1]
+		# 尝试转换为数字
+		try:
+			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+				value = int(value)
+		except:
+			pass
+		if self.cloud.set_private_variable(name, value):
+			print(f"成功设置私有变量 {name} = {value}")
+		else:
+			print(f"错误:设置私有变量失败,请检查变量名 '{name}'")
+
+	def do_set_public(self, arg):
+		"""设置公有变量的值
+		用法: set_public <变量名> <值>"""
+		args = shlex.split(arg)
+		if len(args) < 2:
+			print("错误:用法: set_public <变量名> <值>")
+			return
+		name = args[0]
+		value = args[1]
+		# 尝试转换为数字
+		try:
+			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+				value = int(value)
+		except:
+			pass
+		if self.cloud.set_public_variable(name, value):
+			print(f"成功设置公有变量 {name} = {value}")
+		else:
+			print(f"错误:设置公有变量失败,请检查变量名 '{name}'")
+
+	def do_list_operations(self, arg):
+		"""云列表操作
+		用法:
+		  list_operations push <列表名> <值>      # 追加元素
+		  list_operations pop <列表名>            # 弹出最后一个元素
+		  list_operations unshift <列表名> <值>   # 在开头添加元素
+		  list_operations shift <列表名>          # 移除第一个元素
+		  list_operations insert <列表名> <位置> <值>  # 在指定位置插入
+		  list_operations remove <列表名> <位置>  # 移除指定位置元素
+		  list_operations replace <列表名> <位置> <值> # 替换指定位置元素
+		  list_operations clear <列表名>          # 清空列表
+		  list_operations get <列表名> <位置>     # 获取指定位置元素"""
+		args = shlex.split(arg)
+		if len(args) < 2:
+			print("错误:参数不足")
+			self.help_list_operations()
+			return
+		operation = args[0]
+		list_name = args[1]
+		cloud_list = self.cloud.get_list(list_name)
+		if not cloud_list:
+			print(f"错误:未找到列表 '{list_name}'")
+			return
+		if operation == "push":
+			if len(args) < 3:
+				print("错误:需要提供要添加的值")
+				return
+			value = args[2]
+			try:
+				if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+					value = int(value)
+			except:
+				pass
+			if self.cloud.list_push(list_name, value):
+				print(f"成功向列表 {list_name} 添加元素: {value}")
+			else:
+				print("添加元素失败")
+		elif operation == "pop":
+			if self.cloud.list_pop(list_name):
+				print(f"成功弹出列表 {list_name} 的最后一个元素")
+			else:
+				print("弹出元素失败")
+		elif operation == "unshift":
+			if len(args) < 3:
+				print("错误:需要提供要添加的值")
+				return
+			value = args[2]
+			try:
+				if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+					value = int(value)
+			except:
+				pass
+			if self.cloud.list_unshift(list_name, value):
+				print(f"成功在列表 {list_name} 开头添加元素: {value}")
+			else:
+				print("添加元素失败")
+		elif operation == "shift":
+			if self.cloud.list_shift(list_name):
+				print(f"成功移除列表 {list_name} 的第一个元素")
+			else:
+				print("移除元素失败")
+		elif operation == "insert":
+			if len(args) < 4:
+				print("错误:需要提供位置和值")
+				return
+			try:
+				index = int(args[2])
+				value = args[3]
+				try:
+					if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+						value = int(value)
+				except:
+					pass
+				if self.cloud.list_insert(list_name, index, value):
+					print(f"成功在列表 {list_name} 的位置 {index} 插入元素: {value}")
+				else:
+					print("插入元素失败")
+			except ValueError:
+				print("错误:位置必须是数字")
+		elif operation == "remove":
+			if len(args) < 3:
+				print("错误:需要提供位置")
+				return
+			try:
+				index = int(args[2])
+				if self.cloud.list_remove(list_name, index):
+					print(f"成功移除列表 {list_name} 位置 {index} 的元素")
+				else:
+					print("移除元素失败")
+			except ValueError:
+				print("错误:位置必须是数字")
+		elif operation == "replace":
+			if len(args) < 4:
+				print("错误:需要提供位置和新值")
+				return
+			try:
+				index = int(args[2])
+				value = args[3]
+				try:
+					if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
+						value = int(value)
+				except:
+					pass
+				if self.cloud.list_replace(list_name, index, value):
+					print(f"成功替换列表 {list_name} 位置 {index} 的元素为: {value}")
+				else:
+					print("替换元素失败")
+			except ValueError:
+				print("错误:位置必须是数字")
+		elif operation == "clear":
+			if self.cloud.list_clear(list_name):
+				print(f"成功清空列表 {list_name}")
+			else:
+				print("清空列表失败")
+		elif operation == "get":
+			if len(args) < 3:
+				print("错误:需要提供位置")
+				return
+			try:
+				index = int(args[2])
+				value = cloud_list.get(index)
+				if value is not None:
+					print(f"列表 {list_name} 位置 {index} 的元素: {value}")
+				else:
+					print(f"错误:位置 {index} 超出范围")
+			except ValueError:
+				print("错误:位置必须是数字")
+		else:
+			print(f"错误:未知操作 '{operation}'")
+			self.help_list_operations()
+
+	def help_list_operations(self):
+		"""显示列表操作帮助"""
+		print("""
+列表操作命令:
+  list_operations push <列表名> <值>      - 向列表末尾添加元素
+  list_operations pop <列表名>            - 移除并返回列表最后一个元素
+  list_operations unshift <列表名> <值>   - 向列表开头添加元素
+  list_operations shift <列表名>          - 移除并返回列表第一个元素
+  list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
+  list_operations remove <列表名> <位置>  - 移除指定位置的元素
+  list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
+  list_operations clear <列表名>          - 清空列表所有元素
+  list_operations get <列表名> <位置>     - 获取指定位置的元素
+		""")
+
+	def do_ranking(self, arg):
+		"""获取私有变量的排行榜
+		用法: ranking <变量名> [数量] [排序]
+		  数量: 默认10,最大31
+		  排序: 1(升序) 或 -1(降序,默认)"""
+		args = shlex.split(arg)
+		if not args:
+			print("错误:请指定变量名")
+			return
+		name = args[0]
+		limit = 10
+		order = -1
+		if len(args) > 1:
+			try:
+				limit = int(args[1])
+				if limit <= 0 or limit > 31:
+					print("警告:数量范围1-31,使用默认值10")
+					limit = 10
+			except ValueError:
+				print("错误:数量必须是数字")
+				return
+		if len(args) > 2:
+			try:
+				order = int(args[2])
+				if order not in [1, -1]:
+					print("错误:排序必须是1(升序)或-1(降序)")
+					return
+			except ValueError:
+				print("错误:排序必须是数字")
+				return
+		variable = self.cloud.get_private_variable(name)
+		if not variable:
+			print(f"错误:未找到私有变量 '{name}'")
+			return
+		print(f"获取 {name} 的排行榜...")
+		self.cloud.get_private_variable_ranking(name, limit, order)
+
+	def do_refresh(self, arg):
+		"""刷新显示所有数据"""
+		self.cloud.print_all_data()
+
+	def do_online(self, arg):
+		"""查看在线用户数"""
+		print(f"当前在线用户: {self.cloud.online_users}")
+
+	def do_exit(self, arg):
+		"""退出程序"""
+		print("正在关闭连接...")
+		self.cloud.close()
+		return True
+
+	def do_quit(self, arg):
+		"""退出程序"""
+		return self.do_exit(arg)
+
+	def do_EOF(self, arg):
+		"""Ctrl+D 退出"""
+		print()
+		return self.do_exit(arg)
+
+
 def main() -> None:
 	authorization_token = input("请输入你的Authorization token: ").strip()
 	if not authorization_token:
@@ -944,58 +1268,47 @@ def main() -> None:
 	except ValueError:
 		print("作品ID必须是数字")
 		return
+	# 创建云连接
 	cloud = KittenCloudFunction(work_id=work_id, editor=CodemaoWorkEditor.KITTEN, authorization_token=authorization_token)
 
-	def on_open() -> None:
-		print("连接成功")
-
-	def on_close(code: int, msg: str) -> None:
-		print(f"连接关闭: {code} - {msg}")
-
-	def on_error(error: Exception) -> None:
-		print(f"错误: {error}")
-
 	def on_data_ready() -> None:
-		print("数据准备完成")
+		print("数据准备完成!")
 		cloud.print_all_data()
+		print("\n现在你可以使用命令行界面操作云数据了。")
 
 	def on_online_users_change(old_count: int, new_count: int) -> None:
-		print(f"在线用户数变化: {old_count} -> {new_count}")
+		print(f"\n[系统] 在线用户数变化: {old_count} -> {new_count}")
 
 	def on_ranking_received(variable: KittenCloudPrivateVariable, ranking_data: list[dict[str, Any]]) -> None:
 		print(f"\n=== {variable.name} 排行榜 ===")
 		for i, item in enumerate(ranking_data, 1):
 			user_info = item["user"]
 			print(f"{i}. {item['value']} - {user_info['nickname']} (ID: {user_info['id']})")
+		print("云数据> ", end="", flush=True)
 
-	cloud.on("open", on_open)
-	cloud.on("close", on_close)
-	cloud.on("error", on_error)
+	# 注册事件回调
 	cloud.on_data_ready(on_data_ready)
 	cloud.on_online_users_change(on_online_users_change)
 	cloud.on_ranking_received(on_ranking_received)
 	print("正在连接...")
 	cloud.connect()
 	print("等待连接建立...")
-	if cloud.wait_for_connection(timeout=WAIT_TIMEOUT):
+	if cloud.wait_for_connection(timeout=30):
 		print("连接建立成功,等待数据...")
-		if cloud.wait_for_data(timeout=WAIT_TIMEOUT):
-			print("数据加载完成!")
-			private_vars = cloud.get_all_private_variables()
-			if private_vars:
-				first_var_name = next(iter(private_vars.keys()))
-				print(f"\n获取 {first_var_name} 的排行榜...")
-				cloud.get_private_variable_ranking(first_var_name, limit=10, order=-1)
+		if cloud.wait_for_data(timeout=30):
+			print("数据加载完成,启动命令行界面...")
+			# 启动命令行界面
+			cli = CloudCLI(cloud)
+			try:
+				cli.cmdloop()
+			except KeyboardInterrupt:
+				print("\n接收到中断信号,正在退出...")
+				cloud.close()
 		else:
 			print("数据加载超时")
+			cloud.close()
 	else:
 		print("连接超时")
-	try:
-		print("\n程序运行中,按 Ctrl+C 退出...")
-		while True:
-			time.sleep(1)
-	except KeyboardInterrupt:
-		print("\n正在关闭连接...")
 		cloud.close()
 
 
