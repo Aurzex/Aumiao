@@ -1559,16 +1559,16 @@ class CloudCommandLineInterface(cmd.Cmd):
 	def help_list_operations() -> None:
 		"""显示列表操作帮助"""
 		print("""
-列表操作命令:
-list_operations push <列表名> <值>      - 向列表末尾添加元素
-list_operations pop <列表名>            - 移除并返回列表最后一个元素
-list_operations unshift <列表名> <值>   - 向列表开头添加元素
-list_operations shift <列表名>          - 移除并返回列表第一个元素
-list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
-list_operations remove <列表名> <位置>  - 移除指定位置的元素
-list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
-list_operations clear <列表名>          - 清空列表所有元素
-list_operations get <列表名> <位置>     - 获取指定位置的元素
+			列表操作命令:
+			list_operations push <列表名> <值>      - 向列表末尾添加元素
+			list_operations pop <列表名>            - 移除并返回列表最后一个元素
+			list_operations unshift <列表名> <值>   - 向列表开头添加元素
+			list_operations shift <列表名>          - 移除并返回列表第一个元素
+			list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
+			list_operations remove <列表名> <位置>  - 移除指定位置的元素
+			list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
+			list_operations clear <列表名>          - 清空列表所有元素
+			list_operations get <列表名> <位置>     - 获取指定位置的元素
 		""")
 
 	def do_ranking(self, arg: str) -> None:
@@ -1632,60 +1632,3 @@ list_operations get <列表名> <位置>     - 获取指定位置的元素
 		"""Ctrl+D 退出"""
 		print()
 		return self.do_exit(_arg)
-
-
-def main() -> None:
-	"""主函数"""
-	authorization_token = input("请输入你的Authorization token: ").strip()
-	if not authorization_token:
-		print("未提供token, 使用匿名连接")
-		authorization_token = None
-	work_id_input = input("请输入作品ID: ").strip()
-	if not work_id_input:
-		print("作品ID不能为空")
-		return
-	try:
-		work_id = int(work_id_input)
-	except ValueError:
-		print("作品ID必须是数字")
-		return
-	# 创建云管理器
-	cloud_manager = CloudManager(work_id=work_id, editor=None, authorization_token=authorization_token)
-
-	def on_data_ready() -> None:
-		"""数据就绪回调"""
-		print("数据准备完成!")
-		cloud_manager.connection.print_all_data()
-		print("\n现在你可以使用命令行界面操作云数据了。")
-
-	def on_online_users_change(old_count: int, new_count: int) -> None:
-		"""在线用户数变更回调"""
-		print(f"\n[系统] 在线用户数变化: {old_count} -> {new_count}")
-
-	def on_ranking_received(variable: PrivateCloudVariable, ranking_data: list[dict[str, Any]]) -> None:
-		"""排行榜数据接收回调"""
-		print(f"\n=== {variable.name} 排行榜 ===")
-		for i, item in enumerate(ranking_data, 1):
-			user_info = item["user"]
-			print(f"{i}. {item['value']} - {user_info['nickname']} (ID: {user_info['id']})")
-
-	# 注册事件回调
-	cloud_manager.connection.on_data_ready(on_data_ready)
-	cloud_manager.connection.on_online_users_change(on_online_users_change)
-	cloud_manager.connection.on_ranking_received(on_ranking_received)
-	print("正在连接...")
-	if cloud_manager.connect(wait_for_data=True):
-		print("连接建立成功, 启动命令行界面...")
-		cli = CloudCommandLineInterface(cloud_manager)
-		try:
-			cli.cmdloop()
-		except KeyboardInterrupt:
-			print("\n接收到中断信号, 正在退出...")
-			cloud_manager.close()
-	else:
-		print("连接失败")
-		cloud_manager.close()
-
-
-if __name__ == "__main__":
-	main()
