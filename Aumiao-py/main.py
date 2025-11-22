@@ -518,22 +518,3 @@ def main() -> None:
 
 if __name__ == "__main__":
 	main()
-# "POST_COMMENT",
-# "POST_COMMENT_DELETE_FEEDBACK",
-# "POST_DELETE_FEEDBACK",
-# "POST_DISCUSSION_LIKED",
-# "POST_REPLY",
-# "POST_REPLY_AUTHOR",
-# "POST_REPLY_REPLY",
-# "POST_REPLY_REPLY_AUTHOR",
-# "POST_REPLY_REPLY_FEEDBACK",
-# "WORK_COMMENT",路人a评论{user}的作品
-# "WORK_DISCUSSION_LIKED",
-# "WORK_LIKE",
-# "WORK_REPLY",路人a评论{user}在某个作品的评论
-# "WORK_REPLY_AUTHOR",路人a回复{user}作品下路人b的某条评论
-# "WORK_REPLY_REPLY",路人a回复{user}作品下路人b/a的评论下{user}的回复
-# "WORK_REPLY_REPLY_AUTHOR",路人a回复{user}作品下路人b/a对某条评论的回复
-# "WORK_REPLY_REPLY_FEEDBACK",路人a回复{user}在某个作品下发布的评论的路人b/a的回复
-# "WORK_SHOP_REPL"
-# "WORK_SHOP_USER_LEAVE",

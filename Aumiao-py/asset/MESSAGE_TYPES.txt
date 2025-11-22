@@ -1,0 +1,109 @@
+消息类型分类文档
+
+评论相关消息类型
+
+作品评论 (WORK)
+WORK_COMMENT - 用户评论了你的作品
+WORK_REPLY - 用户回复了你在作品下的评论
+WORK_REPLY_REPLY - 用户回复了作品评论下的回复
+WORK_REPLY_REPLY_FEEDBACK - 用户回复了作品评论下的反馈回复
+WORK_REPLY_AUTHOR - 作者回复了作品评论
+WORK_REPLY_REPLY_AUTHOR - 作者回复了作品评论下的回复
+
+帖子评论 (POST)
+POST_COMMENT - 用户评论了你的帖子
+POST_REPLY - 用户回复了帖子评论
+POST_REPLY_REPLY - 用户回复了帖子评论下的回复
+POST_REPLY_REPLY_FEEDBACK - 用户回复了帖子评论下的反馈回复
+POST_REPLY_AUTHOR - 作者回复了帖子评论
+POST_REPLY_REPLY_AUTHOR - 作者回复了帖子评论下的回复
+
+专题评论 (WORK_SUBJECT)
+WORK_SUBJECT_COMMENT - 用户评论了专题
+WORK_SUBJECT_REPLY - 用户回复了专题评论
+WORK_SUBJECT_REPLY_REPLY - 用户回复了专题评论下的回复
+WORK_SUBJECT_REPLY_REPLY_FEEDBACK - 用户回复了专题评论下的反馈回复
+WORK_SUBJECT_REPLY_AUTHOR - 作者回复了专题评论
+WORK_SUBJECT_REPLY_REPLY_AUTHOR - 作者回复了专题评论下的回复
+
+工作室评论 (WORK_SHOP)
+WORK_SHOP_COMMENT - 用户评论了工作室
+WORK_SHOP_REPLY - 用户回复了工作室评论
+WORK_SHOP_REPLY_REPLY - 用户回复了工作室评论下的回复
+WORK_SHOP_REPLY_REPLY_FEEDBACK - 用户回复了工作室评论下的反馈回复
+WORK_SHOP_REPLY_AUTHOR - 作者回复了工作室评论
+WORK_SHOP_REPLY_REPLY_AUTHOR - 作者回复了工作室评论下的回复
+
+违规处理消息类型
+
+作品违规
+WORK_CANCEL - 作品因违规被取消发布
+WORK_CANCEL_FEEDBACK - 举报的作品被取消发布的反馈
+WORK_DELETE - 作品因严重违规被删除
+WORK_DELETE_FEEDBACK - 举报的作品被删除的反馈
+
+评论违规
+WORK_COMMENT_DELETE - 作品评论因违规被删除
+WORK_COMMENT_DELETE_FEEDBACK - 举报的作品评论被删除的反馈
+WORK_COMMENT_DELETE_WITH_RESULT - 作品评论被删除并处罚
+WORK_COMMENT_DELETE_FEEDBACK_WITH_RESULT - 举报的作品评论被删除并处罚的反馈
+
+帖子违规
+POST_COMMENT_DELETE - 帖子回复因违规被删除
+POST_COMMENT_DELETE_FEEDBACK - 举报的帖子回复被删除的反馈
+POST_COMMENT_DELETE_WITH_RESULT - 帖子回复被删除并处罚
+POST_COMMENT_DELETE_FEEDBACK_WITH_RESULT - 举报的帖子回复被删除并处罚的反馈
+POST_DELETE - 帖子因违规被删除
+POST_DELETE_FEEDBACK - 举报的帖子被删除的反馈
+POST_DELETE_WITH_RESULT - 帖子被删除并处罚
+POST_DELETE_FEEDBACK_WITH_RESULT - 举报的帖子被删除并处罚的反馈
+
+收录和推荐消息类型
+
+作品收录
+WORK_SUBJECT_INCLUDED - 作品被收录到专题
+WORK_SUBJECT_RECOMMEND - 作品被推荐到专题
+WORK_SUBJECT_ACCEPTED - 推荐的作品通过审核
+WORK_SUBJECT_UNACCEPTED - 推荐的作品未通过审核
+
+工作室相关
+STUDIO_WORK_INCLUDED - 作品被收录到工作室
+STUDIO_WORK_RECOMMEND - 作品被推荐到工作室
+STUDIO_WORK_ACCEPTED - 投稿的作品通过审核
+STUDIO_WORK_UNACCEPTED - 投稿的作品未通过审核
+
+首页推荐
+WORK_LABEL_NEW_WORK - 作品上首页新作推荐
+WORK_LABEL_HOT_WORK - 作品晋升热门作品
+WORK_LABEL_CHOICE_WORK - 作品入选点猫精选
+CHANNEL_REMOVE_WORK - 作品从栏目下架通知
+
+社交互动消息类型
+
+点赞相关
+WORK_DISCUSSION_LIKED - 作品被点赞
+WORK_LIKE - 作品被喜欢
+POST_DISCUSSION_LIKED - 帖子被点赞
+
+工作室成员管理
+WORK_SHOP_APPLY_ACCEPTED - 工作室申请通过
+WORK_SHOP_APPLY_UNACCEPTED - 工作室申请未通过
+WORK_SHOP_USER_LEAVE - 成员退出工作室
+WORK_SHOP_DISSOLVE - 工作室被解散
+WORK_SHOP_USER_REMOVE - 成员被移出工作室
+WORK_SHOP_PROMOTE_DEPUTY_LEADER - 被提升为副室长
+
+系统消息类型
+USER_TYPE_NEW_TO_OLD - 用户类型变更
+BROADCAST - 系统广播消息
+
+渲染方法说明
+
+组件根据不同的消息类型调用不同的渲染方法：
+
+render_work() - 渲染作品相关消息
+render_reply() - 渲染帖子回复相关消息
+render_work_subject() - 渲染专题相关消息
+render_work_shop() - 渲染工作室相关消息
+
+每个渲染方法接收不同的样式参数来控制消息的显示样式，如 title_comment、title_reply、reply、reply_author、feedback 等。
