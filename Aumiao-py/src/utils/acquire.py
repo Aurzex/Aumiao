@@ -138,9 +138,9 @@ class IFileUploader(ABC):
 class Token:
 	"""Token管理"""
 
-	average: str = field(default="", metadata={"track": False})
+	average: str = field(default="", metadata={"track": True})
 	edu: str = field(default="", metadata={"track": False})
-	judgement: str = field(default="", metadata={"track": False})
+	judgement: str = field(default="", metadata={"track": True})
 	blank: str = field(default="", metadata={"track": False})
 
 	def __setattr__(self, name: str, value: str) -> None:
@@ -155,29 +155,60 @@ class Token:
 
 
 class IdentityManager:
-	"""身份管理器"""
+	"""身份管理器 - 修复版本"""
 
 	def __init__(self) -> None:
 		self.tokens = Token()
 		self._current_identity = "blank"
 		self._token_map = {"average": "average", "edu": "edu", "judgement": "judgement", "blank": "blank"}
+		self._backup_tokens = {}  # 添加令牌备份机制
 
 	def switch_identity(self, identity: str, token: str) -> None:
-		"""切换身份"""
+		"""切换身份 - 修复版本"""
 		if identity not in self._token_map:
 			error_msg = f"无效的身份: {identity}"
 			raise ValueError(error_msg)
-		# 更新token存储
-		setattr(self.tokens, self._token_map[identity], token)
-		self._current_identity = identity
+		# 备份当前令牌(如果非空)
+		current_token = self.get_current_token()
+		if current_token and self._current_identity != "blank":
+			self._backup_tokens[self._current_identity] = current_token
+		# 设置新令牌
+		if token and token.strip():
+			setattr(self.tokens, self._token_map[identity], token)
+			self._current_identity = identity
+		else:
+			print(f"警告:尝试设置空令牌到身份 {identity}")
+
+	def restore_identity(self, identity: str) -> bool:
+		"""恢复特定身份的令牌"""
+		if identity in self._backup_tokens:
+			token = self._backup_tokens[identity]
+			if token and token.strip():
+				setattr(self.tokens, self._token_map[identity], token)
+				self._current_identity = identity
+				print(f"已恢复身份: {identity}")
+				return True
+		return False
+
+	def backup_current_token(self) -> None:
+		"""备份当前令牌"""
+		if self._current_identity != "blank":
+			current_token = self.get_current_token()
+			if current_token:
+				self._backup_tokens[self._current_identity] = current_token
 
 	def get_current_token(self) -> str:
-		"""获取当前token"""
-		return getattr(self.tokens, self._token_map[self._current_identity])
+		"""获取当前token - 修复版本"""
+		token = getattr(self.tokens, self._token_map[self._current_identity])
+		return token or ""  # 确保返回字符串,避免 None
 
 	def get_identity_headers(self) -> dict[str, str]:
-		"""获取身份认证头"""
-		return {"Authorization": f"Bearer {self.get_current_token()}"}
+		"""获取身份认证头 - 修复版本"""
+		token = self.get_current_token()
+		if not token or not token.strip():
+			print(f"警告:身份 '{self._current_identity}' 的令牌为空,无法生成认证头")
+			return {}
+		return {"Authorization": f"Bearer {token}"}
 
 	@property
 	def current_identity(self) -> str:
@@ -245,8 +276,15 @@ class BaseHTTPClient:
 		return Response(500)
 
 	def _prepare_headers(self, headers: dict[str, str] | None, files: dict[str, Any] | None) -> dict[str, str]:
-		"""准备请求头"""
+		"""准备请求头 - 修复版本"""
+		# 合并基础头和新头
 		request_headers = {**self._http_client.headers, **(headers or {})}
+		# 检查 Authorization 头是否为空
+		auth_header = request_headers.get("Authorization", "")
+		if auth_header and (not auth_header.strip() or auth_header == "Bearer "):
+			print("警告:Authorization 头为空,移除该头")
+			request_headers.pop("Authorization", None)
+		# 处理文件上传时的头
 		if files:
 			request_headers.pop("Content-Type", None)
 			request_headers.pop("Content-Length", None)
@@ -277,8 +315,10 @@ class BaseHTTPClient:
 		print(f"请求失败,第 {attempt + 1} 次重试: {error}")
 
 	def update_headers(self, headers: dict[str, str]) -> None:
-		"""更新请求头"""
-		self._http_client.headers.update(headers)
+		"""更新请求头 - 修复版本"""
+		# 过滤空值头
+		valid_headers = {k: v for k, v in headers.items() if v and v.strip()}
+		self._http_client.headers.update(valid_headers)
 
 	def _merge_pagination_config(self, config: PaginationConfig | None) -> PaginationConfig:
 		"""合并分页配置"""
@@ -530,20 +570,46 @@ class BaseHTTPClient:
 # ==================== 具体实现 ====================
 @singleton
 class CodeMaoClient(BaseHTTPClient):
-	"""编程猫HTTP客户端"""
+	"""编程猫HTTP客户端 - 修复版本"""
 
 	def __init__(self) -> None:
-		# 修复未定义的data变量
 		setting_manager: SettingManager = setting.SettingManager()
 		config = ClientConfig(log_requests=setting_manager.data.PARAMETER.log)
 		super().__init__(config)
+		# 修复:只创建一个 IdentityManager 实例
 		self.identity_manager = IdentityManager()
-		self.token = IdentityManager().tokens
+		self.token = self.identity_manager.tokens  # 使用同一个实例
+		# 初始化时设置默认请求头
+		self._initialize_default_headers()
+
+	def _initialize_default_headers(self) -> None:
+		"""初始化默认请求头"""
+		# 确保初始请求头正确设置
+		default_headers = setting.SettingManager().data.PROGRAM.HEADERS.copy()
+		self.update_headers(default_headers)
 
 	def switch_identity(self, identity: str, token: str) -> None:
-		"""切换身份并更新请求头"""
-		self.identity_manager.switch_identity(identity, token)
-		self.update_headers(self.identity_manager.get_identity_headers())
+		"""切换身份并更新请求头 - 修复版本"""
+		if not token or not token.strip():
+			print(f"警告:尝试为身份 '{identity}' 设置空令牌")
+			return
+		# 验证身份类型
+		valid_identities = ["average", "edu", "judgement", "blank"]
+		if identity not in valid_identities:
+			print(f"错误:无效的身份类型 '{identity}',有效身份:{valid_identities}")
+			return
+		try:
+			# 使用身份管理器切换身份
+			self.identity_manager.switch_identity(identity, token)
+			# 获取身份认证头并更新
+			identity_headers = self.identity_manager.get_identity_headers()
+			if identity_headers and identity_headers.get("Authorization"):
+				self.update_headers(identity_headers)
+				print(f"已切换到身份: {identity}")
+			else:
+				print(f"警告:身份 '{identity}' 的认证头为空")
+		except Exception as e:
+			print(f"切换身份失败: {e}")
 
 
 class CodeMaoWebSocketClient(IWebSocketClient):
