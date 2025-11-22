@@ -4,6 +4,7 @@ import json
 import shlex
 import threading
 import time
+import traceback
 import uuid
 from collections.abc import Callable
 from contextlib import suppress
@@ -52,7 +53,7 @@ CONNECTION_TIMEOUT = 30
 DATA_TIMEOUT = 30
 WAIT_TIMEOUT = 30
 MESSAGE_TYPE_LENGTH = 2
-WEBSOCKET_TRANSPORT_TYPE = 3  # 修复类型错误
+WEBSOCKET_TRANSPORT_TYPE = "websocket"  # 修复类型错误
 
 
 class CodemaoWorkEditor(Enum):
@@ -160,7 +161,8 @@ class KittenCloudVariable(KittenCloudData):
 
 	def set(self, value: CloudValueType) -> bool:
 		if not isinstance(value, (int, str)):
-			raise TypeError("云变量值必须是整数或字符串")
+			error_msg = "云变量值必须是整数或字符串"
+			raise TypeError(error_msg)
 		old_value = self.value
 		self.value = value
 		self.emit_change(cast("CloudValueType", old_value), value, "local")
@@ -199,9 +201,11 @@ class KittenCloudPrivateVariable(KittenCloudVariable):
 
 	def get_ranking_list(self, limit: int = DEFAULT_RANKING_LIMIT, order: int = -1) -> None:
 		if not isinstance(limit, int) or limit <= 0:
-			raise ValueError("限制数量必须是正整数")
+			error_msg = "限制数量必须是正整数"
+			raise ValueError(error_msg)
 		if order not in {1, -1}:
-			raise ValueError("排序顺序必须是1(正序)或-1(逆序)")
+			error_msg = "排序顺序必须是1(正序)或-1(逆序)"
+			raise ValueError(error_msg)
 		request_data = {"cvid": self.cvid, "limit": limit, "order_type": order}
 		self.connection.send_message(KittenCloudSendMessageType.GET_PRIVATE_VARIABLE_RANKING_LIST, request_data)
 
@@ -244,7 +248,8 @@ class KittenCloudList(KittenCloudData):
 
 	def push(self, item: CloudValueType) -> bool:
 		if not isinstance(item, (int, str)):
-			raise TypeError("列表元素必须是整数或字符串")
+			error_msg = "列表元素必须是整数或字符串"
+			raise TypeError(error_msg)
 		self.value.append(item)
 		self._emit_operation("push", item, len(self.value) - 1)
 		return True
@@ -258,7 +263,8 @@ class KittenCloudList(KittenCloudData):
 
 	def unshift(self, item: CloudValueType) -> bool:
 		if not isinstance(item, (int, str)):
-			raise TypeError("列表元素必须是整数或字符串")
+			error_msg = "列表元素必须是整数或字符串"
+			raise TypeError(error_msg)
 		self.value.insert(0, item)
 		self._emit_operation("unshift", item, 0)
 		return True
@@ -272,7 +278,8 @@ class KittenCloudList(KittenCloudData):
 
 	def insert(self, index: int, item: CloudValueType) -> bool:
 		if not isinstance(item, (int, str)):
-			raise TypeError("列表元素必须是整数或字符串")
+			error_msg = "列表元素必须是整数或字符串"
+			raise TypeError(error_msg)
 		if 0 <= index <= len(self.value):
 			self.value.insert(index, item)
 			self._emit_operation("insert", item, index)
@@ -288,7 +295,8 @@ class KittenCloudList(KittenCloudData):
 
 	def replace(self, index: int, item: CloudValueType) -> bool:
 		if not isinstance(item, (int, str)):
-			raise TypeError("列表元素必须是整数或字符串")
+			error_msg = "列表元素必须是整数或字符串"
+			raise TypeError(error_msg)
 		if 0 <= index < len(self.value):
 			old_item = self.value[index]
 			self.value[index] = item
@@ -298,7 +306,8 @@ class KittenCloudList(KittenCloudData):
 
 	def replace_last(self, item: CloudValueType) -> bool:
 		if not isinstance(item, (int, str)):
-			raise TypeError("列表元素必须是整数或字符串")
+			error_msg = "列表元素必须是整数或字符串"
+			raise TypeError(error_msg)
 		if self.value:
 			old_item = self.value[-1]
 			self.value[-1] = item
@@ -405,8 +414,8 @@ class KittenCloudFunction:
 			CodemaoWorkEditor.COCO: {"authorization_type": 1, "stag": 1},
 		}
 		params = base_params.get(self.editor, base_params[CodemaoWorkEditor.KITTEN])
-		params["EIO"] = WEBSOCKET_TRANSPORT_TYPE  # 修复类型错误
-		params["transport"] = "websocket"
+		params["EIO"] = "3"  # Engine.IO 版本
+		params["transport"] = WEBSOCKET_TRANSPORT_TYPE
 		params_str = "&".join([f"{k}={v}" for k, v in params.items()])
 		return f"wss://socketcv.codemao.cn:9096/cloudstorage/?session_id={self.work_id}&{params_str}"
 
@@ -421,15 +430,16 @@ class KittenCloudFunction:
 	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
 		if isinstance(message, bytes):
 			message = message.decode("utf-8")
+		message_str = str(message)  # 确保是字符串类型
 		# 处理ping-pong
-		if message == WEBSOCKET_PING_MESSAGE:
+		if message_str == WEBSOCKET_PING_MESSAGE:
 			if self.ws:
 				self.ws.send(WEBSOCKET_PONG_MESSAGE)
 			return
 		# 处理握手
-		if message.startswith(WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX):
+		if message_str.startswith(WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX):
 			try:
-				handshake_data = json.loads(message[1:])
+				handshake_data = json.loads(message_str[1:])
 				ping_interval = handshake_data.get("pingInterval", PING_INTERVAL_MS)
 				ping_timeout = handshake_data.get("pingTimeout", PING_TIMEOUT_MS)
 				print(f"握手成功,ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")
@@ -439,11 +449,11 @@ class KittenCloudFunction:
 					self.ws.send(WEBSOCKET_CONNECT_MESSAGE)
 					print("已发送连接请求")
 			except Exception as e:
-				error_msg = f"握手处理错误: {e}"
+				error_msg = f"{ERROR_HANDSHAKE_PROCESSING}: {e}"
 				print(error_msg)
 			return
 		# 处理连接确认
-		if message == WEBSOCKET_CONNECTED_MESSAGE:
+		if message_str == WEBSOCKET_CONNECTED_MESSAGE:
 			self.connected = True
 			print("连接确认收到")
 			self._emit_event("open")
@@ -453,8 +463,8 @@ class KittenCloudFunction:
 				threading.Timer(0.5, self._send_join_message).start()
 			return
 		# 处理事件消息
-		if message.startswith(WEBSOCKET_EVENT_MESSAGE_PREFIX):
-			data_str = message[MESSAGE_TYPE_LENGTH:]
+		if message_str.startswith(WEBSOCKET_EVENT_MESSAGE_PREFIX):
+			data_str = message_str[MESSAGE_TYPE_LENGTH:]
 			try:
 				data_list = json.loads(data_str)
 				if isinstance(data_list, list) and len(data_list) >= 2:
@@ -465,7 +475,7 @@ class KittenCloudFunction:
 						message_data = json.loads(message_data)
 					self._handle_cloud_message(message_type, message_data)
 			except json.JSONDecodeError as e:
-				error_msg = f"JSON解析错误: {e}, 数据: {data_str}"
+				error_msg = f"{ERROR_JSON_PARSE}: {e}, 数据: {data_str}"
 				print(error_msg)
 			return
 
@@ -534,10 +544,8 @@ class KittenCloudFunction:
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {data}")
 		except Exception as e:
-			error_msg = f"云消息处理错误: {e}"
+			error_msg = f"{ERROR_CLOUD_MESSAGE_PROCESSING}: {e}"
 			print(error_msg)
-			import traceback
-
 			traceback.print_exc()
 			self._emit_event("error", e)
 
@@ -868,6 +876,13 @@ class KittenCloudFunction:
 			return True
 		return False
 
+	def list_shift(self, name: str) -> bool:
+		cloud_list = self.get_list(name)
+		if cloud_list and cloud_list.shift() is not None:
+			self.send_message(KittenCloudSendMessageType.UPDATE_LIST, {cloud_list.cvid: [{"action": "delete", "nth": 1}]})
+			return True
+		return False
+
 	def list_insert(self, name: str, index: int, value: int | str) -> bool:
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.insert(index, value):
@@ -935,30 +950,34 @@ class KittenCloudFunction:
 class CloudCLI(cmd.Cmd):
 	"""云数据交互式命令行界面"""
 
-	def __init__(self, cloud):
+	def __init__(self, cloud: KittenCloudFunction) -> None:
 		super().__init__()
 		self.cloud = cloud
 		self.prompt = "云数据> "
 		self.intro = "欢迎使用云数据交互式命令行!输入 help 或 ? 查看可用命令。"
 
-	def preloop(self):
+	def preloop(self) -> None:
 		"""在循环开始前检查连接状态"""
 		if not self.cloud.connected:
 			print("警告:云连接未建立,请先等待连接成功")
 
-	def do_status(self, arg):
+	def do_status(self, arg: str) -> None:
 		"""查看连接状态和数据状态"""
 		print(f"连接状态: {'已连接' if self.cloud.connected else '未连接'}")
 		print(f"数据就绪: {'是' if self.cloud.data_ready else '否'}")
 		print(f"在线用户: {self.cloud.online_users}")
 
-	def do_list(self, arg):
+	def do_list(self, arg: str) -> None:
 		"""列出所有数据
 		用法: list [type]
 		type: private(私有变量) / public(公有变量) / lists(列表) / all(全部)"""
 		args = shlex.split(arg)
 		show_type = args[0] if args else "all"
-		if show_type in ["all", "private"]:
+		show_types = {"all", "private", "public", "lists"}
+		if show_type not in show_types:
+			print(f"错误:类型必须是 {', '.join(show_types)} 之一")
+			return
+		if show_type in {"all", "private"}:
 			print("\n=== 私有变量 ===")
 			private_vars = self.cloud.get_all_private_variables()
 			if private_vars:
@@ -966,7 +985,7 @@ class CloudCLI(cmd.Cmd):
 					print(f"  {name}: {var.get()}")
 			else:
 				print("  无私有变量")
-		if show_type in ["all", "public"]:
+		if show_type in {"all", "public"}:
 			print("\n=== 公有变量 ===")
 			public_vars = self.cloud.get_all_public_variables()
 			if public_vars:
@@ -974,7 +993,7 @@ class CloudCLI(cmd.Cmd):
 					print(f"  {name}: {var.get()}")
 			else:
 				print("  无公有变量")
-		if show_type in ["all", "lists"]:
+		if show_type in {"all", "lists"}:
 			print("\n=== 云列表 ===")
 			lists = self.cloud.get_all_lists()
 			if lists:
@@ -983,7 +1002,7 @@ class CloudCLI(cmd.Cmd):
 			else:
 				print("  无云列表")
 
-	def do_get(self, arg):
+	def do_get(self, arg: str) -> None:
 		"""获取特定变量的值
 		用法: get <变量名>"""
 		if not arg:
@@ -1007,7 +1026,7 @@ class CloudCLI(cmd.Cmd):
 			return
 		print(f"错误:未找到变量或列表 '{name}'")
 
-	def do_set_private(self, arg):
+	def do_set_private(self, arg: str) -> None:
 		"""设置私有变量的值
 		用法: set_private <变量名> <值>"""
 		args = shlex.split(arg)
@@ -1020,14 +1039,14 @@ class CloudCLI(cmd.Cmd):
 		try:
 			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 				value = int(value)
-		except:
-			pass
+		except Exception:
+			pass  # 保持为字符串
 		if self.cloud.set_private_variable(name, value):
 			print(f"成功设置私有变量 {name} = {value}")
 		else:
 			print(f"错误:设置私有变量失败,请检查变量名 '{name}'")
 
-	def do_set_public(self, arg):
+	def do_set_public(self, arg: str) -> None:
 		"""设置公有变量的值
 		用法: set_public <变量名> <值>"""
 		args = shlex.split(arg)
@@ -1040,25 +1059,26 @@ class CloudCLI(cmd.Cmd):
 		try:
 			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 				value = int(value)
-		except:
-			pass
+		except Exception:
+			pass  # 保持为字符串
 		if self.cloud.set_public_variable(name, value):
 			print(f"成功设置公有变量 {name} = {value}")
 		else:
 			print(f"错误:设置公有变量失败,请检查变量名 '{name}'")
 
-	def do_list_operations(self, arg):
+	def do_list_operations(self, arg: str) -> None:
 		"""云列表操作
 		用法:
-		  list_operations push <列表名> <值>      # 追加元素
-		  list_operations pop <列表名>            # 弹出最后一个元素
-		  list_operations unshift <列表名> <值>   # 在开头添加元素
-		  list_operations shift <列表名>          # 移除第一个元素
-		  list_operations insert <列表名> <位置> <值>  # 在指定位置插入
-		  list_operations remove <列表名> <位置>  # 移除指定位置元素
-		  list_operations replace <列表名> <位置> <值> # 替换指定位置元素
-		  list_operations clear <列表名>          # 清空列表
-		  list_operations get <列表名> <位置>     # 获取指定位置元素"""
+			list_operations push <列表名> <值>      # 追加元素
+			list_operations pop <列表名>            # 弹出最后一个元素
+			list_operations unshift <列表名> <值>   # 在开头添加元素
+			list_operations shift <列表名>          # 移除第一个元素
+			list_operations insert <列表名> <位置> <值>  # 在指定位置插入
+			list_operations remove <列表名> <位置>  # 移除指定位置元素
+			list_operations replace <列表名> <位置> <值> # 替换指定位置元素
+			list_operations clear <列表名>          # 清空列表
+			list_operations get <列表名> <位置>     # 获取指定位置元素
+		"""
 		args = shlex.split(arg)
 		if len(args) < 2:
 			print("错误:参数不足")
@@ -1078,8 +1098,8 @@ class CloudCLI(cmd.Cmd):
 			try:
 				if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 					value = int(value)
-			except:
-				pass
+			except Exception:
+				pass  # 保持为字符串
 			if self.cloud.list_push(list_name, value):
 				print(f"成功向列表 {list_name} 添加元素: {value}")
 			else:
@@ -1097,8 +1117,8 @@ class CloudCLI(cmd.Cmd):
 			try:
 				if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 					value = int(value)
-			except:
-				pass
+			except Exception:
+				pass  # 保持为字符串
 			if self.cloud.list_unshift(list_name, value):
 				print(f"成功在列表 {list_name} 开头添加元素: {value}")
 			else:
@@ -1118,8 +1138,8 @@ class CloudCLI(cmd.Cmd):
 				try:
 					if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 						value = int(value)
-				except:
-					pass
+				except Exception:
+					pass  # 保持为字符串
 				if self.cloud.list_insert(list_name, index, value):
 					print(f"成功在列表 {list_name} 的位置 {index} 插入元素: {value}")
 				else:
@@ -1148,8 +1168,8 @@ class CloudCLI(cmd.Cmd):
 				try:
 					if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 						value = int(value)
-				except:
-					pass
+				except Exception:
+					pass  # 保持为字符串
 				if self.cloud.list_replace(list_name, index, value):
 					print(f"成功替换列表 {list_name} 位置 {index} 的元素为: {value}")
 				else:
@@ -1178,26 +1198,26 @@ class CloudCLI(cmd.Cmd):
 			print(f"错误:未知操作 '{operation}'")
 			self.help_list_operations()
 
-	def help_list_operations(self):
+	def help_list_operations(self) -> None:
 		"""显示列表操作帮助"""
 		print("""
-列表操作命令:
-  list_operations push <列表名> <值>      - 向列表末尾添加元素
-  list_operations pop <列表名>            - 移除并返回列表最后一个元素
-  list_operations unshift <列表名> <值>   - 向列表开头添加元素
-  list_operations shift <列表名>          - 移除并返回列表第一个元素
-  list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
-  list_operations remove <列表名> <位置>  - 移除指定位置的元素
-  list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
-  list_operations clear <列表名>          - 清空列表所有元素
-  list_operations get <列表名> <位置>     - 获取指定位置的元素
-		""")
+	列表操作命令:
+	list_operations push <列表名> <值>      - 向列表末尾添加元素
+	list_operations pop <列表名>            - 移除并返回列表最后一个元素
+	list_operations unshift <列表名> <值>   - 向列表开头添加元素
+	list_operations shift <列表名>          - 移除并返回列表第一个元素
+	list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
+	list_operations remove <列表名> <位置>  - 移除指定位置的元素
+	list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
+	list_operations clear <列表名>          - 清空列表所有元素
+	list_operations get <列表名> <位置>     - 获取指定位置的元素
+			""")
 
-	def do_ranking(self, arg):
+	def do_ranking(self, arg: str) -> None:
 		"""获取私有变量的排行榜
 		用法: ranking <变量名> [数量] [排序]
-		  数量: 默认10,最大31
-		  排序: 1(升序) 或 -1(降序,默认)"""
+		数量: 默认10,最大31
+		排序: 1(升序) 或 -1(降序,默认)"""
 		args = shlex.split(arg)
 		if not args:
 			print("错误:请指定变量名")
@@ -1208,8 +1228,8 @@ class CloudCLI(cmd.Cmd):
 		if len(args) > 1:
 			try:
 				limit = int(args[1])
-				if limit <= 0 or limit > 31:
-					print("警告:数量范围1-31,使用默认值10")
+				if limit <= 0 or limit > DEFAULT_RANKING_LIMIT:
+					print(f"警告:数量范围1-{DEFAULT_RANKING_LIMIT},使用默认值10")
 					limit = 10
 			except ValueError:
 				print("错误:数量必须是数字")
@@ -1217,7 +1237,7 @@ class CloudCLI(cmd.Cmd):
 		if len(args) > 2:
 			try:
 				order = int(args[2])
-				if order not in [1, -1]:
+				if order not in {1, -1}:
 					print("错误:排序必须是1(升序)或-1(降序)")
 					return
 			except ValueError:
@@ -1230,25 +1250,25 @@ class CloudCLI(cmd.Cmd):
 		print(f"获取 {name} 的排行榜...")
 		self.cloud.get_private_variable_ranking(name, limit, order)
 
-	def do_refresh(self, arg):
+	def do_refresh(self, arg: str) -> None:
 		"""刷新显示所有数据"""
 		self.cloud.print_all_data()
 
-	def do_online(self, arg):
+	def do_online(self, arg: str) -> None:
 		"""查看在线用户数"""
 		print(f"当前在线用户: {self.cloud.online_users}")
 
-	def do_exit(self, arg):
+	def do_exit(self, arg: str) -> bool:
 		"""退出程序"""
 		print("正在关闭连接...")
 		self.cloud.close()
 		return True
 
-	def do_quit(self, arg):
+	def do_quit(self, arg: str) -> bool:
 		"""退出程序"""
 		return self.do_exit(arg)
 
-	def do_EOF(self, arg):
+	def do_EOF(self, arg: str) -> bool:  # type: ignore
 		"""Ctrl+D 退出"""
 		print()
 		return self.do_exit(arg)
