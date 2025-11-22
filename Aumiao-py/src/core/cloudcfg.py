@@ -459,6 +459,8 @@ class KittenCloudFunction:
 					message_type = data_list[0]
 					message_data = data_list[1]
 					print(f"处理云消息: {message_type}, 数据: {message_data}")
+					if isinstance(message_data, str):
+						message_data = json.loads(message_data)
 					self._handle_cloud_message(message_type, message_data)
 			except json.JSONDecodeError as e:
 				error_msg = f"JSON解析错误: {e}, 数据: {data_str}"
