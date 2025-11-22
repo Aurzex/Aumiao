@@ -1,0 +1,25 @@
+{
+  "data": {
+    "items": [
+      {
+        "icon_url": "https://static.codemao.cn/forum/%E6%96%B0%E6%89%8B%E5%BF%85%E7%9C%8B1.png",
+        "id": "1",
+        "is_published": true,
+        "target": "10278",
+        "target_type": "POSTS",
+        "title": "新手必读"
+      },
+      {
+        "icon_url": "https://static.codemao.cn/forum/%E5%B0%91%E9%99%A2%E5%A3%AB1.png",
+        "id": "2",
+        "is_published": true,
+        "target": "10284",
+        "target_type": "POSTS",
+        "title": "少院士讲堂"
+      }
+    ]
+  },
+  "method": "GET",
+  "status_code": 200,
+  "url": "https://api-whale.codemao.cn/admins/app/topics/all"
+}

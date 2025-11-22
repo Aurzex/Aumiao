@@ -1,0 +1,413 @@
+## 消息类型实现详情
+
+### 评论相关消息类型
+
+#### 作品评论 (WORK)
+**WORK_COMMENT**
+- 实现方法：render_work(t, s, "title_comment")
+- 显示文本：[用户名]评论了你的作品[作品名称]
+- 跳转链接：/work/[business_id]
+
+**WORK_REPLY**
+- 实现方法：render_work(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在作品[作品名称]下的评论
+- 跳转链接：/work/[business_id]
+
+**WORK_REPLY_REPLY**
+- 实现方法：render_work(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在作品[作品名称]下的评论
+- 跳转链接：/work/[business_id]
+
+**WORK_REPLY_REPLY_FEEDBACK**
+- 实现方法：render_work(t, s, "title_reply", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你在作品[作品名称]下的评论
+- 跳转链接：/work/[business_id]
+
+**WORK_REPLY_AUTHOR**
+- 实现方法：render_work(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的作品[作品名称]
+- 跳转链接：/work/[business_id]
+
+**WORK_REPLY_REPLY_AUTHOR**
+- 实现方法：render_work(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的作品[作品名称]
+- 跳转链接：/work/[business_id]
+
+#### 帖子评论 (POST)
+**POST_COMMENT**
+- 实现方法：render_reply(t, s, "title_normal", "reply_normal")
+- 显示文本：[用户名]回复了你的帖子[帖子名称]
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+**POST_REPLY**
+- 实现方法：render_reply(t, s, "title_comment", "reply", "feedback")
+- 显示文本：[用户名]评论了你在帖子[帖子名称]下的回帖
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+**POST_REPLY_REPLY**
+- 实现方法：render_reply(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在帖子[帖子名称]下的评论
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+**POST_REPLY_REPLY_FEEDBACK**
+- 实现方法：render_reply(t, s, "title_normal", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你的帖子[帖子名称]
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+**POST_REPLY_AUTHOR**
+- 实现方法：render_reply(t, s, "title_normal", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你的帖子[帖子名称]
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+**POST_REPLY_REPLY_AUTHOR**
+- 实现方法：render_reply(t, s, "title_reply", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你在帖子[帖子名称]下的评论
+- 跳转链接：[whitepaw]/wiki/forum/[business_id]
+
+#### 专题评论 (WORK_SUBJECT)
+**WORK_SUBJECT_COMMENT**
+- 实现方法：render_work_subject(t, s, "title_comment")
+- 显示文本：[用户名]评论了你的专题[专题名称]
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_REPLY**
+- 实现方法：render_work_subject(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在专题[专题名称]下的评论
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_REPLY_REPLY**
+- 实现方法：render_work_subject(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在专题[专题名称]下的评论
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_REPLY_REPLY_FEEDBACK**
+- 实现方法：render_work_subject(t, s, "title_reply", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你在专题[专题名称]下的评论
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_REPLY_AUTHOR**
+- 实现方法：render_work_subject(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的专题[专题名称]
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_REPLY_REPLY_AUTHOR**
+- 实现方法：render_work_subject(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的专题[专题名称]
+- 跳转链接：/gallery/[business_id]
+
+#### 工作室评论 (WORK_SHOP)
+**WORK_SHOP_COMMENT**
+- 实现方法：render_work_shop(t, s, "title_comment")
+- 显示文本：[用户名]评论了你的工作室[工作室名称]
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_REPLY**
+- 实现方法：render_work_shop(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在工作室[工作室名称]下的评论
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_REPLY_REPLY**
+- 实现方法：render_work_shop(t, s, "title_reply", "reply", "feedback")
+- 显示文本：[用户名]回复了你在工作室[工作室名称]下的评论
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_REPLY_REPLY_FEEDBACK**
+- 实现方法：render_work_shop(t, s, "title_reply", "reply_author", "feedback")
+- 显示文本：[用户名]回复了你在工作室[工作室名称]下的评论
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_REPLY_AUTHOR**
+- 实现方法：render_work_shop(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的工作室[工作室名称]
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_REPLY_REPLY_AUTHOR**
+- 实现方法：render_work_shop(t, s, "title_comment", "reply_author")
+- 显示文本：[用户名]评论了你的工作室[工作室名称]
+- 跳转链接：/work_shop/[business_id]
+
+### 违规处理消息类型
+
+#### 作品违规
+**WORK_CANCEL**
+- 显示文本：你的作品[work_name]违反了社区规定，已取消发布...
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_CANCEL_FEEDBACK**
+- 显示文本：经核实，你举报的作品[business_name]存在违规情况...
+
+**WORK_DELETE**
+- 显示文本：你的作品[business_name]严重违反社区规定，已删除...
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_DELETE_FEEDBACK**
+- 显示文本：经核实，你举报的作品[business_name]存在违规情况...
+
+#### 评论违规
+**WORK_COMMENT_DELETE**
+- 显示文本：你在作品[business_name]下的评论"[comment_content]"被举报"[reason_name]"...
+- 跳转链接：/work/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_COMMENT_DELETE_FEEDBACK**
+- 显示文本：经核实，你在作品[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...
+- 跳转链接：/work/[business_id]
+
+**WORK_COMMENT_DELETE_WITH_RESULT**
+- 显示文本：你在作品[business_name]下的评论"[comment_content]"被举报"[reason_name]"...处以【[result_name]】处罚
+- 跳转链接：/work/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_COMMENT_DELETE_FEEDBACK_WITH_RESULT**
+- 显示文本：经核实，你在作品[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...处以【[result_name]】处罚
+- 跳转链接：/work/[business_id]
+
+**WORK_SUBJECT_COMMENT_DELETE**
+- 显示文本：你在专题[business_name]下的评论"[comment_content]"被举报"[reason_name]"...
+- 跳转链接：/gallery/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_SUBJECT_COMMENT_DELETE_FEEDBACK**
+- 显示文本：经核实，你在专题[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...
+- 跳转链接：/gallery/[business_id]
+
+**WORK_SUBJECT_COMMENT_DELETE_WITH_RESULT**
+- 显示文本：你在专题[business_name]下的评论"[comment_content]"被举报"[reason_name]"...处以【[result_name]】处罚
+- 跳转链接：/gallery/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_SUBJECT_COMMENT_DELETE_FEEDBACK_WITH_RESULT**
+- 显示文本：经核实，你在专题[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...处以【[result_name]】处罚
+- 跳转链接：/gallery/[business_id]
+
+#### 帖子违规
+**POST_COMMENT_DELETE_FEEDBACK**
+- 显示文本：经核实，你在帖子[business_name]下举报的回复"[comment_content]"存在"[reason_name]"的情况...
+- 跳转链接：/community/[business_id]
+
+**POST_COMMENT_DELETE_FEEDBACK_WITH_RESULT**
+- 显示文本：经核实，你在帖子[business_name]下举报的回复"[comment_content]"存在"[reason_name]"的情况...处以【[result_name]】处罚
+- 跳转链接：/community/[business_id]
+
+**POST_DELETE_FEEDBACK**
+- 显示文本：经核实，你举报的帖子[business_name]存在"[reason_name]"的情况...
+
+**POST_DELETE_FEEDBACK_WITH_RESULT**
+- 显示文本：经核实，你举报的帖子[business_name]存在"[reason_name]"的情况...处以【[result_name]】处罚
+
+**POST_DELETE**
+- 显示文本：你的帖子[business_name]被举报"[reason_name]"...
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**POST_DELETE_WITH_RESULT**
+- 显示文本：你的帖子[business_name]被举报"[reason_name]"...处以【[result_name]】处罚
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**POST_COMMENT_DELETE**
+- 显示文本：你的帖子[business_name]下的回复"[comment_content]"被举报"[reason_name]"...
+- 跳转链接：/community/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**POST_COMMENT_DELETE_WITH_RESULT**
+- 显示文本：你的帖子[business_name]下的回复"[comment_content]"被举报"[reason_name]"...处以【[result_name]】处罚
+- 跳转链接：/community/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_SHOP_COMMENT_DELETE**
+- 显示文本：你在工作室[business_name]下的评论"[comment_content]"被举报"[reason_name]"...
+- 跳转链接：/work_shop/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_SHOP_COMMENT_DELETE_FEEDBACK**
+- 显示文本：经核实，你在工作室[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...
+- 跳转链接：/work_shop/[business_id]
+
+**WORK_SHOP_COMMENT_DELETE_WITH_RESULT**
+- 显示文本：你在工作室[business_name]下的评论"[comment_content]"被举报"[reason_name]"...处以【[result_name]】处罚
+- 跳转链接：/work_shop/[business_id]
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+**WORK_SHOP_COMMENT_DELETE_FEEDBACK_WITH_RESULT**
+- 显示文本：经核实，你在专题[business_name]下举报的评论"[comment_content]"存在"[reason_name]"的情况...处以【[result_name]】处罚
+- 跳转链接：/work_shop/[business_id]
+
+### 收录和推荐消息类型
+
+#### 作品收录
+**WORK_SUBJECT_INCLUDED**
+- 显示文本：恭喜！你的作品[work_name]已被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 专题：/gallery/[work_subject_id]
+
+**WORK_SUBJECT_RECOMMEND**
+- 特殊处理：当work_subject_id为393时调用get_certifacate_by_393
+- 显示文本：恭喜！你的作品[work_name]被[presenter.nickname]推荐，已被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 专题：/gallery/[work_subject_id]
+  - 推荐人：[whitepaw]/user/[presenter.id]
+
+**WORK_SUBJECT_ACCEPTED**
+- 显示文本：恭喜！你推荐的作品[work_name]已通过审核，被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 专题：/gallery/[work_subject_id]
+
+**WORK_SUBJECT_UNACCEPTED**
+- 显示文本：很遗憾！你推荐的作品[work_name]未能通过审核。未通过原因：[audit_reason]
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：雷电猴QQ 2530173083
+
+#### 工作室相关
+**STUDIO_WORK_INCLUDED**
+- 显示文本：恭喜！你的作品[work_name]已被收录到[work_studio_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作室：/studio/[work_studio_id]
+
+**STUDIO_WORK_RECOMMEND**
+- 显示文本：恭喜！你的作品[work_name]被[presenter.nickname]推荐，已被收录到[work_studio_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作室：/studio/[work_studio_id]
+  - 推荐人：[whitepaw]/user/[presenter.id]
+
+**STUDIO_WORK_ACCEPTED**
+- 显示文本：恭喜！你投稿的作品[work_name]已通过审核，被收录到[work_studio_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作室：/studio/[work_studio_id]
+
+**STUDIO_WORK_UNACCEPTED**
+- 显示文本：很遗憾！你投稿的作品[work_name]未能通过审核。未通过原因：[audit_reason]
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 反馈链接：https://www.codemao.cn/wiki/forum/162686
+
+#### 首页推荐
+**WORK_LABEL_NEW_WORK**
+- 显示文本：恭喜你！你的作品上首页啦~ [用户昵称]恭喜你，你的作品上首页啦...
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：阿尔法QQ3285488411，官方QQ群：713072438
+
+**WORK_LABEL_HOT_WORK**
+- 显示文本：恭喜你！你的作品晋升啦~ [用户昵称]恭喜你，你的作品晋升啦...
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：阿尔法QQ：3285488411
+
+**WORK_LABEL_CHOICE_WORK**
+- 显示文本：恭喜你！你的入选【点猫精选】啦~ [用户昵称]恭喜你，你的作品[work_name]入选【点猫精选】啦...
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：阿尔法QQ：3285488411
+
+**CHANNEL_REMOVE_WORK**
+- 显示文本：想要你的作品获得更多的点赞吗？[用户昵称]很多小伙伴体验你的作品[work_name]并给你点赞...
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：阿尔法QQ3285488411
+
+#### 工作坊相关
+**WORK_SHOP_INCLUDED**
+- 显示文本：恭喜！你的作品[work_name]已被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作坊：/work_shop/[work_subject_id]
+
+**WORK_SHOP_RECOMMEND**
+- 显示文本：恭喜！你的作品[work_name]被[presenter.nickname]推荐，已被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作坊：/work_shop/[work_subject_id]
+  - 推荐人：[whitepaw]/user/[presenter.id]
+
+**WORK_SHOP_ACCEPTED**
+- 显示文本：恭喜！你推荐的作品[work_name]已通过审核，被收录到[work_subject_name]
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 工作坊：/work_shop/[work_subject_id]
+
+**WORK_SHOP_UNACCEPTED**
+- 显示文本：很遗憾！你推荐的作品[work_name]未能通过审核。未通过原因：[audit_reason]
+- 跳转链接：Object(p.D)(work_type, work_id)
+- 联系方式：雷电猴QQ 2530173083
+
+### 社交互动消息类型
+
+#### 点赞相关
+**WORK_LIKE**
+- 实现方法：render_like_work(t, s)
+- 显示文本：[用户名]赞了你的作品[作品名称]
+- 跳转链接：/work/[business_id]
+
+**WORK_FORK**
+- 实现方法：render_like_work(t, s)
+- 显示文本：[用户名]购买了你的作品[作品名称]
+- 跳转链接：/work/[business_id]
+
+**WORK_DISCUSSION_LIKED**
+- 实现方法：render_like_work_comment(t, s)
+- 显示文本：[用户名]赞了你在作品[作品名称]下的评论
+- 跳转链接：[whitepaw]/work/[business_id]
+
+**POST_DISCUSSION_LIKED**
+- 实现方法：render_like_forum_comment(t, s)
+- 显示文本：[用户名]赞了你在帖子[帖子名称]下的回复
+- 跳转链接：[whitepaw]/community/[business_id]
+
+**WORK_SUBJECT_DISCUSSION_LIKED**
+- 实现方法：render_like_gallery_comment(t, s)
+- 显示文本：[用户名]赞了你在作品专题[专题名称]下的评论
+- 跳转链接：[whitepaw]/community/[business_id]
+
+**WORK_SHOP_DISCUSSION_LIKED**
+- 实现方法：render_like_work_shop_comment(t, s)
+- 显示文本：[用户名]赞了你在工作室[工作室名称]下的评论
+- 跳转链接：[whitepaw]/community/[business_id]
+
+#### 工作室成员管理
+**WORK_SHOP_APPLY_ACCEPTED**
+- 显示文本：恭喜你，通过[work_subject_name]工作室的审核...
+- 跳转链接：/work_shop/[reference_id]
+
+**WORK_SHOP_APPLY_UNACCEPTED**
+- 显示文本：很遗憾，你的[work_subject_name]工作室申请未通过...
+- 跳转链接：/work_shop/[reference_id]
+
+**WORK_SHOP_USER_LEAVE**
+- 显示文本：[leaver.nickname]已退出[work_subject_name]工作室
+- 跳转链接：
+  - 用户：/user/[leaver.leaver_id]
+  - 工作室：/work_shop/[reference_id]
+
+**WORK_SHOP_DISSOLVE**
+- 显示文本：很遗憾[work_subject_name]工作室已被室长解散...
+- 跳转链接：/work_shop/[reference_id]
+
+**WORK_SHOP_USER_REMOVE**
+- 显示文本：很遗憾，你已被[work_subject_name]工作室删除...
+- 跳转链接：/work_shop/[reference_id]
+
+**WORK_SHOP_PROMOTE_DEPUTY_LEADER**
+- 显示文本：恭喜你，你已被选为[work_subject_name]工作室副室长...
+- 跳转链接：/work_shop/[reference_id]
+
+### 系统消息类型
+**USER_TYPE_NEW_TO_OLD**
+- 显示方式：dangerouslySetInnerHTML显示content内容
+
+**BROADCAST**
+- 显示方式：dangerouslySetInnerHTML显示content内容
+
+### 特殊处理方法
+**get_certifacate_by_393**
+- 触发条件：WORK_SUBJECT_RECOMMEND且work_subject_id为393
+- 显示文本：恭喜！你的作品[work_name]已被收录到[work_subject_name]...快去领取证书【链接】
+- 跳转链接：
+  - 作品：Object(p.D)(work_type, work_id)
+  - 证书：https://mobile.codemao.cn/certificate_reward?cert_id=2&id=[receiver_id]
+
+**replace_content方法**
+- 功能：替换评论内容中的HTML标签
+- 处理规则：
+  - 图片标签替换为"[图片]"
+  - iframe标签替换为"[作品]"
+  - 其他HTML标签移除

@@ -1,0 +1,41 @@
+{
+  "data": {
+    "items": [
+      {
+        "created_at": 1543393437,
+        "id": "1",
+        "preview_url": "https://static.codemao.cn/kitten/sample_projects/subjects/%E4%B8%93%E9%A2%98%E5%B0%81%E9%9D%A2-2017.png",
+        "sample_joined_at": 1543394567,
+        "title": "{ \"zh\": \"2017年，编程猫走过的岁月\", \"tw\": \"2017年，編程貓走過的歲月\", \"en\": \"Codemao in 2017\" }",
+        "updated_at": 1543394567
+      },
+      {
+        "created_at": 1543393463,
+        "id": "2",
+        "preview_url": "https://static.codemao.cn/kitten/sample_projects/subjects/%E4%B8%93%E9%A2%98%E5%B0%81%E9%9D%A2-2018.png",
+        "sample_joined_at": 1545044322,
+        "title": "{ \"zh\": \"2018年，编程猫走过的岁月\", \"tw\": \"2018年，編程貓走過的歲月\", \"en\": \"Codemao in 2018\" }",
+        "updated_at": 1545044322
+      },
+      {
+        "created_at": 1548154925,
+        "id": "3",
+        "preview_url": "https://static.codemao.cn/kitten/sample_projects/subjects/%E4%B8%93%E9%A2%98%E5%B0%81%E9%9D%A2-2019.png",
+        "sample_joined_at": 1551236145,
+        "title": "{ \"zh\": \"2019年，编程猫走过的岁月\", \"tw\": \"2019年，編程貓走過的歲月\", \"en\": \"Codemao in 2019\" }",
+        "updated_at": 1551236145
+      },
+      {
+        "created_at": 1731571635,
+        "id": "4",
+        "preview_url": "https://static.codemao.cn/kitten/sample_projects/subjects/专题封面-ai.png",
+        "sample_joined_at": 1731571635,
+        "title": "{\"zh\":\"同上一堂课·编创人工智能\",\"tw\":\"同上一堂課·編創人工智能\",\"en\":\"Learn about AI and graphical coding\"}",
+        "updated_at": 1731571635
+      }
+    ]
+  },
+  "method": "GET",
+  "status_code": 200,
+  "url": "https://api-whale.codemao.cn/admin/samples/subject"
+}

@@ -3,9 +3,9 @@ import platform
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
-from typing import Literal, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 from src import user, whale
 from src.api import community
@@ -17,15 +17,46 @@ from src.core.services import FileUploader, MillenniumEntanglement, Motion, Repo
 from src.utils import data, plugin, tool
 
 # 常量定义
-MAX_MENU_KEY_LENGTH = 2
 T = TypeVar("T")
 AUI = "jkslnlkqrljojqlkrlkqqljpjqrkqs"  # cSpell:ignore jkslnlkqrljojqlkrlkqqljpjqrkqs
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-	filename="app.log",
-	level=logging.ERROR,
-	format="%(asctime)s - %(levelname)s - %(message)s",  # cSpell:ignore levelname
-)
+
+
+@dataclass
+class AppConfig:
+	"""应用配置类"""
+
+	MAX_MENU_KEY_LENGTH: int = 2
+	LOG_LEVEL: str = "ERROR"
+	LOG_FORMAT: str = "%(asctime)s - %(levelname)s - %(message)s"  # cSpell:ignore levelname
+	LOG_FILE: str = "app.log"
+	# 菜单相关常量
+	MENU_ITEMS: dict[str, tuple[str, bool, bool]] = None  # type: ignore  # noqa: PGH003
+
+	def __post_init__(self) -> None:
+		"""初始化菜单配置"""
+		# 菜单配置: (名称, 需要登录, 是否可见)
+		self.MENU_ITEMS = {
+			"01": ("用户登录", False, True),
+			"02": ("账户登出", True, True),
+			"03": ("状态查询", True, True),
+			"04": ("清除评论", True, True),
+			"05": ("清除红点", True, True),
+			"06": ("自动回复", True, True),
+			"07": ("处理举报", True, True),
+			"08": ("下载小说", False, True),
+			"09": ("上传文件", True, True),
+			"10": ("上传历史", False, True),
+			"11": ("编译作品", False, True),
+			"12": ("生成口令", True, True),
+			"13": ("插件管理", False, True),
+			"14": ("助手对话", True, True),
+			"00": ("退出系统", False, True),
+			"1106": ("隐藏功能", True, False),
+		}
+
+
+config = AppConfig()
 printer = tool.Printer()
 
 
@@ -34,15 +65,31 @@ class MenuOption:
 	"""菜单选项类"""
 
 	name: str
-	handler: Callable[[], None]  # 更精确的类型注解
+	handler: Callable[[], None]
 	require_auth: bool = False
-	visible: bool = True  # 控制是否显示在菜单中
+	visible: bool = True
+
+
+def setup_logging() -> None:
+	"""配置日志系统 - 优化配置"""
+	logging.basicConfig(
+		filename=config.LOG_FILE,
+		level=getattr(logging, config.LOG_LEVEL),
+		format=config.LOG_FORMAT,
+		encoding="utf-8",
+	)
+	# 可选:添加控制台日志输出
+	console_handler = logging.StreamHandler()
+	console_handler.setLevel(logging.ERROR)
+	formatter = logging.Formatter(config.LOG_FORMAT)
+	console_handler.setFormatter(formatter)
+	logger = logging.getLogger()
+	logger.addHandler(console_handler)
 
 
 def enable_vt_mode() -> None:
 	"""启用Windows虚拟终端模式"""
 	if platform.system() == "Windows":
-		# 基于系统, 判断是否需要引入ctypes库
 		from ctypes import windll  # noqa: PLC0415
 
 		try:
@@ -53,43 +100,61 @@ def enable_vt_mode() -> None:
 			print(printer.color_text("警告: 无法启用虚拟终端模式,颜色显示可能不正常", "ERROR"))
 
 
-def handle_errors(func: Callable) -> Callable:
-	"""统一错误处理装饰器"""
+def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
+	"""统一错误处理装饰器 - 性能优化"""
 
-	def wrapper(*args: ..., **kwargs: ...) -> object | None:
+	@wraps(func)
+	def wrapper(*args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
 		try:
 			return func(*args, **kwargs)
 		except ValueError as ve:
 			print(printer.color_text(f"输入错误: {ve}", "ERROR"))
 		except Exception as e:
-			logger.exception(f"{func.__name__} 执行失败")  # noqa: G004
+			logger.exception("%s 执行失败", func.__name__)
 			print(printer.color_text(f"操作失败: {e}", "ERROR"))
 
 	return wrapper
 
 
 class AccountDataManager:
-	"""账户数据管理类"""
+	"""账户数据管理类 - 性能优化"""
 
 	def __init__(self) -> None:
-		self.account_data: dict[str, dict] = {}
-		self.token: str = ""
-		self.is_logged_in = False
+		self._account_data: dict[str, dict] = {}
+		self._token: str = ""
+		self._is_logged_in = False
+
+	@property
+	def account_data(self) -> dict[str, dict]:
+		return self._account_data
+
+	@property
+	def token(self) -> str:
+		return self._token
+
+	@token.setter
+	def token(self, value: str) -> None:
+		self._token = value
+
+	@property
+	def is_logged_in(self) -> bool:
+		return self._is_logged_in
 
 	def update(self, data: dict[str, dict]) -> None:
-		"""更新账户数据"""
-		self.account_data = data
-		self.is_logged_in = True
+		"""更新账户数据 - 避免不必要的数据复制"""
+		self._account_data = data
+		self._is_logged_in = True
 
 	def clear(self) -> None:
-		"""清除账户数据"""
-		self.account_data = {}
-		self.token: str = ""
-		self.is_logged_in = False
+		"""清除账户数据 - 快速清空"""
+		self._account_data.clear()
+		self._token = ""
+		self._is_logged_in = False
 
 	def get_account_id(self) -> str | None:
-		"""获取账户ID"""
-		return self.account_data.get("ACCOUNT_DATA", {}).get("id")
+		"""获取账户ID - 优化字典访问"""
+		account_data = self._account_data.get("ACCOUNT_DATA", {})
+		return account_data.get("id")
 
 
 def print_account_info(account_data: dict) -> None:
@@ -124,26 +189,36 @@ def login(account_data_manager: AccountDataManager) -> None:
 	print_account_info(account_data)
 
 
-# 修复装饰器类型标注,移除Any类型
-def require_login(func: Callable[[AccountDataManager], None]) -> Callable[[AccountDataManager], None]:
+def require_login(func: Callable[..., Any]) -> Callable[..., Any]:
 	"""登录检查装饰器"""
 
-	def wrapper(account_data_manager: AccountDataManager) -> None:
+	@wraps(func)
+	def wrapper(account_data_manager: AccountDataManager, *args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
 		if not account_data_manager.is_logged_in:
 			print(printer.color_text("请先登录!", "ERROR"))
 			return None
-		return func(account_data_manager)
+		return func(account_data_manager, *args, **kwargs)
 
 	return wrapper
 
 
+def get_positive_int_input(prompt: str, max_value: int | None = None) -> int:
+	"""获取正整数输入 - 复用现有的 get_valid_input"""
+	return printer.get_valid_input(prompt=prompt, cast_type=int, validator=lambda x: x > 0 and (max_value is None or x <= max_value))
+
+
+def get_enum_input(prompt: str, valid_options: set[str]) -> str:
+	"""获取枚举值输入 - 复用现有的 get_valid_input"""
+	return printer.get_valid_input(prompt, valid_options=valid_options)
+
+
 @handle_errors
 @require_login
-def clear_comments(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
-	"""清除评论"""
+def clear_comments(_account_data_manager: AccountDataManager) -> None:
+	"""清除评论 - 优化验证逻辑"""
 	printer.print_header("清除评论")
-	source = printer.get_valid_input("请输入来源类型 (work/post)", {"work", "post"})
-	action_type = printer.get_valid_input("请输入操作类型 (ads/duplicates/blacklist)", {"ads", "duplicates", "blacklist"})
+	source = get_enum_input("请输入来源类型", {"work", "post"})
+	action_type = get_enum_input("请输入操作类型", {"ads", "duplicates", "blacklist"})
 	source = cast("Literal['work', 'post']", source)
 	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
 	Motion().clear_comments(source=source, action_type=action_type)
@@ -152,10 +227,10 @@ def clear_comments(account_data_manager: AccountDataManager) -> None:  # noqa: A
 
 @handle_errors
 @require_login
-def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 	"""清除红点提醒"""
 	printer.print_header("清除红点提醒")
-	method = printer.get_valid_input("请输入方法 (nemo/web)", {"nemo", "web"})
+	method = get_enum_input("请输入方法", {"nemo", "web"})
 	method = cast("Literal['nemo', 'web']", method)
 	Motion().clear_red_point(method=method)
 	print(printer.color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
@@ -163,7 +238,7 @@ def clear_red_point(account_data_manager: AccountDataManager) -> None:  # noqa: 
 
 @handle_errors
 @require_login
-def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def reply_work(_account_data_manager: AccountDataManager) -> None:
 	"""自动回复作品"""
 	printer.print_header("自动回复")
 	Motion().execute_auto_reply_work()
@@ -171,7 +246,7 @@ def reply_work(account_data_manager: AccountDataManager) -> None:  # noqa: ARG00
 
 
 @handle_errors
-def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def handle_report(_account_data_manager: AccountDataManager) -> None:
 	"""处理举报"""
 	printer.print_header("处理举报")
 	ReportAuthManager().execute_admin_login()
@@ -184,7 +259,7 @@ def handle_report(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 
 @handle_errors
 @require_login
-def check_account_status(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def check_account_status(_account_data_manager: AccountDataManager) -> None:
 	"""检查账户状态"""
 	printer.print_header("账户状态查询")
 	status = Motion().get_account_status()
@@ -192,34 +267,26 @@ def check_account_status(account_data_manager: AccountDataManager) -> None:  # n
 
 
 @handle_errors
-def download_fiction(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def download_fiction(_account_data_manager: AccountDataManager) -> None:
 	"""下载小说"""
 	printer.print_header("下载小说")
-	fiction_id = printer.get_valid_input(
-		"请输入小说ID",
-		cast_type=int,
-		validator=lambda x: x > 0,  # 确保ID为正数
-	)
+	fiction_id = get_positive_int_input("请输入小说ID")
 	Motion().execute_download_fiction(fiction_id=fiction_id)
 	print(printer.color_text("小说下载完成", "SUCCESS"))
 
 
 @handle_errors
 @require_login
-def generate_nemo_code(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def generate_nemo_code(_account_data_manager: AccountDataManager) -> None:
 	"""生成喵口令"""
 	printer.print_header("生成喵口令")
-	work_id = printer.get_valid_input(
-		"请输入作品编号",
-		cast_type=int,
-		validator=lambda x: x > 0,  # 确保ID为正数
-	)
+	work_id = get_positive_int_input("请输入作品编号")
 	Motion().generate_nemo_code(work_id=work_id)
 	print(printer.color_text("生成完成", "SUCCESS"))
 
 
 @handle_errors
-def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def print_history(_account_data_manager: AccountDataManager) -> None:
 	"""上传历史"""
 	printer.print_header("上传历史")
 	FileProcessor().print_upload_history()
@@ -228,21 +295,21 @@ def print_history(account_data_manager: AccountDataManager) -> None:  # noqa: AR
 
 @handle_errors
 @require_login
-def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def upload_files(_account_data_manager: AccountDataManager) -> None:
 	"""上传文件"""
 	printer.print_header("上传文件")
 	print(printer.color_text("上传方法说明: \n", "INFO"))
 	print(printer.color_text("编程猫于10月22日对对象存储进行限制", "INFO"))
-	print(printer.color_text("关闭了文件上传接口, 并更换域名*.codemao.cn -> *.bcmcdn.com", "INFO"))
+	print(printer.color_text("关闭了文件上传接口, 并更换域名*.codemao.cn -> *.bcmcdn.com", "INFO"))  # cSpell:ignore bcmcdn
 	print(printer.color_text("因此现在只能使用codemao选项, 然而保着收集api的原则, 过时的api不会删除, 只标记为弃用\n", "INFO"))
 	print(printer.color_text("- codemao: 上传到bcmcdn域名", "PROMPT"))  # cSpell:ignore bcmcdn
 	print(printer.color_text("- codegame: 上传到static域名", "COMMENT"))
 	print(printer.color_text("- pgaot: 上传到static域名", "COMMENT"))
-	method = printer.get_valid_input("请输入方法 (pgaot/codemao/codegame)", {"pgaot", "codemao", "codegame"})
+	method = get_enum_input("请输入方法", {"pgaot", "codemao", "codegame"})
 	file_path_str = printer.prompt_input("请输入文件或文件夹路径")
 	file_path = Path(file_path_str.strip())
 	if file_path.exists():
-		file_path = file_path.resolve()  # 解析为绝对路径
+		file_path = file_path.resolve()
 		print(printer.color_text(f"使用路径: {file_path}", "COMMENT"))
 	else:
 		print(printer.color_text("文件或路径不存在", "ERROR"))
@@ -258,7 +325,7 @@ def upload_files(account_data_manager: AccountDataManager) -> None:  # noqa: ARG
 def logout(account_data_manager: AccountDataManager) -> None:
 	"""用户登出"""
 	printer.print_header("账户登出")
-	method = printer.get_valid_input("请输入方法 (web)", {"web"})
+	method = get_enum_input("请输入方法", {"web"})
 	method = cast("Literal['web']", method)
 	community.AuthManager().execute_logout(method)
 	account_data_manager.clear()
@@ -266,7 +333,8 @@ def logout(account_data_manager: AccountDataManager) -> None:
 
 
 @handle_errors
-def plugin_manager(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def plugin_manager(_account_data_manager: AccountDataManager) -> None:
+	"""插件管理"""
 	printer.print_header("插件管理")
 	plugin_manager = plugin.LazyPluginManager(data.PLUGIN_PATH)
 	console = plugin.PluginConsole(plugin_manager)
@@ -274,9 +342,10 @@ def plugin_manager(account_data_manager: AccountDataManager) -> None:  # noqa: A
 
 
 @handle_errors
-def decompile_works(account_data_manager: AccountDataManager) -> None:  # noqa: ARG001
+def decompile_works(_account_data_manager: AccountDataManager) -> None:
+	"""编译作品"""
 	printer.print_header("编译作品")
-	work_id = printer.get_valid_input("请输入作品ID", cast_type=int, validator=lambda x: x > 0)
+	work_id = get_positive_int_input("请输入作品ID")
 	output_path = decompile_work(work_id)
 	print(printer.color_text(f"✓ 反编译完成: {output_path}", "SUCCESS"))
 
@@ -284,6 +353,7 @@ def decompile_works(account_data_manager: AccountDataManager) -> None:  # noqa: 
 @handle_errors
 @require_login
 def interactive_chat(account_data_manager: AccountDataManager) -> None:
+	"""AI聊天"""
 	printer.print_header("AI聊天")
 	token = account_data_manager.token
 	CodeMaoTool().interactive_chat(token)
@@ -293,29 +363,24 @@ def interactive_chat(account_data_manager: AccountDataManager) -> None:
 @require_login
 def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能.仅管理员可访问"""
-	# if account_data_manager.get_account_id() not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
-	# 	return
-	if printer.prompt_input("") not in tool.Encrypt().decrypt(AUI):  # pyright: ignore[reportOperatorIssue]
+	encrypted_result = tool.Encrypt().decrypt(AUI)
+	decrypted_str = "".join(str(item) for item in encrypted_result) if isinstance(encrypted_result, list) else str(encrypted_result)
+	user_input = printer.prompt_input("请输入验证码")
+	if user_input not in decrypted_str:
 		return
 	printer.print_header("隐藏功能")
 	print(printer.color_text("1. 自动点赞", "COMMENT"))
 	print(printer.color_text("2. 学生管理", "COMMENT"))
 	print(printer.color_text("3. 账号提权", "COMMENT"))
-	sub_choice = printer.get_valid_input("操作选择", valid_options={"1", "2", "3"})
+	sub_choice = get_enum_input("操作选择", {"1", "2", "3"})
 	if sub_choice == "1":
-		user_id = printer.get_valid_input("训练师ID", cast_type=int, validator=lambda x: x > 0)
+		user_id = get_positive_int_input("训练师ID")
 		MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
-		mode = printer.get_valid_input("模式 (delete/create/token)", {"delete", "create", "token"})
-		# 显式转换为Literal类型,解决类型不匹配问题
+		mode = get_enum_input("模式", {"delete", "create", "token"})
 		mode = cast("Literal['delete', 'create','token']", mode)
-		limit = printer.get_valid_input(
-			"数量",
-			cast_type=int,
-			valid_options=range(1, 101),  # 限制1-100的范围
-			validator=lambda x: x > 0,
-		)
+		limit = get_positive_int_input("数量", max_value=100)
 		MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
@@ -330,89 +395,126 @@ def exit_program(_account_data_manager: AccountDataManager) -> None:
 	sys.exit(0)
 
 
-def display_menu(menu_options: dict[str, MenuOption], account_data_manager: AccountDataManager) -> None:
-	"""显示菜单.根据登录状态和可见性控制显示"""
-	printer.print_header("主菜单")
-	for key, option in menu_options.items():
-		if not option.visible:
-			continue
-		color = tool.COLOR_CODES["MENU_ITEM"]
-		if option.require_auth and not account_data_manager.is_logged_in:
-			color = tool.COLOR_CODES["COMMENT"]
-		print(f"{color}{key.rjust(MAX_MENU_KEY_LENGTH)}. {option.name}{tool.COLOR_CODES['RESET']}")
+class MenuSystem:
+	"""菜单系统管理类"""
+
+	def __init__(self, account_data_manager: AccountDataManager) -> None:
+		self.account_data_manager = account_data_manager
+		self.menu_options = self._build_menu_options()
+
+	def _build_menu_options(self) -> dict[str, MenuOption]:
+		"""动态构建菜单选项"""
+		handlers = {
+			"01": login,
+			"02": logout,
+			"03": check_account_status,
+			"04": clear_comments,
+			"05": clear_red_point,
+			"06": reply_work,
+			"07": handle_report,
+			"08": download_fiction,
+			"09": upload_files,
+			"10": print_history,
+			"11": decompile_works,
+			"12": generate_nemo_code,
+			"13": plugin_manager,
+			"14": interactive_chat,
+			"00": exit_program,
+			"1106": handle_hidden_features,
+		}
+		menu_options = {}
+		for key, (name, require_auth, visible) in config.MENU_ITEMS.items():
+			if key in handlers:
+				menu_options[key] = MenuOption(name=name, handler=partial(handlers[key], self.account_data_manager), require_auth=require_auth, visible=visible)
+		return menu_options
+
+	def display(self) -> None:
+		"""显示菜单 - 高性能版本"""
+		printer.print_header("主菜单")
+		# 预计算格式字符串减少重复计算
+		menu_format = f"{{:>{config.MAX_MENU_KEY_LENGTH}}}. {{}}"
+		for key, option in self.menu_options.items():
+			if not option.visible:
+				continue
+			# 格式化菜单文本
+			menu_text = menu_format.format(key, option.name)
+			# 选择颜色
+			color_type = "COMMENT" if (option.require_auth and not self.account_data_manager.is_logged_in) else "MENU_ITEM"
+			print(printer.color_text(menu_text, color_type))
+
+	def handle_choice(self, choice: str) -> bool:
+		"""处理菜单选择,返回是否继续运行"""
+		if choice not in self.menu_options:
+			print(printer.color_text("无效的输入, 请重新选择", "ERROR"))
+			return True
+		option = self.menu_options[choice]
+		# 登录检查
+		if option.require_auth and not self.account_data_manager.is_logged_in:
+			print(printer.color_text("该操作需要登录!", "ERROR"))
+			if printer.prompt_input("是否立即登录? (y/n)").lower() == "y":
+				login(self.account_data_manager)
+			return True
+		# 执行处理器
+		option.handler()
+		return choice != "00"  # 选择退出时返回False
+
+	def get_valid_choices(self) -> set[str]:
+		"""获取有效的菜单选项"""
+		return {key for key, option in self.menu_options.items() if option.visible}
+
+
+def pause_for_continue() -> None:
+	"""暂停等待继续"""
+	input(f"\n{printer.color_text('⏎ 按回车键继续...', 'PROMPT')}")
+
+
+def handle_keyboard_interrupt() -> None:
+	"""处理键盘中断"""
+	print(f"\n{printer.color_text('程序被用户中断', 'ERROR')}")
+
+
+def handle_unexpected_error() -> None:
+	"""处理未预期错误"""
+	logger.error("程序发生未处理异常")
+	print(f"\n{printer.color_text('程序发生错误', 'ERROR')}")
+
+
+def prompt_exit() -> None:
+	"""提示退出"""
+	input(f"\n{printer.color_text('⏎ 按回车键退出程序', 'PROMPT')}")
+
+
+def get_menu_choice(_menu_system: MenuSystem) -> str:
+	"""获取菜单选择 - 优化输入处理"""
+	return printer.prompt_input("请输入操作编号")
+
+
+def run_main_loop(menu_system: MenuSystem) -> None:
+	"""运行主循环"""
+	while True:
+		menu_system.display()
+		choice = get_menu_choice(menu_system)
+		if not menu_system.handle_choice(choice):
+			break
+		pause_for_continue()
 
 
 def main() -> None:
-	"""主程序入口"""
+	"""主程序入口 - 优化流程控制"""
 	enable_vt_mode()
+	setup_logging()
 	Index().index()
 	account_data_manager = AccountDataManager()
-	menu_options = {
-		"01": MenuOption(name="用户登录", handler=partial(login, account_data_manager), require_auth=False),
-		"02": MenuOption(name="清除评论", handler=partial(clear_comments, account_data_manager), require_auth=True),
-		"03": MenuOption(name="清除红点", handler=partial(clear_red_point, account_data_manager), require_auth=True),
-		"04": MenuOption(name="自动回复", handler=partial(reply_work, account_data_manager), require_auth=True),
-		"05": MenuOption(name="账户登出", handler=partial(logout, account_data_manager), require_auth=True),
-		"06": MenuOption(name="处理举报", handler=partial(handle_report, account_data_manager), require_auth=False),
-		"07": MenuOption(name="状态查询", handler=partial(check_account_status, account_data_manager), require_auth=True),
-		"08": MenuOption(name="下载小说", handler=partial(download_fiction, account_data_manager), require_auth=False),
-		"09": MenuOption(name="生成口令", handler=partial(generate_nemo_code, account_data_manager), require_auth=True),
-		"10": MenuOption(name="上传文件", handler=partial(upload_files, account_data_manager), require_auth=True),
-		"11": MenuOption(name="上传历史", handler=partial(print_history, account_data_manager), require_auth=False),
-		"12": MenuOption(name="插件管理", handler=partial(plugin_manager, account_data_manager), require_auth=False),
-		"13": MenuOption(name="编译作品", handler=partial(decompile_works, account_data_manager), require_auth=False),
-		"14": MenuOption(name="助手对话", handler=partial(interactive_chat, account_data_manager), require_auth=True),
-		"00": MenuOption(name="退出系统", handler=partial(exit_program, account_data_manager), require_auth=False),
-		"1106": MenuOption(
-			name="隐藏功能",
-			handler=partial(handle_hidden_features, account_data_manager),
-			require_auth=True,
-			visible=False,  # 可以根据需要设置为False完全隐藏
-		),
-	}
-	while True:
-		display_menu(menu_options, account_data_manager)
-		choice = printer.prompt_input("请输入操作编号 (01-12)")
-		if choice in menu_options:
-			option = menu_options[choice]
-			if option.require_auth and not account_data_manager.is_logged_in:
-				print(printer.color_text("该操作需要登录!", "ERROR"))
-				if printer.prompt_input("是否立即登录? (y/n)").lower() == "y":
-					login(account_data_manager)
-				else:
-					continue
-			option.handler()
-		else:
-			print(printer.color_text("无效的输入, 请重新选择", "ERROR"))
-		input(f"\n{printer.color_text('⏎ 按回车键继续...', 'PROMPT')}")
+	menu_system = MenuSystem(account_data_manager)
+	try:
+		run_main_loop(menu_system)
+	except KeyboardInterrupt:
+		handle_keyboard_interrupt()
+	except Exception:
+		handle_unexpected_error()
+	finally:
+		prompt_exit()
 
 
 if __name__ == "__main__":
-	try:
-		main()
-	except KeyboardInterrupt:
-		print(f"\n{printer.color_text('程序被用户中断', 'ERROR')}")
-	except Exception:
-		logger.exception("程序发生未处理异常")
-		print(f"\n{printer.color_text('程序发生错误', 'ERROR')}")
-	finally:
-		input(f"\n{printer.color_text('⏎ 按回车键退出程序', 'PROMPT')}")
-# "POST_COMMENT",
-# "POST_COMMENT_DELETE_FEEDBACK",
-# "POST_DELETE_FEEDBACK",
-# "POST_DISCUSSION_LIKED",
-# "POST_REPLY",
-# "POST_REPLY_AUTHOR",
-# "POST_REPLY_REPLY",
-# "POST_REPLY_REPLY_AUTHOR",
-# "POST_REPLY_REPLY_FEEDBACK",
-# "WORK_COMMENT",路人a评论{user}的作品
-# "WORK_DISCUSSION_LIKED",
-# "WORK_LIKE",
-# "WORK_REPLY",路人a评论{user}在某个作品的评论
-# "WORK_REPLY_AUTHOR",路人a回复{user}作品下路人b的某条评论
-# "WORK_REPLY_REPLY",路人a回复{user}作品下路人b/a的评论下{user}的回复
-# "WORK_REPLY_REPLY_AUTHOR",路人a回复{user}作品下路人b/a对某条评论的回复
-# "WORK_REPLY_REPLY_FEEDBACK",路人a回复{user}在某个作品下发布的评论的路人b/a的回复
-# "WORK_SHOP_REPL"
-# "WORK_SHOP_USER_LEAVE",
+	main()

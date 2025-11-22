@@ -1,0 +1,12 @@
+{
+  "data": {
+    "items": [
+      "387924",
+      "498635",
+      "532729"
+    ]
+  },
+  "method": "GET",
+  "status_code": 200,
+  "url": "https://api-whale.codemao.cn/forums/notice-boards"
+}
