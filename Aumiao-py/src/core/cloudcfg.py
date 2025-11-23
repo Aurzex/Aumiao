@@ -181,29 +181,6 @@ class WorkInfo:
 		self.preview_url = data.get("preview", "")
 		self.source_urls = data.get("source_urls", data.get("work_urls", []))
 
-	@property
-	def file_extension(self) -> str:
-		"""根据作品类型返回文件扩展名"""
-		extensions = {
-			"KITTEN2": ".bcm",
-			"KITTEN3": ".bcm",
-			"KITTEN4": ".bcm4",
-			"COCO": ".json",
-			"NEMO": "",
-			"NEKO": ".json",  # NEKO类型使用JSON格式
-		}
-		return extensions.get(self.type, ".json")
-
-	@property
-	def is_nemo(self) -> bool:
-		"""是否为Nemo作品"""
-		return self.type == "NEMO"
-
-	@property
-	def is_neko(self) -> bool:
-		"""是否为NEKO作品"""
-		return self.type == "NEKO"
-
 
 class CloudAuthenticator:
 	"""云服务认证管理器"""
