@@ -3,7 +3,7 @@ cffi==2.0.0
 charset-normalizer==3.4.4
 cryptography==46.0.3
 idna==3.11
-nuitka==2.8.5
+nuitka==2.8.8
 ordered-set==4.1.0
 pycparser==2.23
 requests==2.32.5
