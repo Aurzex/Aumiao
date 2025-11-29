@@ -14,76 +14,100 @@ from typing import Any, cast
 import httpx
 import websocket
 
+
 # ==============================
-# 常量定义
+# 常量定义 - 分类整理
 # ==============================
-# HTTP 相关常量
-HTTP_SUCCESS_CODE = 200
-CONNECTION_TIMEOUT = 30
-REQUEST_TIMEOUT = 10
-# WebSocket 消息类型常量
-WEBSOCKET_PING_MESSAGE = "2"
-WEBSOCKET_PONG_MESSAGE = "3"
-WEBSOCKET_CONNECT_MESSAGE = "40"
-WEBSOCKET_CONNECTED_MESSAGE = "40"
-WEBSOCKET_EVENT_MESSAGE_PREFIX = "42"
-WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX = "0"
-# 配置常量
-MAX_DISPLAY_LENGTH = 50
-TRUNCATED_SUFFIX = "..."
-DEFAULT_RANKING_LIMIT = 31
-MAX_RECONNECT_ATTEMPTS = 5
-RECONNECT_INTERVAL = 8
-PING_INTERVAL_MS = 25000
-PING_TIMEOUT_MS = 5000
-WEBSOCKET_PING_INTERVAL = 20
-WEBSOCKET_PING_TIMEOUT = 10
-DATA_TIMEOUT = 30
-WAIT_TIMEOUT = 30
-MESSAGE_TYPE_LENGTH = 2
-WEBSOCKET_TRANSPORT_TYPE = "websocket"
-# 魔法数值常量(用于替换代码中的魔法数字)
-MIN_RANKING_LIMIT = 1
-MAX_RANKING_LIMIT = 31
-ASCENDING_ORDER = 1
-DESCENDING_ORDER = -1
-LIST_START_INDEX = 0
-FIRST_ELEMENT_INDEX = 0
-LAST_ELEMENT_INDEX = -1
-MIN_LIST_INDEX = 0
-MAX_LIST_DISPLAY_ELEMENTS = 6
-PARTIAL_LIST_DISPLAY_COUNT = 3
-# 新增常量修复魔法数值问题
-MIN_LIST_OPERATION_ARGS = 2
-MIN_SET_ARGS = 2
-MIN_INSERT_ARGS = 2
-MIN_REMOVE_ARGS = 1
-MIN_REPLACE_ARGS = 2
-MIN_GET_ARGS = 1
-MIN_RANKING_ARGS = 1
-# 错误消息常量
-ERROR_CALLBACK_EXECUTION = "回调执行错误"
-ERROR_CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
-ERROR_RANKING_CALLBACK = "排行榜回调执行错误"
-ERROR_OPERATION_CALLBACK = "操作回调执行错误"
-ERROR_EVENT_CALLBACK = "事件回调执行错误"
-ERROR_SEND_MESSAGE = "发送消息错误"
-ERROR_CONNECTION = "连接错误"
-ERROR_WEB_SOCKET_RUN = "WebSocket运行错误"
-ERROR_CLOSE_CONNECTION = "关闭连接时出错"
-ERROR_GET_SERVER_TIME = "获取服务器时间失败"
-ERROR_HANDSHAKE_DATA_PARSE = "握手数据解析失败"
-ERROR_HANDSHAKE_PROCESSING = "握手处理错误"
-ERROR_JSON_PARSE = "JSON解析错误"
-ERROR_CLOUD_MESSAGE_PROCESSING = "云消息处理错误"
-ERROR_CREATE_DATA_ITEM = "创建数据项时出错"
-ERROR_INVALID_RANKING_DATA = "无效的排行榜数据格式"
-ERROR_PING_SEND = "发送 ping 失败"
-ERROR_NO_PENDING_REQUESTS = "收到排行榜数据但没有待处理的请求"
-ERROR_INVALID_VARIABLE_TYPE = "云变量值必须是整数或字符串"
-ERROR_INVALID_LIST_ITEM_TYPE = "列表元素必须是整数或字符串"
-ERROR_INVALID_RANKING_ORDER = "排序顺序必须是1(正序)或-1(逆序)"
-ERROR_INVALID_RANKING_LIMIT = "限制数量必须是正整数"
+class HTTPConfig:
+	"""HTTP相关配置"""
+
+	SUCCESS_CODE = 200
+	CONNECTION_TIMEOUT = 30
+	REQUEST_TIMEOUT = 10
+
+
+class WebSocketConfig:
+	"""WebSocket相关配置"""
+
+	PING_MESSAGE = "2"
+	PONG_MESSAGE = "3"
+	CONNECT_MESSAGE = "40"
+	CONNECTED_MESSAGE = "40"
+	EVENT_MESSAGE_PREFIX = "42"
+	HANDSHAKE_MESSAGE_PREFIX = "0"
+	TRANSPORT_TYPE = "websocket"
+	PING_INTERVAL = 20
+	PING_TIMEOUT = 10
+	MESSAGE_TYPE_LENGTH = 2
+
+
+class DisplayConfig:
+	"""显示相关配置"""
+
+	MAX_DISPLAY_LENGTH = 50
+	TRUNCATED_SUFFIX = "..."
+	MAX_LIST_DISPLAY_ELEMENTS = 6
+	PARTIAL_LIST_DISPLAY_COUNT = 3
+
+
+class DataConfig:
+	"""数据相关配置"""
+
+	DEFAULT_RANKING_LIMIT = 31
+	MAX_RECONNECT_ATTEMPTS = 5
+	RECONNECT_INTERVAL = 8
+	PING_INTERVAL_MS = 25000
+	PING_TIMEOUT_MS = 5000
+	DATA_TIMEOUT = 30
+	WAIT_TIMEOUT = 30
+
+
+class ValidationConfig:
+	"""验证相关配置"""
+
+	MIN_RANKING_LIMIT = 1
+	MAX_RANKING_LIMIT = 31
+	ASCENDING_ORDER = 1
+	DESCENDING_ORDER = -1
+	LIST_START_INDEX = 0
+	FIRST_ELEMENT_INDEX = 0
+	LAST_ELEMENT_INDEX = -1
+	MIN_LIST_INDEX = 0
+	# 最小参数数量
+	MIN_LIST_OPERATION_ARGS = 2
+	MIN_SET_ARGS = 2
+	MIN_INSERT_ARGS = 2
+	MIN_REMOVE_ARGS = 1
+	MIN_REPLACE_ARGS = 2
+	MIN_GET_ARGS = 1
+	MIN_RANKING_ARGS = 1
+
+
+class ErrorMessages:
+	"""错误消息常量"""
+
+	CALLBACK_EXECUTION = "回调执行错误"
+	CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
+	RANKING_CALLBACK = "排行榜回调执行错误"
+	OPERATION_CALLBACK = "操作回调执行错误"
+	EVENT_CALLBACK = "事件回调执行错误"
+	SEND_MESSAGE = "发送消息错误"
+	CONNECTION = "连接错误"
+	WEB_SOCKET_RUN = "WebSocket运行错误"
+	CLOSE_CONNECTION = "关闭连接时出错"
+	GET_SERVER_TIME = "获取服务器时间失败"
+	HANDSHAKE_DATA_PARSE = "握手数据解析失败"
+	HANDSHAKE_PROCESSING = "握手处理错误"
+	JSON_PARSE = "JSON解析错误"
+	CLOUD_MESSAGE_PROCESSING = "云消息处理错误"
+	CREATE_DATA_ITEM = "创建数据项时出错"
+	INVALID_RANKING_DATA = "无效的排行榜数据格式"
+	PING_SEND = "发送 ping 失败"
+	NO_PENDING_REQUESTS = "收到排行榜数据但没有待处理的请求"
+	INVALID_VARIABLE_TYPE = "云变量值必须是整数或字符串"
+	INVALID_LIST_ITEM_TYPE = "列表元素必须是整数或字符串"
+	INVALID_RANKING_ORDER = "排序顺序必须是1(正序)或-1(逆序)"
+	INVALID_RANKING_LIMIT = "限制数量必须是正整数"
 
 
 # ==============================
@@ -150,7 +174,7 @@ class DisplayHelper:
 	"""显示辅助类,处理长文本截断和格式化显示"""
 
 	@staticmethod
-	def truncate_value(value: Any, max_length: int = MAX_DISPLAY_LENGTH) -> str:  # noqa: ANN401
+	def truncate_value(value: Any, max_length: int = DisplayConfig.MAX_DISPLAY_LENGTH) -> str:  # noqa: ANN401
 		"""截断过长的值用于显示"""
 		if isinstance(value, (int, float, bool)):
 			return str(value)
@@ -159,14 +183,14 @@ class DisplayHelper:
 			return str_value
 		# 对于列表,显示前几个和后几个元素
 		if isinstance(value, list):
-			if len(value) <= MAX_LIST_DISPLAY_ELEMENTS:
+			if len(value) <= DisplayConfig.MAX_LIST_DISPLAY_ELEMENTS:
 				return str(value)
-			first_part = value[:PARTIAL_LIST_DISPLAY_COUNT]
-			last_part = value[-PARTIAL_LIST_DISPLAY_COUNT:]
+			first_part = value[: DisplayConfig.PARTIAL_LIST_DISPLAY_COUNT]
+			last_part = value[-DisplayConfig.PARTIAL_LIST_DISPLAY_COUNT :]
 			return f"[{', '.join(map(str, first_part))}, ..., {', '.join(map(str, last_part))}]"
 		# 对于长字符串,截取前后部分
-		half_length = max_length // 2 - len(TRUNCATED_SUFFIX) // 2
-		return f"{str_value[:half_length]}{TRUNCATED_SUFFIX}{str_value[-half_length:]}"
+		half_length = max_length // 2 - len(DisplayConfig.TRUNCATED_SUFFIX) // 2
+		return f"{str_value[:half_length]}{DisplayConfig.TRUNCATED_SUFFIX}{str_value[-half_length:]}"
 
 
 class WorkInfo:
@@ -194,14 +218,14 @@ class CloudAuthenticator:
 	def get_current_time() -> int:
 		"""获取服务器当前时间"""
 		try:
-			response = httpx.get("https://api.codemao.cn/coconut/clouddb/currentTime", timeout=REQUEST_TIMEOUT)
-			if response.status_code == HTTP_SUCCESS_CODE:
+			response = httpx.get("https://api.codemao.cn/coconut/clouddb/currentTime", timeout=HTTPConfig.REQUEST_TIMEOUT)
+			if response.status_code == HTTPConfig.SUCCESS_CODE:
 				data: dict | str = response.json()
 				if isinstance(data, dict) and "data" in data:
 					return data["data"]
 				return int(cast("str", data))
 		except Exception as error:
-			print(f"{ERROR_GET_SERVER_TIME}: {error}")
+			print(f"{ErrorMessages.GET_SERVER_TIME}: {error}")
 		return int(time.time())
 
 	def get_calibrated_timestamp(self) -> int:
@@ -243,7 +267,7 @@ class CloudDataItem:
 			try:
 				callback(old_value, new_value, source)
 			except Exception as error:
-				print(f"{ERROR_CALLBACK_EXECUTION}: {error}")
+				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
 
 class CloudVariable(CloudDataItem):
@@ -264,7 +288,7 @@ class CloudVariable(CloudDataItem):
 	def set(self, value: CloudValueType) -> bool:
 		"""设置变量值"""
 		if not isinstance(value, (int, str)):
-			raise TypeError(ERROR_INVALID_VARIABLE_TYPE)
+			raise TypeError(ErrorMessages.INVALID_VARIABLE_TYPE)
 		old_value = self.value
 		self.value = value
 		self.emit_change(old_value, value, "local")
@@ -281,7 +305,7 @@ class CloudVariable(CloudDataItem):
 			try:
 				callback(old_value_cast, new_value_cast, source)
 			except Exception as error:
-				print(f"{ERROR_CLOUD_VARIABLE_CALLBACK}: {error}")
+				print(f"{ErrorMessages.CLOUD_VARIABLE_CALLBACK}: {error}")
 
 
 class PrivateCloudVariable(CloudVariable):
@@ -301,14 +325,14 @@ class PrivateCloudVariable(CloudVariable):
 			try:
 				callback(ranking_data)
 			except Exception as error:
-				print(f"{ERROR_RANKING_CALLBACK}: {error}")
+				print(f"{ErrorMessages.RANKING_CALLBACK}: {error}")
 
-	def get_ranking_list(self, limit: int = DEFAULT_RANKING_LIMIT, order: int = DESCENDING_ORDER) -> None:
+	def get_ranking_list(self, limit: int = DataConfig.DEFAULT_RANKING_LIMIT, order: int = ValidationConfig.DESCENDING_ORDER) -> None:
 		"""获取排行榜列表"""
 		if not isinstance(limit, int) or limit <= 0:
-			raise ValueError(ERROR_INVALID_RANKING_LIMIT)
-		if order not in {ASCENDING_ORDER, DESCENDING_ORDER}:
-			raise ValueError(ERROR_INVALID_RANKING_ORDER)
+			raise ValueError(ErrorMessages.INVALID_RANKING_LIMIT)
+		if order not in {ValidationConfig.ASCENDING_ORDER, ValidationConfig.DESCENDING_ORDER}:
+			raise ValueError(ErrorMessages.INVALID_RANKING_ORDER)
 		request_data = {"cvid": self.cloud_variable_id, "limit": limit, "order_type": order}
 		self.connection.send_message(SendMessageType.GET_PRIVATE_VARIABLE_RANKING_LIST, request_data)
 
@@ -345,18 +369,18 @@ class CloudList(CloudDataItem):
 			try:
 				callback(*args)
 			except Exception as error:
-				print(f"{ERROR_OPERATION_CALLBACK}: {error}")
+				print(f"{ErrorMessages.OPERATION_CALLBACK}: {error}")
 
 	def get(self, index: int) -> CloudValueType | None:
 		"""获取指定位置的元素"""
-		if MIN_LIST_INDEX <= index < len(self.value):
+		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			return self.value[index]
 		return None
 
 	def push(self, item: CloudValueType) -> bool:
 		"""向列表末尾添加元素"""
 		if not isinstance(item, (int, str)):
-			raise TypeError(ERROR_INVALID_LIST_ITEM_TYPE)
+			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
 		self.value.append(item)
 		self._emit_operation("push", item, len(self.value) - 1)
 		return True
@@ -372,24 +396,24 @@ class CloudList(CloudDataItem):
 	def unshift(self, item: CloudValueType) -> bool:
 		"""向列表开头添加元素"""
 		if not isinstance(item, (int, str)):
-			raise TypeError(ERROR_INVALID_LIST_ITEM_TYPE)
-		self.value.insert(FIRST_ELEMENT_INDEX, item)
-		self._emit_operation("unshift", item, FIRST_ELEMENT_INDEX)
+			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
+		self.value.insert(ValidationConfig.FIRST_ELEMENT_INDEX, item)
+		self._emit_operation("unshift", item, ValidationConfig.FIRST_ELEMENT_INDEX)
 		return True
 
 	def shift(self) -> CloudValueType | None:
 		"""移除并返回列表第一个元素"""
 		if self.value:
-			item = self.value.pop(FIRST_ELEMENT_INDEX)
-			self._emit_operation("shift", item, FIRST_ELEMENT_INDEX)
+			item = self.value.pop(ValidationConfig.FIRST_ELEMENT_INDEX)
+			self._emit_operation("shift", item, ValidationConfig.FIRST_ELEMENT_INDEX)
 			return item
 		return None
 
 	def insert(self, index: int, item: CloudValueType) -> bool:
 		"""在指定位置插入元素"""
 		if not isinstance(item, (int, str)):
-			raise TypeError(ERROR_INVALID_LIST_ITEM_TYPE)
-		if MIN_LIST_INDEX <= index <= len(self.value):
+			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
+		if ValidationConfig.MIN_LIST_INDEX <= index <= len(self.value):
 			self.value.insert(index, item)
 			self._emit_operation("insert", item, index)
 			return True
@@ -397,7 +421,7 @@ class CloudList(CloudDataItem):
 
 	def remove(self, index: int) -> CloudValueType | None:
 		"""移除指定位置的元素"""
-		if MIN_LIST_INDEX <= index < len(self.value):
+		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			item = self.value.pop(index)
 			self._emit_operation("remove", item, index)
 			return item
@@ -406,8 +430,8 @@ class CloudList(CloudDataItem):
 	def replace(self, index: int, item: CloudValueType) -> bool:
 		"""替换指定位置的元素"""
 		if not isinstance(item, (int, str)):
-			raise TypeError(ERROR_INVALID_LIST_ITEM_TYPE)
-		if MIN_LIST_INDEX <= index < len(self.value):
+			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
+		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			old_item = self.value[index]
 			self.value[index] = item
 			self._emit_operation("replace", old_item, item, index)
@@ -417,10 +441,10 @@ class CloudList(CloudDataItem):
 	def replace_last(self, item: CloudValueType) -> bool:
 		"""替换列表最后一个元素"""
 		if not isinstance(item, (int, str)):
-			raise TypeError(ERROR_INVALID_LIST_ITEM_TYPE)
+			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
 		if self.value:
-			old_item = self.value[LAST_ELEMENT_INDEX]
-			self.value[LAST_ELEMENT_INDEX] = item
+			old_item = self.value[ValidationConfig.LAST_ELEMENT_INDEX]
+			self.value[ValidationConfig.LAST_ELEMENT_INDEX] = item
 			self._emit_operation("replace_last", old_item, item)
 			return True
 		return False
@@ -482,9 +506,9 @@ class CloudConnection:
 		self.websocket_client: websocket.WebSocketApp | None = None
 		self.connected = False
 		self.auto_reconnect = True
-		self.reconnect_interval = RECONNECT_INTERVAL
+		self.reconnect_interval = DataConfig.RECONNECT_INTERVAL
 		self.reconnect_attempts = 0
-		self.max_reconnect_attempts = MAX_RECONNECT_ATTEMPTS
+		self.max_reconnect_attempts = DataConfig.MAX_RECONNECT_ATTEMPTS
 		self.private_variables: dict[str, PrivateCloudVariable] = {}
 		self.public_variables: dict[str, PublicCloudVariable] = {}
 		self.lists: dict[str, CloudList] = {}
@@ -513,8 +537,8 @@ class CloudConnection:
 				headers = {}
 				if self.authenticator.authorization_token:
 					headers["Cookie"] = f"Authorization={self.authenticator.authorization_token}"
-				response = httpx.get(f"https://api.codemao.cn/creation-tools/v1/works/{self.work_id}", headers=headers, timeout=REQUEST_TIMEOUT)
-				if response.status_code == HTTP_SUCCESS_CODE:
+				response = httpx.get(f"https://api.codemao.cn/creation-tools/v1/works/{self.work_id}", headers=headers, timeout=HTTPConfig.REQUEST_TIMEOUT)
+				if response.status_code == HTTPConfig.SUCCESS_CODE:
 					raw_info = response.json()
 					self._work_info = WorkInfo(raw_info)
 					print(f"✓ 作品: {self._work_info.name}")
@@ -566,7 +590,7 @@ class CloudConnection:
 				try:
 					callback(*args)
 				except Exception as error:
-					print(f"{ERROR_EVENT_CALLBACK}: {error}")
+					print(f"{ErrorMessages.EVENT_CALLBACK}: {error}")
 
 	def _get_websocket_url(self) -> str:
 		"""获取WebSocket连接URL"""
@@ -580,7 +604,7 @@ class CloudConnection:
 		}
 		params = editor_params.get(self.editor, editor_params[EditorType.KITTEN])
 		params["EIO"] = "3"
-		params["transport"] = WEBSOCKET_TRANSPORT_TYPE
+		params["transport"] = WebSocketConfig.TRANSPORT_TYPE
 		params_str = "&".join([f"{k}={v}" for k, v in params.items()])
 		return f"wss://socketcv.codemao.cn:9096/cloudstorage/?session_id={self.work_id}&{params_str}"
 
@@ -600,20 +624,20 @@ class CloudConnection:
 				message = message.decode("utf-8")
 			message_str = str(message)
 			# 处理ping消息
-			if message_str == WEBSOCKET_PING_MESSAGE:
+			if message_str == WebSocketConfig.PING_MESSAGE:
 				if self.websocket_client:
-					self.websocket_client.send(WEBSOCKET_PONG_MESSAGE)
+					self.websocket_client.send(WebSocketConfig.PONG_MESSAGE)
 				return
 			# 处理握手消息
-			if message_str.startswith(WEBSOCKET_HANDSHAKE_MESSAGE_PREFIX):
+			if message_str.startswith(WebSocketConfig.HANDSHAKE_MESSAGE_PREFIX):
 				self._handle_handshake_message(message_str)
 				return
 			# 处理连接确认消息
-			if message_str == WEBSOCKET_CONNECTED_MESSAGE:
+			if message_str == WebSocketConfig.CONNECTED_MESSAGE:
 				self._handle_connected_message()
 				return
 			# 处理事件消息
-			if message_str.startswith(WEBSOCKET_EVENT_MESSAGE_PREFIX):
+			if message_str.startswith(WebSocketConfig.EVENT_MESSAGE_PREFIX):
 				self._handle_event_message(message_str)
 				return
 		except Exception as error:
@@ -623,15 +647,15 @@ class CloudConnection:
 		"""处理握手消息"""
 		try:
 			handshake_data = json.loads(message[1:])
-			ping_interval = handshake_data.get("pingInterval", PING_INTERVAL_MS)
-			ping_timeout = handshake_data.get("pingTimeout", PING_TIMEOUT_MS)
+			ping_interval = handshake_data.get("pingInterval", DataConfig.PING_INTERVAL_MS)
+			ping_timeout = handshake_data.get("pingTimeout", DataConfig.PING_TIMEOUT_MS)
 			print(f"✓ 握手成功, ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")
 			self._start_ping(ping_interval, ping_timeout)
 			if self.websocket_client:
-				self.websocket_client.send(WEBSOCKET_CONNECT_MESSAGE)
+				self.websocket_client.send(WebSocketConfig.CONNECT_MESSAGE)
 				print("✓ 已发送连接请求")
 		except Exception as error:
-			print(f"{ERROR_HANDSHAKE_PROCESSING}: {error}")
+			print(f"{ErrorMessages.HANDSHAKE_PROCESSING}: {error}")
 
 	def _handle_connected_message(self) -> None:
 		"""处理连接确认消息"""
@@ -647,7 +671,7 @@ class CloudConnection:
 	def _handle_event_message(self, message: str) -> None:
 		"""处理事件消息"""
 		try:
-			data_str = message[MESSAGE_TYPE_LENGTH:]
+			data_str = message[WebSocketConfig.MESSAGE_TYPE_LENGTH :]
 			data_list = json.loads(data_str)
 			if isinstance(data_list, list) and len(data_list) >= 2:  # noqa: PLR2004
 				message_type = data_list[0]
@@ -664,7 +688,7 @@ class CloudConnection:
 						print(f"警告: 无法解析消息数据为JSON: {message_data[:100]}...")
 				self._handle_cloud_message(message_type, message_data)
 		except json.JSONDecodeError as error:
-			print(f"{ERROR_JSON_PARSE}: {error}, 数据: {DisplayHelper.truncate_value(message)}")
+			print(f"{ErrorMessages.JSON_PARSE}: {error}, 数据: {DisplayHelper.truncate_value(message)}")
 		except Exception as error:
 			print(f"处理事件消息时发生未知错误: {error}")
 
@@ -686,9 +710,9 @@ class CloudConnection:
 				time.sleep(interval / 1000)
 				if self._ping_active and self.connected and self.websocket_client:
 					try:
-						self.websocket_client.send(WEBSOCKET_PING_MESSAGE)
+						self.websocket_client.send(WebSocketConfig.PING_MESSAGE)
 					except Exception as error:
-						print(f"{ERROR_PING_SEND}: {error}")
+						print(f"{ErrorMessages.PING_SEND}: {error}")
 						break
 
 		self._ping_thread = threading.Thread(target=ping_task, daemon=True)
@@ -720,7 +744,7 @@ class CloudConnection:
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {DisplayHelper.truncate_value(data)}")
 		except Exception as error:
-			print(f"{ERROR_CLOUD_MESSAGE_PROCESSING}: {error}")
+			print(f"{ErrorMessages.CLOUD_MESSAGE_PROCESSING}: {error}")
 			traceback.print_exc()
 			self._emit_event("error", error)
 
@@ -777,7 +801,7 @@ class CloudConnection:
 			else:
 				print(f"未知数据类型: {data_type}")
 		except Exception as error:
-			print(f"{ERROR_CREATE_DATA_ITEM}: {error}, 数据: {DisplayHelper.truncate_value(item)}")
+			print(f"{ErrorMessages.CREATE_DATA_ITEM}: {error}, 数据: {DisplayHelper.truncate_value(item)}")
 
 	def _create_private_variable(self, cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		"""创建私有变量"""
@@ -814,11 +838,11 @@ class CloudConnection:
 	def _handle_receive_ranking_list(self, data: dict[str, Any] | object) -> None:
 		"""处理接收排行榜列表消息"""
 		if not self._pending_ranking_requests:
-			print(ERROR_NO_PENDING_REQUESTS)
+			print(ErrorMessages.NO_PENDING_REQUESTS)
 			return
 		variable = self._pending_ranking_requests.pop(0)
 		if not isinstance(data, dict) or "items" not in data or not isinstance(data["items"], list):
-			print(f"{ERROR_INVALID_RANKING_DATA}: {DisplayHelper.truncate_value(data)}")
+			print(f"{ErrorMessages.INVALID_RANKING_DATA}: {DisplayHelper.truncate_value(data)}")
 			return
 		ranking_data = [
 			{"value": item["value"], "user": {"id": int(item["identifier"]), "nickname": item["nickname"], "avatar_url": item["avatar_url"]}}
@@ -942,11 +966,11 @@ class CloudConnection:
 			print("错误: 连接未就绪,无法发送消息")
 			return
 		message_content = [message_type.value, data]
-		message = f"{WEBSOCKET_EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
+		message = f"{WebSocketConfig.EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
 		try:
 			self.websocket_client.send(message)
 		except Exception as error:
-			print(f"{ERROR_SEND_MESSAGE}: {error}")
+			print(f"{ErrorMessages.SEND_MESSAGE}: {error}")
 			self._emit_event("error", error)
 
 	def connect(self) -> None:
@@ -974,17 +998,17 @@ class CloudConnection:
 				try:
 					if self.websocket_client:
 						self.websocket_client.run_forever(
-							ping_interval=WEBSOCKET_PING_INTERVAL,
-							ping_timeout=WEBSOCKET_PING_TIMEOUT,
+							ping_interval=WebSocketConfig.PING_INTERVAL,
+							ping_timeout=WebSocketConfig.PING_TIMEOUT,
 							skip_utf8_validation=True,
 						)
 				except Exception as error:
-					print(f"{ERROR_WEB_SOCKET_RUN}: {error}")
+					print(f"{ErrorMessages.WEB_SOCKET_RUN}: {error}")
 
 			thread = threading.Thread(target=run_websocket, daemon=True)
 			thread.start()
 		except Exception as error:
-			print(f"{ERROR_CONNECTION}: {error}")
+			print(f"{ErrorMessages.CONNECTION}: {error}")
 			self._emit_event("error", error)
 
 	def close(self) -> None:
@@ -997,9 +1021,9 @@ class CloudConnection:
 			try:
 				self.websocket_client.close()
 			except Exception as error:
-				print(f"{ERROR_CLOSE_CONNECTION}: {error}")
+				print(f"{ErrorMessages.CLOSE_CONNECTION}: {error}")
 
-	def wait_for_connection(self, timeout: int = CONNECTION_TIMEOUT) -> bool:
+	def wait_for_connection(self, timeout: int = HTTPConfig.CONNECTION_TIMEOUT) -> bool:
 		"""等待连接建立"""
 		start_time = time.time()
 		last_log_time = start_time
@@ -1016,7 +1040,7 @@ class CloudConnection:
 		print(f"连接超时, 等待 {timeout} 秒后仍未建立连接")
 		return False
 
-	def wait_for_data(self, timeout: int = DATA_TIMEOUT) -> bool:
+	def wait_for_data(self, timeout: int = DataConfig.DATA_TIMEOUT) -> bool:
 		"""等待数据加载完成"""
 		start_time = time.time()
 		last_log_time = start_time
@@ -1079,7 +1103,7 @@ class CloudConnection:
 			return True
 		return False
 
-	def get_private_variable_ranking(self, name: str, limit: int = DEFAULT_RANKING_LIMIT, order: int = DESCENDING_ORDER) -> None:
+	def get_private_variable_ranking(self, name: str, limit: int = DataConfig.DEFAULT_RANKING_LIMIT, order: int = ValidationConfig.DESCENDING_ORDER) -> None:
 		"""获取私有变量排行榜"""
 		variable = self.get_private_variable(name)
 		if variable:
@@ -1412,7 +1436,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		"""设置私有变量的值
 		用法: set_private <变量名> <值>"""
 		args = shlex.split(arg)
-		if len(args) < MIN_SET_ARGS:
+		if len(args) < ValidationConfig.MIN_SET_ARGS:
 			print("错误: 用法: set_private <变量名> <值>")
 			print("使用 'available' 查看可用私有变量")
 			return
@@ -1429,7 +1453,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		"""设置公有变量的值
 		用法: set_public <变量名> <值>"""
 		args = shlex.split(arg)
-		if len(args) < MIN_SET_ARGS:
+		if len(args) < ValidationConfig.MIN_SET_ARGS:
 			print("错误: 用法: set_public <变量名> <值>")
 			print("使用 'available' 查看可用公有变量")
 			return
@@ -1452,23 +1476,27 @@ class CloudCommandLineInterface(cmd.Cmd):
 			return value
 		return value
 
-	def do_list_operations(self, arg: str) -> None:
-		"""云列表操作
+	def do_list_ops(self, arg: str) -> None:
+		"""云列表操作 (list_operations的简短版本)
 		用法:
-			list_operations push <列表名> <值>      # 追加元素
-			list_operations pop <列表名>            # 弹出最后一个元素
-			list_operations unshift <列表名> <值>   # 在开头添加元素
-			list_operations shift <列表名>          # 移除第一个元素
-			list_operations insert <列表名> <位置> <值>  # 在指定位置插入
-			list_operations remove <列表名> <位置>  # 移除指定位置元素
-			list_operations replace <列表名> <位置> <值> # 替换指定位置元素
-			list_operations clear <列表名>          # 清空列表
-			list_operations get <列表名> <位置>     # 获取指定位置元素
+			list_ops push <列表名> <值>      # 追加元素
+			list_ops pop <列表名>            # 弹出最后一个元素
+			list_ops unshift <列表名> <值>   # 在开头添加元素
+			list_ops shift <列表名>          # 移除第一个元素
+			list_ops insert <列表名> <位置> <值>  # 在指定位置插入
+			list_ops remove <列表名> <位置>  # 移除指定位置元素
+			list_ops replace <列表名> <位置> <值> # 替换指定位置元素
+			list_ops clear <列表名>          # 清空列表
+			list_ops get <列表名> <位置>     # 获取指定位置元素
 		"""
+		self._handle_list_operations(arg)
+
+	def _handle_list_operations(self, arg: str) -> None:
+		"""处理列表操作"""
 		args = shlex.split(arg)
-		if len(args) < MIN_LIST_OPERATION_ARGS:
+		if len(args) < ValidationConfig.MIN_LIST_OPERATION_ARGS:
 			print("错误: 参数不足")
-			self.help_list_operations()
+			self.help_list_ops()
 			return
 		operation = args[0]
 		list_name = args[1]
@@ -1493,11 +1521,11 @@ class CloudCommandLineInterface(cmd.Cmd):
 			handler(cloud_list, args[2:])
 		else:
 			print(f"错误: 未知操作 '{operation}'")
-			self.help_list_operations()
+			self.help_list_ops()
 
 	def _handle_list_push(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表push操作"""
-		if len(args) < MIN_GET_ARGS:
+		if len(args) < ValidationConfig.MIN_GET_ARGS:
 			print("错误: 需要提供要添加的值")
 			return
 		value = self._parse_value(args[0])
@@ -1515,7 +1543,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_unshift(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表unshift操作"""
-		if len(args) < MIN_GET_ARGS:
+		if len(args) < ValidationConfig.MIN_GET_ARGS:
 			print("错误: 需要提供要添加的值")
 			return
 		value = self._parse_value(args[0])
@@ -1533,7 +1561,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_insert(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表insert操作"""
-		if len(args) < MIN_INSERT_ARGS:
+		if len(args) < ValidationConfig.MIN_INSERT_ARGS:
 			print("错误: 需要提供位置和值")
 			return
 		try:
@@ -1548,7 +1576,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_remove(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表remove操作"""
-		if len(args) < MIN_REMOVE_ARGS:
+		if len(args) < ValidationConfig.MIN_REMOVE_ARGS:
 			print("错误: 需要提供位置")
 			return
 		try:
@@ -1562,7 +1590,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	def _handle_list_replace(self, cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表replace操作"""
-		if len(args) < MIN_REPLACE_ARGS:
+		if len(args) < ValidationConfig.MIN_REPLACE_ARGS:
 			print("错误: 需要提供位置和值")
 			return
 		try:
@@ -1585,7 +1613,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 	@staticmethod
 	def _handle_list_get(cloud_list: CloudList, args: list[str]) -> None:
 		"""处理列表get操作"""
-		if len(args) < MIN_GET_ARGS:
+		if len(args) < ValidationConfig.MIN_GET_ARGS:
 			print("错误: 需要提供位置")
 			return
 		try:
@@ -1599,19 +1627,19 @@ class CloudCommandLineInterface(cmd.Cmd):
 			print("错误: 位置必须是整数")
 
 	@staticmethod
-	def help_list_operations() -> None:
+	def help_list_ops() -> None:
 		"""显示列表操作帮助"""
 		print("""
 		列表操作命令:
-		list_operations push <列表名> <值>      - 向列表末尾添加元素
-		list_operations pop <列表名>            - 移除并返回列表最后一个元素
-		list_operations unshift <列表名> <值>   - 向列表开头添加元素
-		list_operations shift <列表名>          - 移除并返回列表第一个元素
-		list_operations insert <列表名> <位置> <值> - 在指定位置插入元素
-		list_operations remove <列表名> <位置>  - 移除指定位置的元素
-		list_operations replace <列表名> <位置> <值> - 替换指定位置的元素
-		list_operations clear <列表名>          - 清空列表所有元素
-		list_operations get <列表名> <位置>     - 获取指定位置的元素
+		list_ops push <列表名> <值>      - 向列表末尾添加元素
+		list_ops pop <列表名>            - 移除并返回列表最后一个元素
+		list_ops unshift <列表名> <值>   - 向列表开头添加元素
+		list_ops shift <列表名>          - 移除并返回列表第一个元素
+		list_ops insert <列表名> <位置> <值> - 在指定位置插入元素
+		list_ops remove <列表名> <位置>  - 移除指定位置的元素
+		list_ops replace <列表名> <位置> <值> - 替换指定位置的元素
+		list_ops clear <列表名>          - 清空列表所有元素
+		list_ops get <列表名> <位置>     - 获取指定位置的元素
 		""")
 
 	def do_ranking(self, arg: str) -> None:
@@ -1626,12 +1654,12 @@ class CloudCommandLineInterface(cmd.Cmd):
 			return
 		name = args[0]
 		limit = 10
-		order = DESCENDING_ORDER
+		order = ValidationConfig.DESCENDING_ORDER
 		if len(args) > 1:
 			try:
 				limit = int(args[1])
-				if limit < MIN_RANKING_LIMIT or limit > MAX_RANKING_LIMIT:
-					print(f"警告: 数量范围{MIN_RANKING_LIMIT}-{MAX_RANKING_LIMIT}, 使用默认值10")
+				if limit < ValidationConfig.MIN_RANKING_LIMIT or limit > ValidationConfig.MAX_RANKING_LIMIT:
+					print(f"警告: 数量范围{ValidationConfig.MIN_RANKING_LIMIT}-{ValidationConfig.MAX_RANKING_LIMIT}, 使用默认值10")
 					limit = 10
 			except ValueError:
 				print("错误: 数量必须是数字")
@@ -1639,7 +1667,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		if len(args) > 2:  # noqa: PLR2004
 			try:
 				order = int(args[2])
-				if order not in {ASCENDING_ORDER, DESCENDING_ORDER}:
+				if order not in {ValidationConfig.ASCENDING_ORDER, ValidationConfig.DESCENDING_ORDER}:
 					print("错误: 排序必须是1(升序)或-1(降序)")
 					return
 			except ValueError:
