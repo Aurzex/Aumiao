@@ -7,8 +7,7 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
-from src import user, whale
-from src.api import community
+from src import auth, user, whale
 from src.core.base import Index
 from src.core.compile import decompile_work
 from src.core.deepser import CodeMaoTool
@@ -171,7 +170,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("用户登录")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	response = community.AuthManager().login(identity=identity, password=password)
+	response = auth.AuthManager().login(identity=identity, password=password)
 	data_ = user.UserDataFetcher().fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {
@@ -327,7 +326,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("账户登出")
 	method = get_enum_input("请输入方法", {"web"})
 	method = cast("Literal['web']", method)
-	community.AuthManager().execute_logout(method)
+	auth.AuthManager().execute_logout(method)
 	account_data_manager.clear()
 	print(printer.color_text("已成功登出账户", "SUCCESS"))
 
@@ -336,7 +335,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 def plugin_manager(_account_data_manager: AccountDataManager) -> None:
 	"""插件管理"""
 	printer.print_header("插件管理")
-	plugin_manager = plugin.LazyPluginManager(data.PLUGIN_PATH)
+	plugin_manager = plugin.LazyPluginManager(data.PathConfig.PLUGIN_PATH)
 	console = plugin.PluginConsole(plugin_manager)
 	console.run()
 

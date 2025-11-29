@@ -987,7 +987,7 @@ class ReportAuthManager(ClassUnion):
 				self._printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 			elif method == "load":
 				# 从文件加载学生账号Token(文件路径在data模块定义)
-				token_list = self._file.read_line(data.TOKEN_DIR)
+				token_list = self._file.read_line(data.PathConfig.TOKEN_FILE_PATH)
 				self.student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
 				self._printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号Token", "SUCCESS")
 		except Exception as e:
@@ -1012,7 +1012,7 @@ class ReportAuthManager(ClassUnion):
 				username, password = selected_account
 				self._printer.print_message(f"切换学生账号: {id(username)}", "INFO")
 				sleep(2)  # 避免接口限流
-				self._community_login.login(
+				self._auth.login(
 					identity=username,
 					password=password,
 					status="edu",  # 教育账号标识

@@ -7,8 +7,8 @@ from src.utils import acquire, data, file
 from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
-CAPTCHA_DIR: Path = data.CURRENT_DIR / "captcha.jpg"
-JS_DIR: Path = data.CURRENT_DIR / "js_module"
+CAPTCHA_DIR: Path = data.PathConfig.CURRENT_DIR / "captcha.jpg"
+JS_DIR: Path = data.PathConfig.CURRENT_DIR / "js_module"
 
 
 @singleton

@@ -298,7 +298,7 @@ class Motion(ClassUnion):
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
 		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
-		fiction_dir = data.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir = data.PathConfig.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
@@ -363,7 +363,7 @@ class Motion(ClassUnion):
 		"""
 		实现风纪欲望的小帮手
 		"""
-		token_list = self._file.read_line(data.TOKEN_DIR)
+		token_list = self._file.read_line(data.PathConfig.TOKEN_FILE_PATH)
 		_student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
 		print(f"正在查找发布时间在{self._tool.TimeUtils().format_timestamp(timeline)}之后的帖子")
 		post_list: list = self._forum_obtain.fetch_hot_posts_ids()["items"][0:19]
@@ -446,10 +446,10 @@ class MillenniumEntanglement(ClassUnion):
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
-				response = self._community_login.login(identity=identity, password=pass_key, status="edu", prefer_method="password")
+				response = self._auth.login(identity=identity, password=pass_key, status="edu", prefer_method="simple_password")
 				token = response["auth"]["token"]
 				token_list.append(token)
-				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")
+				self._file.file_write(path=data.PathConfig.TOKEN_FILE_PATH, content=f"{token}\n", method="a")
 			return token_list
 
 		if action_type == "delete":

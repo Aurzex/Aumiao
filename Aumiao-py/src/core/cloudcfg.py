@@ -1,158 +1,18 @@
 import cmd
-import hashlib
 import json
 import shlex
 import threading
 import time
 import traceback
-import uuid
 from collections.abc import Callable
 from contextlib import suppress
-from enum import Enum
 from typing import Any, cast
 
 import httpx
 import websocket
 
-
-# ==============================
-# 常量定义 - 分类整理
-# ==============================
-class HTTPConfig:
-	"""HTTP相关配置"""
-
-	SUCCESS_CODE = 200
-	CONNECTION_TIMEOUT = 30
-	REQUEST_TIMEOUT = 10
-
-
-class WebSocketConfig:
-	"""WebSocket相关配置"""
-
-	PING_MESSAGE = "2"
-	PONG_MESSAGE = "3"
-	CONNECT_MESSAGE = "40"
-	CONNECTED_MESSAGE = "40"
-	EVENT_MESSAGE_PREFIX = "42"
-	HANDSHAKE_MESSAGE_PREFIX = "0"
-	TRANSPORT_TYPE = "websocket"
-	PING_INTERVAL = 20
-	PING_TIMEOUT = 10
-	MESSAGE_TYPE_LENGTH = 2
-
-
-class DisplayConfig:
-	"""显示相关配置"""
-
-	MAX_DISPLAY_LENGTH = 50
-	TRUNCATED_SUFFIX = "..."
-	MAX_LIST_DISPLAY_ELEMENTS = 6
-	PARTIAL_LIST_DISPLAY_COUNT = 3
-
-
-class DataConfig:
-	"""数据相关配置"""
-
-	DEFAULT_RANKING_LIMIT = 31
-	MAX_RECONNECT_ATTEMPTS = 5
-	RECONNECT_INTERVAL = 8
-	PING_INTERVAL_MS = 25000
-	PING_TIMEOUT_MS = 5000
-	DATA_TIMEOUT = 30
-	WAIT_TIMEOUT = 30
-
-
-class ValidationConfig:
-	"""验证相关配置"""
-
-	MIN_RANKING_LIMIT = 1
-	MAX_RANKING_LIMIT = 31
-	ASCENDING_ORDER = 1
-	DESCENDING_ORDER = -1
-	LIST_START_INDEX = 0
-	FIRST_ELEMENT_INDEX = 0
-	LAST_ELEMENT_INDEX = -1
-	MIN_LIST_INDEX = 0
-	# 最小参数数量
-	MIN_LIST_OPERATION_ARGS = 2
-	MIN_SET_ARGS = 2
-	MIN_INSERT_ARGS = 2
-	MIN_REMOVE_ARGS = 1
-	MIN_REPLACE_ARGS = 2
-	MIN_GET_ARGS = 1
-	MIN_RANKING_ARGS = 1
-
-
-class ErrorMessages:
-	"""错误消息常量"""
-
-	CALLBACK_EXECUTION = "回调执行错误"
-	CLOUD_VARIABLE_CALLBACK = "云变量变更回调执行错误"
-	RANKING_CALLBACK = "排行榜回调执行错误"
-	OPERATION_CALLBACK = "操作回调执行错误"
-	EVENT_CALLBACK = "事件回调执行错误"
-	SEND_MESSAGE = "发送消息错误"
-	CONNECTION = "连接错误"
-	WEB_SOCKET_RUN = "WebSocket运行错误"
-	CLOSE_CONNECTION = "关闭连接时出错"
-	GET_SERVER_TIME = "获取服务器时间失败"
-	HANDSHAKE_DATA_PARSE = "握手数据解析失败"
-	HANDSHAKE_PROCESSING = "握手处理错误"
-	JSON_PARSE = "JSON解析错误"
-	CLOUD_MESSAGE_PROCESSING = "云消息处理错误"
-	CREATE_DATA_ITEM = "创建数据项时出错"
-	INVALID_RANKING_DATA = "无效的排行榜数据格式"
-	PING_SEND = "发送 ping 失败"
-	NO_PENDING_REQUESTS = "收到排行榜数据但没有待处理的请求"
-	INVALID_VARIABLE_TYPE = "云变量值必须是整数或字符串"
-	INVALID_LIST_ITEM_TYPE = "列表元素必须是整数或字符串"
-	INVALID_RANKING_ORDER = "排序顺序必须是1(正序)或-1(逆序)"
-	INVALID_RANKING_LIMIT = "限制数量必须是正整数"
-
-
-# ==============================
-# 枚举类型定义
-# ==============================
-class EditorType(Enum):
-	"""编辑器类型枚举"""
-
-	NEMO = "NEMO"
-	KITTEN = "KITTEN"
-	KITTEN_N = "NEKO"
-	COCO = "COCO"
-
-
-class DataType(Enum):
-	"""云数据类型枚举"""
-
-	PRIVATE_VARIABLE = 0
-	PUBLIC_VARIABLE = 1
-	LIST = 2
-
-
-class ReceiveMessageType(Enum):
-	"""接收消息类型枚举"""
-
-	JOIN = "connect_done"
-	RECEIVE_ALL_DATA = "list_variables_done"
-	UPDATE_PRIVATE_VARIABLE = "update_private_vars_done"
-	RECEIVE_PRIVATE_VARIABLE_RANKING_LIST = "list_ranking_done"
-	UPDATE_PUBLIC_VARIABLE = "update_vars_done"
-	UPDATE_LIST = "update_lists_done"
-	ILLEGAL_EVENT = "illegal_event_done"
-	UPDATE_ONLINE_USER_NUMBER = "online_users_change"
-
-
-class SendMessageType(Enum):
-	"""发送消息类型枚举"""
-
-	JOIN = "join"
-	GET_ALL_DATA = "list_variables"
-	UPDATE_PRIVATE_VARIABLE = "update_private_vars"
-	GET_PRIVATE_VARIABLE_RANKING_LIST = "list_ranking"
-	UPDATE_PUBLIC_VARIABLE = "update_vars"
-	UPDATE_LIST = "update_lists"
-
+from src.api.auth import CloudAuthenticator
+from src.core.base import DataConfig, DataType, DisplayConfig, EditorType, ErrorMessages, HTTPConfig, ReceiveMessageType, SendMessageType, ValidationConfig, WebSocketConfig
 
 # ==============================
 # 类型别名定义
@@ -204,44 +64,6 @@ class WorkInfo:
 		self.user_id = data.get("user_id", 0)
 		self.preview_url = data.get("preview", "")
 		self.source_urls = data.get("source_urls", data.get("work_urls", []))
-
-
-class CloudAuthenticator:
-	"""云服务认证管理器"""
-
-	def __init__(self, authorization_token: str | None = None) -> None:
-		self.authorization_token = authorization_token
-		self.client_id = str(uuid.uuid4())
-		self.time_difference = 0
-
-	@staticmethod
-	def get_current_time() -> int:
-		"""获取服务器当前时间"""
-		try:
-			response = httpx.get("https://api.codemao.cn/coconut/clouddb/currentTime", timeout=HTTPConfig.REQUEST_TIMEOUT)
-			if response.status_code == HTTPConfig.SUCCESS_CODE:
-				data: dict | str = response.json()
-				if isinstance(data, dict) and "data" in data:
-					return data["data"]
-				return int(cast("str", data))
-		except Exception as error:
-			print(f"{ErrorMessages.GET_SERVER_TIME}: {error}")
-		return int(time.time())
-
-	def get_calibrated_timestamp(self) -> int:
-		"""获取校准后的时间戳"""
-		if self.time_difference == 0:
-			server_time = self.get_current_time()
-			local_time = int(time.time())
-			self.time_difference = local_time - server_time
-		return int(time.time()) - self.time_difference
-
-	def generate_device_auth(self) -> dict[str, Any]:
-		"""生成设备认证信息"""
-		timestamp = self.get_calibrated_timestamp()
-		sign_text = f"pBlYqXbJDu{timestamp}{self.client_id}"
-		sign = hashlib.sha256(sign_text.encode()).hexdigest().upper()
-		return {"sign": sign, "timestamp": timestamp, "client_id": self.client_id}
 
 
 # ==============================
@@ -611,7 +433,7 @@ class CloudConnection:
 	def _get_websocket_headers(self) -> dict[str, str]:
 		"""获取WebSocket请求头"""
 		headers: dict[str, str] = {}
-		device_auth = self.authenticator.generate_device_auth()
+		device_auth = self.authenticator.generate_x_device_auth()
 		headers["X-Creation-Tools-Device-Auth"] = json.dumps(device_auth)
 		if self.authenticator.authorization_token:
 			headers["Cookie"] = f"Authorization={self.authenticator.authorization_token}"
