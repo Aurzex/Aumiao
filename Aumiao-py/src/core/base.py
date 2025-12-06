@@ -3,7 +3,7 @@
 from collections import namedtuple
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, auto
 from typing import Any, Literal, TypedDict, cast
 
 from src.api import auth, community, edu, forum, library, shop, user, whale, work
@@ -196,13 +196,41 @@ class SendMessageType(Enum):
 	UPDATE_LIST = "update_lists"
 
 
-class EColorFormat(Enum):
+class ConnectionType(Enum):
+	"""连接类型"""
+
+	PREVIOUS_STATEMENT = "previous_statement"
+	NEXT_STATEMENT = "next_statement"
+	INPUT_VALUE = "input_value"
+	OUTPUT_VALUE = "output_value"
+
+
+class ShadowType(Enum):
+	"""影子积木类型"""
+
+	REGULAR = "regular"
+	EMPTY = "empty"
+	VALUE = "value"
+	REPLACEABLE = "replaceable"
+	STATEMENT = "statement"
+
+
+class ShadowCategory(Enum):
+	"""影子积木分类"""
+
+	DEFAULT_VALUE = "default_value"
+	PLACEHOLDER = "placeholder"
+	INPUT_TEMPLATE = "input_template"
+	TOOLBOX_PREVIEW = "toolbox_preview"
+
+
+class ColorFormat(Enum):
 	"""颜色格式枚举"""
 
-	ColorPalette = 1
-	ColorString = 2
-	HSVA = 3
-	RGBA = 4
+	COLOR_PALETTE = auto()
+	COLOR_STRING = auto()
+	HSVA = auto()
+	RGBA = auto()
 
 
 class ControllerType(Enum):
