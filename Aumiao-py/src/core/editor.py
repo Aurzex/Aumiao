@@ -5,13 +5,14 @@ KN项目编辑器 - 完整增强版
 
 import copy
 import json
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 
 # ============================================================================
@@ -279,7 +280,7 @@ class BlockCategory(Enum):
 
 
 # ============================================================================
-# 数据类定义(保持不变)
+# 数据类定义
 # ============================================================================
 @dataclass
 class BlockDefinition:
@@ -412,37 +413,53 @@ class Block:
 		return block
 
 	def get_all_blocks(self) -> Sequence["Block"]:
-		"""获取此块及其所有子块 - 使用Sequence协变"""
-		blocks: list[Block] = [self]
-		# 遍历输入
-		for input_block in self.inputs.values():
-			if input_block:
-				blocks.extend(input_block.get_all_blocks())
-		# 遍历语句
-		for statement_blocks in self.statements.values():
-			for block in statement_blocks:
-				blocks.extend(block.get_all_blocks())
-		# 遍历下一个块
-		if self.next:
-			blocks.extend(self.next.get_all_blocks())
+		"""获取此块及其所有子块 - 使用迭代而不是递归避免栈溢出"""
+		blocks: list[Block] = []
+		visited: set[str] = set()
+		stack: list[Block] = [self]
+		while stack:
+			current = stack.pop()
+			if current.id in visited:
+				continue
+			visited.add(current.id)
+			blocks.append(current)
+			# 添加输入块到栈
+			for input_block in current.inputs.values():
+				if input_block and input_block.id not in visited:
+					stack.append(input_block)
+			# 添加语句块到栈
+			for statement_blocks in current.statements.values():
+				for block in statement_blocks:
+					if block.id not in visited:
+						stack.append(block)
+			# 添加下一个块到栈
+			if current.next and current.next.id not in visited:
+				stack.append(current.next)
 		return blocks
 
 	def find_block(self, block_id: str) -> Optional["Block"]:
-		"""查找指定ID的块"""
-		if self.id == block_id:
-			return self
-		for input_block in self.inputs.values():
-			if input_block:
-				found = input_block.find_block(block_id)
-				if found:
-					return found
-		for statement_blocks in self.statements.values():
-			for block in statement_blocks:
-				found = block.find_block(block_id)
-				if found:
-					return found
-		if self.next:
-			return self.next.find_block(block_id)
+		"""查找指定ID的块 - 使用迭代而不是递归"""
+		visited: set[str] = set()
+		stack: list[Block] = [self]
+		while stack:
+			current = stack.pop()
+			if current.id in visited:
+				continue
+			visited.add(current.id)
+			if current.id == block_id:
+				return current
+			# 添加输入块到栈
+			for input_block in current.inputs.values():
+				if input_block and input_block.id not in visited:
+					stack.append(input_block)
+			# 添加语句块到栈
+			for statement_blocks in current.statements.values():
+				for block in statement_blocks:
+					if block.id not in visited:
+						stack.append(block)
+			# 添加下一个块到栈
+			if current.next and current.next.id not in visited:
+				stack.append(current.next)
 		return None
 
 
@@ -698,18 +715,32 @@ class KNProject:
 		return var_id
 
 	def get_all_blocks(self) -> list[Block]:
-		"""获取项目中所有块"""
-		all_blocks = []
+		"""获取项目中所有块 - 使用迭代避免递归"""
+		all_blocks: list[Block] = []
+		visited: set[str] = set()
+		# 收集所有起始块
+		stack: list[Block] = []
 		# 场景的块
 		for scene in self.scenes.values():
-			all_blocks.extend(scene.blocks)
-			for block in scene.blocks:
-				all_blocks.extend(block.get_all_blocks())
+			stack.extend(scene.blocks)
 		# 角色的块
 		for actor in self.actors.values():
-			all_blocks.extend(actor.blocks)
-			for block in actor.blocks:
-				all_blocks.extend(block.get_all_blocks())
+			stack.extend(actor.blocks)
+		# 迭代遍历
+		while stack:
+			block = stack.pop()
+			if block.id in visited:
+				continue
+			visited.add(block.id)
+			all_blocks.append(block)
+			# 递归处理输入
+			stack.extend(input_block for input_block in block.inputs.values() if input_block and input_block.id not in visited)
+			# 递归处理语句
+			for stmt_blocks in block.statements.values():
+				stack.extend(stmt_block for stmt_block in stmt_blocks if stmt_block.id not in visited)
+			# 处理下一个块
+			if block.next and block.next.id not in visited:
+				stack.append(block.next)
 		return all_blocks
 
 	def find_block(self, block_id: str) -> Block | None:
@@ -929,8 +960,7 @@ class KNEditor:
 				fixes.extend(f"语句 {stmt_name}: {fix}" for fix in sub_fixes)
 		if block.next:
 			sub_fixes = self.auto_fix_block(block.next)
-			for fix in sub_fixes:
-				fixes.append(f"下一个块: {fix}")
+			fixes.extend(f"下一个块: {fix}" for fix in sub_fixes)
 		return fixes
 
 	# ============================================================================
@@ -1142,8 +1172,6 @@ class KNEditor:
 			return ""
 		self._save_state()
 		original = self.project.actors[actor_id]
-		# 深拷贝角色
-		import copy
 
 		new_actor = copy.deepcopy(original)
 		new_actor.id = str(uuid.uuid4())
@@ -1414,12 +1442,17 @@ class KNEditor:
 	# ============================================================================
 	# 5. 性能优化功能
 	# ============================================================================
-	def optimize_project(self) -> dict[str, int]:
-		"""优化项目性能"""
+	def optimize_project(self, safe_mode: bool = True) -> dict[str, int]:
+		"""优化项目性能 - 增加安全模式"""
 		results: dict[str, int] = {}
-		# 1. 移除未使用的资源
-		unused_resources = self._remove_unused_resources()
-		results["移除未使用的资源"] = unused_resources
+		if safe_mode:
+			print("使用安全模式进行优化(不会删除任何资源)")
+		# 1. 移除未使用的资源(安全模式下跳过)
+		if not safe_mode:
+			unused_resources = self._remove_unused_resources()
+			results["移除未使用的资源"] = unused_resources
+		else:
+			results["移除未使用的资源"] = 0
 		# 2. 压缩块ID
 		compressed_blocks = self._compress_block_ids()
 		results["压缩块ID"] = compressed_blocks
@@ -1429,40 +1462,107 @@ class KNEditor:
 		# 4. 清理空块
 		cleaned_blocks = self._clean_empty_blocks()
 		results["清理空块"] = cleaned_blocks
-		# 5. 优化变量存储
-		optimized_vars = self._optimize_variables()
-		results["优化变量"] = optimized_vars
+		# 5. 优化变量(安全模式下跳过删除操作)
+		if not safe_mode:
+			optimized_vars = self._optimize_variables()
+			results["优化变量"] = optimized_vars
+		else:
+			results["优化变量"] = 0
 		total_optimized = sum(results.values())
 		if total_optimized > 0:
 			print(f"项目优化完成,共优化 {total_optimized} 个项目")
 		return results
 
 	def _remove_unused_resources(self) -> int:
-		"""删除未使用的资源"""
+		"""删除未使用的资源 - 更保守的方法"""
 		if not hasattr(self.project, "resources"):
 			return 0
 		used_resources: set[str] = set()
-		# 收集使用的样式
+		# 1. 收集所有块中使用的资源引用
+		all_blocks = self.project.get_all_blocks()
+		for block in all_blocks:
+			# 收集音频引用
+			if block.type in {"play_audio", "play_audio_and_wait"}:
+				audio_id = block.fields.get("AUDIO", "")
+				if audio_id:
+					used_resources.add(audio_id)
+				# 检查输入中的音频
+				if block.inputs.get("audio_id"):
+					used_resources.update(self._get_resource_refs_from_block(cast("Block", block.inputs["audio_id"])))
+			# 收集样式引用
+			if block.type in {"set_sprite_style", "self_appear", "self_gradually_show_hide"}:
+				style_id = block.fields.get("STYLE", "")
+				if style_id:
+					used_resources.add(style_id)
+			# 收集变量引用(变量本身就是一种资源)
+			if block.type in {"variables_get", "variables_set", "change_variables"}:
+				var_id = block.fields.get("VARIABLE", "")
+				if var_id:
+					used_resources.add(var_id)
+			# 收集函数引用
+			if block.type == "procedures_2_callnoreturn":
+				proc_id = block.fields.get("PROCEDURE", "")
+				if proc_id:
+					used_resources.add(proc_id)
+		# 2. 收集角色和场景中的样式引用
 		for actor in self.project.actors.values():
 			used_resources.update(actor.styles)
 			if actor.current_style_id:
 				used_resources.add(actor.current_style_id)
-		# 收集场景背景
+			# 角色的图片资源
+			if hasattr(actor, "image_resources"):
+				used_resources.update(actor.image_resources)
 		for scene in self.project.scenes.values():
 			if scene.background_image:
 				used_resources.add(scene.background_image)
-		# 收集音频引用(简化处理)
-		all_blocks = self.project.get_all_blocks()
-		for block in all_blocks:
-			if block.type == "play_audio":
-				audio_id = block.fields.get("AUDIO", "")
-				if audio_id:
-					used_resources.add(audio_id)
-		# 删除未使用的资源
-		unused = [resource_id for resource_id in list(self.project.resources.keys()) if resource_id not in used_resources]
+			used_resources.update(scene.styles)
+			if scene.current_style_id:
+				used_resources.add(scene.current_style_id)
+		# 3. 保留项目变量(非常重要!)
+		used_resources.update(self.project.variables.keys())
+		# 4. 保留音频和过程
+		used_resources.update(self.project.audios.keys())
+		used_resources.update(self.project.procedures.keys())
+		# 5. 只删除完全没有引用的资源
+		if not hasattr(self.project, "resources"):
+			return 0
+		unused = [
+			resource_id
+			for resource_id in list(self.project.resources.keys())
+			if resource_id not in used_resources and not resource_id.startswith(("var_", "audio_", "style_", "proc_"))
+		]
 		for resource_id in unused:
-			del self.project.resources[resource_id]
+			# 双重检查:确保不是任何变量、音频、过程、样式的ID
+			is_used = (
+				resource_id in self.project.variables
+				or resource_id in self.project.audios
+				or resource_id in self.project.procedures
+				or resource_id in self.project.styles
+				or any(resource_id in actor.styles for actor in self.project.actors.values())
+				or any(resource_id in scene.styles for scene in self.project.scenes.values())
+			)
+			if not is_used:
+				del self.project.resources[resource_id]
 		return len(unused)
+
+	def _get_resource_refs_from_block(self, block: Block) -> list[str]:
+		"""从块及其子块中提取资源引用"""
+		# 检查当前块的字段
+		refs = [
+			field_value
+			for field_value in block.fields.values()
+			if isinstance(field_value, str) and field_value and re.match(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", field_value)
+		]
+		# 递归检查子块
+		for input_block in block.inputs.values():
+			if input_block:
+				refs.extend(self._get_resource_refs_from_block(input_block))
+		for stmt_blocks in block.statements.values():
+			for stmt_block in stmt_blocks:
+				refs.extend(self._get_resource_refs_from_block(stmt_block))
+		if block.next:
+			refs.extend(self._get_resource_refs_from_block(block.next))
+		return refs
 
 	def _compress_block_ids(self) -> int:
 		"""压缩块ID(将长UUID替换为短ID)"""
@@ -1482,36 +1582,112 @@ class KNEditor:
 		return len(id_map)
 
 	def _merge_duplicate_blocks(self) -> int:
-		"""合并完全相同的块"""
+		"""合并完全相同的块 - 修复递归深度问题"""
 		merged_count = 0
 		all_blocks = self.project.get_all_blocks()
+		# 收集所有块的位置和引用关系,避免递归查找
+		block_lookup: dict[str, Block] = {block.id: block for block in all_blocks}
+		block_references: dict[str, set[str]] = {}  # block_id -> 引用它的块ID集合
+		# 首先构建引用关系图
+		for block in all_blocks:
+			refs = set()
+			# 检查输入引用
+			for input_block in block.inputs.values():
+				if input_block:
+					refs.add(input_block.id)
+			# 检查语句引用
+			for stmt_blocks in block.statements.values():
+				refs.update(stmt_block.id for stmt_block in stmt_blocks)
+			# 检查下一个块引用
+			if block.next:
+				refs.add(block.next.id)
+			# 为每个被引用的块记录引用者
+			for ref_id in refs:
+				if ref_id not in block_references:
+					block_references[ref_id] = set()
+				block_references[ref_id].add(block.id)
 		# 计算块的哈希值
-		block_hashes: dict[str, list[Block]] = {}
 
-		def block_hash(block: Block) -> int:
-			"""计算块的哈希值"""
-			parts = [block.type, str(sorted(block.fields.items())), str(block.mutation)]
-			return hash("|".join(parts))
+		def block_hash(block: Block) -> str:
+			"""计算块的哈希值 - 只考虑重要属性"""
+			# 简化哈希计算,避免复杂结构
+			parts = [
+				block.type,
+				str(sorted(block.fields.items())),
+				block.mutation or "",
+			]
+			# 只考虑直接属性,不递归考虑子块
+			return str(hash("|".join(parts)))
 
 		# 按哈希值分组
+		block_hashes: dict[str, list[str]] = {}  # hash -> 块ID列表
 		for block in all_blocks:
-			h = str(block_hash(block))
+			h = block_hash(block)
 			if h not in block_hashes:
 				block_hashes[h] = []
-			block_hashes[h].append(block)
+			block_hashes[h].append(block.id)
 		# 合并相同哈希的块
-		for blocks in block_hashes.values():
-			if len(blocks) > 1:
-				# 保留第一个,用它的ID替换其他的
-				keep_block = blocks[0]
-				for block in blocks[1:]:
-					# 替换引用
-					self._replace_block_reference(block.id, keep_block.id)
-					merged_count += 1
+		processed_ids: set[str] = set()
+		for block_ids in block_hashes.values():
+			if len(block_ids) <= 1:
+				continue
+			# 保留第一个块,用它的ID替换其他的
+			keep_id = block_ids[0]
+			keep_block = block_lookup[keep_id]
+			for block_id in block_ids[1:]:
+				if block_id in processed_ids:
+					continue
+				# 检查是否形成了循环引用
+				if self._would_create_cycle(keep_id, block_id, block_lookup, block_references):
+					print(f"警告: 跳过合并 {block_id[:8]} -> {keep_id[:8]},因为会形成循环引用")
+					continue
+				# 替换所有对这个块的引用
+				if block_id in block_references:
+					for referrer_id in block_references[block_id]:
+						if referrer_id not in block_lookup:
+							continue
+						referrer_block = block_lookup[referrer_id]
+						# 修复输入引用
+						for input_name, input_block in list(referrer_block.inputs.items()):
+							if input_block and input_block.id == block_id:
+								referrer_block.inputs[input_name] = keep_block
+						# 修复语句引用
+						for _stmt_name, stmt_blocks in list(referrer_block.statements.items()):
+							for i, stmt_block in enumerate(stmt_blocks):
+								if stmt_block.id == block_id:
+									stmt_blocks[i] = keep_block
+						# 修复下一个块引用
+						if referrer_block.next and referrer_block.next.id == block_id:
+							referrer_block.next = keep_block
+				merged_count += 1
+				processed_ids.add(block_id)
 		return merged_count
 
+	def _would_create_cycle(self, keep_id: str, replace_id: str, block_lookup: dict[str, Block], _block_references: dict[str, set[str]]) -> bool:
+		"""检查替换是否会形成循环引用"""
+		# 如果keep_block引用了replace_id,那么替换会形成循环
+		visited: set[str] = set()
+		stack: list[str] = [keep_id]
+		while stack:
+			current_id = stack.pop()
+			if current_id in visited:
+				continue
+			visited.add(current_id)
+			if current_id == replace_id:
+				return True  # 发现循环
+			current_block = block_lookup.get(current_id)
+			if not current_block:
+				continue
+			# 检查当前块是否引用了其他块
+			stack.extend(input_block.id for input_block in current_block.inputs.values() if input_block and input_block.id not in visited)
+			for stmt_blocks in current_block.statements.values():
+				stack.extend(stmt_block.id for stmt_block in stmt_blocks if stmt_block.id not in visited)
+			if current_block.next and current_block.next.id not in visited:
+				stack.append(current_block.next.id)
+		return False
+
 	def _replace_block_reference(self, old_id: str, new_id: str) -> None:
-		"""替换块引用"""
+		"""替换块引用 - 修复递归调用"""
 		for block in self.project.get_all_blocks():
 			# 检查输入
 			for input_name, input_block in list(block.inputs.items()):
@@ -1521,7 +1697,7 @@ class KNEditor:
 					if new_block:
 						block.inputs[input_name] = new_block
 			# 检查语句
-			for stmt_blocks in list(block.statements.values()):
+			for _stmt_name, stmt_blocks in list(block.statements.items()):
 				for i, stmt_block in enumerate(stmt_blocks):
 					if stmt_block.id == old_id:
 						new_block = self.project.find_block(new_id)
@@ -1548,6 +1724,7 @@ class KNEditor:
 		# 检查每个实体的块
 		for scene in self.project.scenes.values():
 			original_count = len(scene.blocks)
+
 			scene.blocks = [b for b in scene.blocks if not is_empty_block(b)]
 			cleaned_count += original_count - len(scene.blocks)
 		for actor in self.project.actors.values():
@@ -1557,32 +1734,48 @@ class KNEditor:
 		return cleaned_count
 
 	def _optimize_variables(self) -> int:
-		"""优化变量存储"""
+		"""优化变量存储 - 更保守的方法"""
 		optimized_count = 0
-		# 1. 移除未使用的变量
-		variable_refs = self._find_all_variable_references()
-		unused_vars = [var_id for var_id in list(self.project.variables.keys()) if var_id not in variable_refs]
-		for var_id in unused_vars:
-			del self.project.variables[var_id]
-			optimized_count += 1
-		# 2. 合并相同值的变量
-		value_map: dict[str, list[str]] = {}
-		for var_id, var_data in self.project.variables.items():
-			value = str(var_data.get("value", "")) if isinstance(var_data, dict) else str(var_data.value)
-			if value not in value_map:
-				value_map[value] = []
-			value_map[value].append(var_id)
-		# 对于每个值,保留第一个变量,其他变量引用它
-		for var_ids in value_map.values():
-			if len(var_ids) > 1:
-				keep_id = var_ids[0]
-				for var_id in var_ids[1:]:
-					# 替换引用
-					self._replace_variable_reference(var_id, keep_id)
-					# 移除重复变量
-					if var_id in self.project.variables:
-						del self.project.variables[var_id]
-						optimized_count += 1
+		# 1. 先找出所有实际使用的变量
+		used_vars = set()
+		all_blocks = self.project.get_all_blocks()
+		for block in all_blocks:
+			# 检查块字段中的变量引用
+			for field_name, field_value in block.fields.items():
+				if isinstance(field_value, str) and field_value in self.project.variables:
+					used_vars.add(field_value)
+				# 检查字段名包含"VARIABLE"的
+				if "VARIABLE" in field_name and field_value in self.project.variables:
+					used_vars.add(field_value)
+		# 2. 保留变量定义中引用的其他变量
+		for var_data in self.project.variables.values():
+			if isinstance(var_data, dict):
+				# 检查变量值中是否引用了其他变量
+				value = var_data.get("value", "")
+				if isinstance(value, str) and value in self.project.variables:
+					used_vars.add(value)
+		# 3. 只删除确实没有引用的变量(但要非常小心)
+		unused_vars = []
+		for var_id in list(self.project.variables.keys()):
+			if var_id not in used_vars:
+				# 双重检查:确保没有任何块引用这个变量
+				is_referenced = False
+				for block in all_blocks:
+					for field_value in block.fields.values():
+						if field_value == var_id:
+							is_referenced = True
+							break
+					if is_referenced:
+						break
+				if not is_referenced:
+					unused_vars.append(var_id)
+		print(f"发现 {len(unused_vars)} 个可能未使用的变量")
+		# 4. 对于未使用的变量,先备份再删除
+		if unused_vars and input("是否要删除未使用的变量?(y/N): ").lower() == "y":
+			for var_id in unused_vars:
+				del self.project.variables[var_id]
+				optimized_count += 1
+			print(f"已删除 {len(unused_vars)} 个未使用的变量")
 		return optimized_count
 
 	def _replace_variable_reference(self, old_id: str, new_id: str) -> None:
@@ -1746,84 +1939,6 @@ class KNEditor:
 	# ============================================================================
 	# 演示和测试方法
 	# ============================================================================
-	def demo_all_features(self) -> None:
-		"""演示所有增强功能"""
-		print("=" * 60)
-		print("KN项目编辑器增强功能演示")
-		print("=" * 60)
-		# 1. 创建测试项目
-		self.create_new_project("增强功能演示项目")
-		# 2. 添加测试角色和代码
-		actor_id = self.project.add_actor("测试角色", {"x": 100, "y": 100})
-		self.select_actor(actor_id)
-		# 添加一些代码块
-		start_block = self.add_block("on_running_group_activated")
-		say_block = self.add_block("self_dialog", fields={"TEXT": "你好!"})
-		move_block = self.add_block("self_move_to", fields={"X": "200", "Y": "200"})
-		# 连接块
-		if start_block and say_block:
-			start_block.next = say_block
-		if say_block and move_block:
-			say_block.next = move_block
-		# 3. 演示块验证
-		print("\n1. 块验证功能:")
-		print("-" * 40)
-		# 创建一个有问题的块
-		bad_block = Block(type="self_move_to")
-		errors = self.validate_block(bad_block)
-		print(f"验证有问题的块: {len(errors)} 个错误")
-		for err in errors[:3]:  # 只显示前3个错误
-			print(f"  - {err}")
-		# 自动修复
-		fixes = self.auto_fix_block(bad_block)
-		print(f"自动修复: {len(fixes)} 个修复")
-		for fix in fixes[:3]:
-			print(f"  - {fix}")
-		# 4. 演示代码生成
-		print("\n2. 代码生成功能:")
-		print("-" * 40)
-		python_code = self.generate_python_code(start_block)
-		print("生成的Python代码:")
-		print(python_code[:200] + "..." if len(python_code) > 200 else python_code)
-		pseudo_code = self.generate_pseudocode(start_block)
-		print("\n生成的伪代码:")
-		print(pseudo_code)
-		# 5. 演示批量操作
-		print("\n3. 批量操作功能:")
-		print("-" * 40)
-		# 批量创建变量
-		variables_to_create = [{"name": "分数", "value": 0}, {"name": "生命", "value": 3}, {"name": "速度", "value": 5}]
-		for var in variables_to_create:
-			self.project.add_variable(str(var["name"]), var["value"])
-		print(f"批量创建了 {len(variables_to_create)} 个变量")
-		# 复制角色
-		new_actor_id = self.duplicate_actor_with_code(actor_id, "复制的角色")
-		if new_actor_id:
-			print(f"成功复制角色: {actor_id[:8]} -> {new_actor_id[:8]}")
-		# 6. 演示错误恢复
-		print("\n4. 错误恢复功能:")
-		print("-" * 40)
-		# 创建一个无效的引用
-		if self.current_scene:
-			self.current_scene.actor_ids.append("invalid_actor_id")
-		# 运行错误修复
-		fixes_result = self.auto_fix_project()
-		for category, fix_list in fixes_result.items():
-			print(f"{category}: {len(fix_list)} 个修复")
-			for fix in fix_list[:2]:  # 只显示前2个
-				print(f"  - {fix}")
-		# 7. 演示性能优化
-		print("\n5. 性能优化功能:")
-		print("-" * 40)
-		# 添加一些重复的块
-		for _ in range(3):
-			self.add_block("wait", fields={"SECONDS": "1"})
-		# 运行优化
-		results = self.optimize_project()
-		for operation, count in results.items():
-			print(f"{operation}: {count}")
-		print("\n演示完成!")
-		print("=" * 60)
 
 
 # ============================================================================
@@ -1833,7 +1948,6 @@ def _is_valid_number(value: Any) -> bool:
 	"""检查是否为有效数字"""
 	try:
 		float(str(value))
-
 	except (ValueError, TypeError):
 		return False
 	else:
@@ -1867,7 +1981,7 @@ class BlockDefinitionManager:
 		self._initialize_definitions()
 
 	def _initialize_definitions(self) -> None:
-		"""初始化块定义 - 增强版,包含必需字段信息"""
+		"""初始化块定义 - 增强版,包含必需字段信息和缺失的块类型"""
 		# 事件类
 		self._add_definition(
 			block_type=BlockType.ON_RUNNING_GROUP_ACTIVATED.value,
@@ -2078,6 +2192,77 @@ class BlockDefinitionManager:
 			default_fields={"OP": "and"},
 			required_inputs=["A", "B"],
 		)
+		# 添加缺失的块类型
+		self._add_definition(
+			block_type="wait_until",
+			name="等待直到条件成立",
+			category=BlockCategory.CONTROL.value,
+			color="#D63AFF",
+			inputs={"CONDITION": BlockType.LOGIC_BOOLEAN.value},
+			can_have_next=True,
+			required_inputs=["CONDITION"],
+		)
+		self._add_definition(
+			block_type="mouse_down",
+			name="鼠标按下",
+			category=BlockCategory.SENSING.value,
+			color="#4CBFE6",
+			fields={"MOUSE_BUTTON": FieldType.TEXT},
+			is_output=True,
+			default_fields={"MOUSE_BUTTON": "left"},
+		)
+		self._add_definition(
+			block_type="self_appear",
+			name="显示/隐藏",
+			category=BlockCategory.APPEARANCE.value,
+			color="#FF66CC",
+			fields={"STATE": FieldType.BOOLEAN},
+			can_have_next=True,
+			default_fields={"STATE": "true"},
+		)
+		self._add_definition(
+			block_type="self_gradually_show_hide",
+			name="渐变显示/隐藏",
+			category=BlockCategory.APPEARANCE.value,
+			color="#FF66CC",
+			fields={"ACTION": FieldType.DROPDOWN, "TIME": FieldType.NUMBER},
+			can_have_next=True,
+			default_fields={"ACTION": "show", "TIME": "1"},
+		)
+		self._add_definition(
+			block_type="procedures_2_callnoreturn",
+			name="调用函数",
+			category=BlockCategory.PROCEDURE.value,
+			color="#FF8C00",
+			fields={"PROCEDURE": FieldType.PROCEDURE},
+			can_have_next=True,
+			required_fields=["PROCEDURE"],
+		)
+		self._add_definition(
+			block_type="get_play_audio",
+			name="获取音频ID",
+			category=BlockCategory.AUDIO.value,
+			color="#D65F8A",
+			fields={"AUDIO": FieldType.AUDIO},
+			is_output=True,
+			required_fields=["AUDIO"],
+		)
+		self._add_definition(
+			block_type="set_sprite_style",
+			name="设置角色样式",
+			category=BlockCategory.APPEARANCE.value,
+			color="#FF66CC",
+			fields={"STYLE": FieldType.STYLE},
+			can_have_next=True,
+			required_fields=["STYLE"],
+		)
+		self._add_definition(
+			block_type="get_styles",
+			name="获取样式列表",
+			category=BlockCategory.APPEARANCE.value,
+			color="#FF66CC",
+			is_output=True,
+		)
 		print(f"已初始化 {len(self.definitions)} 种块定义(增强版)")
 
 	def _add_definition(
@@ -2131,3 +2316,95 @@ class BlockDefinitionManager:
 		"""按分类获取块定义"""
 		block_types = self.categories.get(category, [])
 		return [self.definitions[t] for t in block_types if t in self.definitions]
+
+
+def open_existing_project_for_editing(filepath: str | Path) -> tuple[KNEditor, bool]:
+	"""
+	打开已有作品进行编辑
+	参数:
+		filepath: 项目文件路径(.kn格式)
+	返回:
+		tuple[KNEditor, bool]: (编辑器实例, 是否成功加载)
+	"""
+	editor = KNEditor()
+	try:
+		# 1. 加载项目文件
+		editor.load_project(filepath)
+		# 2. 自动验证项目完整性
+		validation_results = editor.validate_project()
+		if validation_results:
+			print("项目验证发现以下问题:")
+			for category, errors in validation_results.items():
+				print(f"\n{category}:")
+				for error in errors[:5]:  # 只显示前5个错误
+					print(f"  - {error}")
+				if len(errors) > 5:
+					print(f"  还有 {len(errors) - 5} 个问题...")
+		# 3. 自动修复常见问题
+		fixes = editor.auto_fix_project()
+		if fixes:
+			print("\n已自动修复以下问题:")
+			for category, fix_list in fixes.items():
+				print(f"\n{category} (共{len(fix_list)}项修复):")
+				for fix in fix_list[:3]:  # 只显示前3个修复
+					print(f"  - {fix}")
+				if len(fix_list) > 3:
+					print(f"  还有 {len(fix_list) - 3} 项修复...")
+		# 4. 创建备份
+		backup_path = editor.create_backup()
+		print(f"\n已创建项目备份: {backup_path}")
+		# 5. 自动选择默认编辑对象
+		if editor.project.scenes:
+			# 选择第一个场景
+			first_scene_id = list(editor.project.scenes.keys())[0]
+			editor.select_scene(first_scene_id)
+			print(f"已选择场景: {editor.current_scene.name if editor.current_scene else first_scene_id}")
+		# 6. 显示项目信息
+		print("\n项目信息:")
+		print(f"  名称: {editor.project.project_name}")
+		print(f"  版本: {editor.project.version}")
+		print(f"  场景数: {len(editor.project.scenes)}")
+		print(f"  角色数: {len(editor.project.actors)}")
+		total_blocks = len(editor.project.get_all_blocks())
+		print(f"  总代码块数: {total_blocks}")
+		return editor, True
+	except FileNotFoundError:
+		print(f"错误: 找不到文件 {filepath}")
+		return editor, False
+	except json.JSONDecodeError as e:
+		print(f"错误: 文件格式错误 - {e}")
+		return editor, False
+	except Exception as e:
+		print(f"错误: 加载项目失败 - {e}")
+		return editor, False
+
+
+# 使用示例
+if __name__ == "__main__":
+	# 示例1: 打开已有项目进行编辑
+	project_path = Path(input("请输入项目文件路径: "))
+	editor, success = open_existing_project_for_editing(project_path)
+	if success:
+		print(f"\n项目 '{editor.project.project_name}' 已成功加载!")
+		print(f"文件路径: {editor.project.filepath}")
+		# 现在可以进行各种编辑操作:
+		# 1. 添加新代码块
+		if editor.current_scene:
+			new_block = editor.add_block(block_type="self_dialog", location=(100, 100), fields={"TEXT": "你好!"})
+			if new_block:
+				print(f"添加了新对话块: {new_block.id[:8]}")
+		# 2. 生成Python代码
+		python_code = editor.generate_python_code()
+		print(f"\n生成的Python代码:\n{python_code}")
+		# 3. 优化项目
+		optimization_results = editor.optimize_project()
+		if optimization_results:
+			print(f"\n优化结果: {optimization_results}")
+		# 4. 保存修改
+		editor.save_project()
+		print("项目已保存!")
+		# 5. 显示当前场景的代码块树
+		print("\n代码块树结构:")
+		editor.print_block_tree()
+	else:
+		print("项目加载失败,请检查文件路径和格式。")
