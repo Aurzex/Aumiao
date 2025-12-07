@@ -356,7 +356,7 @@ class CodeMaoTool:
 					print(f"对话历史 ({client.get_conversation_count()} 轮):")
 					for i, msg in enumerate(history[-6:], 1):
 						role = "你" if msg["role"] == "user" else "AI"
-						content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]  # noqa: PLR2004
+						content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]
 						print(f"  {i}. {role}: {content_preview}")
 					continue
 				print("AI: ", end="", flush=True)
@@ -416,7 +416,7 @@ class CodeMaoAIClient:
 			chat_count = user_info.get("chat_count", 0)
 			if self.verbose:
 				print(f"当前token剩余对话次数: {chat_count}")
-			return chat_count >= 2  # 剩余次数大于等于2次认为充足  # noqa: PLR2004, TRY300
+			return chat_count >= 2  # 剩余次数大于等于2次认为充足  # noqa: TRY300
 		except Exception as e:
 			if self.verbose:
 				print(f"检查配额失败: {e}")

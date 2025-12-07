@@ -81,7 +81,13 @@ class CommentProcessor:
 				target_lists["duplicates"].extend(identifiers)
 
 	def _process_abnormal_comments(
-		self, comments: list[dict[str, Any]], item_id: int, title: str, action_type: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		action_type: str,
+		params: dict[str, Any],
+		target_lists: defaultdict[str, list[str]],
 	) -> None:
 		"""处理异常评论 广告/黑名单:"""
 		for comment in comments:
@@ -120,7 +126,11 @@ class CommentProcessor:
 		# 生成日志信息
 		if action_type in log_templates:
 			log_message = log_templates[action_type].format(
-				type=log_type, title=title[:10], parent=parent_info, content=data.get("content", "")[:50], nickname=data.get("nickname", "未知用户")
+				type=log_type,
+				title=title[:10],
+				parent=parent_info,
+				content=data.get("content", "")[:50],
+				nickname=data.get("nickname", "未知用户"),
 			)
 			print(log_message)
 		# 添加到目标列表
@@ -675,7 +685,7 @@ class ReportProcessor(ClassUnion):
 		if user_id != "UNKNOWN":
 			self._printer.print_message(f"违规用户链接: https://shequ.codemao.cn/user/{user_id}", "INFO")
 
-	def _check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:  # noqa: ANN401
+	def _check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:
 		"""检查举报内容违规"""
 		# 这里实现违规检查逻辑,可以从旧版代码移植
 		self._printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
@@ -735,7 +745,11 @@ class ReportProcessor(ClassUnion):
 			# 检查广告、黑名单、重复评论
 			for check_type in ["ads", "blacklist", "duplicates"]:
 				comment_processor.process_item(
-					item={"id": source_id, "title": board_name}, config=config, action_type=check_type, params=check_params, target_lists=violation_targets
+					item={"id": source_id, "title": board_name},
+					config=config,
+					action_type=check_type,
+					params=check_params,
+					target_lists=violation_targets,
 				)
 			# 合并所有违规内容(去重,避免重复举报)
 			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
@@ -743,7 +757,7 @@ class ReportProcessor(ClassUnion):
 			self._printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
-	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0912, PLR0914, PLR0915
+	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0914, PLR0915
 		"""处理自动举报:用学生账号批量举报违规评论"""
 		# 1. 检查学生账号是否可用
 		if not (self.auth_manager.student_accounts or self.auth_manager.student_tokens):
@@ -777,11 +791,11 @@ class ReportProcessor(ClassUnion):
 		for idx, violation in enumerate(violations, 1):
 			# 解析违规内容格式
 			violation_parts = violation.split(":")
-			if len(violation_parts) < 2:  # noqa: PLR2004
+			if len(violation_parts) < 2:
 				self._printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
 				continue
 			item_id_part = violation_parts[0].split(".")
-			if len(item_id_part) < 2:  # noqa: PLR2004
+			if len(item_id_part) < 2:
 				self._printer.print_message(f"违规ID格式错误: {violation_parts[0]}", "ERROR")
 				continue
 			_, comment_id = item_id_part
@@ -882,11 +896,20 @@ class ReportProcessor(ClassUnion):
 					if is_reply and parent_id is not None:
 						# 回复类型:需传入父评论ID
 						return self._shop_motion.execute_report_comment(
-							comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, comment_parent_id=parent_id, description=description
+							comment_id=target_id,
+							reason_content=reason_content,
+							reason_id=reason_id,
+							reporter_id=reporter_id,
+							comment_parent_id=parent_id,
+							description=description,
 						)
 					# 普通评论:无需父ID
 					return self._shop_motion.execute_report_comment(
-						comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, description=description
+						comment_id=target_id,
+						reason_content=reason_content,
+						reason_id=reason_id,
+						reporter_id=reporter_id,
+						description=description,
 					)
 			# 未知来源类型:举报失败
 		except Exception as e:
@@ -1059,7 +1082,13 @@ class FileProcessor(ClassUnion):
 		return url
 
 	def handle_directory_upload(
-		self, dir_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader, *, recursive: bool
+		self,
+		dir_path: Path,
+		save_path: str,
+		method: Literal["pgaot", "codemao", "codegame"],
+		uploader: acquire.FileUploader,
+		*,
+		recursive: bool,
 	) -> dict[str, str | None]:
 		"""处理整个文件夹的上传流程"""
 		results = {}
@@ -1082,7 +1111,11 @@ class FileProcessor(ClassUnion):
 					# 记录上传历史
 					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
 					history = data.UploadHistory(
-						file_name=str(relative_path), file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp()
+						file_name=str(relative_path),
+						file_size=file_size_human,
+						method=method,
+						save_url=url,
+						upload_time=self._tool.TimeUtils().current_timestamp(),
 					)
 					self._upload_history.data.history.append(history)
 					results[str(child_file)] = url
@@ -1135,7 +1168,7 @@ class FileProcessor(ClassUnion):
 				com_index = url.find(".com")
 				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
 				return f"[cdn]{simplified_url}"
-			simplified_url = url[:30] + "..." if len(url) > 30 else url  # noqa: PLR2004
+			simplified_url = url[:30] + "..." if len(url) > 30 else url
 			return f"[other]{simplified_url}"
 
 		# 批量验证链接函数

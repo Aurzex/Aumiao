@@ -258,7 +258,7 @@ class Motion(ClassUnion):
 					}
 				)
 				(self._work_motion.create_comment_reply if source_type == "work" else self._forum_motion.create_comment_reply)(
-					**params  # pyright: ignore[reportArgumentType]
+					**params,  # pyright: ignore[reportArgumentType]
 				)  # 优化方法名:reply_to_comment→create_comment_reply
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
 			except Exception as e:
@@ -505,11 +505,20 @@ class MillenniumEntanglement(ClassUnion):
 					if is_reply and parent_id is not None:
 						# 回复类型:需传入父评论ID
 						return self._shop_motion.execute_report_comment(
-							comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, comment_parent_id=parent_id, description=description
+							comment_id=target_id,
+							reason_content=reason_content,
+							reason_id=reason_id,
+							reporter_id=reporter_id,
+							comment_parent_id=parent_id,
+							description=description,
 						)
 					# 普通评论:无需父ID
 					return self._shop_motion.execute_report_comment(
-						comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, description=description
+						comment_id=target_id,
+						reason_content=reason_content,
+						reason_id=reason_id,
+						reporter_id=reporter_id,
+						description=description,
 					)
 			# 未知来源类型:举报失败
 		except Exception as e:

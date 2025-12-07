@@ -168,7 +168,7 @@ class FileHelper:
 		Path(path).mkdir(parents=True, exist_ok=True)
 
 	@staticmethod
-	def write_json(path: str | Path, data: Any) -> None:  # noqa: ANN401
+	def write_json(path: str | Path, data: Any) -> None:
 		"""写入JSON文件"""
 		with Path(path).open("w", encoding="utf-8") as f:
 			json.dump(data, f, ensure_ascii=False, indent=2)
@@ -515,7 +515,7 @@ class KittenDecompiler(BaseDecompiler):
 				"project_name": self.work_info.name,
 				"toolbox_order": toolbox_categories,
 				"last_toolbox_order": toolbox_categories,
-			}
+			},
 		)
 
 	@staticmethod
@@ -608,7 +608,7 @@ class BlockProcessor:
 				"shadows": self.shadows,
 				"type": block_type,
 				"visible": "visible",
-			}
+			},
 		)
 		self.actor.connections[block_id] = self.connection
 		self.actor.blocks[block_id] = self.block
@@ -720,7 +720,7 @@ class FunctionProcessor(BlockProcessor):
 					"kind": "domain_block",
 					"params": {"param_name": param_name, "param_default_value": ""},
 					"type": "procedures_2_stable_parameter",
-				}
+				},
 			)
 			param_block["parent_id"] = self.block["id"]
 			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
@@ -798,7 +798,7 @@ class CocoDecompiler(BaseDecompiler):
 					"objectVariables": [],
 					"primitiveVariables": [],
 					"widgets": {},
-				}
+				},
 			)
 			for widget_id in screen["widgetIds"] + screen["invisibleWidgetIds"]:
 				screen["widgets"][widget_id] = work["widgetMap"][widget_id]
@@ -814,7 +814,7 @@ class CocoDecompiler(BaseDecompiler):
 				"globalWidgets": work["widgetMap"],
 				"sourceId": "",
 				"sourceTag": 1,
-			}
+			},
 		)
 
 	@staticmethod

@@ -45,7 +45,7 @@ class DisplayHelper:
 	"""显示辅助类,处理长文本截断和格式化显示"""
 
 	@staticmethod
-	def truncate_value(value: Any, max_length: int = DisplayConfig.MAX_DISPLAY_LENGTH) -> str:  # noqa: ANN401
+	def truncate_value(value: Any, max_length: int = DisplayConfig.MAX_DISPLAY_LENGTH) -> str:
 		"""截断过长的值用于显示"""
 		if isinstance(value, (int, float, bool)):
 			return str(value)
@@ -551,7 +551,7 @@ class CloudConnection:
 		try:
 			data_str = message[WebSocketConfig.MESSAGE_TYPE_LENGTH :]
 			data_list = json.loads(data_str)
-			if isinstance(data_list, list) and len(data_list) >= 2:  # noqa: PLR2004
+			if isinstance(data_list, list) and len(data_list) >= 2:
 				message_type = data_list[0]
 				message_data = data_list[1]
 				print(f"处理云消息: {message_type}, 数据: {DisplayHelper.truncate_value(message_data)}")
@@ -963,7 +963,7 @@ class CloudConnection:
 				print("✓ 连接已建立")
 				return True
 			current_time = time.time()
-			if current_time - last_log_time >= 3:  # noqa: PLR2004
+			if current_time - last_log_time >= 3:
 				elapsed = current_time - start_time
 				print(f"等待连接中... 已等待 {elapsed:.1f} 秒")
 				last_log_time = current_time
@@ -980,7 +980,7 @@ class CloudConnection:
 				print("✓ 数据加载完成!")
 				return True
 			current_time = time.time()
-			if current_time - last_log_time >= 5:  # noqa: PLR2004
+			if current_time - last_log_time >= 5:
 				elapsed = current_time - start_time
 				print(f"等待数据中... 已等待 {elapsed:.1f} 秒, 连接状态: {self.connected}")
 				last_log_time = current_time
@@ -1280,7 +1280,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 			print(f"  公有变量: {len(available['public_variables'])} 个")
 			print(f"  云列表: {len(available['lists'])} 个")
 
-	def do_available(self, arg: str) -> None:  # noqa: PLR0912
+	def do_available(self, arg: str) -> None:
 		"""显示所有可用变量和列表
 		用法: available [详细]"""
 		if not self.connection.data_ready:
@@ -1597,7 +1597,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		list_ops replace <列表名> <位置> <值> - 替换指定位置的元素
 		list_ops clear <列表名>          - 清空列表所有元素
 		list_ops get <列表名> <位置>     - 获取指定位置的元素
-		"""
+		""",
 		)
 
 	def do_ranking(self, arg: str) -> None:
@@ -1622,7 +1622,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 			except ValueError:
 				print("错误: 数量必须是数字")
 				return
-		if len(args) > 2:  # noqa: PLR2004
+		if len(args) > 2:
 			try:
 				order = int(args[2])
 				if order not in {ValidationConfig.ASCENDING_ORDER, ValidationConfig.DESCENDING_ORDER}:

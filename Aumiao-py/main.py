@@ -103,7 +103,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 	"""统一错误处理装饰器 - 性能优化"""
 
 	@wraps(func)
-	def wrapper(*args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
+	def wrapper(*args: Any, **kwargs: Any) -> Any | None:
 		try:
 			return func(*args, **kwargs)
 		except ValueError as ve:
@@ -192,7 +192,7 @@ def require_login(func: Callable[..., Any]) -> Callable[..., Any]:
 	"""登录检查装饰器"""
 
 	@wraps(func)
-	def wrapper(account_data_manager: AccountDataManager, *args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
+	def wrapper(account_data_manager: AccountDataManager, *args: Any, **kwargs: Any) -> Any | None:
 		if not account_data_manager.is_logged_in:
 			print(printer.color_text("请先登录!", "ERROR"))
 			return None

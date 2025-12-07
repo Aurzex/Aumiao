@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import operator
 import re
@@ -2102,298 +2103,281 @@ class KNEditor:
 		self.project.print_summary()
 
 
-def main() -> None:
-	"""主函数 - 交互式KN项目解析器"""
+def main() -> None:  # noqa: PLR0912, PLR0914, PLR0915
+	"""主函数 - 交互式KN项目编辑器"""
 	print("=" * 60)
-	print("KN项目文件解析器")
+	print("KN项目编辑器")
 	print("=" * 60)
+	editor = KNEditor()
 	while True:
 		print("\n请选择操作:")
-		print("1. 解析项目文件")
-		print("2. 分析过程/函数")
-		print("3. 导出为XML格式")
-		print("4. 从XML导入")
-		print("5. 分析项目结构")
-		print("6. 显示项目摘要")
-		print("7. 列出所有元素")
-		print("8. 查看特定过程")
-		print("0. 退出")
-		choice = input("\n请输入选项编号 (0-8): ").strip()
-		if choice == "0":
+		print(" 1. 创建新项目")
+		print(" 2. 加载项目文件")
+		print(" 3. 保存项目")
+		print(" 4. 显示项目摘要")
+		print(" 5. 分析项目结构")
+		print(" 6. 管理场景")
+		print(" 7. 管理角色")
+		print(" 8. 管理积木")
+		print(" 9. 管理变量/函数/音频")
+		print("10. 导出为XML格式")
+		print("11. 从XML导入")
+		print("12. 创建示例程序")
+		print("13. 查找积木/角色/场景")
+		print("14. 退出")
+		choice = input("请输入选项 (1-14): ").strip()
+		if choice == "1":
+			project_name = input("请输入项目名称: ").strip()
+			editor.project = KNProject(project_name)
+			print(f"已创建新项目: {project_name}")
+		elif choice == "2":
+			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
+			try:
+				editor.load_project(filepath)
+			except Exception as e:
+				print(f"加载失败: {e}")
+		elif choice == "3":
+			if editor.project.filepath:
+				save_path = input(f"保存路径 [{editor.project.filepath}]: ").strip()
+				if not save_path:
+					save_path = editor.project.filepath
+			else:
+				save_path = input("请输入保存路径: ").strip()
+			try:
+				editor.save_project(save_path)
+			except Exception as e:
+				print(f"保存失败: {e}")
+		elif choice == "4":
+			if editor.project:
+				editor.print_project_info()
+			else:
+				print("请先加载或创建项目")
+		elif choice == "5":
+			if editor.project:
+				analysis = editor.project.analyze_project()
+				print("\n" + "=" * 60)
+				print("项目详细分析:")
+				print("=" * 60)
+				for key, value in analysis.items():
+					if key in {"block_type_counts", "category_counts"}:
+						print(f"\n{key}:")
+						for sub_key, sub_value in value.items():
+							print(f"  {sub_key}: {sub_value}")
+					else:
+						print(f"{key}: {value}")
+			else:
+				print("请先加载或创建项目")
+		elif choice == "6":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			print("\n场景管理:")
+			print(" 1. 添加场景")
+			print(" 2. 查看所有场景")
+			print(" 3. 选择当前场景")
+			print(" 4. 添加积木到场景")
+			sub_choice = input("请选择: ").strip()
+			if sub_choice == "1":
+				name = input("场景名称: ").strip()
+				screen_name = input("屏幕名称 [默认: 屏幕]: ").strip()
+				if not screen_name:
+					screen_name = "屏幕"
+				scene_id = editor.project.add_scene(name, screen_name)
+				print(f"已添加场景: {name} (ID: {scene_id})")
+			elif sub_choice == "2":
+				print("\n所有场景:")
+				for scene_id, scene in editor.project.scenes.items():
+					print(f"  ID: {scene_id}, 名称: {scene.name}, 角色数: {len(scene.actor_ids)}")
+			elif sub_choice == "3":
+				scene_name = input("请输入场景名称: ").strip()
+				if editor.select_scene_by_name(scene_name):
+					print(f"已选择场景: {scene_name}")
+				else:
+					print("场景未找到")
+			elif sub_choice == "4":
+				if not editor.current_scene_id:
+					print("请先选择场景")
+					continue
+				block_type = input("积木类型: ").strip()
+				try:
+					block = editor.add_block(block_type)
+					if block:
+						print(f"已添加积木: {block_type} (ID: {block.id})")
+				except Exception as e:
+					print(f"添加失败: {e}")
+		elif choice == "7":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			print("\n角色管理:")
+			print(" 1. 添加角色")
+			print(" 2. 查看所有角色")
+			print(" 3. 选择当前角色")
+			print(" 4. 添加积木到角色")
+			sub_choice = input("请选择: ").strip()
+			if sub_choice == "1":
+				name = input("角色名称: ").strip()
+				x = input("X坐标 [默认: 0]: ").strip()
+				y = input("Y坐标 [默认: 0]: ").strip()
+				position = {"x": 0.0, "y": 0.0}
+				if x:
+					with contextlib.suppress(ValueError):
+						position["x"] = float(x)
+				if y:
+					with contextlib.suppress(ValueError):
+						position["y"] = float(y)
+				actor_id = editor.project.add_actor(name, position)
+				print(f"已添加角色: {name} (ID: {actor_id})")
+			elif sub_choice == "2":
+				print("\n所有角色:")
+				for actor_id, actor in editor.project.actors.items():
+					print(f"  ID: {actor_id}, 名称: {actor.name}, 位置: ({actor.position['x']}, {actor.position['y']})")
+			elif sub_choice == "3":
+				actor_name = input("请输入角色名称: ").strip()
+				if editor.select_actor_by_name(actor_name):
+					print(f"已选择角色: {actor_name}")
+				else:
+					print("角色未找到")
+			elif sub_choice == "4":
+				if not editor.current_actor_id:
+					print("请先选择角色")
+					continue
+				block_type = input("积木类型: ").strip()
+				try:
+					block = editor.add_block(block_type)
+					if block:
+						print(f"已添加积木: {block_type} (ID: {block.id})")
+				except Exception as e:
+					print(f"添加失败: {e}")
+		elif choice == "8":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			print("\n积木管理:")
+			print(" 1. 查看所有积木")
+			print(" 2. 查找积木")
+			print(" 3. 添加影子积木")
+			sub_choice = input("请选择: ").strip()
+			if sub_choice == "1":
+				all_blocks = editor.project.get_all_blocks()
+				print(f"\n总积木数: {len(all_blocks)}")
+				print("前10个积木:")
+				for i, block in enumerate(all_blocks[:10]):
+					print(f"  {i + 1}. ID: {block.id}, 类型: {block.type}")
+			elif sub_choice == "2":
+				block_id = input("请输入积木ID: ").strip()
+				block = editor.project.find_block(block_id)
+				if block:
+					print(f"找到积木: ID={block.id}, 类型={block.type}")
+					print(f"字段: {block.fields}")
+				else:
+					print("积木未找到")
+			elif sub_choice == "3":
+				# 简化版: 创建影子积木示例
+				block_type = input("影子积木类型: ").strip()
+				shadow_type = input("影子类型 (regular/replaceable/empty) [默认: regular]: ").strip()
+				if not shadow_type:
+					shadow_type = "regular"
+				shadow = ShadowBlock(
+					type=block_type,
+					shadow_type=ShadowType(shadow_type),
+				)
+				print(f"已创建影子积木: {shadow.id}")
+				# 这里可以扩展为添加到特定积木
+		elif choice == "9":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			print("\n资源管理:")
+			print(" 1. 添加变量")
+			print(" 2. 添加函数")
+			print(" 3. 添加音频")
+			print(" 4. 查看所有资源")
+			sub_choice = input("请选择: ").strip()
+			if sub_choice == "1":
+				name = input("变量名称: ").strip()
+				value = input("初始值 [默认: 0]: ").strip()
+				if not value:
+					value = 0
+				var_id = editor.project.add_variable(name, value)
+				print(f"已添加变量: {name} (ID: {var_id})")
+			elif sub_choice == "2":
+				name = input("函数名称: ").strip()
+				proc_id = editor.project.add_procedure(name)
+				print(f"已添加函数: {name} (ID: {proc_id})")
+			elif sub_choice == "3":
+				name = input("音频名称: ").strip()
+				url = input("音频URL [可选]: ").strip()
+				audio_id = editor.project.add_audio(name, url)
+				print(f"已添加音频: {name} (ID: {audio_id})")
+			elif sub_choice == "4":
+				print("\n变量:")
+				for var in editor.project.variables.values():
+					print(f"  {var.get('name', 'Unknown')}: {var.get('value', 'N/A')}")
+				print("\n函数:")
+				for proc in editor.project.procedures.values():
+					print(f"  {proc.name}: {len(proc.params)} 个参数")
+		elif choice == "10":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			filepath = input("请输入XML导出路径: ").strip()
+			try:
+				editor.export_to_xml_file(filepath)
+			except Exception as e:
+				print(f"导出失败: {e}")
+		elif choice == "11":
+			filepath = input("请输入XML文件路径: ").strip()
+			try:
+				editor.import_from_xml_file(filepath)
+			except Exception as e:
+				print(f"导入失败: {e}")
+		elif choice == "12":
+			if not editor.project:
+				print("请先创建或加载项目")
+				continue
+			actor_name = input("角色名称 [默认: 角色1]: ").strip()
+			if not actor_name:
+				actor_name = "角色1"
+			scene_name = input("场景名称 [默认: 场景1]: ").strip()
+			if not scene_name:
+				scene_name = "场景1"
+			try:
+				editor.project.create_simple_program(actor_name, scene_name)
+				print("示例程序已创建")
+			except Exception as e:
+				print(f"创建失败: {e}")
+		elif choice == "13":
+			if not editor.project:
+				print("请先加载或创建项目")
+				continue
+			search_type = input("查找类型 (block/actor/scene): ").strip().lower()
+			if search_type == "block":
+				search_term = input("请输入积木ID或类型关键词: ").strip()
+				all_blocks = editor.project.get_all_blocks()
+				found = [b for b in all_blocks if search_term in b.id or search_term in b.type]
+				print(f"找到 {len(found)} 个积木")
+				for block in found[:5]:  # 显示前5个
+					print(f"  ID: {block.id}, 类型: {block.type}")
+			elif search_type == "actor":
+				search_term = input("请输入角色名称: ").strip()
+				actor = editor.project.find_actor_by_name(search_term)
+				if actor:
+					print(f"找到角色: {actor.name} (ID: {actor.id})")
+				else:
+					print("角色未找到")
+			elif search_type == "scene":
+				search_term = input("请输入场景名称: ").strip()
+				scene = editor.project.find_scene_by_name(search_term)
+				if scene:
+					print(f"找到场景: {scene.name} (ID: {scene.id})")
+				else:
+					print("场景未找到")
+		elif choice == "14":
 			print("感谢使用,再见!")
 			break
-		if choice == "1":
-			# 解析项目文件
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				print(f"\n✓ 成功加载项目: {project.project_name}")
-				print(f"  版本: {project.version}")
-				print(f"  工具类型: {project.tool_type}")
-				# 显示基本信息
-				print("\n项目包含:")
-				print(f"  • 场景: {len(project.scenes)} 个")
-				print(f"  • 角色: {len(project.actors)} 个")
-				print(f"  • 变量: {len(project.variables)} 个")
-				print(f"  • 音频: {len(project.audios)} 个")
-				print(f"  • 过程/函数: {len(project.procedures)} 个")
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 解析文件时出错: {e}")
-		elif choice == "2":
-			# 分析过程/函数
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				print("\n📋 过程/函数分析")
-				print("=" * 60)
-				print(f"总过程数: {len(project.procedures)}")
-				print("-" * 60)
-
-				for proc_id, procedure in project.procedures.items():
-					print(f"\n过程: {procedure.name}")
-					print(f"  ID: {proc_id}")
-					print(f"  类型: {procedure.type}")
-					print(f"  参数数: {len(procedure.params)}")
-					print(f"  代码块数: {len(procedure.blocks)}")
-
-					# 显示参数
-					if procedure.params:
-						print("  参数列表:")
-						for param in procedure.params:
-							if isinstance(param, dict):
-								param_name = param.get("name", "未知")
-								param_type = param.get("type", "未知")
-								param_content = param.get("content", "")
-								print(f"    • {param_name}: {param_type} ({param_content})")
-
-					# 显示块类型
-					if procedure.blocks:
-						block_types = {}
-						for block in procedure.blocks:
-							block_types[block.type] = block_types.get(block.type, 0) + 1
-						print("  块类型统计:")
-						for block_type, count in block_types.items():
-							print(f"    • {block_type}: {count}")
-
-				print("\n" + "=" * 60)
-
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 分析过程时出错: {e}")
-		elif choice == "8":
-			# 查看特定过程
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				print("\n🔍 查看特定过程")
-				print("=" * 60)
-
-				if not project.procedures:
-					print("项目中没有任何过程/函数")
-					continue
-
-				# 列出所有过程
-				print("可用过程:")
-				for i, (proc_id, procedure) in enumerate(project.procedures.items(), 1):
-					print(f"  {i}. {procedure.name} (ID: {proc_id[:8]}...)")
-
-				proc_choice = input("\n请选择要查看的过程编号: ").strip()
-				try:
-					proc_index = int(proc_choice) - 1
-					proc_items = list(project.procedures.items())
-					if 0 <= proc_index < len(proc_items):
-						proc_id, procedure = proc_items[proc_index]
-						print(f"\n📄 过程: {procedure.name}")
-						print("=" * 40)
-						print(f"ID: {proc_id}")
-						print(f"类型: {procedure.type}")
-
-						# 显示参数
-						if procedure.params:
-							print("\n参数:")
-							for param in procedure.params:
-								if isinstance(param, dict):
-									print(f"  - {param.get('name', '未知')}: {param.get('type', '未知')}")
-
-						# 显示块结构
-						if procedure.blocks:
-							print(f"\n代码块 ({len(procedure.blocks)} 个):")
-							for i, block in enumerate(procedure.blocks, 1):
-								print(f"  {i}. {block.type}")
-								if block.fields:
-									for key, value in block.fields.items():
-										if key != "NAME":  # 过滤一些字段
-											print(f"      {key}: {value}")
-
-						# 显示块统计
-						block_count = len(procedure.blocks)
-						shadow_count = sum(len(block.shadow_manager.shadow_blocks) for block in procedure.blocks)
-						print("\n统计:")
-						print(f"  • 总块数: {block_count}")
-						print(f"  • 影子块数: {shadow_count}")
-
-						# 导出过程为XML
-						export_choice = input("\n是否导出此过程为XML? (y/n): ").strip().lower()
-						if export_choice == "y":
-							xml_content = ""
-							for block in procedure.blocks:
-								xml_content += block.to_xml() + "\n"
-
-							export_path = f"procedure_{procedure.name}.xml"
-							with Path(export_path).open("w", encoding="utf-8") as f:
-								f.write(xml_content)
-							print(f"✓ 过程已导出到: {export_path}")
-
-					else:
-						print("错误:无效的选择")
-				except ValueError:
-					print("错误:请输入有效的数字")
-
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 查看过程时出错: {e}")
-		elif choice == "3":
-			# 导出为XML
-			input_file = input("请输入KN项目文件路径 (.bcmkn): ").strip()
-			if not input_file:
-				print("错误:请输入源文件路径")
-				continue
-			output_file = input("请输入XML输出路径 (.xml): ").strip()
-			if not output_file:
-				print("错误:请输入输出文件路径")
-				continue
-			try:
-				# 加载项目
-				project = KNProject.load_from_file(input_file)
-				# 导出为XML
-				xml_content = project.to_xml()
-				with Path(output_file).open("w", encoding="utf-8") as f:
-					f.write(xml_content)
-				print(f"✓ 项目已导出为XML: {output_file}")
-				print(f"  项目名称: {project.project_name}")
-				print(f"  包含场景: {len(project.scenes)} 个")
-				print(f"  包含角色: {len(project.actors)} 个")
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {input_file}")
-			except Exception as e:
-				print(f"✗ 导出时出错: {e}")
-		elif choice == "4":
-			# 从XML导入
-			xml_file = input("请输入XML文件路径 (.xml): ").strip()
-			if not xml_file:
-				print("错误:请输入XML文件路径")
-				continue
-			output_file = input("请输入KN项目保存路径 (.bcmkn): ").strip()
-			if not output_file:
-				print("错误:请输入保存路径")
-				continue
-			try:
-				# 从XML导入
-				with Path(xml_file).open(encoding="utf-8") as f:
-					xml_content = f.read()
-				project = KNProject.from_xml(xml_content)
-				# 保存为KN格式
-				project.save_to_file(output_file)
-				print(f"✓ XML已导入并保存为KN项目: {output_file}")
-				print(f"  项目名称: {project.project_name}")
-				print(f"  版本: {project.version}")
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {xml_file}")
-			except Exception as e:
-				print(f"✗ 导入时出错: {e}")
-		elif choice == "5":
-			# 分析项目结构
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				analysis = project.analyze_project()
-				print("\n📊 项目分析报告")
-				print("=" * 40)
-				print(f"项目名称: {analysis['project_name']}")
-				print(f"工具类型: {analysis['tool_type']}")
-				print(f"项目版本: {analysis['version']}")
-				print("-" * 40)
-				print(f"场景数量: {analysis['scenes_count']}")
-				print(f"角色数量: {analysis['actors_count']}")
-				print(f"变量数量: {analysis['variables_count']}")
-				print(f"音频数量: {analysis['audios_count']}")
-				print(f"样式数量: {analysis['styles_count']}")
-				print("-" * 40)
-				print(f"总积木数: {analysis['total_blocks']}")
-				print(f"影子积木: {analysis['shadow_blocks']}")
-				# 显示积木类型统计
-				if analysis["block_type_counts"]:
-					print("\n📦 积木类型统计:")
-					for block_type, count in sorted(analysis["block_type_counts"].items(), key=operator.itemgetter(1), reverse=True)[:10]:  # 只显示前10种
-						print(f"  {block_type:30} {count:3d} 个")
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 分析时出错: {e}")
-		elif choice == "6":
-			# 显示项目摘要
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				print("\n📋 项目摘要")
-				print("=" * 50)
-				project.print_summary()
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 读取文件时出错: {e}")
-		elif choice == "7":
-			# 列出所有元素
-			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
-			if not filepath:
-				print("错误:请输入文件路径")
-				continue
-			try:
-				project = KNProject.load_from_file(filepath)
-				# 列出场景
-				print(f"\n🎬 场景列表 ({len(project.scenes)} 个):")
-				for scene_id, scene in project.scenes.items():
-					is_current = "✓" if scene_id == project.current_scene_id else " "
-					print(f"  {is_current} {scene.name:20} (ID: {scene_id[:8]}...)")
-					print(f"     包含角色: {len(scene.actor_ids)} 个")
-					print(f"     代码块: {len(scene.blocks)} 个")
-				# 列出角色
-				print(f"\n👤 角色列表 ({len(project.actors)} 个):")
-				for actor_id, actor in project.actors.items():
-					print(f"  • {actor.name:20} (ID: {actor_id[:8]}...)")
-					print(f"     位置: ({actor.position['x']}, {actor.position['y']})")
-					print(f"     代码块: {len(actor.blocks)} 个")
-				# 列出变量
-				if project.variables:
-					print(f"\n📊 变量列表 ({len(project.variables)} 个):")
-					for var in project.variables.values():
-						var_type = "全局" if var.get("isGlobal", True) else "局部"
-						print(f"  {var.get('name', '未命名'):15} = {var.get('value', '')} ({var_type})")
-			except FileNotFoundError:
-				print(f"✗ 文件不存在: {filepath}")
-			except Exception as e:
-				print(f"✗ 列出元素时出错: {e}")
 		else:
-			print("错误:无效的选项,请重新选择")
+			print("无效选项,请重新选择")
 
 
 main()
