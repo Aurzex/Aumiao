@@ -1,12 +1,6 @@
-"""
-完整重构的核心逻辑模块
-包含Repository模式、Builder模式的完整实现和所有业务逻辑
-"""
-
 from __future__ import annotations
 
 import contextlib
-import html
 import json
 import operator
 import re
@@ -14,6 +8,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from html import unescape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
@@ -802,7 +797,7 @@ class ShadowXML:
 		if not xml_str or not xml_str.strip():
 			return cls("", "", "", True, False, {})  # noqa: FBT003
 		try:
-			cleaned = html.unescape(xml_str)
+			cleaned = unescape(xml_str)
 			root = ET.fromstring(cleaned)
 			fields = {}
 			for field_elem in root.findall("field"):
