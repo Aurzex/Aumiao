@@ -197,7 +197,7 @@ class SendMessageType(Enum):
 
 
 class ConnectionType(Enum):
-	"""连接类型"""
+	"""连接类型枚举"""
 
 	PREVIOUS_STATEMENT = "previous_statement"
 	NEXT_STATEMENT = "next_statement"
@@ -206,7 +206,7 @@ class ConnectionType(Enum):
 
 
 class ShadowType(Enum):
-	"""影子积木类型"""
+	"""影子积木类型枚举"""
 
 	REGULAR = "regular"
 	EMPTY = "empty"
@@ -216,7 +216,7 @@ class ShadowType(Enum):
 
 
 class ShadowCategory(Enum):
-	"""影子积木分类"""
+	"""影子积木分类枚举"""
 
 	DEFAULT_VALUE = "default_value"
 	PLACEHOLDER = "placeholder"
@@ -261,215 +261,6 @@ class NodeType(Enum):
 	TEXT_NODE = 3
 
 
-class BlockType(Enum):
-	"""所有块类型的枚举 ,补充第一版缺失的"""
-
-	# 事件类
-	ON_RUNNING_GROUP_ACTIVATED = "on_running_group_activated"
-	SPRITE_ON_TAP = "sprite_on_tap"
-	ON_SWIPE = "on_swipe"
-	ON_KEYDOWN = "on_keydown"
-	ON_BUMP_ACTOR = "on_bump_actor"
-	WHEN = "when"
-	SELF_LISTEN = "self_listen"
-	SELF_BROADCAST = "self_broadcast"
-	SELF_BROADCAST_AND_WAIT = "self_broadcast_and_wait"
-	RECEIVED_BROADCAST = "received_broadcast"
-	SELF_LISTEN_WITH_PARAM = "self_listen_with_param"
-	SELF_BROADCAST_WITH_PARAM = "self_broadcast_with_param"
-	STOP = "stop"
-	RESTART = "restart"
-	SWITCH_TO_SCREEN = "switch_to_screen"
-	SET_SCREEN_TRANSITION = "set_screen_transition"
-	START_ON_CLICK = "start_on_click"
-	GET_SCREENS = "get_screens"
-	BROADCAST_INPUT = "broadcast_input"
-	START_AS_A_MIRROR = "start_as_a_mirror"
-	MIRROR = "mirror"
-	DISPOSE_CLONE = "dispose_clone"
-	GET_CURRENT_CLONE_INDEX = "get_current_clone_index"
-	GET_CLONE_NUM = "get_clone_num"
-	GET_CLONE_INDEX_PROPERTY = "get_clone_index_property"
-	# 控制类
-	REPEAT_FOREVER = "repeat_forever"
-	REPEAT_N_TIMES = "repeat_n_times"
-	TRAVERSE_NUMBER = "traverse_number"
-	REPEAT_FOREVER_UNTIL = "repeat_forever_until"
-	BREAK = "break"
-	CONTROLS_IF = "controls_if"
-	CONTROLS_IF_ELSE = "controls_if_else"
-	WAIT = "wait"
-	WAIT_UNTIL = "wait_until"
-	CONSOLE_LOG = "console_log"
-	WARP = "warp"
-	TELL = "tell"
-	SYNC_TELL = "sync_tell"
-	# 动作/运动类
-	SELF_GO_FORWARD = "self_go_forward"
-	SELF_MOVE_SPECIFY = "self_move_specify"
-	SELF_MOVE_TO = "self_move_to"
-	SELF_SET_POSITION_X = "self_set_position_x"
-	SELF_SET_POSITION_Y = "self_set_position_y"
-	SELF_CHANGE_COORDINATE_X = "self_change_coordinate_x"
-	SELF_CHANGE_COORDINATE_Y = "self_change_coordinate_y"
-	SELF_GLIDE_TO = "self_glide_to"
-	SELF_ROTATE = "self_rotate"
-	SELF_ROTATE_AROUND = "self_rotate_around"
-	SELF_POINT_TOWARDS = "self_point_towards"
-	SELF_FACE_TO = "self_face_to"
-	SELF_SET_DRAGGABLE = "self_set_draggable"
-	SELF_SET_ROLE_CAMP = "self_set_role_camp"
-	# 外观类
-	SET_SPRITE_STYLE = "set_sprite_style"
-	SELF_PREV_NEXT_STYLE = "self_prev_next_style"
-	SELF_APPEAR = "self_appear"
-	SELF_GRADUALLY_SHOW_HIDE = "self_gradually_show_hide"
-	SET_SCALE = "set_scale"
-	SELF_CHANGE_SCALE = "self_change_scale"
-	SET_WIDTH_HEIGHT_SCALE = "set_width_height_scale"
-	SELF_SET_EFFECT = "self_set_effect"
-	SELF_CHANGE_EFFECT = "self_change_effect"
-	CLEAR_ALL_EFFECTS = "clear_all_effects"
-	SET_TOP_BOTTOM_LAYER = "set_top_bottom_layer"
-	GET_STYLES = "get_styles"
-	# 对话/界面类
-	CREATE_STAGE_DIALOG = "create_stage_dialog"
-	SELF_DIALOG_WAIT = "self_dialog_wait"
-	SELF_DIALOG = "self_dialog"
-	CLOSE_SELF_DIALOG = "close_self_dialog"
-	SELF_ASK = "self_ask"
-	GET_ANSWER = "get_answer"
-	ASK_AND_CHOOSE = "ask_and_choose"
-	TRANSLATE = "translate"
-	TRANSLATE_RESULT = "translate_result"
-	# 音频类
-	PLAY_AUDIO = "play_audio"
-	PLAY_AUDIO_AND_WAIT = "play_audio_and_wait"
-	STOP_AUDIO = "stop_audio"
-	SOUND_COLOR = "sound_color"
-	VOICE_RECOGNITION = "voice_recognition"
-	GET_VOICE_ANSWER = "get_voice_answer"
-	GET_PLAY_AUDIO = "get_play_audio"
-	# 检测类
-	BUMP_INTO = "bump_into"
-	BUMP_INTO_COLOR = "bump_into_color"
-	OUT_OF_BOUNDARY = "out_of_boundary"
-	COORDINATE_OF_SPRITE = "coordinate_of_sprite"
-	STYLE_OF_SPRITE = "style_of_sprite"
-	APPEARANCE_OF_SPRITE = "appearance_of_sprite"
-	DISTANCE_TO = "distance_to"
-	MOUSE_DOWN = "mouse_down"
-	CHECK_KEY = "check_key"
-	GET_MOUSE_INFO = "get_mouse_info"
-	GET_ORIENTATION = "get_orientation"
-	GET_TIME = "get_time"
-	SET_TIMER_STATE = "set_timer_state"
-	SHOW_HIDE_TIMER = "show_hide_timer"
-	TIMER = "timer"
-	# 运算类
-	MATH_ARITHMETIC = "math_arithmetic"
-	RANDOM_NUM = "random_num"
-	LOGIC_COMPARE = "logic_compare"
-	LOGIC_OPERATION = "logic_operation"
-	LOGIC_NEGATE = "logic_negate"
-	LOGIC_BOOLEAN = "logic_boolean"
-	MATH_ROUND = "math_round"
-	MATH_MODULO = "math_modulo"
-	DIVISIBLE_BY = "divisible_by"
-	TEXT_JOIN = "text_join"
-	TEXT_SELECT = "text_select"
-	TEXT_LENGTH = "text_length"
-	TEXT_CONTAIN = "text_contain"
-	CONVERT_TYPE = "convert_type"
-	# 变量类
-	VARIABLES_SET = "variables_set"
-	CHANGE_VARIABLES = "change_variables"
-	SHOW_HIDE_VARIABLES = "show_hide_variables"
-	VARIABLES_GET = "variables_get"
-	SCRIPT_VARIABLES = "script_variables"
-	# 列表类
-	LIST_APPEND = "list_append"
-	LIST_INSERT_VALUE = "list_insert_value"
-	DELETE_LIST_ITEM = "delete_list_item"
-	REPLACE_LIST_ITEM = "replace_list_item"
-	LIST_COPY = "list_copy"
-	LIST_ITEM = "list_item"
-	LIST_LENGTH = "list_length"
-	LIST_INDEX_OF = "list_index_of"
-	LIST_IS_EXIST = "list_is_exist"
-	SHOW_HIDE_LIST = "show_hide_list"
-	TEMPORARY_LIST = "temporary_list"
-	# 画笔类
-	SELF_PEN_DOWN = "self_pen_down"
-	SELF_PEN_UP = "self_pen_up"
-	CLEAR_DRAWING = "clear_drawing"
-	SELF_SET_PEN_SIZE = "self_set_pen_size"
-	SELF_CHANGE_PEN_SIZE = "self_change_pen_size"
-	SELF_SET_PEN_COLOR = "self_set_pen_color"
-	IMAGE_STAMP = "image_stamp"
-	STAMP = "stamp"
-	# 函数/过程类
-	PROCEDURES_DEFNORETURN = "procedures_2_defnoreturn"
-	PROCEDURES_RETURN_VALUE = "procedures_2_return_value"
-	PROCEDURES_CALLRETURN = "procedures_2_callreturn"
-	PROCEDURES_CALLNORETURN = "procedures_2_callnoreturn"
-	PROCEDURES_STABLE_PARAMETER = "procedures_2_stable_parameter"
-	PROCEDURES_PARAMETER = "procedures_2_parameter"
-	PROCEDURES_ACTOR_PARAM = "procedures_2_actor_param"
-	# 动画类
-	SELF_STRESS_ANIMATION = "self_stress_animation"
-	SELF_APPEAR_ANIMATION = "self_appear_animation"
-	GLOBAL_ANIMATION = "global_animation"
-	# 数值类
-	MATH_NUMBER = "math_number"
-	TEXT = "text"
-	COLOR_SIZE_SLIDER = "color_size_slider"
-	COLOR_PICKER = "color_picker"  # 来自第一版
-	# 摄像头类
-	OPEN_CLOSE_CAMERA = "open_hide_camera"
-	SET_CAMERA_ALPHA = "set_camera_alpha"
-	RECOGNIZE_BODY_PART = "recognize_body_part"
-	BUMP_INTO_BODY_PART = "bump_into_body_part"
-	MOVE_TO_BODY_PART = "move_to_body_part"
-	FACE_TO_BODY_PART = "face_to_body_part"
-	GET_POSITION_OF_BODY_PART = "get_position_of_body_part"
-	RECOGNIZE_GESTURE = "recognize_gesture"
-	# 认知AI类
-	ENABLE_FACE_DETECT_BY_ACTOR = "enable_face_detect_by_actor"
-	ENABLE_OBJECT_DETECT_BY_ACTOR = "enable_object_detect_by_actor"
-	GET_FACE_DETECTION_RESULT = "get_face_detection_result"
-	CHECK_EMOTION = "check_emotion"
-	CHECK_GENDER = "check_gender"
-	# AI对话类
-	AI_CHAT_ASK = "ai_chat_ask"
-	AI_CHAT_ANSWER = "ai_chat_answer"
-	SET_SYSTEM_PRESET = "set_system_preset"
-	NEW_CONVERSATION = "new_conversation"
-	# 分类AI类
-	EVALUATE_ACTOR_STYLE = "evaluate_actor_style"
-	EVALUATE_PHOTO = "evaluate_photo"
-	EVALUATE_CAMERA = "evaluate_camera"
-	GET_EVALUATE_CLASS_NAME = "get_evaluate_class_name"
-	# 在线/排名类
-	SHOW_HIDE_RANKING = "show_hide_ranking"
-	UPDATE_RANKING = "update_ranking"
-	USER_RANKING_INFO = "user_ranking_info"
-	USERNAME_GET = "username_get"
-	USER_ID_GET = "user_id_get"
-	# 判题类
-	SEND_JUDGE_RESULT = "send_judge_result"
-	# 其他
-	ON_BUMP_ACTOR_PARAM = "on_bump_actor_param"
-	SELF_LISTEN_PARAM = "self_listen_param"
-	TRAVERSE_NUMBER_PARAM = "traverse_number_param"
-	MATH_NUMBER_WITH_SLIDER = "math_number_with_slider"
-	MATH_COMPARE_NEQ = "math_compare_neq"
-	MATH_COMPARE_GREATER = "math_compare_more"
-	MATH_COMPARE_LESS = "math_compare_less"
-	MATH_ARITHMETIC_POWER = "math_arithmetic_power"
-	SHADOW_TEXT = "shadow_text"
-
-
 class FieldType(Enum):
 	"""字段类型枚举"""
 
@@ -502,6 +293,235 @@ class FieldType(Enum):
 	PEN_COLOR_PROPERTY = "pen_color_property"
 
 
+class BlockType(Enum):
+	"""所有块类型枚举"""
+
+	# 事件类
+	ON_RUNNING_GROUP_ACTIVATED = "on_running_group_activated"
+	SPRITE_ON_TAP = "sprite_on_tap"
+	ON_SWIPE = "on_swipe"
+	ON_KEYDOWN = "on_keydown"
+	ON_BUMP_ACTOR = "on_bump_actor"
+	WHEN = "when"
+	SELF_LISTEN = "self_listen"
+	SELF_BROADCAST = "self_broadcast"
+	SELF_BROADCAST_AND_WAIT = "self_broadcast_and_wait"
+	RECEIVED_BROADCAST = "received_broadcast"
+	SELF_LISTEN_WITH_PARAM = "self_listen_with_param"
+	SELF_BROADCAST_WITH_PARAM = "self_broadcast_with_param"
+	STOP = "stop"
+	RESTART = "restart"
+	SWITCH_TO_SCREEN = "switch_to_screen"
+	SET_SCREEN_TRANSITION = "set_screen_transition"
+	START_ON_CLICK = "start_on_click"
+	GET_SCREENS = "get_screens"
+	BROADCAST_INPUT = "broadcast_input"
+	START_AS_A_MIRROR = "start_as_a_mirror"
+	MIRROR = "mirror"
+	DISPOSE_CLONE = "dispose_clone"
+	GET_CURRENT_CLONE_INDEX = "get_current_clone_index"
+	GET_CLONE_NUM = "get_clone_num"
+	GET_CLONE_INDEX_PROPERTY = "get_clone_index_property"
+
+	# 控制类
+	REPEAT_FOREVER = "repeat_forever"
+	REPEAT_N_TIMES = "repeat_n_times"
+	TRAVERSE_NUMBER = "traverse_number"
+	REPEAT_FOREVER_UNTIL = "repeat_forever_until"
+	BREAK = "break"
+	CONTROLS_IF = "controls_if"
+	CONTROLS_IF_ELSE = "controls_if_else"
+	WAIT = "wait"
+	WAIT_UNTIL = "wait_until"
+	CONSOLE_LOG = "console_log"
+	WARP = "warp"
+	TELL = "tell"
+	SYNC_TELL = "sync_tell"
+
+	# 动作/运动类
+	SELF_GO_FORWARD = "self_go_forward"
+	SELF_MOVE_SPECIFY = "self_move_specify"
+	SELF_MOVE_TO = "self_move_to"
+	SELF_SET_POSITION_X = "self_set_position_x"
+	SELF_SET_POSITION_Y = "self_set_position_y"
+	SELF_CHANGE_COORDINATE_X = "self_change_coordinate_x"
+	SELF_CHANGE_COORDINATE_Y = "self_change_coordinate_y"
+	SELF_GLIDE_TO = "self_glide_to"
+	SELF_ROTATE = "self_rotate"
+	SELF_ROTATE_AROUND = "self_rotate_around"
+	SELF_POINT_TOWARDS = "self_point_towards"
+	SELF_FACE_TO = "self_face_to"
+	SELF_SET_DRAGGABLE = "self_set_draggable"
+	SELF_SET_ROLE_CAMP = "self_set_role_camp"
+
+	# 外观类
+	SET_SPRITE_STYLE = "set_sprite_style"
+	SELF_PREV_NEXT_STYLE = "self_prev_next_style"
+	SELF_APPEAR = "self_appear"
+	SELF_GRADUALLY_SHOW_HIDE = "self_gradually_show_hide"
+	SET_SCALE = "set_scale"
+	SELF_CHANGE_SCALE = "self_change_scale"
+	SET_WIDTH_HEIGHT_SCALE = "set_width_height_scale"
+	SELF_SET_EFFECT = "self_set_effect"
+	SELF_CHANGE_EFFECT = "self_change_effect"
+	CLEAR_ALL_EFFECTS = "clear_all_effects"
+	SET_TOP_BOTTOM_LAYER = "set_top_bottom_layer"
+	GET_STYLES = "get_styles"
+
+	# 对话/界面类
+	CREATE_STAGE_DIALOG = "create_stage_dialog"
+	SELF_DIALOG_WAIT = "self_dialog_wait"
+	SELF_DIALOG = "self_dialog"
+	CLOSE_SELF_DIALOG = "close_self_dialog"
+	SELF_ASK = "self_ask"
+	GET_ANSWER = "get_answer"
+	ASK_AND_CHOOSE = "ask_and_choose"
+	TRANSLATE = "translate"
+	TRANSLATE_RESULT = "translate_result"
+
+	# 音频类
+	PLAY_AUDIO = "play_audio"
+	PLAY_AUDIO_AND_WAIT = "play_audio_and_wait"
+	STOP_AUDIO = "stop_audio"
+	SOUND_COLOR = "sound_color"
+	VOICE_RECOGNITION = "voice_recognition"
+	GET_VOICE_ANSWER = "get_voice_answer"
+	GET_PLAY_AUDIO = "get_play_audio"
+
+	# 检测类
+	BUMP_INTO = "bump_into"
+	BUMP_INTO_COLOR = "bump_into_color"
+	OUT_OF_BOUNDARY = "out_of_boundary"
+	COORDINATE_OF_SPRITE = "coordinate_of_sprite"
+	STYLE_OF_SPRITE = "style_of_sprite"
+	APPEARANCE_OF_SPRITE = "appearance_of_sprite"
+	DISTANCE_TO = "distance_to"
+	MOUSE_DOWN = "mouse_down"
+	CHECK_KEY = "check_key"
+	GET_MOUSE_INFO = "get_mouse_info"
+	GET_ORIENTATION = "get_orientation"
+	GET_TIME = "get_time"
+	SET_TIMER_STATE = "set_timer_state"
+	SHOW_HIDE_TIMER = "show_hide_timer"
+	TIMER = "timer"
+
+	# 运算类
+	MATH_ARITHMETIC = "math_arithmetic"
+	RANDOM_NUM = "random_num"
+	LOGIC_COMPARE = "logic_compare"
+	LOGIC_OPERATION = "logic_operation"
+	LOGIC_NEGATE = "logic_negate"
+	LOGIC_BOOLEAN = "logic_boolean"
+	MATH_ROUND = "math_round"
+	MATH_MODULO = "math_modulo"
+	DIVISIBLE_BY = "divisible_by"
+	TEXT_JOIN = "text_join"
+	TEXT_SELECT = "text_select"
+	TEXT_LENGTH = "text_length"
+	TEXT_CONTAIN = "text_contain"
+	CONVERT_TYPE = "convert_type"
+
+	# 变量类
+	VARIABLES_SET = "variables_set"
+	CHANGE_VARIABLES = "change_variables"
+	SHOW_HIDE_VARIABLES = "show_hide_variables"
+	VARIABLES_GET = "variables_get"
+	SCRIPT_VARIABLES = "script_variables"
+
+	# 列表类
+	LIST_APPEND = "list_append"
+	LIST_INSERT_VALUE = "list_insert_value"
+	DELETE_LIST_ITEM = "delete_list_item"
+	REPLACE_LIST_ITEM = "replace_list_item"
+	LIST_COPY = "list_copy"
+	LIST_ITEM = "list_item"
+	LIST_LENGTH = "list_length"
+	LIST_INDEX_OF = "list_index_of"
+	LIST_IS_EXIST = "list_is_exist"
+	SHOW_HIDE_LIST = "show_hide_list"
+	TEMPORARY_LIST = "temporary_list"
+
+	# 画笔类
+	SELF_PEN_DOWN = "self_pen_down"
+	SELF_PEN_UP = "self_pen_up"
+	CLEAR_DRAWING = "clear_drawing"
+	SELF_SET_PEN_SIZE = "self_set_pen_size"
+	SELF_CHANGE_PEN_SIZE = "self_change_pen_size"
+	SELF_SET_PEN_COLOR = "self_set_pen_color"
+	IMAGE_STAMP = "image_stamp"
+	STAMP = "stamp"
+
+	# 函数/过程类
+	PROCEDURES_DEFNORETURN = "procedures_2_defnoreturn"
+	PROCEDURES_RETURN_VALUE = "procedures_2_return_value"
+	PROCEDURES_CALLRETURN = "procedures_2_callreturn"
+	PROCEDURES_CALLNORETURN = "procedures_2_callnoreturn"
+	PROCEDURES_STABLE_PARAMETER = "procedures_2_stable_parameter"
+	PROCEDURES_PARAMETER = "procedures_2_parameter"
+	PROCEDURES_ACTOR_PARAM = "procedures_2_actor_param"
+
+	# 动画类
+	SELF_STRESS_ANIMATION = "self_stress_animation"
+	SELF_APPEAR_ANIMATION = "self_appear_animation"
+	GLOBAL_ANIMATION = "global_animation"
+
+	# 数值类
+	MATH_NUMBER = "math_number"
+	TEXT = "text"
+	COLOR_SIZE_SLIDER = "color_size_slider"
+	COLOR_PICKER = "color_picker"
+
+	# 摄像头类
+	OPEN_CLOSE_CAMERA = "open_hide_camera"
+	SET_CAMERA_ALPHA = "set_camera_alpha"
+	RECOGNIZE_BODY_PART = "recognize_body_part"
+	BUMP_INTO_BODY_PART = "bump_into_body_part"
+	MOVE_TO_BODY_PART = "move_to_body_part"
+	FACE_TO_BODY_PART = "face_to_body_part"
+	GET_POSITION_OF_BODY_PART = "get_position_of_body_part"
+	RECOGNIZE_GESTURE = "recognize_gesture"
+
+	# 认知AI类
+	ENABLE_FACE_DETECT_BY_ACTOR = "enable_face_detect_by_actor"
+	ENABLE_OBJECT_DETECT_BY_ACTOR = "enable_object_detect_by_actor"
+	GET_FACE_DETECTION_RESULT = "get_face_detection_result"
+	CHECK_EMOTION = "check_emotion"
+	CHECK_GENDER = "check_gender"
+
+	# AI对话类
+	AI_CHAT_ASK = "ai_chat_ask"
+	AI_CHAT_ANSWER = "ai_chat_answer"
+	SET_SYSTEM_PRESET = "set_system_preset"
+	NEW_CONVERSATION = "new_conversation"
+
+	# 分类AI类
+	EVALUATE_ACTOR_STYLE = "evaluate_actor_style"
+	EVALUATE_PHOTO = "evaluate_photo"
+	EVALUATE_CAMERA = "evaluate_camera"
+	GET_EVALUATE_CLASS_NAME = "get_evaluate_class_name"
+
+	# 在线/排名类
+	SHOW_HIDE_RANKING = "show_hide_ranking"
+	UPDATE_RANKING = "update_ranking"
+	USER_RANKING_INFO = "user_ranking_info"
+	USERNAME_GET = "username_get"
+	USER_ID_GET = "user_id_get"
+
+	# 判题类
+	SEND_JUDGE_RESULT = "send_judge_result"
+
+	# 其他
+	ON_BUMP_ACTOR_PARAM = "on_bump_actor_param"
+	SELF_LISTEN_PARAM = "self_listen_param"
+	TRAVERSE_NUMBER_PARAM = "traverse_number_param"
+	MATH_NUMBER_WITH_SLIDER = "math_number_with_slider"
+	MATH_COMPARE_NEQ = "math_compare_neq"
+	MATH_COMPARE_GREATER = "math_compare_more"
+	MATH_COMPARE_LESS = "math_compare_less"
+	MATH_ARITHMETIC_POWER = "math_arithmetic_power"
+	SHADOW_TEXT = "shadow_text"
+
+
 class BlockCategory(Enum):
 	"""块分类枚举"""
 
@@ -526,6 +546,175 @@ class BlockCategory(Enum):
 	JUDGE = "judge"
 	MATH = "math"
 	TEXT = "text"
+
+
+# 块配置映射 - 更详细的配置
+BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
+	# 事件类配置
+	BlockType.ON_RUNNING_GROUP_ACTIVATED: {
+		"category": BlockCategory.EVENT,
+		"fields": [],
+		"inputs": [],
+		"output": False,
+		"color": "#FFAB19",
+		"can_have_previous": False,
+		"can_have_next": True,
+	},
+	BlockType.SPRITE_ON_TAP: {
+		"category": BlockCategory.EVENT,
+		"fields": [],
+		"inputs": [],
+		"output": False,
+		"color": "#FFAB19",
+		"can_have_previous": False,
+		"can_have_next": True,
+	},
+	# 控制类配置
+	BlockType.REPEAT_FOREVER: {
+		"category": BlockCategory.CONTROL,
+		"fields": [],
+		"inputs": ["STATEMENT"],
+		"output": False,
+		"color": "#FF8C1A",
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	BlockType.WAIT: {
+		"category": BlockCategory.CONTROL,
+		"fields": [],
+		"inputs": ["SECONDS"],
+		"output": False,
+		"color": "#FF8C1A",
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	BlockType.CONTROLS_IF_ELSE: {
+		"category": BlockCategory.CONTROL,
+		"fields": [],
+		"inputs": ["IF0", "DO0", "ELSE"],
+		"output": False,
+		"color": "#FF8C1A",
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	# 运动类配置
+	BlockType.SELF_MOVE_TO: {
+		"category": BlockCategory.MOTION,
+		"fields": [],
+		"inputs": ["X", "Y"],
+		"output": False,
+		"color": "#4C97FF",
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	# 外观类配置
+	BlockType.SELF_DIALOG: {
+		"category": BlockCategory.APPEARANCE,
+		"fields": [],
+		"inputs": ["TEXT"],
+		"output": False,
+		"color": "#9966FF",
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	# 数学类配置
+	BlockType.MATH_NUMBER: {
+		"category": BlockCategory.MATH,
+		"fields": ["NUM"],
+		"inputs": [],
+		"output": True,
+		"color": "#40BF4A",
+		"can_have_previous": False,
+		"can_have_next": False,
+	},
+	# 文本类配置
+	BlockType.TEXT: {
+		"category": BlockCategory.TEXT,
+		"fields": ["TEXT"],
+		"inputs": [],
+		"output": True,
+		"color": "#CF63CF",
+		"can_have_previous": False,
+		"can_have_next": False,
+	},
+	# 逻辑类配置
+	BlockType.LOGIC_COMPARE: {
+		"category": BlockCategory.OPERATOR,
+		"fields": ["OP"],
+		"inputs": ["A", "B"],
+		"output": True,
+		"color": "#40BF4A",
+		"can_have_previous": False,
+		"can_have_next": False,
+	},
+}
+
+
+# 颜色配置
+COLOR_CONFIG: dict[BlockCategory, str] = {
+	BlockCategory.EVENT: "#FFAB19",
+	BlockCategory.CONTROL: "#FF8C1A",
+	BlockCategory.MOTION: "#4C97FF",
+	BlockCategory.APPEARANCE: "#9966FF",
+	BlockCategory.INTERACTION: "#5CB1D6",
+	BlockCategory.AUDIO: "#D65CD6",
+	BlockCategory.SENSING: "#5CB1D6",
+	BlockCategory.OPERATOR: "#40BF4A",
+	BlockCategory.VARIABLE: "#FF8C1A",
+	BlockCategory.LIST: "#FF6680",
+	BlockCategory.PROCEDURE: "#FF6680",
+	BlockCategory.PEN: "#009900",
+	BlockCategory.ANIMATION: "#9966FF",
+	BlockCategory.CAMERA: "#4C97FF",
+	BlockCategory.COGNITIVE: "#FF6680",
+	BlockCategory.AI_CHAT: "#40BF4A",
+	BlockCategory.AI_CLASSIFY: "#CF63CF",
+	BlockCategory.ONLINE: "#FFAB19",
+	BlockCategory.JUDGE: "#FF8C1A",
+	BlockCategory.MATH: "#40BF4A",
+	BlockCategory.TEXT: "#CF63CF",
+}
+
+
+# 字段类型到值的映射
+FIELD_TYPE_MAPPING: dict[FieldType, dict[str, Any]] = {
+	FieldType.TEXT: {
+		"default": "",
+		"validator": lambda x: isinstance(x, str),
+	},
+	FieldType.NUMBER: {
+		"default": 0,
+		"validator": lambda x: isinstance(x, (int, float)),
+	},
+	FieldType.BOOLEAN: {
+		"default": False,
+		"validator": lambda x: isinstance(x, bool),
+	},
+	FieldType.COLOR: {
+		"default": "#000000",
+		"validator": lambda x: isinstance(x, str) and (x.startswith(("#", "rgb"))),
+	},
+}
+
+
+# 块连接约束
+CONNECTION_CONSTRAINTS: dict = {
+	"output": ["input_value"],
+	"previous_statement": ["next_statement"],
+	"next_statement": ["previous_statement"],
+	"input_value": ["output"],
+}
+
+
+# 默认项目配置
+DEFAULT_PROJECT_CONFIG: dict = {
+	"version": "0.20.0",
+	"tool_type": "KN",
+	"stage_size": {"width": 900.0, "height": 562.0},
+	"timer_position": {"x": 720.0, "y": 12.0},
+	"workspace_scroll_xy": {"x": 0.0, "y": 0.0},
+	"background_color": "#FFFFFF",
+}
 
 
 # ==============================
