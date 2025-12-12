@@ -38,7 +38,6 @@ class TypeChecker:
 					return 0 <= int(r) <= 255 and 0 <= int(g) <= 255 and 0 <= int(b) <= 255 and 0 <= float(a) <= 1
 				except (ValueError, TypeError):
 					return False
-
 		# 检查RGB格式
 		if color_str.startswith("rgb("):
 			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
@@ -58,7 +57,6 @@ class TypeChecker:
 		if isinstance(value, str):
 			try:
 				float(value)
-
 			except ValueError:
 				return False
 			else:
@@ -205,7 +203,6 @@ class Color:
 					self.g = int(match.group(2))
 					self.b = int(match.group(3))
 					self.a = float(match.group(4))
-
 				except (ValueError, TypeError):
 					return False
 				else:
@@ -669,6 +666,67 @@ class Block:
 
 
 # ============================================================================
+# 自定义函数/过程类
+# ============================================================================
+@dataclass
+class Procedure:
+	"""自定义函数/过程类"""
+
+	id: str
+	name: str
+	type: str = "NORMAL"  # NORMAL, DEFINE, etc.
+	params: list[dict[str, Any]] = field(default_factory=list)
+	blocks: list[Block] = field(default_factory=list)
+	workspace_scroll_xy: dict[str, float] = field(default_factory=lambda: {"x": 0.0, "y": 0.0})
+	comments: dict[str, Any] = field(default_factory=dict)
+
+	def __post_init__(self) -> None:
+		"""初始化后处理"""
+		if not self.id:
+			self.id = str(uuid.uuid4())
+
+	def to_dict(self) -> dict[str, Any]:
+		"""转换为字典"""
+		return {
+			"id": self.id,
+			"name": self.name,
+			"type": self.type,
+			"params": self.params.copy(),
+			"nekoBlockJsonList": [block.to_dict() for block in self.blocks],
+			"workspaceScrollXy": self.workspace_scroll_xy.copy(),
+			"comments": self.comments.copy(),
+		}
+
+	@classmethod
+	def from_dict(cls, data: dict[str, Any]) -> Procedure:
+		"""从字典创建过程"""
+		proc = cls(
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			name=JSONConverter.ensure_str(data.get("name")),
+			type=JSONConverter.ensure_str(data.get("type", "NORMAL")),
+			params=JSONConverter.ensure_list(data.get("params")),
+			workspace_scroll_xy=JSONConverter.ensure_dict(data.get("workspaceScrollXy", {"x": 0.0, "y": 0.0})),
+			comments=JSONConverter.ensure_dict(data.get("comments", {})),
+		)
+		# 加载块
+		blocks_data = JSONConverter.ensure_list(data.get("nekoBlockJsonList"))
+		for block_data in blocks_data:
+			if isinstance(block_data, dict):
+				proc.blocks.append(Block.from_dict(block_data))
+		return proc
+
+	def add_block(self, block_type: str, **kwargs: Any) -> Block:
+		"""添加代码块到过程"""
+		block = Block(type=block_type, **kwargs)
+		self.blocks.append(block)
+		return block
+
+	def get_param_names(self) -> list[str]:
+		"""获取参数名称列表"""
+		return [param.get("name", "") for param in self.params if isinstance(param, dict)]
+
+
+# ============================================================================
 # 原有影子积木系统(保留以支持原有代码)
 # ============================================================================
 @dataclass
@@ -1101,7 +1159,7 @@ class KNProject:
 		self.project_folder: Path | None = None
 
 	@classmethod
-	def load_from_dict(cls, data: dict[str, Any]) -> KNProject:
+	def load_from_dict(cls, data: dict[str, Any]) -> KNProject:  # noqa: PLR0914
 		"""从JSON字典加载项目 - 修正版"""
 		project = cls(
 			JSONConverter.ensure_str(data.get("projectName", "未命名项目")),
@@ -1652,14 +1710,14 @@ class KNEditor:
 		self.project.print_summary()
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
 	"""主函数 - 交互式KN项目编辑器"""
 	print("=" * 60)
 	print("KN项目编辑器")
 	print("=" * 60)
 	editor = KNEditor()
 
-	def handle_menu_choice(choice: str) -> bool:
+	def handle_menu_choice(choice: str) -> bool:  # noqa: PLR0912, PLR0915
 		"""处理菜单选择"""
 		if choice == "1":
 			project_name = input("请输入项目名称: ").strip()
@@ -1937,4 +1995,5 @@ def main() -> None:
 			break
 
 
-main()
+if __name__ == "__main__":
+	main()
