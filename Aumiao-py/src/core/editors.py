@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import html  # 将import移到顶部
 import json
 import operator
 import re
@@ -26,7 +27,8 @@ class TypeChecker:
 			return False
 		# 检查HEX格式
 		if color_str.startswith("#"):
-			return len(color_str) in {4, 5, 7, 9} and all(c in "0123456789ABCDEFabcdef" for c in color_str[1:])
+			hex_part = color_str[1:]
+			return len(hex_part) in {3, 4, 6, 8} and all(c in "0123456789ABCDEFabcdef" for c in hex_part)
 		# 检查RGBA格式
 		if color_str.startswith("rgba("):
 			match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
@@ -36,6 +38,7 @@ class TypeChecker:
 					return 0 <= int(r) <= 255 and 0 <= int(g) <= 255 and 0 <= int(b) <= 255 and 0 <= float(a) <= 1
 				except (ValueError, TypeError):
 					return False
+
 		# 检查RGB格式
 		if color_str.startswith("rgb("):
 			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
@@ -55,9 +58,11 @@ class TypeChecker:
 		if isinstance(value, str):
 			try:
 				float(value)
-				return True  # noqa: TRY300
+
 			except ValueError:
 				return False
+			else:
+				return True
 		return False
 
 	@staticmethod
@@ -200,9 +205,11 @@ class Color:
 					self.g = int(match.group(2))
 					self.b = int(match.group(3))
 					self.a = float(match.group(4))
-					return True  # noqa: TRY300
+
 				except (ValueError, TypeError):
 					return False
+				else:
+					return True
 		# 处理RGB格式
 		if color_str.startswith("rgb("):
 			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
@@ -212,9 +219,10 @@ class Color:
 					self.g = int(match.group(2))
 					self.b = int(match.group(3))
 					self.a = 1.0
-					return True  # noqa: TRY300
 				except (ValueError, TypeError):
 					return False
+				else:
+					return True
 		return False
 
 	def to_string(self, *, formats: ColorFormat = ColorFormat.RGBA) -> str:
@@ -342,11 +350,330 @@ class CommentJson:
 
 
 # ============================================================================
-# 影子积木系统(完整版)
+# 影子积木XML解析器
+# ============================================================================
+@dataclass
+class ShadowXML:
+	"""影子积木XML解析器"""
+
+	xml_string: str
+	type: str = ""
+	id: str = ""
+	visible: bool = True
+	inline: bool = False
+	fields: dict[str, str] = field(default_factory=dict)
+
+	@classmethod
+	def from_xml(cls, xml_str: str) -> ShadowXML:
+		"""从XML字符串创建影子积木"""
+		if not xml_str or not xml_str.strip():
+			return cls("", "", "", True, False, {})  # noqa: FBT003
+		try:
+			# 清理XML字符串
+			cleaned = html.unescape(xml_str)
+			# 解析XML
+			root = ET.fromstring(cleaned)  # noqa: S314
+			# 提取字段
+			fields = {}
+			for field_elem in root.findall("field"):
+				name = field_elem.get("name")
+				if name:
+					fields[name] = field_elem.text or ""
+			return cls(
+				xml_string=xml_str,
+				type=root.get("type", ""),
+				id=root.get("id", ""),
+				visible=root.get("visible", "visible") == "visible",
+				inline=root.get("inline", "false") == "true",
+				fields=fields,
+			)
+		except ET.ParseError:
+			# 返回原始XML
+			return cls(xml_string=xml_str)
+
+	def to_dict(self) -> dict[str, Any]:
+		"""转换为字典"""
+		return {
+			"xml_string": self.xml_string,
+			"type": self.type,
+			"id": self.id,
+			"visible": self.visible,
+			"inline": self.inline,
+			"fields": self.fields.copy(),
+		}
+
+
+# ============================================================================
+# KN积木块系统(匹配实际JSON结构)
+# ============================================================================
+@dataclass
+class Block:
+	"""KN积木结构 - 匹配实际JSON数据结构"""
+
+	# KN实际JSON字段
+	id: str = field(default_factory=lambda: str(uuid.uuid4()))
+	type: str = ""
+	location: list[float] | None = None
+	shield: bool = False
+	parent_id: str | None = None
+	mutation: str = ""
+	is_output: bool = False
+	is_shadow: bool = False
+	fields: dict[str, Any] = field(default_factory=dict)
+	field_constraints: dict[str, Any] = field(default_factory=dict)
+	field_extra_attr: dict[str, Any] = field(default_factory=dict)
+	# 特殊字段 - 实际KN结构
+	shadows: dict[str, str] = field(default_factory=dict)  # XML字符串
+	inputs: dict[str, dict] = field(default_factory=dict)  # 嵌套字典
+	statements: dict[str, dict] = field(default_factory=dict)  # 嵌套字典
+	next: dict | None = None  # 嵌套字典,非Block对象引用
+	# 内部操作字段(保留,但不输出到JSON)
+	collapsed: bool = False
+	disabled: bool = False
+	deletable: bool = True
+	movable: bool = True
+	editable: bool = True
+	visible: str = "visible"  # 保持为字符串类型以兼容原有代码
+	comment: str | None = None
+	# 影子积木管理器(保留,用于内部操作)
+	shadow_manager: Any | None = field(default_factory=lambda: None)
+	_parsed_shadows: dict[str, ShadowXML] = field(default_factory=dict)
+
+	def __post_init__(self) -> None:
+		"""初始化后处理"""
+		if not self.id:
+			self.id = str(uuid.uuid4())
+		if not self.fields:
+			self.fields = {}
+		if not self.shadows:
+			self.shadows = {}
+		if not self.inputs:
+			self.inputs = {}
+		if not self.statements:
+			self.statements = {}
+		if not self.field_constraints:
+			self.field_constraints = {}
+		if not self.field_extra_attr:
+			self.field_extra_attr = {}
+
+	def to_dict(self) -> dict[str, Any]:
+		"""转换为字典 - 匹配KN输出格式"""
+		result: dict[str, Any] = {
+			"id": self.id,
+			"type": self.type,
+			"shield": self.shield,
+			"fields": self.fields.copy(),
+			"shadows": self.shadows.copy(),
+			"mutation": self.mutation,
+			"is_output": self.is_output,
+			"is_shadow": self.is_shadow,
+			"field_constraints": self.field_constraints.copy(),
+			"field_extra_attr": self.field_extra_attr.copy(),
+		}
+		if self.location is not None:
+			result["location"] = self.location.copy()
+		if self.parent_id is not None:
+			result["parent_id"] = self.parent_id
+		# 处理inputs - 保持原始字典结构
+		if self.inputs:
+			result["inputs"] = self.inputs.copy()
+		# 处理statements - 保持原始字典结构
+		if self.statements:
+			result["statements"] = self.statements.copy()
+		# 处理next - 保持字典结构
+		if self.next is not None:
+			result["next"] = self.next
+		return result
+
+	@classmethod
+	def from_dict(cls, data: dict[str, Any]) -> Block:
+		"""从字典创建块 - 匹配KN实际JSON结构"""
+		# 检查是否为过程调用块
+		block_type = JSONConverter.ensure_str(data.get("type"))
+		fields = JSONConverter.ensure_dict(data.get("fields"))
+		# 如果是过程调用,特殊处理
+		if block_type in {"procedures_2_callnoreturn", "procedures_2_callreturn"}:
+			return cls._create_procedure_call_block(data, block_type)
+		# 创建基础块对象
+		block = cls(
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			type=block_type,
+			location=JSONConverter.ensure_list(data.get("location")),
+			shield=JSONConverter.ensure_bool(data.get("shield", False)),
+			parent_id=data.get("parent_id"),
+			mutation=JSONConverter.ensure_str(data.get("mutation", "")),
+			is_output=JSONConverter.ensure_bool(data.get("is_output", False)),
+			is_shadow=JSONConverter.ensure_bool(data.get("is_shadow", False)),
+			fields=fields,
+			field_constraints=JSONConverter.ensure_dict(data.get("field_constraints", {})),
+			field_extra_attr=JSONConverter.ensure_dict(data.get("field_extra_attr", {})),
+			shadows=JSONConverter.ensure_dict(data.get("shadows", {})),
+		)
+		# 处理inputs - 保持为嵌套字典,不转换为Block对象
+		inputs_data = data.get("inputs", {})
+		if isinstance(inputs_data, dict):
+			block.inputs.update(inputs_data)
+		# 处理statements - 保持为嵌套字典
+		statements_data = data.get("statements", {})
+		if isinstance(statements_data, dict):
+			block.statements.update(statements_data)
+		# 处理next - 保持为字典
+		next_data = data.get("next")
+		if isinstance(next_data, dict):
+			block.next = next_data
+		return block
+
+	@classmethod
+	def _create_procedure_call_block(cls, data: dict[str, Any], block_type: str) -> Block:
+		"""创建过程调用块"""
+		block_id = JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4()))
+		fields = JSONConverter.ensure_dict(data.get("fields", {}))
+		mutation = JSONConverter.ensure_str(data.get("mutation", ""))
+		# 解析mutation获取过程ID和参数信息
+		procedure_id = fields.get("NAME", "")
+		params_info = cls._parse_procedure_mutation(mutation)
+		block = cls(
+			id=block_id,
+			type=block_type,
+			fields=fields,
+			mutation=mutation,
+			parent_id=data.get("parent_id"),
+			location=JSONConverter.ensure_list(data.get("location")),
+			shield=JSONConverter.ensure_bool(data.get("shield", False)),
+		)
+		# 设置过程调用的参数
+		block.fields["procedure_id"] = procedure_id
+		block.fields["params_info"] = params_info
+		# 处理输入参数
+		if "inputs" in data:
+			inputs_dict = JSONConverter.ensure_dict(data.get("inputs"))
+			block.inputs.update(inputs_dict)
+		# 处理下一个块
+		if data.get("next"):
+			block.next = data["next"]
+		return block
+
+	@classmethod
+	def _parse_procedure_mutation(cls, mutation_xml: str) -> dict[str, Any]:
+		"""解析过程调用的mutation XML"""
+		if not mutation_xml:
+			return {}
+		try:
+			root = ET.fromstring(mutation_xml)  # noqa: S314
+			result: dict[str, Any] = {
+				"def_id": root.get("def_id", ""),
+				"name": root.get("name", ""),
+				"type": root.get("type", "NORMAL"),
+				"args": [],
+			}
+			# 解析参数
+			for arg_elem in root.findall("arg"):
+				arg_info = {
+					"id": arg_elem.get("id", ""),
+					"content": arg_elem.get("content", ""),
+					"type": arg_elem.get("type", ""),
+				}
+				result["args"].append(arg_info)
+		except ET.ParseError:
+			# 如果XML解析失败,返回空字典
+			return {}
+		else:
+			return result
+
+	def get_all_blocks(self) -> list[Block]:
+		"""获取此块及其所有子块"""
+		blocks: list[Block] = []
+		visited: set[str] = set()
+
+		def collect_blocks(block_data: dict) -> None:
+			"""递归收集块"""
+			if "id" not in block_data or block_data["id"] in visited:
+				return
+			# 创建块对象
+			block = Block.from_dict(block_data)
+			visited.add(block.id)
+			blocks.append(block)
+			# 递归处理输入
+			for input_data in block.inputs.values():
+				if isinstance(input_data, dict):
+					collect_blocks(input_data)
+			# 递归处理语句
+			for stmt_data in block.statements.values():
+				if isinstance(stmt_data, dict):
+					collect_blocks(stmt_data)
+			# 处理下一个块
+			if block.next is not None and isinstance(block.next, dict):
+				collect_blocks(block.next)
+
+		# 从当前块开始收集
+		collect_blocks(self.to_dict())
+		return blocks
+
+	def find_block(self, block_id: str) -> Block | None:
+		"""查找指定ID的块"""
+		for block in self.get_all_blocks():
+			if block.id == block_id:
+				return block
+		return None
+
+	def parse_shadows(self) -> dict[str, ShadowXML]:
+		"""解析影子积木XML"""
+		if not self._parsed_shadows:
+			self._parsed_shadows = {}
+			for key, xml_str in self.shadows.items():
+				if xml_str:
+					self._parsed_shadows[key] = ShadowXML.from_xml(xml_str)
+		return self._parsed_shadows
+
+	def to_xml(
+		self,
+		*,
+		include_shadows: bool = True,
+		include_location: bool = True,
+	) -> str:
+		"""转换为XML字符串"""
+		# 创建根元素
+		root = ET.Element("shadow" if self.is_shadow else "block")
+		root.set("type", self.type)
+		root.set("id", self.id)
+		# 添加位置信息
+		if include_location and self.location is not None and len(self.location) >= 2:
+			root.set("x", str(self.location[0]))
+			root.set("y", str(self.location[1]))
+		# 处理mutation
+		if self.mutation:
+			try:
+				mutation_elem = ET.fromstring(self.mutation)  # noqa: S314
+				root.append(mutation_elem)
+			except ET.ParseError:
+				mutation_elem = ET.Element("mutation")
+				root.append(mutation_elem)
+		# 处理字段
+		for field_name, field_value in self.fields.items():
+			if field_value is not None:
+				field_elem = ET.Element("field")
+				field_elem.set("name", field_name)
+				field_elem.text = str(field_value)
+				root.append(field_elem)
+		# 处理影子积木(转换为XML元素)
+		if include_shadows and self.shadows:
+			for shadow_name, shadow_xml in self.shadows.items():
+				if shadow_xml:
+					try:
+						shadow_elem = ET.fromstring(shadow_xml)  # noqa: S314
+						shadow_elem.set("name", shadow_name)
+						root.append(shadow_elem)
+					except ET.ParseError:
+						pass
+		return ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+
+# ============================================================================
+# 原有影子积木系统(保留以支持原有代码)
 # ============================================================================
 @dataclass
 class ShadowBlock:
-	"""影子积木(完整版)"""
+	"""影子积木(完整版) - 保留以支持原有代码"""
 
 	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	type: str = ""
@@ -392,7 +719,7 @@ class ShadowBlock:
 			self.editable = False
 			self.is_detachable = False
 			self.can_have_inputs = False
-		elif self.shadow_type == ShadowType.REPLACEABLE:  # 修正拼写
+		elif self.shadow_type == ShadowType.REPLACEABLE:
 			self.is_detachable = True
 			self.can_be_replaced = True
 
@@ -413,7 +740,7 @@ class ShadowBlock:
 			"disabled": self.disabled,
 			"collapsed": self.collapsed,
 			"is_detachable": self.is_detachable,
-			"is_replaceable": self.is_replaceable,  # 修正拼写
+			"is_replaceable": self.is_replaceable,
 			"can_have_inputs": self.can_have_inputs,
 			"can_be_replaced": self.can_be_replaced,
 			"keeps_value": self.keeps_value,
@@ -464,7 +791,7 @@ class ShadowBlock:
 			),
 			is_replaceable=JSONConverter.ensure_bool(
 				data.get("is_replaceable", True),
-			),  # 修正拼写
+			),
 			can_have_inputs=JSONConverter.ensure_bool(
 				data.get("can_have_inputs", True),
 			),
@@ -482,722 +809,62 @@ class ShadowBlock:
 			),
 		)
 
-	def to_xml(self, *, include_location: bool = False) -> str:
-		"""转换为XML字符串"""
-		# 根据影子类型创建根元素
-		root = ET.Element("empty") if self.shadow_type == ShadowType.EMPTY else ET.Element("shadow")
-		# 设置基本属性
-		root.set("type", self.type)
-		# 添加位置信息
-		if include_location and self.location is not None and len(self.location) >= 2:
-			root.set("x", str(self.location[0]))
-			root.set("y", str(self.location[1]))
-		# 添加字段
-		for field_name, field_value in self.fields.items():
-			if field_value is not None:
-				field_elem = ET.Element("field")
-				field_elem.set("name", field_name)
-				field_elem.text = str(field_value)
-				root.append(field_elem)
-		# 添加mutation
-		if self.mutation:
-			try:
-				mutation_elem = ET.fromstring(self.mutation)  # noqa: S314
-				root.append(mutation_elem)
-			except ET.ParseError:
-				# 如果无法解析,创建简单的mutation元素
-				mutation_elem = ET.Element("mutation")
-				root.append(mutation_elem)
-		# 添加影子属性
-		if not self.editable:
-			root.set("editable", "false")
-		if not self.deletable:
-			root.set("deletable", "false")
-		if not self.movable:
-			root.set("movable", "false")
-		if self.disabled:
-			root.set("disabled", "true")
-		if self.collapsed:
-			root.set("collapsed", "true")
-		return ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-	def detach_to_block(self) -> Block:
-		"""分离为普通积木块"""
-		# 创建普通积木
-		visible = "visible" if self.visible else ""
-		return Block(
-			id=self.id,
-			type=self.type,
-			fields=self.fields.copy(),
-			mutation=self.mutation,
-			is_output=self.is_output,
-			editable=True,
-			deletable=True,
-			movable=True,
-			visible=visible,
-			disabled=self.disabled,
-			collapsed=self.collapsed,
-			location=self.location.copy() if self.location else None,
-			is_shadow=False,
-		)
-
-	def clone(self) -> ShadowBlock:
-		"""克隆影子积木"""
-		clone_data = self.to_dict()
-		clone_data["id"] = str(uuid.uuid4())
-		return self.from_dict(clone_data)
-
-	def matches_type(self, block_type: str) -> bool:
-		"""检查是否匹配积木类型"""
-		return self.type == block_type
-
-	def can_accept_connection(self, connection_type: ConnectionType) -> bool:
-		"""检查是否可以接受连接"""
-		if self.connection_type is not None:
-			return self.connection_type == connection_type
-		return True
-
-	def apply_field_constraints(
-		self,
-		field_name: str,
-		value: Any,
-	) -> Any | None:
-		"""应用字段约束"""
-		if field_name in self.field_constraints:
-			constraints = self.field_constraints[field_name]
-			# 检查类型约束
-			value_type = constraints.get("type")
-			if value_type:
-				try:
-					if value_type == "number":
-						value = float(value)
-					elif value_type == "integer":
-						value = int(value)
-				except (ValueError, TypeError):
-					return None
-			# 检查范围约束
-			if "min" in constraints and value < constraints["min"]:
-				value = constraints["min"]
-			if "max" in constraints and value > constraints["max"]:
-				value = constraints["max"]
-			# 检查选项约束
-			if "options" in constraints and value not in constraints["options"]:
-				return None
-		return value
-
-
-@dataclass
-class ShadowManager:
-	"""影子积木管理器"""
-
-	shadow_blocks: dict[str, ShadowBlock] = field(default_factory=dict)
-	parent_child_map: dict[str, list[str]] = field(default_factory=dict)
-	input_shadow_map: dict[str, dict[str, str]] = field(default_factory=dict)
-
-	def add_shadow_block(
-		self,
-		shadow_block: ShadowBlock,
-		parent_id: str | None = None,
-	) -> str:
-		"""添加影子积木"""
-		self.shadow_blocks[shadow_block.id] = shadow_block
-		# 记录父子关系
-		if parent_id is not None:
-			shadow_block.parent_id = parent_id
-			if parent_id not in self.parent_child_map:
-				self.parent_child_map[parent_id] = []
-			self.parent_child_map[parent_id].append(shadow_block.id)
-		# 记录输入影子映射
-		if parent_id is not None and shadow_block.input_name is not None:
-			if parent_id not in self.input_shadow_map:
-				self.input_shadow_map[parent_id] = {}
-			self.input_shadow_map[parent_id][shadow_block.input_name] = shadow_block.id
-		return shadow_block.id
-
-	def remove_shadow_block(self, shadow_id: str) -> bool:
-		"""移除影子积木"""
-		if shadow_id not in self.shadow_blocks:
-			return False
-		shadow_block = self.shadow_blocks[shadow_id]
-		parent_id = shadow_block.parent_id
-		# 清理父子关系
-		if parent_id is not None and parent_id in self.parent_child_map:
-			if shadow_id in self.parent_child_map[parent_id]:
-				self.parent_child_map[parent_id].remove(shadow_id)
-			if not self.parent_child_map[parent_id]:
-				del self.parent_child_map[parent_id]
-		# 清理输入映射
-		if parent_id is not None and parent_id in self.input_shadow_map:
-			if shadow_block.input_name is not None and shadow_block.input_name in self.input_shadow_map[parent_id]:
-				del self.input_shadow_map[parent_id][shadow_block.input_name]
-			if not self.input_shadow_map[parent_id]:
-				del self.input_shadow_map[parent_id]
-		# 移除影子积木
-		del self.shadow_blocks[shadow_id]
-		return True
-
-	def get_shadows_by_parent(self, parent_id: str) -> list[ShadowBlock]:
-		"""获取父积木的所有影子积木"""
-		if parent_id not in self.parent_child_map:
-			return []
-		shadows: list[ShadowBlock] = [self.shadow_blocks[shadow_id] for shadow_id in self.parent_child_map[parent_id] if shadow_id in self.shadow_blocks]
-		return shadows
-
-	def get_input_shadow(
-		self,
-		parent_id: str,
-		input_name: str,
-	) -> ShadowBlock | None:
-		"""获取指定输入的影子积木"""
-		if parent_id in self.input_shadow_map and input_name in self.input_shadow_map[parent_id]:
-			shadow_id = self.input_shadow_map[parent_id][input_name]
-			return self.shadow_blocks.get(shadow_id)
-		return None
-
-	def to_dict(self) -> dict[str, Any]:
-		"""转换为字典"""
-		return {
-			"shadow_blocks": {k: v.to_dict() for k, v in self.shadow_blocks.items()},
-			"parent_child_map": self.parent_child_map.copy(),
-			"input_shadow_map": self.input_shadow_map.copy(),
-		}
-
-	@classmethod
-	def from_dict(cls, data: dict[str, Any]) -> ShadowManager:
-		"""从字典创建"""
-		manager = cls()
-		# 加载影子积木
-		for shadow_id, shadow_data in JSONConverter.ensure_dict(
-			data.get("shadow_blocks"),
-		).items():
-			shadow_block = ShadowBlock.from_dict(shadow_data)
-			manager.shadow_blocks[shadow_id] = shadow_block
-		# 加载关系映射
-		manager.parent_child_map = JSONConverter.ensure_dict(
-			data.get("parent_child_map"),
-		).copy()
-		manager.input_shadow_map = JSONConverter.ensure_dict(
-			data.get("input_shadow_map"),
-		).copy()
-		return manager
-
 
 # ============================================================================
-# 积木块系统(完整版,支持影子积木)
+# KN项目解析器
 # ============================================================================
-@dataclass
-class Block:
-	"""代码块实例(完整版)"""
+class KNProjectParser:
+	"""KN项目解析器"""
 
-	id: str = field(default_factory=lambda: str(uuid.uuid4()))
-	type: str = ""
-	fields: dict[str, Any] = field(default_factory=dict)
-	shadows: dict[str, Any] = field(default_factory=dict)
-	inputs: dict[str, Block | None] = field(default_factory=dict)
-	statements: dict[str, list[Block]] = field(default_factory=dict)
-	next: Block | None = None
-	location: list[float] | None = None
-	shield: bool = False
-	comment: str | None = None
-	collapsed: bool = False
-	disabled: bool = False
-	deletable: bool = True
-	movable: bool = True
-	editable: bool = True
-	visible: str = "visible"  # 修正为字符串类型
-	is_shadow: bool = False
-	parent_id: str | None = None
-	mutation: str = ""
-	is_output: bool = False
-	# 字段约束和额外属性
-	field_constraints: dict[str, Any] = field(default_factory=dict)
-	field_extra_attr: dict[str, Any] = field(default_factory=dict)
-	# 影子积木管理器
-	shadow_manager: ShadowManager = field(default_factory=ShadowManager)
+	@staticmethod
+	def parse_nested_structure(data: dict, all_blocks_flat: dict[str, dict], parent_id: str | None = None) -> None:
+		"""递归收集嵌套结构中的所有块"""
+		if not isinstance(data, dict) or "type" not in data:
+			return
+		block_id = data.get("id", str(uuid.uuid4()))
+		# 保存原始数据
+		if block_id not in all_blocks_flat:
+			all_blocks_flat[block_id] = data
+		# 设置parent_id
+		data["parent_id"] = parent_id
+		# 递归处理inputs
+		inputs = data.get("inputs", {})
+		for input_data in inputs.values():
+			if isinstance(input_data, dict):
+				KNProjectParser.parse_nested_structure(
+					input_data,
+					all_blocks_flat,
+					block_id,
+				)
+		# 递归处理statements
+		statements = data.get("statements", {})
+		for stmt_data in statements.values():
+			if isinstance(stmt_data, dict):
+				KNProjectParser.parse_nested_structure(
+					stmt_data,
+					all_blocks_flat,
+					block_id,
+				)
+		# 递归处理next
+		next_data = data.get("next")
+		if isinstance(next_data, dict):
+			KNProjectParser.parse_nested_structure(
+				next_data,
+				all_blocks_flat,
+				block_id,
+			)
 
-	def __post_init__(self) -> None:
-		"""初始化后处理"""
-		if not self.id:
-			self.id = str(uuid.uuid4())
-		if not self.fields:
-			self.fields = {}
-		if not self.shadows:
-			self.shadows = {}
-		if not self.inputs:
-			self.inputs = {}
-		if not self.statements:
-			self.statements = {}
-		if not self.field_constraints:
-			self.field_constraints = {}
-		if not self.field_extra_attr:
-			self.field_extra_attr = {}
-
-	def to_dict(self) -> dict[str, Any]:
-		"""转换为字典"""
-		result: dict[str, Any] = {
-			"id": self.id,
-			"type": self.type,
-			"fields": self.fields.copy(),
-			"shadows": self.shadows.copy(),
-			"collapsed": self.collapsed,
-			"disabled": self.disabled,
-			"deletable": self.deletable,
-			"movable": self.movable,
-			"editable": self.editable,
-			"visible": self.visible,
-			"is_shadow": self.is_shadow,
-			"shield": self.shield,
-			"mutation": self.mutation,
-			"is_output": self.is_output,
-			"field_constraints": self.field_constraints.copy(),
-			"field_extra_attr": self.field_extra_attr.copy(),
-		}
-		if self.comment is not None:
-			result["comment"] = self.comment
-		if self.location is not None:
-			result["location"] = self.location.copy()
-		if self.parent_id is not None:
-			result["parent_id"] = self.parent_id
-		# 递归处理输入
-		if self.inputs:
-			inputs_dict: dict[str, Any] = {}
-			for key, block in self.inputs.items():
-				if block is not None:
-					inputs_dict[key] = block.to_dict()
-			if inputs_dict:
-				result["inputs"] = inputs_dict
-		# 递归处理语句
-		if self.statements:
-			statements_dict: dict[str, Any] = {}
-			for key, blocks in self.statements.items():
-				if blocks:
-					statements_dict[key] = blocks[0].to_dict()
-			if statements_dict:
-				result["statements"] = statements_dict
-		# 处理下一个块
-		if self.next is not None:
-			result["next"] = self.next.to_dict()
-		# 添加影子积木管理器
-		result["shadow_manager"] = self.shadow_manager.to_dict()
-		return result
-
-	@classmethod
-	def from_dict(cls, data: dict[str, Any]) -> Block:
-		"""从字典创建块"""
-		# 检查是否为过程调用块
-		block_type = JSONConverter.ensure_str(data.get("type"))
-		fields = JSONConverter.ensure_dict(data.get("fields"))
-		# 如果是过程调用,特殊处理
-		if block_type in {"procedures_2_callnoreturn", "procedures_2_callreturn"}:
-			return cls._create_procedure_call_block(data, block_type)
-		# 原来的创建逻辑...
-		shadow_manager = ShadowManager()
-		if "shadow_manager" in data:
-			shadow_manager = ShadowManager.from_dict(data["shadow_manager"])
-		block = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
-			type=block_type,
-			fields=fields,
-			shadows=JSONConverter.ensure_dict(data.get("shadows")),
-			location=JSONConverter.ensure_list(data.get("location")),
-			comment=data.get("comment"),
-			collapsed=JSONConverter.ensure_bool(data.get("collapsed", False)),
-			disabled=JSONConverter.ensure_bool(data.get("disabled", False)),
-			deletable=JSONConverter.ensure_bool(data.get("deletable", True)),
-			movable=JSONConverter.ensure_bool(data.get("movable", True)),
-			editable=JSONConverter.ensure_bool(data.get("editable", True)),
-			visible=JSONConverter.ensure_str(data.get("visible", "visible")),
-			is_shadow=JSONConverter.ensure_bool(data.get("is_shadow", False)),
-			is_output=JSONConverter.ensure_bool(data.get("is_output", False)),
-			parent_id=data.get("parent_id"),
-			mutation=JSONConverter.ensure_str(data.get("mutation")),
-			field_constraints=JSONConverter.ensure_dict(
-				data.get("field_constraints"),
-			),
-			field_extra_attr=JSONConverter.ensure_dict(
-				data.get("field_extra_attr"),
-			),
-			shield=JSONConverter.ensure_bool(data.get("shield", False)),
-			shadow_manager=shadow_manager,
-		)
-		# 递归创建输入块
-		if "inputs" in data:
-			for key, input_data in JSONConverter.ensure_dict(
-				data.get("inputs"),
-			).items():
-				if input_data and isinstance(input_data, dict):
-					block.inputs[key] = cls.from_dict(input_data)
-		# 递归创建语句块
-		if "statements" in data:
-			for key, statement_data in JSONConverter.ensure_dict(
-				data.get("statements"),
-			).items():
-				if statement_data and isinstance(statement_data, dict):
-					block.statements[key] = [cls.from_dict(statement_data)]
-		# 处理下一个块
-		if data.get("next"):
-			block.next = cls.from_dict(data["next"])
-		return block
-
-	@classmethod
-	def _create_procedure_call_block(cls, data: dict[str, Any], block_type: str) -> Block:
-		"""创建过程调用块"""
-		block_id = JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4()))
-		fields = JSONConverter.ensure_dict(data.get("fields", {}))
-		mutation = JSONConverter.ensure_str(data.get("mutation", ""))
-		# 解析mutation获取过程ID和参数信息
-		procedure_id = fields.get("NAME", "")
-		params_info = cls._parse_procedure_mutation(mutation)
-		block = cls(
-			id=block_id,
-			type=block_type,
-			fields=fields,
-			mutation=mutation,
-			parent_id=data.get("parent_id"),
-			location=JSONConverter.ensure_list(data.get("location")),
-			shield=JSONConverter.ensure_bool(data.get("shield", False)),
-		)
-		# 设置过程调用的参数
-		block.fields["procedure_id"] = procedure_id
-		block.fields["params_info"] = params_info
-		# 处理输入参数
-		if "inputs" in data:
-			inputs_dict = JSONConverter.ensure_dict(data.get("inputs"))
-			for param_id, param_data in inputs_dict.items():
-				if param_data and isinstance(param_data, dict):
-					block.inputs[param_id] = cls.from_dict(param_data)
-		# 处理下一个块
-		if data.get("next"):
-			block.next = cls.from_dict(data["next"])
-		return block
-
-	@classmethod
-	def _parse_procedure_mutation(cls, mutation_xml: str) -> dict[str, Any]:
-		"""解析过程调用的mutation XML"""
-		if not mutation_xml:
-			return {}
-		try:
-			root = ET.fromstring(mutation_xml)  # noqa: S314
-			result = {
-				"def_id": root.get("def_id", ""),
-				"name": root.get("name", ""),
-				"type": root.get("type", "NORMAL"),
-				"args": [],
-			}
-			# 解析参数
-			for arg_elem in root.findall("arg"):
-				arg_info = {
-					"id": arg_elem.get("id", ""),
-					"content": arg_elem.get("content", ""),
-					"type": arg_elem.get("type", ""),
-				}
-				result["args"].append(arg_info)  # pyright: ignore[reportAttributeAccessIssue]
-			return result  # noqa: TRY300
-		except ET.ParseError:
-			# 如果XML解析失败,返回空字典
-			return {}
-
-	def get_all_blocks(self) -> list[Block]:
-		"""获取此块及其所有子块"""
-		blocks: list[Block] = []
-		visited: set[str] = set()
-		stack: list[Block] = [self]
-		while stack:
-			current = stack.pop()
-			if current.id in visited:
-				continue
-			visited.add(current.id)
-			blocks.append(current)
-			# 添加输入块到栈
-			stack.extend(input_block for input_block in current.inputs.values() if input_block is not None and input_block.id not in visited)
-			# 添加语句块到栈
-			for statement_blocks in current.statements.values():
-				stack.extend(block for block in statement_blocks if block.id not in visited)
-			# 添加下一个块到栈
-			if current.next is not None and current.next.id not in visited:
-				stack.append(current.next)
+	@staticmethod
+	def build_blocks_from_flat(all_blocks_flat: dict[str, dict]) -> dict[str, Block]:
+		"""从平面数据构建Block对象"""
+		blocks = {}
+		for block_id, block_data in all_blocks_flat.items():
+			blocks[block_id] = Block.from_dict(block_data)
 		return blocks
 
-	def find_block(self, block_id: str) -> Block | None:
-		"""查找指定ID的块"""
-		for block in self.get_all_blocks():
-			if block.id == block_id:
-				return block
-		return None
-
-	def add_shadow(
-		self,
-		shadow_block: ShadowBlock,
-		input_name: str | None = None,
-	) -> str:
-		"""添加影子积木"""
-		shadow_block.parent_id = self.id
-		shadow_block.input_name = input_name
-		return self.shadow_manager.add_shadow_block(shadow_block, self.id)
-
-	def get_shadows(self) -> list[ShadowBlock]:
-		"""获取所有影子积木"""
-		return self.shadow_manager.get_shadows_by_parent(self.id)
-
-	def get_input_shadow(self, input_name: str) -> ShadowBlock | None:
-		"""获取指定输入的影子积木"""
-		return self.shadow_manager.get_input_shadow(self.id, input_name)
-
-	def to_xml(  # noqa: PLR0912, PLR0915
-		self,
-		*,
-		include_shadows: bool = True,
-		include_location: bool = True,
-	) -> str:
-		"""转换为XML字符串"""
-		# 创建根元素
-		root = ET.Element("shadow" if self.editable else "empty") if self.is_shadow else ET.Element("block")
-		root.set("type", self.type)
-		if self.id and not self.is_shadow:
-			root.set("id", self.id)
-		# 添加位置信息
-		if include_location and self.location is not None and len(self.location) >= 2:
-			root.set("x", str(self.location[0]))
-			root.set("y", str(self.location[1]))
-		# 处理mutation
-		if self.mutation:
-			try:
-				mutation_elem = ET.fromstring(self.mutation)  # noqa: S314
-				root.append(mutation_elem)
-			except ET.ParseError:
-				# 如果无法解析,创建简单的mutation元素
-				mutation_elem = ET.Element("mutation")
-				root.append(mutation_elem)
-		# 处理字段
-		for field_name, field_value in self.fields.items():
-			if field_value is not None:
-				field_elem = ET.Element("field")
-				field_elem.set("name", field_name)
-				field_elem.text = str(field_value)
-				root.append(field_elem)
-		# 处理输入(支持影子积木)
-		for input_name, input_block in self.inputs.items():
-			if input_block is not None:
-				value_elem = ET.Element("value")
-				value_elem.set("name", input_name)
-				# 检查是否有影子积木
-				if include_shadows:
-					shadow = self.get_input_shadow(input_name)
-					if shadow is not None:
-						# 如果有影子积木,使用影子积木的XML
-						shadow_xml = shadow.to_xml(include_location=False)
-						shadow_elem = ET.fromstring(shadow_xml)  # noqa: S314
-						value_elem.append(shadow_elem)
-					else:
-						# 否则使用普通积木
-						child_xml = input_block.to_xml(include_shadows=include_shadows, include_location=False)
-						child_elem = ET.fromstring(child_xml)  # noqa: S314
-						value_elem.append(child_elem)
-				else:
-					# 不使用影子积木
-					child_xml = input_block.to_xml(include_shadows=False, include_location=False)
-					child_elem = ET.fromstring(child_xml)  # noqa: S314
-					value_elem.append(child_elem)
-				root.append(value_elem)
-		# 处理语句块
-		for stmt_name, stmt_blocks in self.statements.items():
-			if stmt_blocks:
-				stmt_elem = ET.Element("statement")
-				stmt_elem.set("name", stmt_name)
-				# 添加第一个语句块
-				first_block = stmt_blocks[0]
-				child_xml = first_block.to_xml(include_shadows=include_shadows, include_location=False)
-				child_elem = ET.fromstring(child_xml)  # noqa: S314
-				stmt_elem.append(child_elem)
-				root.append(stmt_elem)
-		# 处理下一个积木
-		if self.next is not None:
-			next_elem = ET.Element("next")
-			child_xml = self.next.to_xml(include_shadows=include_shadows, include_location=False)
-			child_elem = ET.fromstring(child_xml)  # noqa: S314
-			next_elem.append(child_elem)
-			root.append(next_elem)
-		# 添加特殊属性
-		if self.disabled:
-			root.set("disabled", "true")
-		if self.collapsed:
-			root.set("collapsed", "true")
-		if not self.deletable:
-			root.set("deletable", "false")
-		if not self.movable:
-			root.set("movable", "false")
-		if not self.editable:
-			root.set("editable", "false")
-		if self.visible != "visible":
-			root.set("visible", self.visible)
-		return ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-	@classmethod
-	def from_xml(cls, xml_str: str) -> Block:
-		"""从XML字符串创建积木块"""
-		try:
-			root = ET.fromstring(xml_str)  # noqa: S314
-		except ET.ParseError as e:
-			error_msg = f"XML解析错误: {e}"
-			raise ValueError(error_msg) from e
-		# 解析基本属性
-		block_type = root.get("type", "")
-		block_id = root.get("id", str(uuid.uuid4()))
-		is_shadow = root.tag in {"shadow", "empty"}
-		# 创建块
-		block = cls(
-			id=block_id,
-			type=block_type,
-			is_shadow=is_shadow,
-			editable=root.tag != "empty",
-		)
-		# 解析位置
-		x = root.get("x")
-		y = root.get("y")
-		if x is not None and y is not None:
-			try:
-				block.location = [float(x), float(y)]
-			except ValueError:
-				block.location = [0.0, 0.0]
-		# 解析特殊属性
-		if root.get("disabled") == "true":
-			block.disabled = True
-		if root.get("collapsed") == "true":
-			block.collapsed = True
-		if root.get("deletable") == "false":
-			block.deletable = False
-		if root.get("movable") == "false":
-			block.movable = False
-		if root.get("editable") == "false":
-			block.editable = False
-		visible = root.get("visible")
-		if visible is not None:
-			block.visible = visible
-		# 解析mutation
-		mutation_elem = root.find("mutation")
-		if mutation_elem is not None:
-			block.mutation = ET.tostring(mutation_elem, encoding="unicode")
-		# 解析字段
-		for field_elem in root.findall("field"):
-			field_name = field_elem.get("name")
-			if field_name is not None and field_elem.text is not None:
-				block.fields[field_name] = field_elem.text
-		# 解析输入和语句(包含影子积木)
-		cls._parse_connections(root, block)
-		return block
-
-	@classmethod
-	def _parse_connections(cls, root: ET.Element, block: Block) -> None:
-		"""解析连接关系"""
-		# 解析value输入
-		for value_elem in root.findall("value"):
-			input_name = value_elem.get("name")
-			if input_name is not None:
-				# 检查是否有影子积木
-				shadow_elem = value_elem.find("shadow") or value_elem.find(
-					"empty",
-				)
-				if shadow_elem is not None:
-					# 创建影子积木
-					shadow_xml = ET.tostring(shadow_elem, encoding="unicode")
-					# 简化处理,不依赖外部模块
-					try:
-						shadow_root = ET.fromstring(shadow_xml)  # noqa: S314
-						shadow_block = ShadowBlock(
-							type=shadow_root.get("type", ""),
-							shadow_type=(ShadowType.EMPTY if shadow_root.tag == "empty" else ShadowType.REGULAR),
-						)
-						# 解析影子积木的字段
-						for field_elem in shadow_root.findall("field"):
-							field_name = field_elem.get("name")
-							if field_name is not None and field_elem.text is not None:
-								shadow_block.fields[field_name] = field_elem.text
-						block.add_shadow(shadow_block, input_name)
-					except ET.ParseError:
-						# 如果无法解析,跳过影子积木
-						pass
-				# 解析普通积木
-				child_block = value_elem.find("block")
-				if child_block is not None:
-					child_xml = ET.tostring(child_block, encoding="unicode")
-					block.inputs[input_name] = cls.from_xml(child_xml)
-		# 解析statement输入
-		for stmt_elem in root.findall("statement"):
-			stmt_name = stmt_elem.get("name")
-			if stmt_name is not None:
-				child_block = stmt_elem.find("block")
-				if child_block is not None:
-					child_xml = ET.tostring(child_block, encoding="unicode")
-					block.statements[stmt_name] = [cls.from_xml(child_xml)]
-		# 解析next
-		next_elem = root.find("next")
-		if next_elem is not None:
-			child_block = next_elem.find("block")
-			if child_block is not None:
-				child_xml = ET.tostring(child_block, encoding="unicode")
-				block.next = cls.from_xml(child_xml)
-
-
-@dataclass
-class Procedure:
-	"""自定义函数/过程类"""
-
-	id: str
-	name: str
-	type: str = "NORMAL"  # NORMAL, DEFINE, etc.
-	params: list[dict[str, Any]] = field(default_factory=list)
-	blocks: list[Block] = field(default_factory=list)
-	workspace_scroll_xy: dict[str, float] = field(default_factory=lambda: {"x": 0.0, "y": 0.0})
-	comments: dict[str, Any] = field(default_factory=dict)
-
-	def __post_init__(self) -> None:
-		"""初始化后处理"""
-		if not self.id:
-			self.id = str(uuid.uuid4())
-
-	def to_dict(self) -> dict[str, Any]:
-		"""转换为字典"""
-		return {
-			"id": self.id,
-			"name": self.name,
-			"type": self.type,
-			"params": self.params.copy(),
-			"nekoBlockJsonList": [block.to_dict() for block in self.blocks],
-			"workspaceScrollXy": self.workspace_scroll_xy.copy(),
-			"comments": self.comments.copy(),
-		}
-
-	@classmethod
-	def from_dict(cls, data: dict[str, Any]) -> Procedure:
-		"""从字典创建过程"""
-		proc = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
-			name=JSONConverter.ensure_str(data.get("name")),
-			type=JSONConverter.ensure_str(data.get("type", "NORMAL")),
-			params=JSONConverter.ensure_list(data.get("params")),
-			workspace_scroll_xy=JSONConverter.ensure_dict(data.get("workspaceScrollXy", {"x": 0.0, "y": 0.0})),
-			comments=JSONConverter.ensure_dict(data.get("comments", {})),
-		)
-		# 加载块
-		blocks_data = JSONConverter.ensure_list(data.get("nekoBlockJsonList"))
-		for block_data in blocks_data:
-			if isinstance(block_data, dict):
-				proc.blocks.append(Block.from_dict(block_data))
-		return proc
-
-	def add_block(self, block_type: str, **kwargs: Any) -> Block:
-		"""添加代码块到过程"""
-		block = Block(type=block_type, **kwargs)
-		self.blocks.append(block)
-		return block
-
-	def get_param_names(self) -> list[str]:
-		"""获取参数名称列表"""
-		return [param.get("name", "") for param in self.params if isinstance(param, dict)]
-
 
 # ============================================================================
-# 角色和场景类(增强版)
+# 角色和场景类(保持原样)
 # ============================================================================
 @dataclass
 class Actor:
@@ -1276,37 +943,6 @@ class Actor:
 		self.blocks.append(block)
 		return block
 
-	def add_move_block(self, x: float, y: float) -> Block:
-		"""添加移动块"""
-		block = self.add_block(BlockType.SELF_MOVE_TO.value)
-		block.inputs["X"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": str(x)},
-		)
-		block.inputs["Y"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": str(y)},
-		)
-		return block
-
-	def add_say_block(self, text: str) -> Block:
-		"""添加说话块"""
-		block = self.add_block(BlockType.SELF_DIALOG.value)
-		block.inputs["TEXT"] = Block(
-			type=BlockType.TEXT.value,
-			fields={"TEXT": text},
-		)
-		return block
-
-	def add_wait_block(self, seconds: float) -> Block:
-		"""添加等待块"""
-		block = self.add_block(BlockType.WAIT.value)
-		block.inputs["SECONDS"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": str(seconds)},
-		)
-		return block
-
 
 @dataclass
 class Scene:
@@ -1378,10 +1014,6 @@ class Scene:
 		self.blocks.append(block)
 		return block
 
-	def add_start_block(self) -> Block:
-		"""添加程序启动块"""
-		return self.add_block(BlockType.ON_RUNNING_GROUP_ACTIVATED.value)
-
 
 # ============================================================================
 # 工作区数据
@@ -1435,27 +1067,10 @@ class WorkspaceData:
 		"""添加块"""
 		self.blocks[block.id] = block
 
-	def add_comment(self, comment: CommentJson) -> None:
-		"""添加注释"""
-		self.comments[comment.id] = comment
 
-	def connect_blocks(
-		self,
-		source_id: str,
-		target_id: str,
-		conn_type: str,
-		input_name: str | None = None,
-	) -> None:
-		"""连接两个块"""
-		if source_id not in self.connections:
-			self.connections[source_id] = {}
-		conn = ConnectionJson(type=conn_type)
-		if conn_type == "input":
-			conn.input_type = "value"
-			conn.input_name = input_name
-		self.connections[source_id][target_id] = conn
-
-
+# ============================================================================
+# KN项目主类(修正版)
+# ============================================================================
 class KNProject:
 	"""KN项目(完整重构版)"""
 
@@ -1474,19 +1089,20 @@ class KNProject:
 		self.lists: dict[str, Any] = {}
 		self.broadcasts: dict[str, Any] = {}
 		self.audios: dict[str, Any] = {}
-		self.procedures: dict[str, Procedure] = {}  # 修改为Procedure类型
+		self.procedures: dict[str, Any] = {}
 		# 工作区数据
 		self.workspace: WorkspaceData = WorkspaceData()
 		# 其他设置
 		self.stage_size: dict[str, float] = {"width": 900.0, "height": 562.0}
 		self.timer_position: dict[str, float] = {"x": 720.0, "y": 12.0}
+		self.workspace_scroll_xy: dict[str, float] = {"x": 0.0, "y": 0.0}
 		self.filepath: Path | None = None
 		self.resources: dict[str, Any] = {}
 		self.project_folder: Path | None = None
 
 	@classmethod
 	def load_from_dict(cls, data: dict[str, Any]) -> KNProject:
-		"""从字典创建项目"""
+		"""从JSON字典加载项目 - 修正版"""
 		project = cls(
 			JSONConverter.ensure_str(data.get("projectName", "未命名项目")),
 		)
@@ -1501,55 +1117,114 @@ class KNProject:
 		project.timer_position = JSONConverter.ensure_dict(
 			data.get("timerPosition", {"x": 720.0, "y": 12.0}),
 		)
-		# 资源
-		project.styles = JSONConverter.ensure_dict(
-			data.get("styles", {}).get("stylesDict", {}),
+		project.workspace_scroll_xy = JSONConverter.ensure_dict(
+			data.get("workspaceScrollXy", {"x": 0.0, "y": 0.0}),
 		)
-		project.variables = JSONConverter.ensure_dict(
-			data.get("variables", {}).get("variablesDict", {}),
-		)
-		project.lists = JSONConverter.ensure_dict(
-			data.get("lists", {}).get("listsDict", {}),
-		)
-		project.broadcasts = JSONConverter.ensure_dict(
-			data.get("broadcasts", {}).get("broadcastsDict", {}),
-		)
-		project.audios = JSONConverter.ensure_dict(
-			data.get("audios", {}).get("audiosDict", {}),
-		)
-		# 加载过程 - 修改为使用Procedure类
-		procedures_dict = JSONConverter.ensure_dict(
-			data.get("procedures", {}).get("proceduresDict", {}),
-		)
-		for proc_id, proc_data in procedures_dict.items():
-			if isinstance(proc_data, dict):
-				project.procedures[proc_id] = Procedure.from_dict(proc_data)
-		# 场景
+		# 解析样式
+		styles_data = data.get("styles", {})
+		styles_dict = JSONConverter.ensure_dict(styles_data.get("stylesDict", {}))
+		for style_id, style_data in styles_dict.items():
+			project.styles[style_id] = {
+				"id": style_id,
+				"url": JSONConverter.ensure_str(style_data.get("url", "")),
+				"name": JSONConverter.ensure_str(style_data.get("name", "")),
+				"centerPoint": JSONConverter.ensure_dict(style_data.get("centerPoint", {"x": 0.0, "y": 0.0})),
+				"adaption": JSONConverter.ensure_str(style_data.get("adaption", "none")),
+				"styleType": JSONConverter.ensure_int(style_data.get("styleType", 1)),
+			}
+		# 解析变量
+		variables_data = data.get("variables", {})
+		variables_dict = JSONConverter.ensure_dict(variables_data.get("variablesDict", {}))
+		for var_id, var_data in variables_dict.items():
+			project.variables[var_id] = {
+				"id": var_id,
+				"name": JSONConverter.ensure_str(var_data.get("name", "")),
+				"type": JSONConverter.ensure_str(var_data.get("type", "any")),
+				"value": var_data.get("value", 0),
+				"style": JSONConverter.ensure_str(var_data.get("style", "default")),
+				"scale": JSONConverter.ensure_float(var_data.get("scale", 1.0)),
+				"visible": JSONConverter.ensure_bool(var_data.get("visible", False)),
+				"position": JSONConverter.ensure_dict(var_data.get("position", {"x": 20.0, "y": 20.0})),
+				"isGlobal": JSONConverter.ensure_bool(var_data.get("isGlobal", True)),
+				"currentEntityId": var_data.get("currentEntityId"),
+			}
+		# 解析场景
 		scenes_data = JSONConverter.ensure_dict(data.get("scenes", {}))
-		scenes_dict = JSONConverter.ensure_dict(
-			scenes_data.get("scenesDict", {}),
-		)
+		scenes_dict = JSONConverter.ensure_dict(scenes_data.get("scenesDict", {}))
 		for scene_id, scene_data in scenes_dict.items():
-			project.scenes[scene_id] = Scene.from_dict(scene_data)
+			# 创建场景对象
+			scene = Scene(
+				id=scene_id,
+				name=JSONConverter.ensure_str(scene_data.get("name")),
+				screen_name=JSONConverter.ensure_str(scene_data.get("screenName", "屏幕")),
+				styles=JSONConverter.ensure_list(scene_data.get("styles", [])),
+				actor_ids=JSONConverter.ensure_list(scene_data.get("actorIds", [])),
+				visible=JSONConverter.ensure_bool(scene_data.get("visible", True)),
+				current_style_id=JSONConverter.ensure_str(scene_data.get("currentStyleId", "")),
+				background_color=JSONConverter.ensure_str(scene_data.get("backgroundColor", "#FFFFFF")),
+				background_image=scene_data.get("backgroundImage"),
+			)
+			# 解析场景积木 - 使用新的解析策略
+			blocks_list = JSONConverter.ensure_list(scene_data.get("nekoBlockJsonList", []))
+			for block_data in blocks_list:
+				if isinstance(block_data, dict):
+					# 使用新的Block.from_dict方法
+					block = Block.from_dict(block_data)
+					scene.blocks.append(block)
+					project.workspace.add_block(block)
+			project.scenes[scene_id] = scene
 		project.current_scene_id = JSONConverter.ensure_str(
 			scenes_data.get("currentSceneId", ""),
 		)
 		project.sort_list = JSONConverter.ensure_list(
 			scenes_data.get("sortList", []),
 		)
-		# 角色
+		# 解析角色
 		actors_data = JSONConverter.ensure_dict(data.get("actors", {}))
-		actors_dict = JSONConverter.ensure_dict(
-			actors_data.get("actorsDict", {}),
-		)
+		actors_dict = JSONConverter.ensure_dict(actors_data.get("actorsDict", {}))
 		for actor_id, actor_data in actors_dict.items():
-			project.actors[actor_id] = Actor.from_dict(actor_data)
-		# 工作区数据
-		if "blocks" in data or "connections" in data or "comments" in data:
-			project.workspace = WorkspaceData.from_dict(data)
-		else:
-			# 如果没有独立的工作区数据,从场景和角色中收集块
-			project._collect_blocks_to_workspace()
+			actor = Actor(
+				id=actor_id,
+				name=JSONConverter.ensure_str(actor_data.get("name")),
+				position=JSONConverter.ensure_dict(actor_data.get("position", {"x": 0.0, "y": 0.0})),
+				scale=JSONConverter.ensure_float(actor_data.get("scale", 100.0)),
+				rotation=JSONConverter.ensure_float(actor_data.get("rotation", 0.0)),
+				visible=JSONConverter.ensure_bool(actor_data.get("visible", True)),
+				locked=JSONConverter.ensure_bool(actor_data.get("locked", False)),
+				draggable=JSONConverter.ensure_bool(actor_data.get("draggable", True)),
+				rotation_type=JSONConverter.ensure_str(actor_data.get("rotationType", "all around")),
+				styles=JSONConverter.ensure_list(actor_data.get("styles", [])),
+				current_style_id=JSONConverter.ensure_str(actor_data.get("currentStyleId", "")),
+			)
+			# 解析角色积木
+			blocks_list = JSONConverter.ensure_list(actor_data.get("nekoBlockJsonList", []))
+			for block_data in blocks_list:
+				if isinstance(block_data, dict):
+					block = Block.from_dict(block_data)
+					actor.blocks.append(block)
+					project.workspace.add_block(block)
+			project.actors[actor_id] = actor
+		# 解析广播
+		broadcasts_data = data.get("broadcasts", {})
+		broadcasts_dict = JSONConverter.ensure_dict(broadcasts_data.get("broadcastsDict", {}))
+		for scene_id, messages in broadcasts_dict.items():
+			if isinstance(messages, list):
+				project.broadcasts[scene_id] = {
+					"scene_id": scene_id,
+					"messages": messages,
+				}
+		# 解析过程
+		procedures_data = data.get("procedures", {})
+		procedures_dict = JSONConverter.ensure_dict(procedures_data.get("proceduresDict", {}))
+		project.procedures = procedures_dict.copy()
+		# 解析列表
+		lists_data = data.get("lists", {})
+		lists_dict = JSONConverter.ensure_dict(lists_data.get("listsDict", {}))
+		project.lists = lists_dict.copy()
+		# 解析音频
+		audios_data = data.get("audios", {})
+		audios_dict = JSONConverter.ensure_dict(audios_data.get("audiosDict", {}))
+		project.audios = audios_dict.copy()
 		return project
 
 	def to_dict(self) -> dict[str, Any]:
@@ -1560,13 +1235,14 @@ class KNProject:
 			"toolType": self.tool_type,
 			"stageSize": self.stage_size,
 			"timerPosition": self.timer_position,
+			"workspaceScrollXy": self.workspace_scroll_xy,
 			# 资源部分
 			"styles": {"stylesDict": self.styles},
 			"variables": {"variablesDict": self.variables},
 			"lists": {"listsDict": self.lists},
 			"broadcasts": {"broadcastsDict": self.broadcasts},
 			"audios": {"audiosDict": self.audios},
-			"procedures": {"proceduresDict": {proc_id: proc.to_dict() for proc_id, proc in self.procedures.items()}},  # 修改为使用Procedure的to_dict
+			"procedures": {"proceduresDict": self.procedures},
 			# 场景部分
 			"scenes": {
 				"scenesDict": {scene_id: scene.to_dict() for scene_id, scene in self.scenes.items()},
@@ -1578,30 +1254,7 @@ class KNProject:
 				"actorsDict": {actor_id: actor.to_dict() for actor_id, actor in self.actors.items()},
 			},
 		}
-		# 添加工作区数据
-		workspace_dict = self.workspace.to_dict()
-		project_dict.update(workspace_dict)
 		return project_dict
-
-	def add_procedure(self, name: str, params: list[dict[str, Any]] | None = None) -> str:
-		"""添加自定义函数"""
-		proc_id = str(uuid.uuid4())
-		if params is None:
-			params = []
-		proc = Procedure(id=proc_id, name=name, params=params)
-		self.procedures[proc_id] = proc
-		return proc_id
-
-	def get_procedure(self, proc_id: str) -> Procedure | None:
-		"""获取过程"""
-		return self.procedures.get(proc_id)
-
-	def get_procedure_by_name(self, name: str) -> Procedure | None:
-		"""按名称获取过程"""
-		for proc in self.procedures.values():
-			if proc.name == name:
-				return proc
-		return None
 
 	@classmethod
 	def load_from_file(cls, filepath: str | Path) -> KNProject:
@@ -1616,19 +1269,6 @@ class KNProject:
 		project.filepath = filepath
 		project.project_folder = filepath.parent
 		return project
-
-	def _collect_blocks_to_workspace(self) -> None:
-		"""从场景和角色中收集块到工作区"""
-		# 清空工作区
-		self.workspace = WorkspaceData()
-		# 收集场景的块
-		for scene in self.scenes.values():
-			for block in scene.blocks:
-				self.workspace.add_block(block)
-		# 收集角色的块
-		for actor in self.actors.values():
-			for block in actor.blocks:
-				self.workspace.add_block(block)
 
 	def save_to_file(self, filepath: str | Path | None = None) -> None:
 		"""保存项目到文件"""
@@ -1649,9 +1289,6 @@ class KNProject:
 			json.dump(data, f, ensure_ascii=False, indent=2)
 		print(f"项目已保存: {filepath}")
 
-	# ============================================================================
-	# Python操作接口
-	# ============================================================================
 	def add_actor(
 		self,
 		name: str,
@@ -1716,9 +1353,7 @@ class KNProject:
 		"""添加块到角色"""
 		if actor_id not in self.actors:
 			return False
-		# 添加到角色
 		self.actors[actor_id].blocks.append(block)
-		# 同时添加到工作区
 		self.workspace.add_block(block)
 		return True
 
@@ -1726,9 +1361,7 @@ class KNProject:
 		"""添加块到场景"""
 		if scene_id not in self.scenes:
 			return False
-		# 添加到场景
 		self.scenes[scene_id].blocks.append(block)
-		# 同时添加到工作区
 		self.workspace.add_block(block)
 		return True
 
@@ -1752,40 +1385,24 @@ class KNProject:
 			type=BlockType.SELF_DIALOG.value,
 			location=[100.0, 150.0],
 		)
-		say_block.inputs["TEXT"] = Block(
-			type=BlockType.TEXT.value,
-			fields={"TEXT": "你好,世界!"},
-			is_output=True,
-		)
+		say_block.inputs["TEXT"] = {"type": BlockType.TEXT.value, "fields": {"TEXT": "你好,世界!"}}
 		# 创建移动块
 		move_block = Block(
 			type=BlockType.SELF_MOVE_TO.value,
 			location=[100.0, 200.0],
 		)
-		move_block.inputs["X"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": "100"},
-			is_output=True,
-		)
-		move_block.inputs["Y"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": "100"},
-			is_output=True,
-		)
+		move_block.inputs["X"] = {"type": BlockType.MATH_NUMBER.value, "fields": {"NUM": "100"}}
+		move_block.inputs["Y"] = {"type": BlockType.MATH_NUMBER.value, "fields": {"NUM": "100"}}
 		# 创建等待块
 		wait_block = Block(
 			type=BlockType.WAIT.value,
 			location=[100.0, 250.0],
 		)
-		wait_block.inputs["SECONDS"] = Block(
-			type=BlockType.MATH_NUMBER.value,
-			fields={"NUM": "1"},
-			is_output=True,
-		)
+		wait_block.inputs["SECONDS"] = {"type": BlockType.MATH_NUMBER.value, "fields": {"NUM": "1"}}
 		# 连接块
-		start_block.next = say_block
-		say_block.next = move_block
-		move_block.next = wait_block
+		start_block.next = say_block.to_dict()
+		say_block.next = move_block.to_dict()
+		move_block.next = wait_block.to_dict()
 		# 添加到场景和角色
 		self.add_block_to_scene(scene_id, start_block)
 		self.add_block_to_actor(actor_id, start_block)
@@ -1794,32 +1411,14 @@ class KNProject:
 	def get_all_blocks(self) -> list[Block]:
 		"""获取项目中所有块"""
 		all_blocks: list[Block] = []
-		visited: set[str] = set()
-		# 收集所有起始块
-		stack: list[Block] = []
-		# 场景的块
+		# 收集场景的块
 		for scene in self.scenes.values():
-			stack.extend(scene.blocks)
-		# 角色的块
+			all_blocks.extend(scene.blocks)
+		# 收集角色的块
 		for actor in self.actors.values():
-			stack.extend(actor.blocks)
-		# 工作区的块
-		stack.extend(self.workspace.blocks.values())
-		# 迭代遍历
-		while stack:
-			block = stack.pop()
-			if block.id in visited:
-				continue
-			visited.add(block.id)
-			all_blocks.append(block)
-			# 递归处理输入
-			stack.extend(input_block for input_block in block.inputs.values() if input_block is not None and input_block.id not in visited)
-			# 递归处理语句
-			for stmt_blocks in block.statements.values():
-				stack.extend(stmt_block for stmt_block in stmt_blocks if stmt_block.id not in visited)
-			# 处理下一个块
-			if block.next is not None and block.next.id not in visited:
-				stack.append(block.next)
+			all_blocks.extend(actor.blocks)
+		# 收集工作区的块
+		all_blocks.extend(self.workspace.blocks.values())
 		return all_blocks
 
 	def find_block(self, block_id: str) -> Block | None:
@@ -1877,9 +1476,7 @@ class KNProject:
 			elif block_type == "text":
 				category_counts[BlockCategory.TEXT.value] += count
 		# 统计影子积木
-		shadow_count = 0
-		for block in all_blocks:
-			shadow_count += len(block.shadow_manager.shadow_blocks)
+		shadow_count = sum(len(block.shadows) for block in all_blocks)
 		return {
 			"project_name": self.project_name,
 			"version": self.version,
@@ -1960,47 +1557,6 @@ class KNProject:
 				block_elem = ET.fromstring(block_xml)  # noqa: S314
 				blocks_elem.append(block_elem)
 		return ET.tostring(root, encoding="unicode", xml_declaration=True)
-
-	@classmethod
-	def from_xml(cls, xml_str: str) -> KNProject:
-		"""从XML创建项目"""
-		root = ET.fromstring(xml_str)  # noqa: S314
-		project_name = root.get("name", "XML项目")
-		project = cls(project_name)
-		project.version = root.get("version", "0.20.0")
-		project.tool_type = root.get("toolType", "KN")
-		# 解析场景
-		scenes_elem = root.find("scenes")
-		if scenes_elem is not None:
-			for scene_elem in scenes_elem.findall("scene"):
-				scene_id = scene_elem.get("id", str(uuid.uuid4()))
-				scene_name = scene_elem.get("name", "场景")
-				scene = Scene(id=scene_id, name=scene_name)
-				# 解析场景的积木
-				blocks_elem = scene_elem.find("blocks")
-				if blocks_elem is not None:
-					for block_elem in blocks_elem.findall("block"):
-						block_xml = ET.tostring(block_elem, encoding="unicode")
-						block = Block.from_xml(block_xml)
-						scene.blocks.append(block)
-				project.scenes[scene_id] = scene
-				project.sort_list.append(scene_id)
-		# 解析角色
-		actors_elem = root.find("actors")
-		if actors_elem is not None:
-			for actor_elem in actors_elem.findall("actor"):
-				actor_id = actor_elem.get("id", str(uuid.uuid4()))
-				actor_name = actor_elem.get("name", "角色")
-				actor = Actor(id=actor_id, name=actor_name)
-				# 解析角色的积木
-				blocks_elem = actor_elem.find("blocks")
-				if blocks_elem is not None:
-					for block_elem in blocks_elem.findall("block"):
-						block_xml = ET.tostring(block_elem, encoding="unicode")
-						block = Block.from_xml(block_xml)
-						actor.blocks.append(block)
-				project.actors[actor_id] = actor
-		return project
 
 
 # ============================================================================
@@ -2091,41 +1647,20 @@ class KNEditor:
 			f.write(xml_content)
 		print(f"项目已导出为XML: {filepath}")
 
-	def import_from_xml_file(self, filepath: str | Path) -> None:
-		"""从XML文件导入项目"""
-		with Path(filepath).open(encoding="utf-8") as f:
-			xml_content = f.read()
-		self.project = KNProject.from_xml(xml_content)
-		print(f"已从XML导入项目: {self.project.project_name}")
-
 	def print_project_info(self) -> None:
 		"""打印项目信息"""
 		self.project.print_summary()
 
 
-def main() -> None:  # noqa: PLR0912, PLR0914, PLR0915
+def main() -> None:
 	"""主函数 - 交互式KN项目编辑器"""
 	print("=" * 60)
 	print("KN项目编辑器")
 	print("=" * 60)
 	editor = KNEditor()
-	while True:
-		print("\n请选择操作:")
-		print(" 1. 创建新项目")
-		print(" 2. 加载项目文件")
-		print(" 3. 保存项目")
-		print(" 4. 显示项目摘要")
-		print(" 5. 分析项目结构")
-		print(" 6. 管理场景")
-		print(" 7. 管理角色")
-		print(" 8. 管理积木")
-		print(" 9. 管理变量/函数/音频")
-		print("10. 导出为XML格式")
-		print("11. 从XML导入")
-		print("12. 创建示例程序")
-		print("13. 查找积木/角色/场景")
-		print("14. 退出")
-		choice = input("请输入选项 (1-14): ").strip()
+
+	def handle_menu_choice(choice: str) -> bool:
+		"""处理菜单选择"""
 		if choice == "1":
 			project_name = input("请输入项目名称: ").strip()
 			editor.project = KNProject(project_name)
@@ -2168,216 +1703,238 @@ def main() -> None:  # noqa: PLR0912, PLR0914, PLR0915
 			else:
 				print("请先加载或创建项目")
 		elif choice == "6":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			print("\n场景管理:")
-			print(" 1. 添加场景")
-			print(" 2. 查看所有场景")
-			print(" 3. 选择当前场景")
-			print(" 4. 添加积木到场景")
-			sub_choice = input("请选择: ").strip()
-			if sub_choice == "1":
-				name = input("场景名称: ").strip()
-				screen_name = input("屏幕名称 [默认: 屏幕]: ").strip()
-				if not screen_name:
-					screen_name = "屏幕"
-				scene_id = editor.project.add_scene(name, screen_name)
-				print(f"已添加场景: {name} (ID: {scene_id})")
-			elif sub_choice == "2":
-				print("\n所有场景:")
-				for scene_id, scene in editor.project.scenes.items():
-					print(f"  ID: {scene_id}, 名称: {scene.name}, 角色数: {len(scene.actor_ids)}")
-			elif sub_choice == "3":
-				scene_name = input("请输入场景名称: ").strip()
-				if editor.select_scene_by_name(scene_name):
-					print(f"已选择场景: {scene_name}")
-				else:
-					print("场景未找到")
-			elif sub_choice == "4":
-				if not editor.current_scene_id:
-					print("请先选择场景")
-					continue
-				block_type = input("积木类型: ").strip()
-				try:
-					block = editor.add_block(block_type)
-					if block:
-						print(f"已添加积木: {block_type} (ID: {block.id})")
-				except Exception as e:
-					print(f"添加失败: {e}")
+			handle_scene_management()
 		elif choice == "7":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			print("\n角色管理:")
-			print(" 1. 添加角色")
-			print(" 2. 查看所有角色")
-			print(" 3. 选择当前角色")
-			print(" 4. 添加积木到角色")
-			sub_choice = input("请选择: ").strip()
-			if sub_choice == "1":
-				name = input("角色名称: ").strip()
-				x = input("X坐标 [默认: 0]: ").strip()
-				y = input("Y坐标 [默认: 0]: ").strip()
-				position = {"x": 0.0, "y": 0.0}
-				if x:
-					with contextlib.suppress(ValueError):
-						position["x"] = float(x)
-				if y:
-					with contextlib.suppress(ValueError):
-						position["y"] = float(y)
-				actor_id = editor.project.add_actor(name, position)
-				print(f"已添加角色: {name} (ID: {actor_id})")
-			elif sub_choice == "2":
-				print("\n所有角色:")
-				for actor_id, actor in editor.project.actors.items():
-					print(f"  ID: {actor_id}, 名称: {actor.name}, 位置: ({actor.position['x']}, {actor.position['y']})")
-			elif sub_choice == "3":
-				actor_name = input("请输入角色名称: ").strip()
-				if editor.select_actor_by_name(actor_name):
-					print(f"已选择角色: {actor_name}")
-				else:
-					print("角色未找到")
-			elif sub_choice == "4":
-				if not editor.current_actor_id:
-					print("请先选择角色")
-					continue
-				block_type = input("积木类型: ").strip()
-				try:
-					block = editor.add_block(block_type)
-					if block:
-						print(f"已添加积木: {block_type} (ID: {block.id})")
-				except Exception as e:
-					print(f"添加失败: {e}")
+			handle_actor_management()
 		elif choice == "8":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			print("\n积木管理:")
-			print(" 1. 查看所有积木")
-			print(" 2. 查找积木")
-			print(" 3. 添加影子积木")
-			sub_choice = input("请选择: ").strip()
-			if sub_choice == "1":
-				all_blocks = editor.project.get_all_blocks()
-				print(f"\n总积木数: {len(all_blocks)}")
-				print("前10个积木:")
-				for i, block in enumerate(all_blocks[:10]):
-					print(f"  {i + 1}. ID: {block.id}, 类型: {block.type}")
-			elif sub_choice == "2":
-				block_id = input("请输入积木ID: ").strip()
-				block = editor.project.find_block(block_id)
-				if block:
-					print(f"找到积木: ID={block.id}, 类型={block.type}")
-					print(f"字段: {block.fields}")
-				else:
-					print("积木未找到")
-			elif sub_choice == "3":
-				# 简化版: 创建影子积木示例
-				block_type = input("影子积木类型: ").strip()
-				shadow_type = input("影子类型 (regular/replaceable/empty) [默认: regular]: ").strip()
-				if not shadow_type:
-					shadow_type = "regular"
-				shadow = ShadowBlock(
-					type=block_type,
-					shadow_type=ShadowType(shadow_type),
-				)
-				print(f"已创建影子积木: {shadow.id}")
-				# 这里可以扩展为添加到特定积木
+			handle_block_management()
 		elif choice == "9":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			print("\n资源管理:")
-			print(" 1. 添加变量")
-			print(" 2. 添加函数")
-			print(" 3. 添加音频")
-			print(" 4. 查看所有资源")
-			sub_choice = input("请选择: ").strip()
-			if sub_choice == "1":
-				name = input("变量名称: ").strip()
-				value = input("初始值 [默认: 0]: ").strip()
-				if not value:
-					value = 0
-				var_id = editor.project.add_variable(name, value)
-				print(f"已添加变量: {name} (ID: {var_id})")
-			elif sub_choice == "2":
-				name = input("函数名称: ").strip()
-				proc_id = editor.project.add_procedure(name)
-				print(f"已添加函数: {name} (ID: {proc_id})")
-			elif sub_choice == "3":
-				name = input("音频名称: ").strip()
-				url = input("音频URL [可选]: ").strip()
-				audio_id = editor.project.add_audio(name, url)
-				print(f"已添加音频: {name} (ID: {audio_id})")
-			elif sub_choice == "4":
-				print("\n变量:")
-				for var in editor.project.variables.values():
-					print(f"  {var.get('name', 'Unknown')}: {var.get('value', 'N/A')}")
-				print("\n函数:")
-				for proc in editor.project.procedures.values():
-					print(f"  {proc.name}: {len(proc.params)} 个参数")
+			handle_resource_management()
 		elif choice == "10":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			filepath = input("请输入XML导出路径: ").strip()
-			try:
-				editor.export_to_xml_file(filepath)
-			except Exception as e:
-				print(f"导出失败: {e}")
+			handle_export_xml()
 		elif choice == "11":
-			filepath = input("请输入XML文件路径: ").strip()
-			try:
-				editor.import_from_xml_file(filepath)
-			except Exception as e:
-				print(f"导入失败: {e}")
+			handle_create_example()
 		elif choice == "12":
-			if not editor.project:
-				print("请先创建或加载项目")
-				continue
-			actor_name = input("角色名称 [默认: 角色1]: ").strip()
-			if not actor_name:
-				actor_name = "角色1"
-			scene_name = input("场景名称 [默认: 场景1]: ").strip()
-			if not scene_name:
-				scene_name = "场景1"
-			try:
-				editor.project.create_simple_program(actor_name, scene_name)
-				print("示例程序已创建")
-			except Exception as e:
-				print(f"创建失败: {e}")
+			handle_search()
 		elif choice == "13":
-			if not editor.project:
-				print("请先加载或创建项目")
-				continue
-			search_type = input("查找类型 (block/actor/scene): ").strip().lower()
-			if search_type == "block":
-				search_term = input("请输入积木ID或类型关键词: ").strip()
-				all_blocks = editor.project.get_all_blocks()
-				found = [b for b in all_blocks if search_term in b.id or search_term in b.type]
-				print(f"找到 {len(found)} 个积木")
-				for block in found[:5]:  # 显示前5个
-					print(f"  ID: {block.id}, 类型: {block.type}")
-			elif search_type == "actor":
-				search_term = input("请输入角色名称: ").strip()
-				actor = editor.project.find_actor_by_name(search_term)
-				if actor:
-					print(f"找到角色: {actor.name} (ID: {actor.id})")
-				else:
-					print("角色未找到")
-			elif search_type == "scene":
-				search_term = input("请输入场景名称: ").strip()
-				scene = editor.project.find_scene_by_name(search_term)
-				if scene:
-					print(f"找到场景: {scene.name} (ID: {scene.id})")
-				else:
-					print("场景未找到")
-		elif choice == "14":
 			print("感谢使用,再见!")
-			break
+			return False
 		else:
 			print("无效选项,请重新选择")
+		return True
+
+	def handle_scene_management() -> None:
+		"""处理场景管理"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n场景管理:")
+		print(" 1. 添加场景")
+		print(" 2. 查看所有场景")
+		print(" 3. 选择当前场景")
+		print(" 4. 添加积木到场景")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("场景名称: ").strip()
+			screen_name = input("屏幕名称 [默认: 屏幕]: ").strip()
+			if not screen_name:
+				screen_name = "屏幕"
+			scene_id = editor.project.add_scene(name, screen_name)
+			print(f"已添加场景: {name} (ID: {scene_id})")
+		elif sub_choice == "2":
+			print("\n所有场景:")
+			for scene_id, scene in editor.project.scenes.items():
+				print(f"  ID: {scene_id}, 名称: {scene.name}, 角色数: {len(scene.actor_ids)}")
+		elif sub_choice == "3":
+			scene_name = input("请输入场景名称: ").strip()
+			if editor.select_scene_by_name(scene_name):
+				print(f"已选择场景: {scene_name}")
+			else:
+				print("场景未找到")
+		elif sub_choice == "4":
+			if not editor.current_scene_id:
+				print("请先选择场景")
+				return
+			block_type = input("积木类型: ").strip()
+			try:
+				block = editor.add_block(block_type)
+				if block:
+					print(f"已添加积木: {block_type} (ID: {block.id})")
+			except Exception as e:
+				print(f"添加失败: {e}")
+
+	def handle_actor_management() -> None:
+		"""处理角色管理"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n角色管理:")
+		print(" 1. 添加角色")
+		print(" 2. 查看所有角色")
+		print(" 3. 选择当前角色")
+		print(" 4. 添加积木到角色")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("角色名称: ").strip()
+			x = input("X坐标 [默认: 0]: ").strip()
+			y = input("Y坐标 [默认: 0]: ").strip()
+			position = {"x": 0.0, "y": 0.0}
+			if x:
+				with contextlib.suppress(ValueError):
+					position["x"] = float(x)
+			if y:
+				with contextlib.suppress(ValueError):
+					position["y"] = float(y)
+			actor_id = editor.project.add_actor(name, position)
+			print(f"已添加角色: {name} (ID: {actor_id})")
+		elif sub_choice == "2":
+			print("\n所有角色:")
+			for actor_id, actor in editor.project.actors.items():
+				print(f"  ID: {actor_id}, 名称: {actor.name}, 位置: ({actor.position['x']}, {actor.position['y']})")
+		elif sub_choice == "3":
+			actor_name = input("请输入角色名称: ").strip()
+			if editor.select_actor_by_name(actor_name):
+				print(f"已选择角色: {actor_name}")
+			else:
+				print("角色未找到")
+		elif sub_choice == "4":
+			if not editor.current_actor_id:
+				print("请先选择角色")
+				return
+			block_type = input("积木类型: ").strip()
+			try:
+				block = editor.add_block(block_type)
+				if block:
+					print(f"已添加积木: {block_type} (ID: {block.id})")
+			except Exception as e:
+				print(f"添加失败: {e}")
+
+	def handle_block_management() -> None:
+		"""处理积木管理"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n积木管理:")
+		print(" 1. 查看所有积木")
+		print(" 2. 查找积木")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			all_blocks = editor.project.get_all_blocks()
+			print(f"\n总积木数: {len(all_blocks)}")
+			print("前10个积木:")
+			for i, block in enumerate(all_blocks[:10]):
+				print(f"  {i + 1}. ID: {block.id}, 类型: {block.type}")
+		elif sub_choice == "2":
+			block_id = input("请输入积木ID: ").strip()
+			block = editor.project.find_block(block_id)
+			if block:
+				print(f"找到积木: ID={block.id}, 类型={block.type}")
+				print(f"字段: {block.fields}")
+			else:
+				print("积木未找到")
+
+	def handle_resource_management() -> None:
+		"""处理资源管理"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n资源管理:")
+		print(" 1. 添加变量")
+		print(" 2. 添加音频")
+		print(" 3. 查看所有资源")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("变量名称: ").strip()
+			value = input("初始值 [默认: 0]: ").strip()
+			if not value:
+				value = 0
+			var_id = editor.project.add_variable(name, value)
+			print(f"已添加变量: {name} (ID: {var_id})")
+		elif sub_choice == "2":
+			name = input("音频名称: ").strip()
+			url = input("音频URL [可选]: ").strip()
+			audio_id = editor.project.add_audio(name, url)
+			print(f"已添加音频: {name} (ID: {audio_id})")
+		elif sub_choice == "3":
+			print("\n变量:")
+			for var in editor.project.variables.values():
+				print(f"  {var.get('name', 'Unknown')}: {var.get('value', 'N/A')}")
+
+	def handle_export_xml() -> None:
+		"""处理XML导出"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		filepath = input("请输入XML导出路径: ").strip()
+		try:
+			editor.export_to_xml_file(filepath)
+		except Exception as e:
+			print(f"导出失败: {e}")
+
+	def handle_create_example() -> None:
+		"""处理创建示例程序"""
+		if not editor.project:
+			print("请先创建或加载项目")
+			return
+		actor_name = input("角色名称 [默认: 角色1]: ").strip()
+		if not actor_name:
+			actor_name = "角色1"
+		scene_name = input("场景名称 [默认: 场景1]: ").strip()
+		if not scene_name:
+			scene_name = "场景1"
+		try:
+			editor.project.create_simple_program(actor_name, scene_name)
+			print("示例程序已创建")
+		except Exception as e:
+			print(f"创建失败: {e}")
+
+	def handle_search() -> None:
+		"""处理查找功能"""
+		if not editor.project:
+			print("请先加载或创建项目")
+			return
+		search_type = input("查找类型 (block/actor/scene): ").strip().lower()
+		if search_type == "block":
+			search_term = input("请输入积木ID或类型关键词: ").strip()
+			all_blocks = editor.project.get_all_blocks()
+			found = [b for b in all_blocks if search_term in b.id or search_term in b.type]
+			print(f"找到 {len(found)} 个积木")
+			for block in found[:5]:
+				print(f"  ID: {block.id}, 类型: {block.type}")
+		elif search_type == "actor":
+			search_term = input("请输入角色名称: ").strip()
+			actor = editor.project.find_actor_by_name(search_term)
+			if actor:
+				print(f"找到角色: {actor.name} (ID: {actor.id})")
+			else:
+				print("角色未找到")
+		elif search_type == "scene":
+			search_term = input("请输入场景名称: ").strip()
+			scene = editor.project.find_scene_by_name(search_term)
+			if scene:
+				print(f"找到场景: {scene.name} (ID: {scene.id})")
+			else:
+				print("场景未找到")
+
+	# 主循环
+	while True:
+		print("\n请选择操作:")
+		print(" 1. 创建新项目")
+		print(" 2. 加载项目文件")
+		print(" 3. 保存项目")
+		print(" 4. 显示项目摘要")
+		print(" 5. 分析项目结构")
+		print(" 6. 管理场景")
+		print(" 7. 管理角色")
+		print(" 8. 管理积木")
+		print(" 9. 管理变量/函数/音频")
+		print("10. 导出为XML格式")
+		print("11. 创建示例程序")
+		print("12. 查找积木/角色/场景")
+		print("13. 退出")
+		choice = input("请输入选项 (1-13): ").strip()
+		if not handle_menu_choice(choice):
+			break
 
 
 main()
