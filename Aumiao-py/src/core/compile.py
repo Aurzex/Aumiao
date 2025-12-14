@@ -1,16 +1,13 @@
-import base64
 import hashlib
 import json
 import random
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, ClassVar
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
 from src.api import community
 from src.utils import acquire
+from src.utils.tool import Crypto
 
 client = acquire.ClientFactory().create_codemao_client()
 
@@ -20,44 +17,14 @@ class BCMKNDecryptor:
 
 	def __init__(self) -> None:
 		# 固定盐值 - 对应JavaScript中的M.j(31)
-		self.default_salt = bytes(range(31))
-
-	@staticmethod
-	def reverse_string(s: str) -> str:
-		"""字符串反转"""
-		return s[::-1]
-
-	@staticmethod
-	def base64_to_bytes(base64_str: str) -> bytes:
-		"""Base64解码"""
-		try:
-			return base64.b64decode(base64_str)
-		except Exception as e:
-			error_msg = f"Base64解码错误: {e}"
-			raise ValueError(error_msg) from e
-
-	def generate_aes_key(self) -> bytes:
-		"""生成AES密钥 - 使用SHA-256算法"""
-		digest = hashes.Hash(hashes.SHA256())
-		digest.update(self.default_salt)
-		return digest.finalize()
-
-	@staticmethod
-	def decrypt_aes_gcm(encrypted_data: bytes, key: bytes, iv: bytes) -> bytes:
-		"""AES-GCM解密"""
-		try:
-			aesgcm = AESGCM(key)
-			return aesgcm.decrypt(iv, encrypted_data, None)
-		except Exception as e:
-			error_msg = f"AES解密错误: {e}"
-			raise ValueError(error_msg) from e
+		self.crypto = Crypto(bytes(range(31)))
 
 	def decrypt_data(self, encrypted_content: str) -> dict[str, Any]:
 		"""解密BCMKN数据"""
 		# 步骤1: 字符串反转
-		reversed_data = self.reverse_string(encrypted_content)
+		reversed_data = self.crypto.reverse_string(encrypted_content)
 		# 步骤2: Base64解码
-		decoded_data = self.base64_to_bytes(reversed_data)
+		decoded_data = self.crypto.base64_to_bytes(reversed_data)
 		# 步骤3: 分离IV和密文 (IV为前12字节)
 		MIN_DATA_LENGTH = 13  # noqa: N806
 		if len(decoded_data) < MIN_DATA_LENGTH:
@@ -66,9 +33,9 @@ class BCMKNDecryptor:
 		iv = decoded_data[:12]
 		ciphertext = decoded_data[12:]
 		# 步骤4: 生成AES密钥
-		key = self.generate_aes_key()
+		key = self.crypto.generate_aes_key()
 		# 步骤5: AES-GCM解密
-		decrypted_bytes = self.decrypt_aes_gcm(ciphertext, key, iv)
+		decrypted_bytes = self.crypto.decrypt_aes_gcm(ciphertext, key, iv)
 		# 清理和修复JSON数据
 		return self.clean_and_repair_json(decrypted_bytes)
 
@@ -146,17 +113,6 @@ class BCMKNDecryptor:
 		return text
 
 
-class Crypto:
-	"""加密哈希工具类"""
-
-	@staticmethod
-	def sha256(data: str | bytes) -> str:
-		"""计算SHA256哈希"""
-		if isinstance(data, str):
-			data = data.encode()
-		return hashlib.sha256(data).hexdigest()
-
-
 class WorkInfo:
 	"""作品信息容器"""
 
@@ -212,7 +168,7 @@ class FileHelper:
 		Path(path).mkdir(parents=True, exist_ok=True)
 
 	@staticmethod
-	def write_json(path: str | Path, data: Any) -> None:  # noqa: ANN401
+	def write_json(path: str | Path, data: Any) -> None:
 		"""写入JSON文件"""
 		with Path(path).open("w", encoding="utf-8") as f:
 			json.dump(data, f, ensure_ascii=False, indent=2)
@@ -559,7 +515,7 @@ class KittenDecompiler(BaseDecompiler):
 				"project_name": self.work_info.name,
 				"toolbox_order": toolbox_categories,
 				"last_toolbox_order": toolbox_categories,
-			}
+			},
 		)
 
 	@staticmethod
@@ -652,7 +608,7 @@ class BlockProcessor:
 				"shadows": self.shadows,
 				"type": block_type,
 				"visible": "visible",
-			}
+			},
 		)
 		self.actor.connections[block_id] = self.connection
 		self.actor.blocks[block_id] = self.block
@@ -764,7 +720,7 @@ class FunctionProcessor(BlockProcessor):
 					"kind": "domain_block",
 					"params": {"param_name": param_name, "param_default_value": ""},
 					"type": "procedures_2_stable_parameter",
-				}
+				},
 			)
 			param_block["parent_id"] = self.block["id"]
 			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
@@ -842,7 +798,7 @@ class CocoDecompiler(BaseDecompiler):
 					"objectVariables": [],
 					"primitiveVariables": [],
 					"widgets": {},
-				}
+				},
 			)
 			for widget_id in screen["widgetIds"] + screen["invisibleWidgetIds"]:
 				screen["widgets"][widget_id] = work["widgetMap"][widget_id]
@@ -858,7 +814,7 @@ class CocoDecompiler(BaseDecompiler):
 				"globalWidgets": work["widgetMap"],
 				"sourceId": "",
 				"sourceTag": 1,
-			}
+			},
 		)
 
 	@staticmethod

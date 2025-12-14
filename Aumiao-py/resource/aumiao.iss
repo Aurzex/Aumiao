@@ -2,7 +2,7 @@
 ; Generated automatically by GitHub Actions
 
 #define MyAppName "Aumiao"
-#define MyAppVersion "2.3.0"
+#define MyAppVersion "2.4.0"
 #define MyAppPublisher "Aumiao Team"
 #define MyAppURL "https://aumiao.aurzex.top/"
 #define MyAppExeName "aumiao.exe"

@@ -1,26 +1,108 @@
-extend-exclude = ["test"]
 exclude = ["**/gui.py"]
-line-length = 180
+extend-exclude = ["test"]
 indent-width = 4
+line-length = 180
 target-version = "py313"
 
 [lint]
-
-select = ["F", "E", "W", "C90", "I", "N", "UP", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "CPY", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "LOG", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TC", "INT", "ARG", "PTH", "TD", "FIX", "ERA", "PD", "PGH", "PL", "C", "R", "TRY", "FLY", "NPY", "FAST", "AIR", "PERF", "FURB", "DOC", "RUF"]
-
-ignore = ["W191","COM812","PLR0913","E731","T201","BLE001","ERA001","C901","B006","TD003","FIX002","CPY001","DOC201","DOC501","S311"]
+select = [
+	"A",
+	"AIR",
+	"ANN",
+	"ARG",
+	"ASYNC",
+	"B",
+	"BLE",
+	"C",
+	"C4",
+	"C90",
+	"COM",
+	"CPY",
+	"DJ",
+	"DOC",
+	"DTZ",
+	"E",
+	"EM",
+	"ERA",
+	"EXE",
+	"F",
+	"FA",
+	"FAST",
+	"FBT",
+	"FIX",
+	"FLY",
+	"FURB",
+	"G",
+	"I",
+	"ICN",
+	"INP",
+	"INT",
+	"ISC",
+	"LOG",
+	"N",
+	"NPY",
+	"PD",
+	"PERF",
+	"PGH",
+	"PIE",
+	"PL",
+	"PT",
+	"PTH",
+	"PYI",
+	"Q",
+	"R",
+	"RET",
+	"RSE",
+	"RUF",
+	"S",
+	"SIM",
+	"SLF",
+	"SLOT",
+	"T10",
+	"T20",
+	"TC",
+	"TD",
+	"TID",
+	"TRY",
+	"UP",
+	"W",
+	"YTT",
+]
+ignore = [
+	"ANN401",
+	"B006",
+	"BLE001",
+	"C901",
+	"CPY001",
+	"DOC201",
+	"DOC501",
+	"E731",
+	"ERA001",
+	"FIX002",
+	"PLR0913",
+	"PLR2004",
+	"S311",
+	"S314",
+	"S405",
+	"T201",
+	"TD002",
+	"TD003",
+	"W191",
+]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 preview = true
 
 [lint.pylint]
-max-branches = 15
-max-positional-args = 15
-max-public-methods = 50
+max-branches = 30
+max-locals = 20
 max-nested-blocks = 15
+max-positional-args = 20
+max-public-methods = 50
+max-returns = 10
 
 [format]
-quote-style = "double"
-indent-style = "tab"
-line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+indent-style = "tab"
+line-ending = "auto"
+quote-style = "double"

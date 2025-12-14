@@ -5,7 +5,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Final
 
 # 版本信息 (新增)
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 # Nuitka 编译兼容性处理 --------------------------------------------------------
 # 更可靠的编译环境检测方式 (同时检查 nuitka 参数和 __compiled__ 属性)
@@ -14,12 +14,13 @@ _is_compiling: bool = any("nuitka" in arg.lower() for arg in argv) or hasattr(sy
 # 类型检查时显式导入 (仅供 IDE 识别)
 if TYPE_CHECKING or _is_compiling:
 	# 显式导入所有子模块以确保类型系统识别
-	from .api import coco, community, edu, forum, library, pickduck, shop, user, whale, work
+	from .api import auth, coco, community, edu, forum, library, pickduck, shop, user, whale, work
 	from .core import client
 	from .utils import acquire, data, decorator, plugin, tool
 
 # 模块路径映射 (使用 Final 类型提示)
 _MODULE_PATHS: Final[dict[str, str]] = {
+	"auth": ".api.auth",
 	"acquire": ".utils.acquire",
 	"client": ".core.client",
 	"coco": ".api.coco",
@@ -58,6 +59,7 @@ __all__: list[str] = [  # noqa: PLE0604
 	"coco",
 	"acquire",
 	"plugin",
+	"auth",
 ]  # type: ignore  # noqa: PGH003
 
 # 模块缓存 (使用弱引用字典可考虑 WeakValueDictionary)

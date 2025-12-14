@@ -1,5 +1,6 @@
 """服务类:认证管理、文件上传、高级服务"""
 
+import contextlib
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from json import loads
@@ -8,6 +9,7 @@ from random import choice
 from typing import ClassVar, Literal, cast
 
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, acquire, data, decorator, tool
+from src.core.editors import KNEditor, KNProject
 from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
 from src.utils.acquire import HTTPStatus
@@ -187,7 +189,7 @@ class Motion(ClassUnion):
 			item["id"] = cast("int", item["id"])
 			self._novel_motion.execute_toggle_novel_favorite(item["id"])
 
-	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀  # noqa: PLR0914
+	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀
 		"""自动回复作品/帖子评论"""
 		formatted_answers = {
 			k: v.format(**self._data.INFO) if isinstance(v, str) else [i.format(**self._data.INFO) for i in v] for answer in self._data.USER_DATA.answers for k, v in answer.items()
@@ -258,7 +260,7 @@ class Motion(ClassUnion):
 					}
 				)
 				(self._work_motion.create_comment_reply if source_type == "work" else self._forum_motion.create_comment_reply)(
-					**params  # pyright: ignore[reportArgumentType]
+					**params,  # pyright: ignore[reportArgumentType]
 				)  # 优化方法名:reply_to_comment→create_comment_reply
 				print(f"已发送回复到{source_type},评论ID: {comment_id}")
 			except Exception as e:
@@ -298,7 +300,7 @@ class Motion(ClassUnion):
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']}")
 		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
-		fiction_dir = data.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir = data.PathConfig.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
@@ -363,7 +365,7 @@ class Motion(ClassUnion):
 		"""
 		实现风纪欲望的小帮手
 		"""
-		token_list = self._file.read_line(data.TOKEN_DIR)
+		token_list = self._file.read_line(data.PathConfig.TOKEN_FILE_PATH)
 		_student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
 		print(f"正在查找发布时间在{self._tool.TimeUtils().format_timestamp(timeline)}之后的帖子")
 		post_list: list = self._forum_obtain.fetch_hot_posts_ids()["items"][0:19]
@@ -446,10 +448,10 @@ class MillenniumEntanglement(ClassUnion):
 			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
 			token_list = []
 			for identity, pass_key in accounts:
-				response = self._community_login.login(identity=identity, password=pass_key, status="edu", prefer_method="password")
+				response = self._auth.login(identity=identity, password=pass_key, status="edu", prefer_method="simple_password")
 				token = response["auth"]["token"]
 				token_list.append(token)
-				self._file.file_write(path=data.TOKEN_DIR, content=f"{token}\n", method="a")
+				self._file.file_write(path=data.PathConfig.TOKEN_FILE_PATH, content=f"{token}\n", method="a")
 			return token_list
 
 		if action_type == "delete":
@@ -505,11 +507,20 @@ class MillenniumEntanglement(ClassUnion):
 					if is_reply and parent_id is not None:
 						# 回复类型:需传入父评论ID
 						return self._shop_motion.execute_report_comment(
-							comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, comment_parent_id=parent_id, description=description
+							comment_id=target_id,
+							reason_content=reason_content,
+							reason_id=reason_id,
+							reporter_id=reporter_id,
+							comment_parent_id=parent_id,
+							description=description,
 						)
 					# 普通评论:无需父ID
 					return self._shop_motion.execute_report_comment(
-						comment_id=target_id, reason_content=reason_content, reason_id=reason_id, reporter_id=reporter_id, description=description
+						comment_id=target_id,
+						reason_content=reason_content,
+						reason_id=reason_id,
+						reporter_id=reporter_id,
+						description=description,
 					)
 			# 未知来源类型:举报失败
 		except Exception as e:
@@ -557,3 +568,278 @@ class Report(ClassUnion):
 		self.printer.print_header("=== 处理结果统计 ===")
 		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		self.report.terminate_session()
+
+
+class KnEditor:
+	def __init__(self) -> None:
+		self.editor = KNEditor()
+
+	def handle_menu_choice(self, choice: str) -> bool:  # noqa: PLR0915
+		"""处理菜单选择"""
+		if choice == "1":
+			project_name = input("请输入项目名称: ").strip()
+			self.editor.project = KNProject(project_name)
+			print(f"已创建新项目: {project_name}")
+		elif choice == "2":
+			filepath = input("请输入项目文件路径 (.bcmkn): ").strip()
+			try:
+				self.editor.load_project(filepath)
+			except Exception as e:
+				print(f"加载失败: {e}")
+		elif choice == "3":
+			if self.editor.project.filepath:
+				save_path = input(f"保存路径 [{self.editor.project.filepath}]: ").strip()
+				if not save_path:
+					save_path = self.editor.project.filepath
+			else:
+				save_path = input("请输入保存路径: ").strip()
+			try:
+				self.editor.save_project(save_path)
+			except Exception as e:
+				print(f"保存失败: {e}")
+		elif choice == "4":
+			if self.editor.project:
+				self.editor.print_project_info()
+			else:
+				print("请先加载或创建项目")
+		elif choice == "5":
+			if self.editor.project:
+				analysis = self.editor.project.analyze_project()
+				print("\n" + "=" * 60)
+				print("项目详细分析:")
+				print("=" * 60)
+				for key, value in analysis.items():
+					if key in {"block_type_counts", "category_counts"}:
+						print(f"\n{key}:")
+						for sub_key, sub_value in value.items():
+							print(f"  {sub_key}: {sub_value}")
+					else:
+						print(f"{key}: {value}")
+			else:
+				print("请先加载或创建项目")
+		elif choice == "6":
+			self.handle_scene_management()
+		elif choice == "7":
+			self.handle_actor_management()
+		elif choice == "8":
+			self.handle_block_management()
+		elif choice == "9":
+			self.handle_resource_management()
+		elif choice == "10":
+			self.handle_export_xml()
+		elif choice == "11":
+			self.handle_search()
+
+		elif choice == "12":
+			print("感谢使用,再见!")
+			return False
+		else:
+			print("无效选项,请重新选择")
+		return True
+
+	def handle_scene_management(self) -> None:
+		"""处理场景管理"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n场景管理:")
+		print(" 1. 添加场景")
+		print(" 2. 查看所有场景")
+		print(" 3. 选择当前场景")
+		print(" 4. 添加积木到场景")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("场景名称: ").strip()
+			screen_name = input("屏幕名称 [默认: 屏幕]: ").strip()
+			if not screen_name:
+				screen_name = "屏幕"
+			scene_id = self.editor.project.add_scene(name, screen_name)
+			print(f"已添加场景: {name} (ID: {scene_id})")
+		elif sub_choice == "2":
+			print("\n所有场景:")
+			for scene_id, scene in self.editor.project.scenes.items():
+				print(f"  ID: {scene_id}, 名称: {scene.name}, 角色数: {len(scene.actor_ids)}")
+		elif sub_choice == "3":
+			scene_name = input("请输入场景名称: ").strip()
+			if self.editor.select_scene_by_name(scene_name):
+				print(f"已选择场景: {scene_name}")
+			else:
+				print("场景未找到")
+		elif sub_choice == "4":
+			if not self.editor.current_scene_id:
+				print("请先选择场景")
+				return
+			block_type = input("积木类型: ").strip()
+			try:
+				block = self.editor.add_block(block_type)
+				if block:
+					print(f"已添加积木: {block_type} (ID: {block.id})")
+			except Exception as e:
+				print(f"添加失败: {e}")
+
+	def handle_actor_management(self) -> None:
+		"""处理角色管理"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n角色管理:")
+		print(" 1. 添加角色")
+		print(" 2. 查看所有角色")
+		print(" 3. 选择当前角色")
+		print(" 4. 添加积木到角色")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("角色名称: ").strip()
+			x = input("X坐标 [默认: 0]: ").strip()
+			y = input("Y坐标 [默认: 0]: ").strip()
+			position = {"x": 0.0, "y": 0.0}
+			if x:
+				with contextlib.suppress(ValueError):
+					position["x"] = float(x)
+			if y:
+				with contextlib.suppress(ValueError):
+					position["y"] = float(y)
+			actor_id = self.editor.project.add_actor(name, position)
+			print(f"已添加角色: {name} (ID: {actor_id})")
+		elif sub_choice == "2":
+			print("\n所有角色:")
+			for actor_id, actor in self.editor.project.actors.items():
+				print(f"  ID: {actor_id}, 名称: {actor.name}, 位置: ({actor.position['x']}, {actor.position['y']})")
+		elif sub_choice == "3":
+			actor_name = input("请输入角色名称: ").strip()
+			if self.editor.select_actor_by_name(actor_name):
+				print(f"已选择角色: {actor_name}")
+			else:
+				print("角色未找到")
+		elif sub_choice == "4":
+			if not self.editor.current_actor_id:
+				print("请先选择角色")
+				return
+			block_type = input("积木类型: ").strip()
+			try:
+				block = self.editor.add_block(block_type)
+				if block:
+					print(f"已添加积木: {block_type} (ID: {block.id})")
+			except Exception as e:
+				print(f"添加失败: {e}")
+
+	def handle_block_management(self) -> None:
+		"""处理积木管理"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n积木管理:")
+		print(" 1. 查看所有积木")
+		print(" 2. 查找积木")
+		print(" 3. 查看积木统计")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			all_blocks = self.editor.project.get_all_blocks()
+			print(f"\n总积木数: {len(all_blocks)}")
+			print("前10个积木:")
+			for i, block in enumerate(all_blocks[:10]):
+				print(f"  {i + 1}. ID: {block.id}, 类型: {block.type}")
+		elif sub_choice == "2":
+			block_id = input("请输入积木ID: ").strip()
+			block = self.editor.project.find_block(block_id)
+			if block:
+				print(f"找到积木: ID={block.id}, 类型={block.type}")
+				print(f"字段: {block.fields}")
+			else:
+				print("积木未找到")
+		elif sub_choice == "3":
+			stats = self.editor.project.workspace.get_statistics()
+			print("\n积木统计信息:")
+			for key, value in stats.items():
+				if isinstance(value, dict):
+					print(f"\n{key}:")
+					for sub_key, sub_value in value.items():
+						print(f"  {sub_key}: {sub_value}")
+				else:
+					print(f"{key}: {value}")
+
+	def handle_resource_management(self) -> None:
+		"""处理资源管理"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		print("\n资源管理:")
+		print(" 1. 添加变量")
+		print(" 2. 添加音频")
+		print(" 3. 查看所有资源")
+		sub_choice = input("请选择: ").strip()
+		if sub_choice == "1":
+			name = input("变量名称: ").strip()
+			value = input("初始值 [默认: 0]: ").strip()
+			if not value:
+				value = 0
+			var_id = self.editor.project.add_variable(name, value)
+			print(f"已添加变量: {name} (ID: {var_id})")
+		elif sub_choice == "2":
+			name = input("音频名称: ").strip()
+			url = input("音频URL [可选]: ").strip()
+			audio_id = self.editor.project.add_audio(name, url)
+			print(f"已添加音频: {name} (ID: {audio_id})")
+		elif sub_choice == "3":
+			print("\n变量:")
+			for var in self.editor.project.variables.values():
+				print(f"  {var.get('name', 'Unknown')}: {var.get('value', 'N/A')}")
+
+	def handle_export_xml(self) -> None:
+		"""处理XML导出"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		filepath = input("请输入XML导出路径: ").strip()
+		try:
+			self.editor.export_to_xml_file(filepath)
+		except Exception as e:
+			print(f"导出失败: {e}")
+
+	def handle_search(self) -> None:
+		"""处理查找功能"""
+		if not self.editor.project:
+			print("请先加载或创建项目")
+			return
+		search_type = input("查找类型 (block/actor/scene): ").strip().lower()
+		if search_type == "block":
+			search_term = input("请输入积木ID或类型关键词: ").strip()
+			all_blocks = self.editor.project.get_all_blocks()
+			found = [b for b in all_blocks if search_term in b.id or search_term in b.type]
+			print(f"找到 {len(found)} 个积木")
+			for block in found[:5]:
+				print(f"  ID: {block.id}, 类型: {block.type}")
+		elif search_type == "actor":
+			search_term = input("请输入角色名称: ").strip()
+			actor = self.editor.project.find_actor_by_name(search_term)
+			if actor:
+				print(f"找到角色: {actor.name} (ID: {actor.id})")
+			else:
+				print("角色未找到")
+		elif search_type == "scene":
+			search_term = input("请输入场景名称: ").strip()
+			scene = self.editor.project.find_scene_by_name(search_term)
+			if scene:
+				print(f"找到场景: {scene.name} (ID: {scene.id})")
+			else:
+				print("场景未找到")
+
+	def init_loop(self) -> None:
+		# 主循环
+		while True:
+			print("\n请选择操作:")
+			print(" 1. 创建新项目")
+			print(" 2. 加载项目文件")
+			print(" 3. 保存项目")
+			print(" 4. 显示项目摘要")
+			print(" 5. 分析项目结构")
+			print(" 6. 管理场景")
+			print(" 7. 管理角色")
+			print(" 8. 管理积木")
+			print(" 9. 管理变量/函数/音频")
+			print("10. 导出为XML格式")
+			print("11. 查找积木/角色/场景")
+			print("12. 退出")
+			choice = input("请输入选项 (1-12): ").strip()
+			if not self.handle_menu_choice(choice):
+				break

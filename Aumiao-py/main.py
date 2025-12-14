@@ -7,8 +7,7 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
-from src import user, whale
-from src.api import community
+from src import auth, user, whale
 from src.core.base import Index
 from src.core.compile import decompile_work
 from src.core.deepser import CodeMaoTool
@@ -104,7 +103,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 	"""统一错误处理装饰器 - 性能优化"""
 
 	@wraps(func)
-	def wrapper(*args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
+	def wrapper(*args: Any, **kwargs: Any) -> Any | None:
 		try:
 			return func(*args, **kwargs)
 		except ValueError as ve:
@@ -171,7 +170,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("用户登录")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	response = community.AuthManager().login(identity=identity, password=password)
+	response = auth.AuthManager().login(identity=identity, password=password)
 	data_ = user.UserDataFetcher().fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {
@@ -193,7 +192,7 @@ def require_login(func: Callable[..., Any]) -> Callable[..., Any]:
 	"""登录检查装饰器"""
 
 	@wraps(func)
-	def wrapper(account_data_manager: AccountDataManager, *args: Any, **kwargs: Any) -> Any | None:  # noqa: ANN401
+	def wrapper(account_data_manager: AccountDataManager, *args: Any, **kwargs: Any) -> Any | None:
 		if not account_data_manager.is_logged_in:
 			print(printer.color_text("请先登录!", "ERROR"))
 			return None
@@ -327,7 +326,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("账户登出")
 	method = get_enum_input("请输入方法", {"web"})
 	method = cast("Literal['web']", method)
-	community.AuthManager().execute_logout(method)
+	auth.AuthManager().execute_logout(method)
 	account_data_manager.clear()
 	print(printer.color_text("已成功登出账户", "SUCCESS"))
 
@@ -336,7 +335,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 def plugin_manager(_account_data_manager: AccountDataManager) -> None:
 	"""插件管理"""
 	printer.print_header("插件管理")
-	plugin_manager = plugin.LazyPluginManager(data.PLUGIN_PATH)
+	plugin_manager = plugin.LazyPluginManager(data.PathConfig.PLUGIN_PATH)
 	console = plugin.PluginConsole(plugin_manager)
 	console.run()
 
