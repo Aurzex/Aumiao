@@ -1,7 +1,7 @@
 import hashlib
 import json
 import random
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, ClassVar
 

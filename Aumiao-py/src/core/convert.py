@@ -357,7 +357,7 @@ class Box3Converter:
 		else:
 			return blocks
 
-	def blocks2vox(self, blocks_data: dict[str, int], axis: str = "xzy", custom_colors: dict[str, Color] | None = None) -> VoxModel:  # noqa: PLR0914
+	def blocks2vox(self, blocks_data: dict[str, int], axis: str = "xzy", custom_colors: dict[str, Color] | None = None) -> VoxModel:
 		"""方块建筑转Vox模型"""
 		try:
 			print("正在处理方块数据...")

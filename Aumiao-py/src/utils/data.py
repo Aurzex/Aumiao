@@ -235,7 +235,7 @@ class DataClassConverter:
 			return dict(value)
 
 	@classmethod
-	def _process_basic_value(cls, value: object, field_type: type) -> Any:  # noqa: ANN401
+	def _process_basic_value(cls, value: object, field_type: type) -> Any:
 		"""处理基本类型的值"""
 		if isinstance(value, field_type):
 			return value
@@ -396,7 +396,7 @@ class HistoryManager(BaseManager[CodemaoHistory]):
 class NestedDefaultDict(UserDict[str, Any]):
 	"""嵌套默认字典"""
 
-	def __getitem__(self, key: str) -> Any:  # noqa: ANN401
+	def __getitem__(self, key: str) -> Any:
 		if key not in self.data:
 			return "UNKNOWN"
 		val = self.data[key]

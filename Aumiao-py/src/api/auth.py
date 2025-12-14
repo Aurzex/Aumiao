@@ -63,7 +63,10 @@ class AuthManager:
 
 	@staticmethod
 	def _determine_login_method(
-		token: str | None, cookies: str | None, identity: str | None, password: str | None
+		token: str | None,
+		cookies: str | None,
+		identity: str | None,
+		password: str | None,
 	) -> Literal["simple_password", "secure_password", "token", "cookies"]:
 		"""确定登录方式"""
 		if token:

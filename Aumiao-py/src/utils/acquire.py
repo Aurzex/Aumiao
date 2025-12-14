@@ -387,7 +387,7 @@ class BaseHTTPClient:
 		return total_items, items_per_page, first_page, response_data
 
 	@staticmethod
-	def _get_nested_value(data: dict[str, Any], key: str) -> Any | None:  # noqa: ANN401
+	def _get_nested_value(data: dict[str, Any], key: str) -> Any | None:
 		"""获取嵌套值"""
 		if not key or not isinstance(data, dict):
 			return None
@@ -491,7 +491,14 @@ class BaseHTTPClient:
 	) -> Generator[dict[str, Any]]:
 		# 获取分页信息
 		total_items, items_per_page, first_page, _ = self._get_pagination_info(
-			endpoint=endpoint, params=params, payload=payload, fetch_method=method, total_key=total_key, data_key=data_key, config=config, include_first_page=True
+			endpoint=endpoint,
+			params=params,
+			payload=payload,
+			fetch_method=method,
+			total_key=total_key,
+			data_key=data_key,
+			config=config,
+			include_first_page=True,
 		)
 		config_ = self._merge_pagination_config(config)
 		base_params = params.copy()

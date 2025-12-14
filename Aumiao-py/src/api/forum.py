@@ -20,7 +20,7 @@ class ForumDataFetcher:
 			# 如果是单个id,则直接传入
 			params = {"ids": post_ids}
 		elif isinstance(post_ids, list):
-			if len(post_ids) >= 20:  # noqa: PLR2004
+			if len(post_ids) >= 20:
 				msg = "数据长度需小于20"
 				raise TypeError(msg)
 			# 如果是多个id,则将id列表转换为字符串

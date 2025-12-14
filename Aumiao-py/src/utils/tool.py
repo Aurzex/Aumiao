@@ -340,7 +340,7 @@ class TimeUtils:
 			msg = f"Invalid timestamp length: {length}. Valid options are 10 or 13"
 			raise ValueError(msg)
 		ts = time.time()
-		return int(ts * 1000) if length == 13 else int(ts)  # noqa: PLR2004
+		return int(ts * 1000) if length == 13 else int(ts)
 
 	@staticmethod
 	def format_timestamp(ts: float | None = None) -> str:
@@ -672,7 +672,7 @@ class EduDataGenerator:
 		agency = f"{random.randint(0, 999):03d}"
 		teacher_type = random.randint(1, 7)
 		gender = random.choice(["male", "female"])
-		gender_code = "0" if gender == "male" else "1" if year <= 2009 else "2"  # noqa: PLR2004
+		gender_code = "0" if gender == "male" else "1" if year <= 2009 else "2"
 		sequence = f"{random.randint(1, 999999):06d}"
 		return f"{year}{province}{agency}{teacher_type}{gender_code}{sequence}"
 
@@ -872,7 +872,7 @@ class Encrypt:
 				val = char_val ^ self.KEY
 			elif idx == 1:
 				val = (char_val + self.KEY) % 256
-			elif idx == 2:  # noqa: PLR2004
+			elif idx == 2:
 				val = (char_val - self.KEY) % 256
 			else:
 				val = ~char_val & 0xFF
@@ -889,7 +889,7 @@ class Encrypt:
 			num_str = digits[i : i + 3]
 			if num_str.isdigit():
 				val = int(num_str)
-				if 0 <= val <= 255:  # noqa: PLR2004
+				if 0 <= val <= 255:
 					parts.append(val)
 					i += 3
 				else:
@@ -903,7 +903,7 @@ class Encrypt:
 				result.append(chr(val ^ self.KEY))
 			elif idx == 1:
 				result.append(chr((val - self.KEY) % 256))
-			elif idx == 2:  # noqa: PLR2004
+			elif idx == 2:
 				result.append(chr((val + self.KEY) % 256))
 			else:
 				result.append(chr(~val & 0xFF))
@@ -1051,7 +1051,12 @@ class DisplayRenderer:
 		self.printer = printer
 
 	def render_page(
-		self, data: list[Any], field_info: dict[str, Any], page_info: dict[str, Any], batch_results: dict[int, str] | None = None, operations: dict[str, str] | None = None
+		self,
+		data: list[Any],
+		field_info: dict[str, Any],
+		page_info: dict[str, Any],
+		batch_results: dict[int, str] | None = None,
+		operations: dict[str, str] | None = None,
 	) -> None:
 		"""渲染单页数据"""
 		self._render_header(page_info)
@@ -1077,7 +1082,12 @@ class DisplayRenderer:
 		self.printer.print_message(separator, "INFO")
 
 	def _render_data_rows(
-		self, data: list[Any], field_info: dict[str, Any], batch_results: dict[int, str] | None, operations: dict[str, str] | None, page_info: dict[str, Any]
+		self,
+		data: list[Any],
+		field_info: dict[str, Any],
+		batch_results: dict[int, str] | None,
+		operations: dict[str, str] | None,
+		page_info: dict[str, Any],
 	) -> None:
 		"""渲染数据行"""
 		start_idx = (page_info["current_page"] - 1) * page_info["page_size"]
@@ -1113,7 +1123,7 @@ class DisplayRenderer:
 			operation_display += f"{shortcut}{local_index} "
 		return operation_display.strip()
 
-	def _batch_format_values(self, item: Any, field_info: dict[str, Any]) -> dict[str, str]:  # noqa: ANN401
+	def _batch_format_values(self, item: Any, field_info: dict[str, Any]) -> dict[str, str]:
 		"""批量格式化字段值"""
 		formatted = {}
 		for field in field_info["fields"]:
@@ -1124,7 +1134,7 @@ class DisplayRenderer:
 				formatted[field] = str(value)
 		return formatted
 
-	def _safe_get_attribute(self, item: Any, field: str) -> Any:  # noqa: ANN401
+	def _safe_get_attribute(self, item: Any, field: str) -> Any:
 		"""安全获取属性"""
 		try:
 			return getattr(item, field, "N/A")

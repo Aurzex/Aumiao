@@ -757,7 +757,7 @@ class ReportProcessor(ClassUnion):
 			self._printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
-	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0914, PLR0915
+	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0915
 		"""处理自动举报:用学生账号批量举报违规评论"""
 		# 1. 检查学生账号是否可用
 		if not (self.auth_manager.student_accounts or self.auth_manager.student_tokens):

@@ -139,7 +139,7 @@ class CodeModificationManager:
 					setattr(module, func_name, new_func)
 
 	@staticmethod
-	def _get_indentation(line) -> Any:  # noqa: ANN001, ANN401
+	def _get_indentation(line) -> Any:  # noqa: ANN001
 		"""获取行的缩进"""
 		return line[: len(line) - len(line.lstrip())]
 
@@ -259,7 +259,7 @@ class LazyPluginManager:
 			name: info for name, info in plugins.items() if keyword_lower in name.lower() or (info["status"] == "loaded" and keyword_lower in info.get("description", "").lower())
 		}
 
-	def load_plugin(self, plugin_name: str) -> bool:  # noqa: PLR0911
+	def load_plugin(self, plugin_name: str) -> bool:
 		"""按需加载插件"""
 		if plugin_name in self.loaded_plugins:
 			return True  # 已加载
