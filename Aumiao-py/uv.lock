@@ -6,7 +6,10 @@ requires-python = ">=3.13"
 name = "anyio"
 version = "4.11.0"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [{ name = "idna" }, { name = "sniffio" }]
+dependencies = [
+    { name = "idna" },
+    { name = "sniffio" },
+]
 sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
@@ -23,7 +26,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [{ name = "nuitka" }]
+dev = [
+    { name = "nuitka" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -158,7 +163,10 @@ wheels = [
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [{ name = "certifi" }, { name = "h11" }]
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
@@ -190,13 +198,13 @@ wheels = [
 
 [[package]]
 name = "nuitka"
-version = "2.8.8"
+version = "2.8.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ordered-set" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/c8/0a8e2e17438cfaf7596f7a30287fe0fdb5ae5718cafd19fa89f500fdb213/nuitka-2.8.8.tar.gz", hash = "sha256:fd0e652ed4f1452f34eb8e25c6902b153aad00882347c2b6b7ad80fb6f02de5e", size = 4332016, upload-time = "2025-11-26T13:52:14.611Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/fb/51df3b30b0f9b3e73f3ba6bea8b94516b16035297c4b3452aaa632a130ae/nuitka-2.8.9.tar.gz", hash = "sha256:b178cd437f2110c46943b368db51d20d57d586a13f8f6323ab1be4e51e2fabf8", size = 4332046, upload-time = "2025-11-29T11:32:20.733Z" }
 
 [[package]]
 name = "ordered-set"
