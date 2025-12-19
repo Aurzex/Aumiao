@@ -1,5 +1,6 @@
 # Aumiao
 
+[![Moe Counter](https://count.getloli.com/@aurzex?name=aurzex&theme=capoo-1&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)](https://count.getloli.com/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-green.svg)](https://www.python.org/downloads/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
