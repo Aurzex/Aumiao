@@ -860,8 +860,9 @@ class Index(ClassUnion):
 	def _print_user_data(self) -> None:
 		"""打印用户数据"""
 		self._print_title("数据")
-		Tool().message_report(user_id=self._data.ACCOUNT_DATA.id)
-		print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
+		if self._data.ACCOUNT_DATA.id:
+			Tool().message_report(user_id=self._data.ACCOUNT_DATA.id)
+			print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
 
 	def index(self) -> None:
 		"""显示首页"""
