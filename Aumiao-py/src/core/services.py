@@ -1,6 +1,7 @@
 """服务类:认证管理、文件上传、高级服务"""
 
 import contextlib
+import re
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from json import JSONDecodeError, loads
@@ -190,7 +191,7 @@ class Motion(ClassUnion):
 			self._novel_motion.execute_toggle_novel_favorite(item["id"])
 
 	def execute_auto_reply_work(self) -> bool:  # noqa: PLR0914, PLR0915
-		"""自动回复作品/帖子评论和回复"""
+		"""自动回复作品/帖子评论和回复,增加作品解析功能"""
 		# 格式化回复内容
 		formatted_answers = {}
 		for answer in self._data.USER_DATA.answers:
@@ -209,7 +210,7 @@ class Motion(ClassUnion):
 		if not new_replies:
 			print("没有需要回复的新通知")
 			return False
-		# 已处理的通知ID集合,用于去重
+		# 已处理的通知ID集合
 		processed_ids = set()
 		for reply in new_replies:
 			try:
@@ -231,45 +232,31 @@ class Motion(ClassUnion):
 				except (JSONDecodeError, TypeError) as e:
 					print(f"解析content失败: {e}")
 					continue
-				# 3. 提取必要信息(添加发送者信息)
+				# 3. 提取必要信息
 				sender_info = content_data.get("sender", {})
 				message_info = content_data.get("message", {})
 				sender_id = sender_info.get("id", "")
 				sender_nickname = sender_info.get("nickname", "未知用户")
 				business_id = message_info.get("business_id")
 				business_name = message_info.get("business_name", "未知")
-				# 4. 确定通知类型和源类型(使用原来的逻辑)
+				# 4. 确定通知类型
 				if not reply_type:
 					continue
 				source_type = "work" if reply_type.startswith("WORK") else "post"
-				# 5. 提取文本内容和匹配关键词(使用原来的逻辑)
+				# 5. 提取文本内容
 				comment_text = message_info.get("comment", "") if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else message_info.get("reply", "")
-				# 使用原来的关键词匹配逻辑
-				chosen = ""
-				matched_keyword = None
-				for keyword, resp in formatted_answers.items():
-					if keyword in comment_text:
-						matched_keyword = keyword
-						chosen = choice(resp) if isinstance(resp, list) else resp
-						break
-				if not chosen:
-					chosen = choice(formatted_replies)
-				# 6. 判断是否是评论或回复,并确定目标ID(使用原来的逻辑)
+				# 6. 解析目标ID和父ID(所有情况都需要)
 				target_id = 0
 				parent_id = 0
-				# 原来的判断逻辑
 				if reply_type.endswith("_COMMENT"):
-					# 这是评论通知
 					target_id = int(reply.get("reference_id", 0))
 					if not target_id:
 						target_id = int(message_info.get("comment_id", 0))
 					parent_id = 0
 				else:
-					# 这是回复通知
 					parent_id = int(reply.get("reference_id", 0))
 					if not parent_id:
 						parent_id = int(message_info.get("replied_id", 0))
-					# 获取评论ID列表并查找匹配的评论ID
 					comment_ids = [
 						str(item)
 						for item in Obtain().get_comments_detail(
@@ -279,14 +266,37 @@ class Motion(ClassUnion):
 						)
 						if isinstance(item, (int, str))
 					]
-					# 使用原来的查找逻辑
 					target_id_str = str(message_info.get("reply_id", ""))
 					found = self._tool.StringProcessor().find_substrings(
 						text=target_id_str,
 						candidates=comment_ids,
 					)[0]
 					target_id = int(found) if found else 0
-				# 7. 打印详细日志(添加发送者信息)
+				# 7. 检查是否包含作品解析关键词
+				if "@作品解析:" in comment_text:
+					# 处理作品解析请求
+					self._handle_work_parsing(
+						comment_text=comment_text,
+						sender_id=sender_id,
+						sender_nickname=sender_nickname,
+						business_id=business_id,
+						source_type=source_type,
+						target_id=target_id,
+						parent_id=parent_id,
+						reply_id=reply_id,
+					)
+					continue  # 跳过普通回复流程
+				# 8. 原有关键词匹配逻辑
+				chosen = ""
+				matched_keyword = None
+				for keyword, resp in formatted_answers.items():
+					if keyword in comment_text:
+						matched_keyword = keyword
+						chosen = choice(resp) if isinstance(resp, list) else resp
+						break
+				if not chosen:
+					chosen = choice(formatted_replies)
+				# 9. 打印日志
 				print(f"\n{'=' * 40}")
 				print(f"处理新通知 [ID: {reply_id}]")
 				print(f"类型: {reply_type} ({'作品' if source_type == 'work' else '帖子'})")
@@ -298,8 +308,7 @@ class Motion(ClassUnion):
 				else:
 					print("未匹配关键词,使用随机回复")
 				print(f"选择回复: 【{chosen}】")
-				print(f"目标ID: {target_id}, 父ID: {parent_id}")
-				# 8. 构造请求参数并发送回复
+				# 10. 发送回复
 				if source_type == "work":
 					params = {
 						"work_id": business_id,
@@ -315,16 +324,205 @@ class Motion(ClassUnion):
 						"content": chosen,
 					}
 					result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
-				# 9. 处理结果
 				if result:
 					print(f"✓ 回复成功发送到{source_type}")
-					print(f"  评论ID: {target_id}, 父ID: {parent_id}")
 				else:
 					print("✗ 回复失败")
 			except Exception as e:
 				print(f"处理通知时发生错误: {e!s}")
 				continue
 		print(f"\n处理完成,共处理 {len(processed_ids)} 条通知")
+		return True
+
+	def _handle_work_parsing(
+		self,
+		comment_text: str,
+		sender_id: int,
+		sender_nickname: str,
+		business_id: int,
+		source_type: str,
+		target_id: int,
+		parent_id: int,
+		reply_id: str,
+	) -> None:
+		"""
+		处理作品解析请求
+		Args:
+			comment_text: 评论内容
+			sender_id: 发送者ID
+			sender_nickname: 发送者昵称
+			business_id: 业务ID(作品/帖子ID)
+			source_type: 来源类型(work/post)
+			target_id: 目标评论ID
+			parent_id: 父评论ID
+			reply_id: 回复ID
+		"""
+		print(f"\n{'=' * 40}")
+		print(f"检测到作品解析请求 [通知ID: {reply_id}]")
+		print(f"发送者: {sender_nickname} (ID: {sender_id})")
+		print(f"原始内容: {comment_text}")
+		try:
+			# 1. 提取作品链接或ID
+			work_info = self._extract_work_info(comment_text)
+			if not work_info:
+				print("✗ 未找到有效的作品链接或ID")
+				return
+			work_id = work_info["work_id"]
+			print(f"✓ 提取到作品ID: {work_id}")
+			# 2. 获取作品详细信息
+			work_details = self._work_obtain.fetch_work_details(work_id)
+			if not work_details:
+				print("✗ 获取作品信息失败")
+				return
+			# 3. 检查是否为作品作者
+			work_author_id = work_details.get("user_info", {}).get("id", 0)
+			is_author = str(sender_id) == str(work_author_id)
+			work_name = work_details.get("work_name", "未知作品")
+			author_nickname = work_details.get("user_info", {}).get("nickname", "未知作者")
+			print(f"作品名称: {work_name}")
+			print(f"作者: {author_nickname} (ID: {work_author_id})")
+			print(f"发送者是否为作者: {'是' if is_author else '否'}")
+			# 4. 解析命令(只保留解析和编译)
+			commands = self._parse_commands(comment_text)
+			print(f"解析到命令: {commands or '无'}")
+			# 5. 生成解析报告
+			report = self._generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
+			# 6. 根据作者身份和来源类型决定评论位置
+			if is_author:
+				print("🔧 作者身份确认,准备多位置处理")
+				# 在作品下评论
+				work_comment_result = self._work_motion.create_work_comment(work_id=work_id, comment=report)
+				if work_comment_result:
+					print("✓ 作品评论已发送")
+				# 在帖子下回复评论(如果当前是在帖子中)
+				if source_type == "post" and target_id > 0:
+					params = {
+						"reply_id": target_id,
+						"parent_id": parent_id,
+						"content": report,
+					}
+					post_reply_result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
+					if post_reply_result:
+						print("✓ 帖子回复已发送")
+				# 如果是作者且有编译命令,执行编译
+				if commands and "compile" in commands:
+					print("🛠️ 检测到编译命令,开始编译作品...")
+					compile_result = self._compile_work(work_id, work_details)
+					if compile_result:
+						print("✅ 作品编译完成")
+					else:
+						print("❌ 作品编译失败")
+			else:
+				print("👤 非作者身份,仅在帖子下回复")
+				# 非作者:只在帖子下回复评论
+				if source_type == "post" and target_id > 0:
+					params = {
+						"reply_id": target_id,
+						"parent_id": parent_id,
+						"content": report,
+					}
+					post_reply_result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
+					if post_reply_result:
+						print("✓ 帖子回复已发送")
+				elif source_type == "work":
+					print("当前通知来自作品,非作者无法回复,跳过")
+		except Exception as e:
+			print(f"处理作品解析时发生错误: {e!s}")
+
+	@staticmethod
+	def _extract_work_info(comment_text: str) -> dict | None:
+		"""
+		从评论中提取作品信息
+		Args:
+			comment_text: 评论内容
+		Returns:
+			作品信息字典或None
+		"""
+		# 支持的格式:@作品解析:https://shequ.codemao.cn/work/123456
+		# 或:@作品解析:123456
+		# 查找链接中的作品ID
+		pattern = r"@作品解析:.*?(?:work/|workId=)(\d+)"
+		match = re.search(pattern, comment_text)
+		if match:
+			work_id = int(match.group(1))
+			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
+		# 如果没有链接,尝试直接提取数字ID
+		pattern2 = r"@作品解析:.*?(\d+)"
+		match2 = re.search(pattern2, comment_text)
+		if match2:
+			work_id = int(match2.group(1))
+			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
+		return None
+
+	def _parse_commands(self, comment_text: str) -> list:
+		"""
+		解析评论中的命令(只保留解析和编译)
+		Args:
+			comment_text: 评论内容
+		Returns:
+			命令列表
+		"""
+		commands = []
+		# 检测解析命令(默认就有)
+		if "解析" in comment_text or "analyze" in comment_text.lower():
+			commands.append("analyze")
+		# 检测编译命令
+		if "编译" in comment_text or "compile" in comment_text.lower():
+			commands.append("compile")
+		return commands
+
+	def _generate_work_report(self, work_details: dict, is_author: bool, commands: list) -> str:
+		"""
+		生成作品解析报告
+		Args:
+			work_details: 作品详细信息
+			is_author: 是否为作者
+			commands: 解析到的命令
+		Returns:
+			解析报告文本
+		"""
+		work_name = work_details.get("work_name", "未知作品")
+		author_nickname = work_details.get("user_info", {}).get("nickname", "未知作者")
+		work_id = work_details.get("id", 0)
+		view_times = work_details.get("view_times", 0)
+		praise_times = work_details.get("praise_times", 0)
+		collect_times = work_details.get("collect_times", 0)
+		n_roles = work_details.get("n_roles", 0)
+		n_brick = work_details.get("n_brick", 0)
+		report = f"📊 作品解析报告:{work_name}\n\n"
+		report += f"👤 作者:{author_nickname}\n"
+		report += f"🔗 作品ID:{work_id}\n"
+		report += "📈 数据统计:\n"
+		report += f"   👁️ 浏览量:{view_times}\n"
+		report += f"   ❤️ 点赞数:{praise_times}\n"
+		report += f"   ⭐ 收藏数:{collect_times}\n"
+		report += f"   🎭 角色数:{n_roles}\n"
+		report += f"   🧱 积木数:{n_brick}\n"
+		if is_author:
+			report += "\n✅ 验证:您是该作品的作者\n"
+			if "compile" in commands:
+				report += "🛠️ 编译命令已接收,正在处理...\n"
+		else:
+			report += "\nℹ️ 提示:非作者身份,编译功能不可用\n"
+		return report
+
+	def _compile_work(self, work_id: int, work_details: dict) -> bool:
+		"""
+		编译作品文件(预留接口)
+		Args:
+			work_id: 作品ID
+			work_details: 作品详细信息
+		Returns:
+			是否成功
+		"""
+		print(f"🛠️ 编译作品 {work_id}...")
+		print(f"作品名称: {work_details.get('work_name')}")
+		print(f"积木块数: {work_details.get('n_brick')}")
+		print(f"角色数量: {work_details.get('n_roles')}")
+		# 这里可以添加实际的编译逻辑
+		# 例如:调用您即将实现的编译函数
+		# return compile_work(work_id)
+		# 暂时返回成功
 		return True
 
 	# 常驻置顶
