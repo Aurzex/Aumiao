@@ -3,7 +3,7 @@
 import contextlib
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from json import loads
+from json import JSONDecodeError, loads
 from pathlib import Path
 from random import choice
 from typing import ClassVar, Literal, cast
@@ -189,83 +189,142 @@ class Motion(ClassUnion):
 			item["id"] = cast("int", item["id"])
 			self._novel_motion.execute_toggle_novel_favorite(item["id"])
 
-	def execute_auto_reply_work(self) -> bool:  # 优化方法名:添加execute_前缀
-		"""自动回复作品/帖子评论"""
-		formatted_answers = {
-			k: v.format(**self._data.INFO) if isinstance(v, str) else [i.format(**self._data.INFO) for i in v] for answer in self._data.USER_DATA.answers for k, v in answer.items()
-		}
-		formatted_replies = [r.format(**self._data.INFO) for r in self._data.USER_DATA.replies]
-		valid_types = list(VALID_REPLY_TYPES)  # 将set转为list
+	def execute_auto_reply_work(self) -> bool:  # noqa: PLR0914, PLR0915
+		"""自动回复作品/帖子评论和回复"""
+		# 格式化回复内容
+		formatted_answers = {}
+		for answer in self._data.USER_DATA.answers:
+			for keyword, resp in answer.items():
+				if isinstance(resp, str):
+					formatted_answers[keyword] = resp.format(**self._data.INFO)
+				elif isinstance(resp, list):
+					formatted_answers[keyword] = [item.format(**self._data.INFO) for item in resp]
+		formatted_replies = [reply.format(**self._data.INFO) for reply in self._data.USER_DATA.replies]
+		# 获取新的回复通知
 		new_replies = self._tool.DataProcessor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
 			id_path="type",
-			target_values=valid_types,
+			target_values=list(VALID_REPLY_TYPES),
 		)
+		if not new_replies:
+			print("没有需要回复的新通知")
+			return False
+		# 已处理的通知ID集合,用于去重
+		processed_ids = set()
 		for reply in new_replies:
 			try:
-				content = loads(reply["content"])
-				msg = content["message"]
-				reply_type = reply["type"]
-				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
-				chosen = next((choice(resp) for keyword, resp in formatted_answers.items() if keyword in comment_text), choice(formatted_replies))
-				source_type = cast("Literal['work', 'post']", "work" if reply_type.startswith("WORK") else "post")
-				comment_ids = [
-					str(item)
-					for item in Obtain().get_comments_detail(
-						com_id=msg["business_id"],
-						source=source_type,
-						method="comment_id",
-					)
-					if isinstance(item, (int, str))
-				]
-				target_id = str(msg.get("reply_id", ""))
-				if reply_type.endswith("_COMMENT"):
-					comment_id = int(reply.get("reference_id", msg.get("comment_id", 0)))
-					parent_id = 0
-				else:
-					parent_id = int(reply.get("reference_id", msg.get("replied_id", 0)))
-					found = self._tool.StringProcessor().find_substrings(
-						text=target_id,
-						candidates=comment_ids,
-					)[0]
-					comment_id = int(found) if found else 0
-				print(f"\n{'=' * 30} 新回复 {'=' * 30}")
-				print(f"类型: {reply_type}")
-				comment_text = msg["comment"] if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else msg["reply"]
-				print(f"提取关键文本: {comment_text}")
+				# 1. 基础信息提取
+				reply_id = reply.get("id", "")
+				reply_type = reply.get("type", "")
+				# 去重检查
+				if reply_id in processed_ids:
+					print(f"跳过重复通知: {reply_id}")
+					continue
+				processed_ids.add(reply_id)
+				# 2. 解析content字段
+				content_data = {}
+				try:
+					if isinstance(reply.get("content"), str):
+						content_data = loads(reply["content"])
+					elif isinstance(reply.get("content"), dict):
+						content_data = reply["content"]
+				except (JSONDecodeError, TypeError) as e:
+					print(f"解析content失败: {e}")
+					continue
+				# 3. 提取必要信息(添加发送者信息)
+				sender_info = content_data.get("sender", {})
+				message_info = content_data.get("message", {})
+				sender_id = sender_info.get("id", "")
+				sender_nickname = sender_info.get("nickname", "未知用户")
+				business_id = message_info.get("business_id")
+				business_name = message_info.get("business_name", "未知")
+				# 4. 确定通知类型和源类型(使用原来的逻辑)
+				if not reply_type:
+					continue
+				source_type = "work" if reply_type.startswith("WORK") else "post"
+				# 5. 提取文本内容和匹配关键词(使用原来的逻辑)
+				comment_text = message_info.get("comment", "") if reply_type in {"WORK_COMMENT", "POST_COMMENT"} else message_info.get("reply", "")
+				# 使用原来的关键词匹配逻辑
+				chosen = ""
 				matched_keyword = None
 				for keyword, resp in formatted_answers.items():
 					if keyword in comment_text:
 						matched_keyword = keyword
 						chosen = choice(resp) if isinstance(resp, list) else resp
-						print(f"匹配到关键字「{keyword}」")
 						break
-				if not matched_keyword:
+				if not chosen:
 					chosen = choice(formatted_replies)
-					print("未匹配关键词,随机选择回复")
-				print(f"最终选择回复: 【{chosen}】")
-				params = (
-					{
-						"work_id": msg["business_id"],
-						"comment_id": comment_id,
+				# 6. 判断是否是评论或回复,并确定目标ID(使用原来的逻辑)
+				target_id = 0
+				parent_id = 0
+				# 原来的判断逻辑
+				if reply_type.endswith("_COMMENT"):
+					# 这是评论通知
+					target_id = int(reply.get("reference_id", 0))
+					if not target_id:
+						target_id = int(message_info.get("comment_id", 0))
+					parent_id = 0
+				else:
+					# 这是回复通知
+					parent_id = int(reply.get("reference_id", 0))
+					if not parent_id:
+						parent_id = int(message_info.get("replied_id", 0))
+					# 获取评论ID列表并查找匹配的评论ID
+					comment_ids = [
+						str(item)
+						for item in Obtain().get_comments_detail(
+							com_id=business_id,
+							source=source_type,
+							method="comment_id",
+						)
+						if isinstance(item, (int, str))
+					]
+					# 使用原来的查找逻辑
+					target_id_str = str(message_info.get("reply_id", ""))
+					found = self._tool.StringProcessor().find_substrings(
+						text=target_id_str,
+						candidates=comment_ids,
+					)[0]
+					target_id = int(found) if found else 0
+				# 7. 打印详细日志(添加发送者信息)
+				print(f"\n{'=' * 40}")
+				print(f"处理新通知 [ID: {reply_id}]")
+				print(f"类型: {reply_type} ({'作品' if source_type == 'work' else '帖子'})")
+				print(f"发送者: {sender_nickname} (ID: {sender_id})")
+				print(f"来源: {business_name}")
+				print(f"内容: {comment_text}")
+				if matched_keyword:
+					print(f"匹配到关键词: 「{matched_keyword}」")
+				else:
+					print("未匹配关键词,使用随机回复")
+				print(f"选择回复: 【{chosen}】")
+				print(f"目标ID: {target_id}, 父ID: {parent_id}")
+				# 8. 构造请求参数并发送回复
+				if source_type == "work":
+					params = {
+						"work_id": business_id,
+						"comment_id": target_id,
 						"parent_id": parent_id,
 						"comment": chosen,
-						"return_data": True,
 					}
-					if source_type == "work"
-					else {
-						"reply_id": comment_id,
+					result = self._work_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
+				else:
+					params = {
+						"reply_id": target_id,
 						"parent_id": parent_id,
 						"content": chosen,
 					}
-				)
-				(self._work_motion.create_comment_reply if source_type == "work" else self._forum_motion.create_comment_reply)(
-					**params,  # pyright: ignore[reportArgumentType]
-				)  # 优化方法名:reply_to_comment→create_comment_reply
-				print(f"已发送回复到{source_type},评论ID: {comment_id}")
+					result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
+				# 9. 处理结果
+				if result:
+					print(f"✓ 回复成功发送到{source_type}")
+					print(f"  评论ID: {target_id}, 父ID: {parent_id}")
+				else:
+					print("✗ 回复失败")
 			except Exception as e:
-				print(f"回复处理失败: {e}")
+				print(f"处理通知时发生错误: {e!s}")
 				continue
+		print(f"\n处理完成,共处理 {len(processed_ids)} 条通知")
 		return True
 
 	# 常驻置顶
@@ -629,7 +688,6 @@ class KnEditor:
 			self.handle_export_xml()
 		elif choice == "11":
 			self.handle_search()
-
 		elif choice == "12":
 			print("感谢使用,再见!")
 			return False

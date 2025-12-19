@@ -58,6 +58,23 @@ class DataFetcher:
 		)
 		return response.json()
 
+	def fetch_replies_gen(
+		self,
+		types: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"],
+		limit: int = 15,
+	) -> Generator[dict]:
+		params = {"query_type": types}
+
+		return self._client.fetch_paginated_data(
+			endpoint="/web/message-record",
+			params=params,
+			method="GET",
+			limit=limit,
+			pagination_method="offset",
+			total_key="total",
+			data_key="items",
+		)
+
 	# 获取nemo消息
 	def fetch_nemo_messages(self, types: Literal["fork", "like"]) -> dict:
 		extra_url = 1 if types == "like" else 3
