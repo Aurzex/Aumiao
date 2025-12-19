@@ -184,6 +184,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 		},
 	}
 	account_data_manager.update(account_data)
+	data.DataManager().update(account_data)
 	account_data_manager.token = response["data"]["auth"]["token"]
 	print_account_info(account_data)
 
