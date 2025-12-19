@@ -319,8 +319,8 @@ class Motion(ClassUnion):
 					result = self._work_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
 				else:
 					params = {
-						"reply_id": target_id,
-						"parent_id": parent_id,
+						"reply_id": str(target_id),
+						"parent_id": str(parent_id),
 						"content": chosen,
 					}
 					result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
@@ -334,7 +334,7 @@ class Motion(ClassUnion):
 		print(f"\n处理完成,共处理 {len(processed_ids)} 条通知")
 		return True
 
-	def _handle_work_parsing(
+	def _handle_work_parsing(  # noqa: PLR0915
 		self,
 		comment_text: str,
 		sender_id: int,
@@ -389,7 +389,7 @@ class Motion(ClassUnion):
 			report = self._generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
 			# 6. 根据作者身份和来源类型决定评论位置
 			if is_author:
-				print("🔧 作者身份确认,准备多位置处理")
+				print("作者身份确认,准备多位置处理")
 				# 在作品下评论
 				work_comment_result = self._work_motion.create_work_comment(work_id=work_id, comment=report)
 				if work_comment_result:
@@ -397,8 +397,8 @@ class Motion(ClassUnion):
 				# 在帖子下回复评论(如果当前是在帖子中)
 				if source_type == "post" and target_id > 0:
 					params = {
-						"reply_id": target_id,
-						"parent_id": parent_id,
+						"reply_id": str(target_id),
+						"parent_id": str(parent_id),
 						"content": report,
 					}
 					post_reply_result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
@@ -406,19 +406,19 @@ class Motion(ClassUnion):
 						print("✓ 帖子回复已发送")
 				# 如果是作者且有编译命令,执行编译
 				if commands and "compile" in commands:
-					print("🛠️ 检测到编译命令,开始编译作品...")
+					print("检测到编译命令,开始编译作品...")
 					compile_result = self._compile_work(work_id, work_details)
 					if compile_result:
-						print("✅ 作品编译完成")
+						print("作品编译完成")
 					else:
-						print("❌ 作品编译失败")
+						print("作品编译失败")
 			else:
-				print("👤 非作者身份,仅在帖子下回复")
+				print("非作者身份,仅在帖子下回复")
 				# 非作者:只在帖子下回复评论
 				if source_type == "post" and target_id > 0:
 					params = {
-						"reply_id": target_id,
-						"parent_id": parent_id,
+						"reply_id": str(target_id),
+						"parent_id": str(parent_id),
 						"content": report,
 					}
 					post_reply_result = self._forum_motion.create_comment_reply(**params)  # pyright: ignore[reportArgumentType]
@@ -454,7 +454,8 @@ class Motion(ClassUnion):
 			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
 		return None
 
-	def _parse_commands(self, comment_text: str) -> list:
+	@staticmethod
+	def _parse_commands(comment_text: str) -> list:
 		"""
 		解析评论中的命令(只保留解析和编译)
 		Args:
@@ -471,7 +472,8 @@ class Motion(ClassUnion):
 			commands.append("compile")
 		return commands
 
-	def _generate_work_report(self, work_details: dict, is_author: bool, commands: list) -> str:
+	@staticmethod
+	def _generate_work_report(work_details: dict, commands: list, *, is_author: bool) -> str:
 		"""
 		生成作品解析报告
 		Args:
@@ -489,24 +491,26 @@ class Motion(ClassUnion):
 		collect_times = work_details.get("collect_times", 0)
 		n_roles = work_details.get("n_roles", 0)
 		n_brick = work_details.get("n_brick", 0)
-		report = f"📊 作品解析报告:{work_name}\n\n"
-		report += f"👤 作者:{author_nickname}\n"
-		report += f"🔗 作品ID:{work_id}\n"
-		report += "📈 数据统计:\n"
-		report += f"   👁️ 浏览量:{view_times}\n"
-		report += f"   ❤️ 点赞数:{praise_times}\n"
-		report += f"   ⭐ 收藏数:{collect_times}\n"
-		report += f"   🎭 角色数:{n_roles}\n"
-		report += f"   🧱 积木数:{n_brick}\n"
+		# 使用双换行符\n\n分隔段落,单换行符\n分隔行
+		report = f"作品解析报告:{work_name}\n\n"
+		report += f"作者:{author_nickname}\n"
+		report += f"作品ID:{work_id}\n"
+		report += "数据统计:\n"
+		report += f"   浏览量:{view_times}\n"
+		report += f"   点赞数:{praise_times}\n"
+		report += f"   收藏数:{collect_times}\n"
+		report += f"   角色数:{n_roles}\n"
+		report += f"   积木数:{n_brick}\n"
 		if is_author:
 			report += "\n✅ 验证:您是该作品的作者\n"
 			if "compile" in commands:
 				report += "🛠️ 编译命令已接收,正在处理...\n"
 		else:
-			report += "\nℹ️ 提示:非作者身份,编译功能不可用\n"
+			report += "\n提示:非作者身份,编译功能不可用\n"
 		return report
 
-	def _compile_work(self, work_id: int, work_details: dict) -> bool:
+	@staticmethod
+	def _compile_work(work_id: int, work_details: dict) -> bool:
 		"""
 		编译作品文件(预留接口)
 		Args:
