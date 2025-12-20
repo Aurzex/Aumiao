@@ -353,26 +353,26 @@ class WorkParser(ClassUnion):
 		view_times = work_details.get("view_times", 0)
 		praise_times = work_details.get("praise_times", 0)
 		collect_times = work_details.get("collect_times", 0)
-		n_roles = work_details.get("n_roles", 0)
-		n_brick = work_details.get("n_brick", 0)
+		# n_roles = work_details.get("n_roles", 0)
+		# n_brick = work_details.get("n_brick", 0)
 		# 构建报告各部分
 		parts = [
-			"📊作品解析报告",
+			"作品解析报告",
 			f"作品名称: {work_name}",
 			f"作者: {author_nickname} (ID: {work_id})",
 			"数据统计:",
 			f"  浏览量: {view_times}",
 			f"  点赞数: {praise_times}",
 			f"  收藏数: {collect_times}",
-			f"  角色数: {n_roles}",
-			f"  积木数: {n_brick}",
+			# f"  角色数: {n_roles}",
+			# f"  积木数: {n_brick}",
 		]
 		if is_author:
-			parts.append("✅验证: 您是该作品的作者")
+			parts.append("验证: 您是该作品的作者")
 			if "compile" in commands:
-				parts.append("🔧编译命令已接收,正在处理...")
+				parts.append("编译命令已接收,正在处理...")
 		else:
-			parts.append("⚠️提示: 非作者身份,编译功能不可用")
+			parts.append("提示: 非作者身份,编译功能不可用")
 		# 用分隔符连接各部分
 		return " | ".join(parts)
 
