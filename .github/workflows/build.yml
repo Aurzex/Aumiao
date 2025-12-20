@@ -6,23 +6,24 @@ permissions:
 
 on:
   push:
-    branches: [dev]  # 只在 dev 分支触发自动发版
+    branches: [main]  # 只在 main 分支触发自动发版
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
       - "Aumiao-py/pyproject.toml"
   pull_request:
-    branches: [main]  # PR 到 main 只做构建验证
+    branches: [main]  # PR 到 main 时只构建验证
     paths:
       - ".github/workflows/build.yml"
       - "Aumiao-py/src/**/*.py"
       - "Aumiao-py/pyproject.toml"
+    types: [closed]  # 只在 PR 合并时触发
   workflow_dispatch:  # 手动触发
 
 env:
   # 构建配置
   BUILD_TYPE: Release
-  COMMIT_INTERVAL: 20  # dev 分支累积 20 个提交后自动发版
+  COMMIT_INTERVAL: 20  # 开发分支累积 20 个提交后自动发版到 main
   
   # Python 环境
   PYTHON_VERSION: "3.13"
@@ -73,10 +74,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check Commit Count and Create Release
+      - name: Check Release Condition
         id: check-commits
         run: |
-          echo "开始提交计数分析"
+          echo "开始发版条件检查"
           echo "事件类型: $GITHUB_EVENT_NAME"
           echo "触发分支: ${GITHUB_REF#refs/heads/}"
           
@@ -89,38 +90,12 @@ jobs:
             echo "is_manual=false" >> $GITHUB_OUTPUT
           fi
           
-          # 对于 PR 事件，只构建不发版
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "Pull Request 事件 - 仅构建不发布"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "release_tag=" >> $GITHUB_OUTPUT
-            echo "full_version=0.0.0.0" >> $GITHUB_OUTPUT
-            echo "latest_tag=" >> $GITHUB_OUTPUT
-            echo "commit_count=0" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # 获取当前分支
-          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
-          echo "当前分支: $CURRENT_BRANCH"
-          
-          # 只在 dev 分支或手动触发时考虑发版
-          if [ "$CURRENT_BRANCH" != "dev" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
-            echo "当前分支不是 dev 且非手动触发，跳过发布检查"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "release_tag=" >> $GITHUB_OUTPUT
-            echo "full_version=0.0.0.0" >> $GITHUB_OUTPUT
-            echo "latest_tag=" >> $GITHUB_OUTPUT
-            echo "commit_count=0" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # 获取完整标签历史
-          git fetch --tags --depth=100
-          
           # 读取项目版本号
           PROJECT_VERSION=$(grep -Po 'version = "\K[0-9]+\.[0-9]+\.[0-9]+' ./${{ env.PROJECT_DIR }}/pyproject.toml)
           echo "项目版本: $PROJECT_VERSION"
+          
+          # 获取完整标签历史
+          git fetch --tags --depth=100
           
           # 获取所有四段式版本标签并按版本号排序
           ALL_TAGS=$(git tag -l "v*.*.*.*" --sort=-version:refname)
@@ -137,9 +112,18 @@ jobs:
             
             # 计算新的四段式版本号
             if [ -n "$LATEST_FULL_TAG" ]; then
-              # 提取第四位版本号并增加
-              LAST_BUILD_NUMBER=$(echo "$LATEST_FULL_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)' | cut -d. -f4)
-              NEW_BUILD_NUMBER=$((LAST_BUILD_NUMBER + 1))
+              # 解析版本号：v2.3.0.8 -> 2.3.0.8
+              VERSION_WITHOUT_V=${LATEST_FULL_TAG#v}
+              # 分割版本号
+              IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$VERSION_WITHOUT_V"
+              # 如果项目版本与标签版本不同，重置构建号
+              LATEST_PROJECT_VERSION="$MAJOR.$MINOR.$PATCH"
+              if [ "$PROJECT_VERSION" != "$LATEST_PROJECT_VERSION" ]; then
+                echo "项目版本已更新 ($LATEST_PROJECT_VERSION -> $PROJECT_VERSION)，重置构建号"
+                NEW_BUILD_NUMBER=1
+              else
+                NEW_BUILD_NUMBER=$((BUILD + 1))
+              fi
             else
               # 首次发版，从1开始
               NEW_BUILD_NUMBER=1
@@ -156,73 +140,120 @@ jobs:
             exit 0
           fi
           
-          # 自动触发：计算 dev 分支自上次发布后的提交数量
-          if [ -n "$LATEST_FULL_TAG" ]; then
-            # 检查标签是否在当前 dev 分支历史中
-            if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
-              # 标签在历史中，计算从标签到 HEAD 的提交
-              COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
-              echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
-            else
-              # 标签不在当前分支历史中
-              echo "标签 $LATEST_FULL_TAG 不在当前 dev 分支历史中"
-              
-              # 找到 dev 分支上最新的标签
-              BRANCH_TAGS=$(git tag --contains HEAD --sort=-version:refname | grep "v*.*.*.*" | head -n 1)
-              if [ -n "$BRANCH_TAGS" ]; then
-                LATEST_FULL_TAG="$BRANCH_TAGS"
+          # PR合并到main的事件处理
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            echo "检测到PR合并到main分支"
+            
+            # 获取PR的提交数量（从PR创建到合并）
+            PR_COMMIT_COUNT=$(git rev-list --count ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+            echo "PR包含的提交数: $PR_COMMIT_COUNT"
+            
+            # 计算累计提交数（从上次发布到当前合并点）
+            if [ -n "$LATEST_FULL_TAG" ]; then
+              # 检查标签是否在当前分支历史中
+              if git merge-base --is-ancestor "$LATEST_FULL_TAG" HEAD 2>/dev/null; then
                 COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
-                echo "使用 dev 分支上的最新标签: $LATEST_FULL_TAG"
-                echo "从标签 $LATEST_FULL_TAG 到 HEAD 的提交数: $COMMIT_COUNT"
               else
-                # 没有找到相关标签，计算所有提交
-                echo "没有找到 dev 分支相关标签，计算所有提交"
-                COMMIT_COUNT=$(git rev-list --count HEAD)
+                # 查找当前分支上最新的标签
+                BRANCH_TAGS=$(git tag --contains HEAD --sort=-version:refname | grep "v*.*.*.*" | head -n 1)
+                if [ -n "$BRANCH_TAGS" ]; then
+                  LATEST_FULL_TAG="$BRANCH_TAGS"
+                  COMMIT_COUNT=$(git rev-list --count "$LATEST_FULL_TAG..HEAD")
+                else
+                  COMMIT_COUNT=$(git rev-list --count HEAD)
+                fi
               fi
+            else
+              COMMIT_COUNT=$(git rev-list --count HEAD)
             fi
-          else
-            echo "没有找到四段式版本标签，计算所有提交"
-            COMMIT_COUNT=$(git rev-list --count HEAD)
+            
+            echo "累计提交数量: $COMMIT_COUNT"
+            echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
+            
+            # 决策逻辑：PR合并时检查是否达到发版阈值
+            if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
+              echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              
+              # 计算新的四段式版本号
+              if [ -n "$LATEST_FULL_TAG" ]; then
+                # 解析版本号
+                VERSION_WITHOUT_V=${LATEST_FULL_TAG#v}
+                IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$VERSION_WITHOUT_V"
+                # 检查项目版本是否更新
+                LATEST_PROJECT_VERSION="$MAJOR.$MINOR.$PATCH"
+                if [ "$PROJECT_VERSION" != "$LATEST_PROJECT_VERSION" ]; then
+                  echo "项目版本已更新 ($LATEST_PROJECT_VERSION -> $PROJECT_VERSION)，重置构建号"
+                  NEW_BUILD_NUMBER=1
+                else
+                  NEW_BUILD_NUMBER=$((BUILD + 1))
+                fi
+              else
+                # 首次发版，从1开始
+                NEW_BUILD_NUMBER=1
+              fi
+              
+              NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
+              RELEASE_TAG="v$NEW_VERSION"
+              
+              echo "新版本号: $NEW_VERSION"
+              echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+              echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+              echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+              echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+            else
+              echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "release_tag=" >> $GITHUB_OUTPUT
+              echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
+              echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+              echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+            fi
+            exit 0
           fi
           
-          echo "总提交数量: $COMMIT_COUNT"
-          echo "发版阈值: ${{ env.COMMIT_INTERVAL }}"
-          
-          # 决策逻辑
-          if [ $COMMIT_COUNT -ge ${{ env.COMMIT_INTERVAL }} ]; then
-            echo "达到发版条件 ($COMMIT_COUNT >= ${{ env.COMMIT_INTERVAL }})，触发发布"
+          # main分支直接推送（非PR合并）的处理
+          if [ "${GITHUB_REF#refs/heads/}" = "main" ]; then
+            echo "main分支直接推送，检查是否发版"
+            
+            # 对于main分支的直接推送，总是发版（通常用于紧急修复）
             echo "should_release=true" >> $GITHUB_OUTPUT
             
             # 计算新的四段式版本号
             if [ -n "$LATEST_FULL_TAG" ]; then
-              # 提取第四位版本号并增加
-              LAST_BUILD_NUMBER=$(echo "$LATEST_FULL_TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.([0-9]+)' | cut -d. -f4)
-              NEW_BUILD_NUMBER=$((LAST_BUILD_NUMBER + 1))
+              VERSION_WITHOUT_V=${LATEST_FULL_TAG#v}
+              IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$VERSION_WITHOUT_V"
+              LATEST_PROJECT_VERSION="$MAJOR.$MINOR.$PATCH"
+              if [ "$PROJECT_VERSION" != "$LATEST_PROJECT_VERSION" ]; then
+                echo "项目版本已更新，重置构建号"
+                NEW_BUILD_NUMBER=1
+              else
+                NEW_BUILD_NUMBER=$((BUILD + 1))
+              fi
             else
-              # 首次发版，从1开始
               NEW_BUILD_NUMBER=1
             fi
             
             NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
             RELEASE_TAG="v$NEW_VERSION"
             
-            echo "新版本号: $NEW_VERSION"
+            echo "main分支推送新版本号: $NEW_VERSION"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
             echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-            
-            # 创建并推送标签
-            git tag $RELEASE_TAG
-            git push origin $RELEASE_TAG
-            echo "创建并推送新标签: $RELEASE_TAG"
-          else
-            echo "未达到发版条件 ($COMMIT_COUNT < ${{ env.COMMIT_INTERVAL }})，跳过发布"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "release_tag=" >> $GITHUB_OUTPUT
-            echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
+            echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
+            echo "commit_count=0" >> $GITHUB_OUTPUT
+            exit 0
           fi
           
+          # 其他情况（如dev分支推送）不发版，只构建验证
+          echo "非发版分支推送，只进行构建验证"
+          echo "should_release=false" >> $GITHUB_OUTPUT
+          echo "release_tag=" >> $GITHUB_OUTPUT
+          echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
           echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
-          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          echo "commit_count=0" >> $GITHUB_OUTPUT
+
+
 
   generate-changelog:
     name: "Generate Changelog"
