@@ -62,9 +62,7 @@ uv sync
 
 ### 首次运行说明 | First Run Instructions
 
-**Python 源码版本 | Python Source Version：**  
-首次运行需要执行 `Aumiao-py` 目录下的 `recover.py` 来生成必要的数据文件。  
-First run requires executing `recover.py` in the `Aumiao-py` directory to generate necessary data files.
+**Python 源码版本 | Python Source Version：**
 
 - `data.json` - 用户数据配置文件 | User data configuration file
 - `setting.json` - 程序设置配置文件 | Program settings configuration file
