@@ -241,7 +241,7 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 def reply_work(_account_data_manager: AccountDataManager) -> None:
 	"""自动回复作品"""
 	printer.print_header("自动回复")
-	Motion().execute_auto_reply_work()
+	Motion().execute_auto_reply()
 	print(printer.color_text("已成功执行自动回复", "SUCCESS"))
 
 

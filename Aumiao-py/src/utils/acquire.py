@@ -1,11 +1,11 @@
 import contextlib
-import ssl
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
 from json import dumps
 from pathlib import Path
+from random import choice
 from time import sleep
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
@@ -640,7 +640,7 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 					"Cache-Control": "no-cache",
 					"Pragma": "no-cache",
 				},
-				sslopt={"cert_reqs": ssl.CERT_NONE},
+				sslopt={"cert_reqs": 0},
 			)
 			self._connected = True
 			print(f"WebSocket连接已建立: {url}")
@@ -727,6 +727,12 @@ class FileUploader(IFileUploader):
 		# 为文件上传创建独立session避免影响主会话
 		self._upload_session = httpx.Client()
 
+	@staticmethod
+	def generate_id(length: int = 20) -> str:
+		"""生成随机ID"""
+		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		return "".join(choice(chars) for _ in range(length))
+
 	def upload(self, file_path: Path, method: str, save_path: str = "aumiao") -> str:
 		"""上传文件"""
 		if method not in self._upload_strategies:
@@ -758,14 +764,17 @@ class FileUploader(IFileUploader):
 
 	def _upload_codemao(self, file_path: Path, save_path: str) -> str:
 		"""CodeMao上传"""
-		unique_name = f"{save_path}/{file_path.name}"
+		random_str = self.generate_id(4)
+		name_parts = file_path.stem, random_str
+		unique_filename = f"{'_'.join(name_parts)}{file_path.suffix}"
+		unique_name = f"{save_path}/{unique_filename}"
 		token_info = self._get_codemao_token(unique_name)
 		with file_path.open("rb") as f:
-			files = {"file": (file_path.name, f)}
+			files = {"file": (unique_filename, f)}
 			data = {
 				"token": token_info["token"],
 				"key": token_info["file_path"],
-				"fname": file_path.name,
+				"fname": unique_filename,
 			}
 			self._upload_request("POST", token_info["upload_url"], files=files, data=data)
 		return token_info["pic_host"] + token_info["file_path"]

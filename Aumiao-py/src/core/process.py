@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 from random import randint
 from time import sleep
-from typing import Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from src.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, ReportRecord, SourceConfig, data, decorator
@@ -1062,11 +1062,24 @@ class ReportAuthManager(ClassUnion):
 		self._printer.print_message("已终止会话并恢复管理员账号", "INFO")
 
 
+class FileUploaderProtocol(Protocol):
+	"""定义上传器的协议接口"""
+
+	@staticmethod
+	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
+
+
 class FileProcessor(ClassUnion):
 	def __init__(self) -> None:
 		super().__init__()
 
-	def handle_file_upload(self, file_path: Path, save_path: str, method: Literal["pgaot", "codemao", "codegame"], uploader: acquire.FileUploader) -> str | None:
+	def handle_file_upload(
+		self,
+		file_path: Path,
+		save_path: str,
+		method: Literal["pgaot", "codemao", "codegame"],
+		uploader: type[FileUploaderProtocol] = acquire.FileUploader,
+	) -> str | None:
 		"""处理单个文件的上传流程"""
 		file_size = file_path.stat().st_size
 		if file_size > MAX_SIZE_BYTES:
@@ -1074,7 +1087,7 @@ class FileProcessor(ClassUnion):
 			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
 			return None
 		# 使用重构后的统一上传接口
-		url = uploader.upload(file_path=file_path, method=method, save_path=save_path)
+		url = uploader().upload(file_path=file_path, method=method, save_path=save_path)
 		file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
 		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp())
 		self._upload_history.data.history.append(history)
@@ -1086,7 +1099,7 @@ class FileProcessor(ClassUnion):
 		dir_path: Path,
 		save_path: str,
 		method: Literal["pgaot", "codemao", "codegame"],
-		uploader: acquire.FileUploader,
+		uploader: type[FileUploaderProtocol] = acquire.FileUploader,
 		*,
 		recursive: bool,
 	) -> dict[str, str | None]:
@@ -1107,7 +1120,7 @@ class FileProcessor(ClassUnion):
 					relative_path = child_file.relative_to(dir_path)
 					child_save_path = str(Path(save_path) / relative_path.parent)
 					# 使用重构后的统一上传接口
-					url = uploader.upload(file_path=child_file, method=method, save_path=child_save_path)
+					url = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
 					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
 					history = data.UploadHistory(
