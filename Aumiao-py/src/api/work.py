@@ -277,7 +277,7 @@ class WorkManager:
 		)
 		return response.status_code == HTTPStatus.OK.value
 
-	def create_work_comment(self, work_id: int, comment: str, emoji: str | None = None, *, return_data: bool = False) -> bool | dict:
+	def create_work_comment(self, work_id: int, comment: str, emoji: str = "", *, return_data: bool = False) -> bool | dict:
 		"""
 		添加作品评论
 		Args:
