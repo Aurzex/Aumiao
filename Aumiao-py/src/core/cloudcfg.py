@@ -133,7 +133,7 @@ class CloudVariable(CloudDataItem):
 		if not isinstance(value, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_VARIABLE_TYPE)
 		old_value = self.value
-		self.value = value
+		self.value: int | str = value
 		self.emit_change(old_value, value, "local")
 		return True
 

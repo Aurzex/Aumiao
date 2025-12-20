@@ -339,7 +339,7 @@ class Motion(ClassUnion):
 		comment_text: str,
 		sender_id: int,
 		sender_nickname: str,
-		business_id: int,
+		business_id: int,  # noqa: ARG002
 		source_type: str,
 		target_id: int,
 		parent_id: int,
