@@ -364,8 +364,6 @@ class WorkManager:
 		method: Literal["PUT", "DELETE"],
 		work_id: int,
 		comment_id: int,
-		*,
-		return_data: bool = False,
 	) -> bool:
 		"""
 		置顶或取消置顶评论
@@ -378,7 +376,7 @@ class WorkManager:
 			操作结果(成功状态或完整响应数据)
 		"""
 		response = self._client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
-		return response.json() if return_data else response.status_code == HTTPStatus.NO_CONTENT.value
+		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_toggle_comment_like(self, work_id: int, comment_id: int, method: SelectMethod = "POST") -> bool:
 		"""
