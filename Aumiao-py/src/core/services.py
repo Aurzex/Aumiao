@@ -12,7 +12,7 @@ from typing import ClassVar, Literal, cast
 
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, data, decorator, tool
 from src.core.compile import decompile_work
-from src.core.editors import KNEditor, KNProject
+from src.core.editorkn import KNEditor, KNProject
 from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
 from src.utils.acquire import HTTPStatus
