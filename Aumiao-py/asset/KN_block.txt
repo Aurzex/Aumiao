@@ -1,0 +1,834 @@
+# 积木系统完整技术文档
+
+## 一、积木核心架构与通用定义
+
+### 1.1 基础积木通用结构
+```javascript
+{
+  // 基础标识属性
+  id: "",                    // 积木唯一标识（UUID格式）
+  type: "",                  // 积木类型标识（如"procedures_2_defnoreturn"）
+  is_shadow: false,          // 是否为影子积木
+  
+  // 显示与控制属性
+  comment: null,             // 注释文本
+  collapsed: false,          // 是否折叠显示
+  disabled: false,           // 是否禁用
+  deletable: true,           // 是否可删除
+  movable: true,             // 是否可移动
+  editable: true,            // 是否可编辑字段
+  visible: "visible",        // 可见性（"visible"/"hidden"）
+  
+  // 布局属性
+  location: [0, 0],          // 坐标位置 [x, y]
+  parent_id: null,           // 父积木ID
+  
+  // 功能属性
+  is_output: false,          // 是否有返回值
+  mutation: "",              // 变异配置（XML格式字符串）
+  shadows: {},               // 关联的影子积木配置
+  fields: {},                // 参数字段（如{NAME: "自定义函数"}）
+  field_constraints: {},     // 字段约束配置
+  field_extra_attr: {},      // 字段额外属性
+  
+  // 连接关系
+  inputs: {},                // 输入项配置
+  next: null                 // 下一块积木连接
+}
+```
+
+### 1.2 积木类别概览（18个完整类别）
+| 类别 | 积木数量 | 核心功能 | 关键积木示例 |
+|------|----------|----------|--------------|
+| **事件类（EVENTS）** | 7 | 触发事件响应 | spriteOnTap, onKeydown |
+| **控制类（CONTROL）** | 5 | 流程控制 | repeatNTimes, wait |
+| **动作类（ACTIONS）** | 6 | 角色移动控制 | selfGoForward, selfSetPositionX |
+| **外观类（APPEARANCE）** | 5 | 视觉属性控制 | setScale, selfSetEffect |
+| **动画类（ANIMATION）** | 4 | 动画效果控制 | selfStressAnimation, selfAppearAnimation |
+| **交互类（INTERACTION）** | 4 | 用户交互 | selfDialog, askAndChoose |
+| **音频类（AUDIO）** | 4 | 声音控制 | playAudio, voiceRecognition |
+| **感知类（SENSING）** | 5 | 环境感知 | bumpIntoColor, getMouseInfo |
+| **运算类（OPERATOR）** | 5 | 数据运算 | mathArithmetic, logicCompare |
+| **变量类（VARIABLES）** | 4 | 变量管理 | variablesSet, changeVariables |
+| **列表类（LIST）** | 4 | 列表操作 | listAppend, listIndexOf |
+| **笔类（PEN）** | 4 | 绘画功能 | selfSetPenSize, stamp |
+| **在线类（ONLINE）** | 4 | 网络功能 | showHideRanking, updateRanking |
+| **判断类（JUDGE）** | 1 | 结果判定 | sendJudgeResult |
+| **认知类（COGNITIVE）** | 3 | AI识别 | recognizeBodyPart, checkEmotion |
+| **AI聊天类（AiChat）** | 2 | AI对话 | aiChatAsk, setSystemPreset |
+| **AI分类类（AiClassify）** | 2 | 图片分类 | evaluatePhoto, getEvaluateClassAccuracy |
+| **过程类（PROCEDURE）** | 3 | 函数定义调用 | 见2.1节详细说明 |
+
+## 二、PROCEDURE类积木详细定义
+
+### 2.1 过程类核心积木详解
+
+#### （1）DEF（无返回值函数定义）
+```javascript
+{
+  type: "procedures_2_defnoreturn",
+  is_output: false,
+  fields: {
+    NAME: ""  // 函数名称，默认空字符串
+  },
+  inputs: {
+    PROCEDURES_2_DEFNORETURN_DEFINE: {
+      type: "input_dummy"  // 函数名输入区域
+    },
+    STACK: {
+      type: "input_statement"  // 函数体语句输入
+    }
+  },
+  mutation: "<mutation xmlns=\"http://www.w3.org/1999/xhtml\"><arg id=\"param0\" name=\"x\" type=\"Number\"/></mutation>",
+  style: "ORANGE_4",  // 默认颜色+函数图标
+  extensions: ["procedures_defnoreturn"]
+}
+```
+
+#### （2）RETURN（有返回值函数定义）
+```javascript
+{
+  type: "procedures_2_return_value",
+  is_output: true,
+  inputs: {
+    PROCEDURES_2_DEFRETURN_RETURN: {
+      type: "input_dummy"  // 返回值标签
+    },
+    VALUE: {
+      type: "input_value",  // 返回值输入
+      check: ["Number", "String", "Boolean", "Array"]
+    }
+  },
+  mutation: "<mutation xmlns=\"http://www.w3.org/1999/xhtml\" items=\"1\" type=\"ROUND\"></mutation>",
+  style: "ORANGE_4"
+}
+```
+
+#### （3）CALL_NORETURN（无返回值函数调用）
+```javascript
+{
+  type: "procedures_2_callnoreturn",
+  is_output: false,
+  fields: {
+    NAME: ""  // 关联的函数名
+  },
+  inputs: {
+    NAME: {
+      type: "field_label"  // 函数名显示
+    },
+    ARG0: {
+      type: "input_value",  // 第一个参数输入
+      check: ["Number"]  // 根据函数定义动态变化
+    }
+    // 更多参数输入根据mutation动态生成
+  },
+  mutation: "<mutation name=\"函数名\" def_id=\"proc1\"><procedures_2_parameter_shadow name=\"x\" value=\"0\"/></mutation>"
+}
+```
+
+#### （4）CALL_RETURN（有返回值函数调用）
+```javascript
+{
+  type: "procedures_2_callreturn",
+  is_output: true,
+  output: ["Number", "String", "Boolean", "Array"],  // 支持多种返回值类型
+  // 其他配置与CALL_NORETURN相同
+}
+```
+
+#### （5）PARAM_ON_BLOCK（函数参数定义）
+```javascript
+{
+  type: "procedures_2_stable_parameter",
+  is_output: true,
+  fields: {
+    param_name: "参数名",
+    param_default_value: "=0"  // 默认值格式：= + 默认值
+  },
+  output: ["Number", "String", "Boolean"],  // 根据参数类型动态变化
+  extensions: ["param_on_block"]
+}
+```
+
+#### （6）PARAM（独立参数积木）
+```javascript
+{
+  type: "procedures_2_parameter",
+  is_output: true,
+  fields: {
+    param_name: "参数名"  // 仅显示参数名标签
+  },
+  output: ["Number", "String", "Boolean"]  // 与对应参数类型一致
+}
+```
+
+### 2.2 PROCEDURE积木的XML与JS对象映射规则
+| XML元素/属性 | JS积木对象属性 | 映射说明 | 示例 |
+|--------------|----------------|----------|------|
+| `<block type="procedures_2_defnoreturn">` | `type: "procedures_2_defnoreturn"` | 函数定义积木类型标识 | - |
+| `<field name="NAME">计算面积</field>` | `fields.NAME: "计算面积"` | 函数名字段映射 | - |
+| `<mutation><arg name="x" type="Number"/>` | `mutation字符串 + inputs动态生成` | 参数列表变异配置 | 生成ARG0输入项 |
+| `<statement name="STACK">...</statement>` | `inputs.STACK: {block: ...}` | 函数体语句块映射 | - |
+| `<value name="ARG0">` | `inputs.ARG0: {block/shadow}` | 参数输入值映射 | 支持block或shadow |
+| `<shadow type="math_number">` | `shadows.ARG0: {type: "math_number"}` | 影子积木映射 | 默认填充数值 |
+| `def_id="proc1"` | 内部关联字段 | 关联函数定义的ID | 用于运行时查找 |
+
+## 三、影子积木系统
+
+### 3.1 影子积木核心特性
+- **标识属性**：`is_shadow: true`
+- **作用**：作为默认填充积木，提供基础参数值
+- **行为特性**：
+  - 用户可替换为自定义积木
+  - 不可删除（`deletable: false`）
+  - 默认可见，替换后仍可恢复
+  - 继承输入项的完整约束规则
+
+### 3.2 典型影子积木定义
+
+#### （1）数值影子积木
+```javascript
+{
+  type: "math_number",
+  is_shadow: true,
+  fields: {
+    NUM: "0"  // 默认值0
+  },
+  constraints: {
+    NUM: "*,*,*,true"  // 允许文本输入
+  }
+}
+```
+
+#### （2）布尔影子积木
+```javascript
+{
+  type: "procedure_boolean",
+  is_shadow: true,
+  fields: {
+    VALUE: "true"  // 默认值true
+  },
+  options: {
+    VALUE: {
+      menu_generator_advanced: [
+        ["true", "true"],
+        ["false", "false"]
+      ]
+    }
+  }
+}
+```
+
+#### （3）PROCEDURE专属影子积木
+```javascript
+{
+  type: "procedures_2_parameter_shadow",
+  is_shadow: true,
+  fields: {
+    name: "x",    // 参数名
+    value: "0"    // 默认值
+  },
+  // 继承参数定义的完整约束
+}
+```
+
+### 3.3 影子积木XML格式
+```xml
+<!-- 数值影子积木 -->
+<shadow type="math_number">
+  <field allow_text="true" name="NUM">0</field>
+</shadow>
+
+<!-- 布尔影子积木 -->
+<shadow type="procedure_boolean">
+  <field name="VALUE">true</field>
+</shadow>
+
+<!-- PROCEDURE参数影子积木 -->
+<procedures_2_parameter_shadow name="x" value="0"/>
+```
+
+## 四、XML解析逻辑
+
+### 4.1 全局XML解析核心流程
+
+```javascript
+// 解析流程伪代码
+function parseXML(xmlString) {
+  // 1. 解析根节点
+  const root = parseXmlElement(xmlString);
+  
+  // 2. 识别积木类型
+  const blockType = root.getAttribute('type');
+  const blockId = root.getAttribute('id') || generateId();
+  
+  // 3. 创建基础积木对象
+  const block = {
+    id: blockId,
+    type: blockType,
+    is_shadow: false,
+    fields: {},
+    inputs: {},
+    shadows: {}
+  };
+  
+  // 4. 解析字段（<field>标签）
+  const fieldElements = root.getElementsByTagName('field');
+  for (let field of fieldElements) {
+    const name = field.getAttribute('name');
+    const value = field.textContent;
+    const constraints = field.getAttribute('constraints');
+    
+    block.fields[name] = value;
+    if (constraints) {
+      block.field_constraints[name] = constraints;
+    }
+  }
+  
+  // 5. 解析变异配置（<mutation>标签）
+  const mutationElement = root.getElementsByTagName('mutation')[0];
+  if (mutationElement) {
+    block.mutation = mutationElement.outerHTML;
+    
+    // 特殊解析：PROCEDURE参数
+    if (blockType.includes('procedures')) {
+      parseProcedureMutation(mutationElement, block);
+    }
+  }
+  
+  // 6. 解析输入项（<value>/<statement>标签）
+  parseInputs(root, block);
+  
+  // 7. 解析影子积木（<shadow>标签）
+  parseShadows(root, block);
+  
+  return block;
+}
+```
+
+### 4.2 PROCEDURE类积木XML解析专属逻辑
+
+#### （1）函数定义积木解析
+```xml
+<!-- 输入XML示例 -->
+<block type="procedures_2_defnoreturn" id="proc1">
+  <field name="NAME">计算面积</field>
+  <mutation xmlns="http://www.w3.org/1999/xhtml">
+    <arg id="param0" name="长" type="Number"/>
+    <arg id="param1" name="宽" type="Number"/>
+  </mutation>
+  <statement name="STACK">
+    <block type="math_arithmetic">
+      <field name="OP">MULTIPLY</field>
+      <value name="A">
+        <block type="procedures_2_stable_parameter">
+          <field name="param_name">长</field>
+        </block>
+      </value>
+      <value name="B">
+        <block type="procedures_2_stable_parameter">
+          <field name="param_name">宽</field>
+        </block>
+      </value>
+    </block>
+  </statement>
+</block>
+```
+
+**解析步骤：**
+1. **提取基础信息**
+   - `type: "procedures_2_defnoreturn"`
+   - `id: "proc1"`
+
+2. **解析函数名字段**
+   - `fields.NAME: "计算面积"`
+
+3. **解析变异配置**
+   ```javascript
+   mutation: `<mutation xmlns="..."><arg id="param0" name="长" type="Number"/><arg id="param1" name="宽" type="Number"/></mutation>`
+   ```
+   - 参数列表：`[{id: "param0", name: "长", type: "Number"}, {id: "param1", name: "宽", type: "Number"}]`
+
+4. **动态生成参数输入项**
+   ```javascript
+   inputs: {
+     STACK: { /* 函数体语句 */ },
+     PARAMS0: {  // 自动生成第一个参数项
+       name: "长",
+       type: "input_value",
+       check: ["Number"]
+     },
+     PARAMS1: {  // 自动生成第二个参数项
+       name: "宽", 
+       type: "input_value",
+       check: ["Number"]
+     }
+   }
+   ```
+
+5. **解析函数体语句**
+   - 递归解析`<statement name="STACK">`内的所有积木
+   - 建立父子连接关系
+
+#### （2）函数调用积木解析
+```xml
+<block type="procedures_2_callnoreturn" id="call1">
+  <mutation name="计算面积" def_id="proc1">
+    <procedures_2_parameter_shadow name="长" value="5"/>
+    <procedures_2_parameter_shadow name="宽" value="3"/>
+  </mutation>
+  <value name="ARG0">
+    <shadow type="math_number">
+      <field name="NUM">5</field>
+    </shadow>
+  </value>
+  <value name="ARG1">
+    <block type="math_number">
+      <field name="NUM">3</field>
+    </block>
+  </value>
+</block>
+```
+
+**解析步骤：**
+1. **提取变异信息**
+   - 函数名：`"计算面积"`
+   - 关联定义ID：`"proc1"`
+   - 参数默认值：`{长: "5", 宽: "3"}`
+
+2. **建立函数关联**
+   ```javascript
+   fields: {
+     NAME: "计算面积",
+     def_id: "proc1"  // 内部关联字段
+   }
+   ```
+
+3. **解析参数输入**
+   - `ARG0`: 影子积木（`type: "math_number"`, `fields.NUM: "5"`）
+   - `ARG1`: 普通积木（`type: "math_number"`, `fields.NUM: "3"`）
+   - 自动校验参数类型匹配
+
+4. **设置输入项约束**
+   - 根据函数定义的参数类型，设置每个ARG输入项的`check`属性
+   - 示例：如果函数定义中"长"参数类型为Number，则`inputs.ARG0.check = ["Number"]`
+
+## 五、参数约束功能完整解析
+
+### 5.1 约束系统架构
+```
+参数约束系统
+├── 类型约束（Type Constraints）
+│   ├── 实现：check属性
+│   ├── 类型：Number/String/Boolean/Array等
+│   └── 作用：限制可连接的积木类型
+├── 数值范围约束（Numeric Range）
+│   ├── 实现：constraints属性
+│   ├── 格式："min,max,step,allowText"
+│   └── 示例："1,100,1,"（1~100，步长1）
+├── 可选值约束（Enum Constraints）
+│   ├── 实现：options.menu_generator_advanced
+│   ├── 格式：[["显示值","实际值"], ...]
+│   └── 示例：方向选择[["上","UP"], ["下","DOWN"]]
+├── 格式约束（Format Constraints）
+│   ├── 实现：字段类型校验
+│   ├── 类型：颜色格式、ID格式、正则匹配
+│   └── 示例：颜色值必须为#RRGGBB格式
+└── 依赖约束（Dependency Constraints）
+    ├── 实现：运行时校验
+    ├── 类型：存在性校验、关联性校验
+    └── 示例：变量必须已定义、排行榜必须已创建
+```
+
+### 5.2 约束实现详细示例
+
+#### （1）类型约束实现
+```javascript
+// 数值输入积木
+{
+  type: "math_number",
+  check: ["Number"],  // 仅接受数值类型
+  output: ["Number"]  // 输出数值类型
+}
+
+// 文本输入积木
+{
+  type: "text",
+  check: ["String"],  // 仅接受字符串类型
+  output: ["String"]  // 输出字符串类型
+}
+
+// 列表操作积木
+{
+  type: "list_get",
+  check: ["Array"],  // 仅接受列表类型
+  output: ["String", "Number", "Boolean"]  // 输出列表项类型
+}
+```
+
+#### （2）数值范围约束实现
+```javascript
+// 角度输入（-180~180，允许文本）
+{
+  type: "self_rotate",
+  fields: {
+    degrees: {
+      constraints: "-180,180,,true",  // 最小值,最大值,步长,允许文本
+      default_value: "0"
+    }
+  }
+}
+
+// 缩放比例（1~200，步长1）
+{
+  type: "set_scale",
+  fields: {
+    scale: {
+      constraints: "1,200,1,",  // 最小值,最大值,步长,不允许文本
+      default_value: "100"
+    }
+  }
+}
+
+// 音量调节（0~100，步长1）
+{
+  type: "set_volume",
+  fields: {
+    volume: {
+      constraints: "0,100,1,",
+      default_value: "50"
+    }
+  }
+}
+```
+
+#### （3）可选值约束实现
+```javascript
+// 方向选择
+{
+  type: "self_move_specify",
+  fields: {
+    direction: {
+      options: {
+        menu_generator_advanced: [
+          ["上", "UP"],
+          ["下", "DOWN"], 
+          ["左", "LEFT"],
+          ["右", "RIGHT"]
+        ]
+      },
+      default_value: "UP"
+    }
+  }
+}
+
+// 动画类型选择
+{
+  type: "self_stress_animation",
+  fields: {
+    animation: {
+      options: {
+        menu_generator_advanced: [
+          ["抖动", "SHAKE"],
+          ["缩放", "SCALE"],
+          ["弹跳", "BOUNCE"]
+        ]
+      },
+      default_value: "SHAKE"
+    }
+  }
+}
+```
+
+#### （4）格式约束实现
+```javascript
+// 颜色字段（颜色拾取器）
+{
+  type: "self_set_pen_color",
+  fields: {
+    colour: {
+      type: "field_colour",  // 特殊字段类型
+      default_value: "#CC66CC"
+    }
+  },
+  extensions: ["colour_picker"]
+}
+
+// 用户ID字段（UUID格式校验）
+{
+  type: "user_info_of_th", 
+  fields: {
+    user_id: {
+      validator: function(value) {
+        // UUID格式正则：8-4-4-4-12十六进制字符
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(value);
+      }
+    }
+  }
+}
+```
+
+#### （5）依赖约束实现
+```javascript
+// 变量操作（变量必须存在）
+{
+  type: "variables_set",
+  fields: {
+    variable: {
+      dependency: {
+        type: "variable_exists",  // 依赖类型
+        scope: "global"  // 作用域：全局/局部
+      }
+    }
+  },
+  validate: function(workspace) {
+    const varName = this.fields.variable;
+    return workspace.getVariable(varName) !== null;
+  }
+}
+
+// 排行榜操作（排行榜必须已创建）
+{
+  type: "update_ranking",
+  fields: {
+    ranking: {
+      dependency: {
+        type: "ranking_exists",
+        scope: "project"
+      }
+    }
+  }
+}
+```
+
+### 5.3 约束生效机制
+
+#### 编辑时约束
+```javascript
+// 连接验证逻辑
+function canConnect(input, block) {
+  // 1. 检查类型约束
+  if (input.check && !input.check.includes(block.output)) {
+    return false;  // 类型不匹配
+  }
+  
+  // 2. 检查数值范围约束
+  if (input.constraints) {
+    const [min, max] = input.constraints.split(',');
+    const value = parseFloat(block.fields.NUM);
+    if (value < min || value > max) {
+      return false;  // 超出范围
+    }
+  }
+  
+  // 3. 检查可选值约束
+  if (input.options) {
+    const validValues = input.options.menu_generator_advanced.map(item => item[1]);
+    if (!validValues.includes(block.fields.VALUE)) {
+      return false;  // 非可选值
+    }
+  }
+  
+  return true;
+}
+```
+
+#### 运行时约束
+```javascript
+// 运行时参数校验
+function validateRuntimeParameters(block, context) {
+  // 1. 格式校验
+  if (block.type === 'self_set_pen_color') {
+    if (!isValidColor(block.fields.colour)) {
+      console.warn('颜色格式无效，使用默认值');
+      block.fields.colour = '#CC66CC';
+    }
+  }
+  
+  // 2. 依赖校验
+  if (block.type === 'variables_set') {
+    if (!context.hasVariable(block.fields.variable)) {
+      console.error(`变量${block.fields.variable}不存在`);
+      return false;
+    }
+  }
+  
+  // 3. 范围校验
+  if (block.type === 'set_scale') {
+    const scale = parseInt(block.fields.scale);
+    if (scale < 1 || scale > 200) {
+      console.warn('缩放比例超出范围，自动调整');
+      block.fields.scale = Math.min(Math.max(scale, 1), 200);
+    }
+  }
+  
+  return true;
+}
+```
+
+## 六、全类别积木XML模板集
+
+### 6.1 事件类（EVENTS）
+```xml
+<!-- 运行组激活事件 -->
+<block type="on_running_group_activated"></block>
+
+<!-- 角色点击事件 -->
+<block type="sprite_on_tap">
+  <field name="sprite">角色A</field>
+</block>
+
+<!-- 滑动事件 -->
+<block type="on_swipe">
+  <field name="direction">UP</field>
+</block>
+
+<!-- 按键事件 -->
+<block type="on_keydown">
+  <field name="key">SPACE</field>
+</block>
+```
+
+### 6.2 控制类（CONTROL）
+```xml
+<!-- 重复N次 -->
+<block type="repeat_n_times">
+  <field name="NUM" constraints="1,,1">5</field>
+  <statement name="DO">
+    <!-- 执行内容 -->
+  </statement>
+</block>
+
+<!-- 条件循环 -->
+<block type="repeat_forever_until">
+  <value name="CONDITION">
+    <shadow type="logic_boolean">
+      <field name="VALUE">true</field>
+    </shadow>
+  </value>
+  <statement name="DO">
+    <!-- 执行内容 -->
+  </statement>
+</block>
+```
+
+### 6.3 过程类（PROCEDURE）
+```xml
+<!-- 函数定义 -->
+<block type="procedures_2_defnoreturn">
+  <field name="NAME">自定义函数</field>
+  <mutation>
+    <arg name="参数1" type="number"/>
+    <arg name="参数2" type="string"/>
+  </mutation>
+  <statement name="STACK">
+    <!-- 函数体 -->
+  </statement>
+</block>
+
+<!-- 函数调用 -->
+<block type="procedures_2_callreturn">
+  <mutation name="自定义函数" def_id="func1"/>
+  <value name="ARG0">
+    <shadow type="math_number">
+      <field name="NUM">10</field>
+    </shadow>
+  </value>
+  <value name="ARG1">
+    <shadow type="text">
+      <field name="TEXT">测试</field>
+    </shadow>
+  </value>
+</block>
+```
+
+### 6.4 其他关键类别示例
+
+```xml
+<!-- 变量设置 -->
+<block type="variables_set">
+  <field name="variable">计数器</field>
+  <value name="value">
+    <shadow type="math_number">
+      <field name="NUM">0</field>
+    </shadow>
+  </value>
+</block>
+
+<!-- 列表操作 -->
+<block type="list_append">
+  <field name="list">成绩列表</field>
+  <value name="item">
+    <shadow type="math_number">
+      <field name="NUM">95</field>
+    </shadow>
+  </value>
+</block>
+
+<!-- 条件判断 -->
+<block type="logic_compare">
+  <field name="OP">GT</field>
+  <value name="A">
+    <shadow type="math_number">
+      <field name="NUM">10</field>
+    </shadow>
+  </value>
+  <value name="B">
+    <shadow type="math_number">
+      <field name="NUM">5</field>
+    </shadow>
+  </value>
+</block>
+```
+
+## 七、关键特性总结
+
+### 7.1 PROCEDURE积木的核心特性
+1. **动态参数支持**：通过mutation配置动态生成参数输入项
+2. **类型安全**：函数调用时自动校验参数类型匹配
+3. **双向关联**：函数定义与调用通过def_id建立关联
+4. **影子积木集成**：参数默认值自动填充影子积木
+
+### 7.2 约束系统的核心价值
+1. **开发体验**：编辑时即时反馈，降低错误率
+2. **代码质量**：运行时自动修正或警告，提升稳定性
+3. **学习友好**：通过约束引导正确使用方式
+4. **扩展性**：支持自定义约束规则添加
+
+### 7.3 XML配置的最佳实践
+1. **合理使用影子积木**：为可选参数提供合理的默认值
+2. **明确约束声明**：所有输入项都应明确约束规则
+3. **保持兼容性**：新增约束不应破坏现有积木功能
+4. **文档完整性**：每个积木类型都应有完整的XML示例
+
+## 八、附录：常用约束速查表
+
+### 8.1 约束格式速查
+| 约束类型 | 格式示例 | 说明 |
+|----------|----------|------|
+| **数值范围** | `"1,100,1,"` | 最小值1，最大值100，步长1，不允许文本 |
+| **带文本输入** | `"0,360,,true"` | 最小值0，最大值360，无步长限制，允许文本 |
+| **仅最小值** | `"0,,"` | 最小值0，无最大值和步长限制 |
+| **固定步长** | `",,0.1"` | 无范围限制，步长固定为0.1 |
+
+### 8.2 常用字段类型
+| 字段类型 | 用途 | 示例 |
+|----------|------|------|
+| `field_label` | 只读标签 | 函数名显示 |
+| `field_input` | 文本输入 | 对话框文本 |
+| `field_number` | 数字输入 | 重复次数 |
+| `field_colour` | 颜色选择 | 画笔颜色 |
+| `field_dropdown` | 下拉菜单 | 方向选择 |
+| `field_variable` | 变量选择 | 变量操作 |
+| `field_list` | 列表选择 | 列表操作 |
+
+### 8.3 常用输入类型
+| 输入类型 | 用途 | 连接类型 |
+|----------|------|----------|
+| `input_value` | 值输入 | 可连接任何输出值的积木 |
+| `input_statement` | 语句输入 | 可连接语句块积木 |
+| `input_dummy` | 占位输入 | 不连接其他积木，仅布局用 |
+| `input_end_row` | 行结束 | 标记行结束，用于换行布局 |
+
+---
