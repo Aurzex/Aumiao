@@ -9,12 +9,12 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from html import unescape
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from src.core.base import BLOCK_CONFIG, DEFAULT_PROJECT_CONFIG, BlockCategory, BlockType, ColorFormat, ConnectionType, ShadowCategory, ShadowType
 
 if TYPE_CHECKING:
-	from collections.abc import Callable
+	from collections.abc import Callable, Generator
 T = TypeVar("T")
 U = TypeVar("U")
 
@@ -2526,20 +2526,43 @@ class KNProject:
 
 
 # ============================================================================
-# Python操作接口类
+# Python操作接口类(优化版)
 # ============================================================================
 class KNEditor:
-	"""KN项目编辑器(Python操作接口)"""
+	"""KN项目编辑器(Python操作接口) - 优化版"""
 
 	def __init__(self, project: KNProject | None = None) -> None:
 		self.project = project or KNProject()
-		self.current_actor_id: str | None = None
-		self.current_scene_id: str | None = None
+		self._current_entity: tuple[str, str] | None = None  # (type, id)
+		self._undo_stack: list[dict[str, Any]] = []
+		self._redo_stack: list[dict[str, Any]] = []
+		self._max_undo_steps = 50
+
+	@property
+	def current_entity_type(self) -> str | None:
+		"""当前实体类型"""
+		return self._current_entity[0] if self._current_entity else None
+
+	@property
+	def current_entity_id(self) -> str | None:
+		"""当前实体ID"""
+		return self._current_entity[1] if self._current_entity else None
+
+	def _record_state(self) -> None:
+		"""记录当前项目状态"""
+		state = self.project.to_dict()
+		self._undo_stack.append(state)
+		# 限制历史记录数量
+		if len(self._undo_stack) > self._max_undo_steps:
+			self._undo_stack.pop(0)
+		# 清空重做栈
+		self._redo_stack.clear()
 
 	def load_project(self, filepath: str | Path) -> None:
 		"""加载项目文件"""
 		self.project = KNProject.load_from_file(filepath)
 		print(f"已加载项目: {self.project.project_name}")
+		self._record_state()
 
 	def import_from_xml_file(self, filepath: str | Path) -> None:
 		"""从XML文件导入项目"""
@@ -2547,16 +2570,24 @@ class KNEditor:
 			xml_content = f.read()
 		self.project = KNProject.from_xml(xml_content)
 		print(f"已从XML导入项目: {self.project.project_name}")
+		self._record_state()
 
 	def save_project(self, filepath: str | Path | None = None) -> None:
 		"""保存项目文件"""
 		self.project.save_to_file(filepath)
 
+	def select(self, entity_type: str, entity_id: str) -> bool:
+		"""通用选择方法"""
+		if entity_type == "actor":
+			return self.select_actor(entity_id)
+		if entity_type == "scene":
+			return self.select_scene(entity_id)
+		return False
+
 	def select_actor(self, actor_id: str) -> bool:
 		"""选择角色"""
 		if actor_id in self.project.actors:
-			self.current_actor_id = actor_id
-			self.current_scene_id = None
+			self._current_entity = ("actor", actor_id)
 			return True
 		return False
 
@@ -2564,16 +2595,14 @@ class KNEditor:
 		"""按名称选择角色"""
 		actor = self.project.find_actor_by_name(name)
 		if actor is not None:
-			self.current_actor_id = actor.id
-			self.current_scene_id = None
+			self._current_entity = ("actor", actor.id)
 			return True
 		return False
 
 	def select_scene(self, scene_id: str) -> bool:
 		"""选择场景"""
 		if scene_id in self.project.scenes:
-			self.current_scene_id = scene_id
-			self.current_actor_id = None
+			self._current_entity = ("scene", scene_id)
 			return True
 		return False
 
@@ -2581,24 +2610,39 @@ class KNEditor:
 		"""按名称选择场景"""
 		scene = self.project.find_scene_by_name(name)
 		if scene is not None:
-			self.current_scene_id = scene.id
-			self.current_actor_id = None
+			self._current_entity = ("scene", scene.id)
 			return True
 		return False
 
 	def get_current_entity(self) -> tuple[str, Actor | Scene | None]:
 		"""获取当前选择的实体"""
-		if self.current_actor_id is not None:
-			actor = self.project.actors.get(self.current_actor_id)
+		if not self._current_entity:
+			return ("none", None)
+		entity_type, entity_id = self._current_entity
+		if entity_type == "actor":
+			actor = self.project.actors.get(entity_id)
 			return ("actor", actor)
-		if self.current_scene_id is not None:
-			scene = self.project.scenes.get(self.current_scene_id)
+		if entity_type == "scene":
+			scene = self.project.scenes.get(entity_id)
 			return ("scene", scene)
 		return ("none", None)
 
+	def batch_edit(self) -> Generator[KNEditor]:
+		# 记录初始状态
+		initial_state = self.project.to_dict()
+		try:
+			yield self
+		except Exception:
+			# 出错时回滚
+			self.project.__dict__.update(KNProject.load_from_dict(initial_state).__dict__)
+			raise
+		finally:
+			# 成功完成,记录状态
+			self._record_state()
+
 	def add_block(self, block_type: str, **kwargs: Any) -> Block | None:
 		"""添加代码块到当前选择的实体"""
-		entity_type, entity = self.get_current_entity()
+		_entity_type, entity = self.get_current_entity()
 		if entity is None:
 			print("错误: 没有选择任何实体")
 			return None
@@ -2614,14 +2658,34 @@ class KNEditor:
 			elif key == "parent_id":
 				builder.with_parent(value)
 		block = builder.build()
+		return self._add_block_to_current(block)
+
+	def add_blocks(self, *builders: BlockBuilder) -> list[Block]:
+		"""批量添加积木"""
+		blocks = []
+		for builder in builders:
+			block = self.add_block_from_builder(builder)
+			if block:
+				blocks.append(block)
+		return blocks
+
+	def add_block_from_builder(self, builder: BlockBuilder) -> Block | None:
+		"""使用构建器添加积木"""
+		block = builder.build()
+		return self._add_block_to_current(block)
+
+	def _add_block_to_current(self, block: Block) -> Block | None:
+		"""添加积木到当前选中的实体"""
+		if not self._current_entity:
+			print("错误: 没有选择任何实体")
+			return None
+		entity_type, entity_id = self._current_entity
 		if entity_type == "actor":
-			actor = cast("Actor", entity)
-			actor.blocks.append(block)
-			self.project.workspace.add_block(block)
+			self.project.actors[entity_id].blocks.append(block)
 		elif entity_type == "scene":
-			scene = cast("Scene", entity)
-			scene.blocks.append(block)
-			self.project.workspace.add_block(block)
+			self.project.scenes[entity_id].blocks.append(block)
+		self.project.workspace.add_block(block)
+		self._record_state()
 		return block
 
 	def export_to_xml_file(self, filepath: str | Path) -> None:
@@ -2630,6 +2694,19 @@ class KNEditor:
 		with Path(filepath).open("w", encoding="utf-8") as f:
 			f.write(xml_content)
 		print(f"项目已导出为XML: {filepath}")
+
+	def export(self, filepath: str | Path, formats: str = "json", indent: int = 2) -> None:
+		"""导出项目为多种格式"""
+		if formats.lower() == "json":
+			data = self.project.to_dict()
+			with Path(filepath).open("w", encoding="utf-8") as f:
+				json.dump(data, f, ensure_ascii=False, indent=indent)
+			print(f"项目已导出为JSON: {filepath}")
+		elif formats.lower() == "xml":
+			self.export_to_xml_file(filepath)
+		else:
+			msg = f"不支持的格式: {formats}"
+			raise ValueError(msg)
 
 	def print_project_info(self) -> None:
 		"""打印项目信息"""
@@ -2644,3 +2721,55 @@ class KNEditor:
 		project_stats = self.project.analyze_project()
 		workspace_stats = self.project.workspace.get_statistics()
 		return {**project_stats, **workspace_stats}
+
+	def undo(self) -> bool:
+		"""撤消操作"""
+		if len(self._undo_stack) < 2:  # 需要至少两个状态才能撤消
+			return False
+		# 当前状态移动到重做栈
+		current = self._undo_stack.pop()
+		self._redo_stack.append(current)
+		# 恢复上一个状态
+		previous = self._undo_stack[-1]
+		self.project.__dict__.update(KNProject.load_from_dict(previous).__dict__)
+		return True
+
+	def redo(self) -> bool:
+		"""重做操作"""
+		if not self._redo_stack:
+			return False
+		# 获取下一个状态
+		next_state = self._redo_stack.pop()
+		self._undo_stack.append(next_state)
+		# 恢复状态
+		self.project.__dict__.update(KNProject.load_from_dict(next_state).__dict__)
+		return True
+
+	def find_blocks(self, block_type: str | None = None, category: BlockCategory | None = None, location: tuple[float, float, float] | None = None) -> list[Block]:
+		"""高级查找功能"""
+		repository = self.project.workspace.repository
+		if location:
+			x, y, radius = location
+			return repository.find_by_location(x, y, radius)
+		if block_type:
+			return repository.get_by_type(block_type)
+		if category:
+			return repository.get_by_category(category)
+		return repository.get_all()
+
+	def find_block(self, block_id: str) -> Block | None:
+		"""查找指定ID的积木"""
+		return self.project.find_block(block_id)
+
+	def validate_project(self) -> dict[str, list[str]]:
+		"""验证项目中的积木约束"""
+		errors = {}
+		for block in self.project.get_all_blocks():
+			is_valid, block_errors = block.validate_constraints()
+			if not is_valid:
+				errors[block.id] = block_errors
+		return errors
+
+	def clear_current_entity(self) -> None:
+		"""清除当前选择的实体"""
+		self._current_entity = None
