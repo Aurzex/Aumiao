@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Kitten/Codemao 作品文件解析编辑工具
-修复版 - 基于实际文件结构实现
-"""
-
 import json
 import operator
 import pathlib
