@@ -213,6 +213,7 @@ class ShadowType(Enum):
 	VALUE = "value"
 	REPLACEABLE = "replaceable"
 	STATEMENT = "statement"
+	PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增:PROCEDURE参数影子积木
 
 
 class ShadowCategory(Enum):
@@ -222,6 +223,7 @@ class ShadowCategory(Enum):
 	PLACEHOLDER = "placeholder"
 	INPUT_TEMPLATE = "input_template"
 	TOOLBOX_PREVIEW = "toolbox_preview"
+	PARAMETER = "parameter"  # 新增:参数影子积木
 
 
 class ColorFormat(Enum):
@@ -293,6 +295,32 @@ class FieldType(Enum):
 	PEN_COLOR_PROPERTY = "pen_color_property"
 
 
+class BlockCategory(Enum):
+	"""块分类枚举"""
+
+	EVENT = "event"
+	CONTROL = "control"
+	MOTION = "motion"
+	APPEARANCE = "appearance"
+	INTERACTION = "interaction"
+	AUDIO = "audio"
+	SENSING = "sensing"
+	OPERATOR = "operator"
+	VARIABLE = "variable"
+	LIST = "list"
+	PROCEDURE = "procedure"
+	PEN = "pen"
+	ANIMATION = "animation"
+	CAMERA = "camera"
+	COGNITIVE = "cognitive"
+	AI_CHAT = "ai_chat"
+	AI_CLASSIFY = "ai_classify"
+	ONLINE = "online"
+	JUDGE = "judge"
+	MATH = "math"
+	TEXT = "text"
+
+
 class BlockType(Enum):
 	"""所有块类型枚举"""
 
@@ -322,7 +350,6 @@ class BlockType(Enum):
 	GET_CURRENT_CLONE_INDEX = "get_current_clone_index"
 	GET_CLONE_NUM = "get_clone_num"
 	GET_CLONE_INDEX_PROPERTY = "get_clone_index_property"
-
 	# 控制类
 	REPEAT_FOREVER = "repeat_forever"
 	REPEAT_N_TIMES = "repeat_n_times"
@@ -337,7 +364,6 @@ class BlockType(Enum):
 	WARP = "warp"
 	TELL = "tell"
 	SYNC_TELL = "sync_tell"
-
 	# 动作/运动类
 	SELF_GO_FORWARD = "self_go_forward"
 	SELF_MOVE_SPECIFY = "self_move_specify"
@@ -353,7 +379,6 @@ class BlockType(Enum):
 	SELF_FACE_TO = "self_face_to"
 	SELF_SET_DRAGGABLE = "self_set_draggable"
 	SELF_SET_ROLE_CAMP = "self_set_role_camp"
-
 	# 外观类
 	SET_SPRITE_STYLE = "set_sprite_style"
 	SELF_PREV_NEXT_STYLE = "self_prev_next_style"
@@ -367,7 +392,6 @@ class BlockType(Enum):
 	CLEAR_ALL_EFFECTS = "clear_all_effects"
 	SET_TOP_BOTTOM_LAYER = "set_top_bottom_layer"
 	GET_STYLES = "get_styles"
-
 	# 对话/界面类
 	CREATE_STAGE_DIALOG = "create_stage_dialog"
 	SELF_DIALOG_WAIT = "self_dialog_wait"
@@ -378,7 +402,6 @@ class BlockType(Enum):
 	ASK_AND_CHOOSE = "ask_and_choose"
 	TRANSLATE = "translate"
 	TRANSLATE_RESULT = "translate_result"
-
 	# 音频类
 	PLAY_AUDIO = "play_audio"
 	PLAY_AUDIO_AND_WAIT = "play_audio_and_wait"
@@ -387,7 +410,6 @@ class BlockType(Enum):
 	VOICE_RECOGNITION = "voice_recognition"
 	GET_VOICE_ANSWER = "get_voice_answer"
 	GET_PLAY_AUDIO = "get_play_audio"
-
 	# 检测类
 	BUMP_INTO = "bump_into"
 	BUMP_INTO_COLOR = "bump_into_color"
@@ -404,7 +426,6 @@ class BlockType(Enum):
 	SET_TIMER_STATE = "set_timer_state"
 	SHOW_HIDE_TIMER = "show_hide_timer"
 	TIMER = "timer"
-
 	# 运算类
 	MATH_ARITHMETIC = "math_arithmetic"
 	RANDOM_NUM = "random_num"
@@ -420,14 +441,12 @@ class BlockType(Enum):
 	TEXT_LENGTH = "text_length"
 	TEXT_CONTAIN = "text_contain"
 	CONVERT_TYPE = "convert_type"
-
 	# 变量类
 	VARIABLES_SET = "variables_set"
 	CHANGE_VARIABLES = "change_variables"
 	SHOW_HIDE_VARIABLES = "show_hide_variables"
 	VARIABLES_GET = "variables_get"
 	SCRIPT_VARIABLES = "script_variables"
-
 	# 列表类
 	LIST_APPEND = "list_append"
 	LIST_INSERT_VALUE = "list_insert_value"
@@ -440,7 +459,6 @@ class BlockType(Enum):
 	LIST_IS_EXIST = "list_is_exist"
 	SHOW_HIDE_LIST = "show_hide_list"
 	TEMPORARY_LIST = "temporary_list"
-
 	# 画笔类
 	SELF_PEN_DOWN = "self_pen_down"
 	SELF_PEN_UP = "self_pen_up"
@@ -450,8 +468,7 @@ class BlockType(Enum):
 	SELF_SET_PEN_COLOR = "self_set_pen_color"
 	IMAGE_STAMP = "image_stamp"
 	STAMP = "stamp"
-
-	# 函数/过程类
+	# 函数/过程类 - 根据文档更新
 	PROCEDURES_DEFNORETURN = "procedures_2_defnoreturn"
 	PROCEDURES_RETURN_VALUE = "procedures_2_return_value"
 	PROCEDURES_CALLRETURN = "procedures_2_callreturn"
@@ -459,18 +476,16 @@ class BlockType(Enum):
 	PROCEDURES_STABLE_PARAMETER = "procedures_2_stable_parameter"
 	PROCEDURES_PARAMETER = "procedures_2_parameter"
 	PROCEDURES_ACTOR_PARAM = "procedures_2_actor_param"
-
+	PROCEDURES_PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增:参数影子积木
 	# 动画类
 	SELF_STRESS_ANIMATION = "self_stress_animation"
 	SELF_APPEAR_ANIMATION = "self_appear_animation"
 	GLOBAL_ANIMATION = "global_animation"
-
 	# 数值类
 	MATH_NUMBER = "math_number"
 	TEXT = "text"
 	COLOR_SIZE_SLIDER = "color_size_slider"
 	COLOR_PICKER = "color_picker"
-
 	# 摄像头类
 	OPEN_CLOSE_CAMERA = "open_hide_camera"
 	SET_CAMERA_ALPHA = "set_camera_alpha"
@@ -480,36 +495,30 @@ class BlockType(Enum):
 	FACE_TO_BODY_PART = "face_to_body_part"
 	GET_POSITION_OF_BODY_PART = "get_position_of_body_part"
 	RECOGNIZE_GESTURE = "recognize_gesture"
-
 	# 认知AI类
 	ENABLE_FACE_DETECT_BY_ACTOR = "enable_face_detect_by_actor"
 	ENABLE_OBJECT_DETECT_BY_ACTOR = "enable_object_detect_by_actor"
 	GET_FACE_DETECTION_RESULT = "get_face_detection_result"
 	CHECK_EMOTION = "check_emotion"
 	CHECK_GENDER = "check_gender"
-
 	# AI对话类
 	AI_CHAT_ASK = "ai_chat_ask"
 	AI_CHAT_ANSWER = "ai_chat_answer"
 	SET_SYSTEM_PRESET = "set_system_preset"
 	NEW_CONVERSATION = "new_conversation"
-
 	# 分类AI类
 	EVALUATE_ACTOR_STYLE = "evaluate_actor_style"
 	EVALUATE_PHOTO = "evaluate_photo"
 	EVALUATE_CAMERA = "evaluate_camera"
 	GET_EVALUATE_CLASS_NAME = "get_evaluate_class_name"
-
 	# 在线/排名类
 	SHOW_HIDE_RANKING = "show_hide_ranking"
 	UPDATE_RANKING = "update_ranking"
 	USER_RANKING_INFO = "user_ranking_info"
 	USERNAME_GET = "username_get"
 	USER_ID_GET = "user_id_get"
-
 	# 判题类
 	SEND_JUDGE_RESULT = "send_judge_result"
-
 	# 其他
 	ON_BUMP_ACTOR_PARAM = "on_bump_actor_param"
 	SELF_LISTEN_PARAM = "self_listen_param"
@@ -520,32 +529,6 @@ class BlockType(Enum):
 	MATH_COMPARE_LESS = "math_compare_less"
 	MATH_ARITHMETIC_POWER = "math_arithmetic_power"
 	SHADOW_TEXT = "shadow_text"
-
-
-class BlockCategory(Enum):
-	"""块分类枚举"""
-
-	EVENT = "event"
-	CONTROL = "control"
-	MOTION = "motion"
-	APPEARANCE = "appearance"
-	INTERACTION = "interaction"
-	AUDIO = "audio"
-	SENSING = "sensing"
-	OPERATOR = "operator"
-	VARIABLE = "variable"
-	LIST = "list"
-	PROCEDURE = "procedure"
-	PEN = "pen"
-	ANIMATION = "animation"
-	CAMERA = "camera"
-	COGNITIVE = "cognitive"
-	AI_CHAT = "ai_chat"
-	AI_CLASSIFY = "ai_classify"
-	ONLINE = "online"
-	JUDGE = "judge"
-	MATH = "math"
-	TEXT = "text"
 
 
 # 块配置映射 - 更详细的配置
@@ -609,7 +592,7 @@ BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 	},
 	# 外观类配置
 	BlockType.SELF_DIALOG: {
-		"category": BlockCategory.APPEARANCE,
+		"category": BlockCategory.INTERACTION,
 		"fields": [],
 		"inputs": ["TEXT"],
 		"output": False,
@@ -626,6 +609,9 @@ BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 		"color": "#40BF4A",
 		"can_have_previous": False,
 		"can_have_next": False,
+		"field_constraints": {
+			"NUM": "*,*,*,true",  # 允许文本输入
+		},
 	},
 	# 文本类配置
 	BlockType.TEXT: {
@@ -647,9 +633,91 @@ BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 		"can_have_previous": False,
 		"can_have_next": False,
 	},
+	# 过程类配置 - 根据文档更新
+	BlockType.PROCEDURES_DEFNORETURN: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["NAME"],
+		"inputs": ["PROCEDURES_2_DEFNORETURN_DEFINE", "STACK"],
+		"output": False,
+		"color": "#FF6680",  # ORANGE_4
+		"can_have_previous": True,
+		"can_have_next": True,
+		"style": "ORANGE_4",
+		"extensions": ["procedures_defnoreturn"],
+	},
+	BlockType.PROCEDURES_RETURN_VALUE: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": [],
+		"inputs": ["PROCEDURES_2_DEFRETURN_RETURN", "VALUE"],
+		"output": True,
+		"color": "#FF6680",  # ORANGE_4
+		"can_have_previous": False,
+		"can_have_next": False,
+		"style": "ORANGE_4",
+	},
+	BlockType.PROCEDURES_CALLNORETURN: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["NAME"],
+		"inputs": ["NAME"],  # 动态生成ARG输入项
+		"output": False,
+		"color": "#FF6680",  # ORANGE_4
+		"can_have_previous": True,
+		"can_have_next": True,
+	},
+	BlockType.PROCEDURES_CALLRETURN: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["NAME"],
+		"inputs": ["NAME"],  # 动态生成ARG输入项
+		"output": True,
+		"color": "#FF6680",  # ORANGE_4
+		"can_have_previous": False,
+		"can_have_next": False,
+		"output_types": ["Number", "String", "Boolean", "Array"],
+	},
+	BlockType.PROCEDURES_STABLE_PARAMETER: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["param_name", "param_default_value"],
+		"inputs": [],
+		"output": True,
+		"color": "#FF6680",
+		"can_have_previous": False,
+		"can_have_next": False,
+		"output_types": ["Number", "String", "Boolean"],
+		"extensions": ["param_on_block"],
+	},
+	BlockType.PROCEDURES_PARAMETER: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["param_name"],
+		"inputs": [],
+		"output": True,
+		"color": "#FF6680",
+		"can_have_previous": False,
+		"can_have_next": False,
+		"output_types": ["Number", "String", "Boolean"],
+	},
+	BlockType.PROCEDURES_PARAMETER_SHADOW: {
+		"category": BlockCategory.PROCEDURE,
+		"fields": ["name", "value"],
+		"inputs": [],
+		"output": True,
+		"color": "#FF6680",
+		"can_have_previous": False,
+		"can_have_next": False,
+		"is_shadow": True,
+		"deletable": False,
+	},
+	# 逻辑布尔类
+	BlockType.LOGIC_BOOLEAN: {
+		"category": BlockCategory.OPERATOR,
+		"fields": ["VALUE"],
+		"inputs": [],
+		"output": True,
+		"color": "#40BF4A",
+		"can_have_previous": False,
+		"can_have_next": False,
+		"options": {"VALUE": {"menu_generator_advanced": [["true", "true"], ["false", "false"]]}},
+	},
 }
-
-
 # 颜色配置
 COLOR_CONFIG: dict[BlockCategory, str] = {
 	BlockCategory.EVENT: "#FFAB19",
@@ -674,8 +742,6 @@ COLOR_CONFIG: dict[BlockCategory, str] = {
 	BlockCategory.MATH: "#40BF4A",
 	BlockCategory.TEXT: "#CF63CF",
 }
-
-
 # 字段类型到值的映射
 FIELD_TYPE_MAPPING: dict[FieldType, dict[str, Any]] = {
 	FieldType.TEXT: {
@@ -695,8 +761,6 @@ FIELD_TYPE_MAPPING: dict[FieldType, dict[str, Any]] = {
 		"validator": lambda x: isinstance(x, str) and (x.startswith(("#", "rgb"))),
 	},
 }
-
-
 # 块连接约束
 CONNECTION_CONSTRAINTS: dict = {
 	"output": ["input_value"],
@@ -704,8 +768,6 @@ CONNECTION_CONSTRAINTS: dict = {
 	"next_statement": ["previous_statement"],
 	"input_value": ["output"],
 }
-
-
 # 默认项目配置
 DEFAULT_PROJECT_CONFIG: dict = {
 	"version": "0.20.0",
@@ -715,8 +777,6 @@ DEFAULT_PROJECT_CONFIG: dict = {
 	"workspace_scroll_xy": {"x": 0.0, "y": 0.0},
 	"background_color": "#FFFFFF",
 }
-
-
 # ==============================
 # 数据结构定义
 # ==============================

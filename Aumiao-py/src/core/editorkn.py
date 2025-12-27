@@ -35,7 +35,14 @@ class TypeChecker:
 			if match:
 				try:
 					r, g, b, a = match.groups()
-					return all([0 <= int(r) <= 255, 0 <= int(g) <= 255, 0 <= int(b) <= 255, 0 <= float(a) <= 1])
+					return all(
+						[
+							0 <= int(r) <= 255,
+							0 <= int(g) <= 255,
+							0 <= int(b) <= 255,
+							0 <= float(a) <= 1,
+						],
+					)
 				except (ValueError, TypeError):
 					return False
 		if color_str.startswith("rgb("):
@@ -79,6 +86,16 @@ class TypeChecker:
 		try:
 			uuid.UUID(value)
 		except (ValueError, TypeError, AttributeError):
+			return False
+		else:
+			return True
+
+	@staticmethod
+	def is_valid_xml_string(xml_str: str) -> bool:
+		"""检查是否为有效XML字符串"""
+		try:
+			ET.fromstring(xml_str)
+		except ET.ParseError:
 			return False
 		else:
 			return True
@@ -151,14 +168,267 @@ class JSONConverter:
 		return default or str(uuid.uuid4())
 
 
+class ConstraintManager:
+	"""约束管理器"""
+
+	@staticmethod
+	def parse_constraints(constraint_str: str) -> dict[str, Any]:
+		"""解析约束字符串"""
+		if not constraint_str:
+			return {}
+		parts = constraint_str.split(",")
+		result = {}
+		if len(parts) > 0 and parts[0]:
+			result["min"] = float(parts[0])
+		if len(parts) > 1 and parts[1]:
+			result["max"] = float(parts[1])
+		if len(parts) > 2 and parts[2]:
+			result["step"] = float(parts[2])
+		if len(parts) > 3 and parts[3]:
+			result["allow_text"] = parts[3].lower() in {"true", "1", "yes"}
+		return result
+
+	@staticmethod
+	def validate_numeric_constraint(value: Any, constraint: dict) -> tuple[bool, str]:
+		"""验证数值约束"""
+		if "min" in constraint:
+			try:
+				num_value = float(value)
+				if num_value < constraint["min"]:
+					return False, f"值不能小于{constraint['min']}"
+			except (ValueError, TypeError):
+				if not constraint.get("allow_text"):
+					return False, "请输入数字"
+		if "max" in constraint:
+			try:
+				num_value = float(value)
+				if num_value > constraint["max"]:
+					return False, f"值不能大于{constraint['max']}"
+			except (ValueError, TypeError):
+				if not constraint.get("allow_text"):
+					return False, "请输入数字"
+		if "step" in constraint:
+			try:
+				num_value = float(value)
+				if constraint["step"] > 0:
+					remainder = (num_value - (constraint.get("min", 0))) % constraint["step"]
+					if remainder > 0.0001:  # 浮点数精度容差
+						return False, f"值必须是{constraint['step']}的倍数"
+			except (ValueError, TypeError):
+				if not constraint.get("allow_text"):
+					return False, "请输入数字"
+		return True, ""
+
+	@staticmethod
+	def validate_type_constraint(value_type: str, allowed_types: list[str]) -> bool:
+		"""验证类型约束"""
+		return value_type in allowed_types
+
+	@staticmethod
+	def validate_enum_constraint(value: Any, options: list[list[str]]) -> bool:
+		"""验证枚举约束"""
+		valid_values = [item[1] for item in options]
+		return str(value) in valid_values
+
+
+class XMLParser:
+	"""XML解析器 - 根据文档实现完整的XML解析逻辑"""
+
+	@staticmethod
+	def parse_xml(xml_string: str) -> dict[str, Any]:
+		"""解析XML字符串为积木对象"""
+		try:
+			root = ET.fromstring(xml_string)
+		except ET.ParseError as e:
+			msg = f"XML解析错误: {e}"
+			raise ValueError(msg)  # noqa: B904
+		return XMLParser._parse_element(root)
+
+	@staticmethod
+	def _parse_element(element: ET.Element) -> dict[str, Any]:  # noqa: PLR0915
+		"""解析XML元素"""
+		# 解析属性
+		result: dict[str, Any] = dict(element.attrib.items())
+		# 设置积木类型
+		if element.tag in {"block", "shadow"}:
+			result["type"] = element.get("type", "")
+			result["is_shadow"] = element.tag == "shadow"
+			result["id"] = element.get("id", str(uuid.uuid4()))
+		# 解析字段
+		fields = {}
+		field_constraints = {}
+		for field_elem in element.findall("field"):
+			name = field_elem.get("name")
+			if name:
+				fields[name] = field_elem.text or ""
+				# 解析字段约束
+				constraints = field_elem.get("constraints")
+				if constraints:
+					field_constraints[name] = constraints
+		if fields:
+			result["fields"] = fields
+		if field_constraints:
+			result["field_constraints"] = field_constraints
+		# 解析变异配置
+		mutation_elem = element.find("mutation")
+		if mutation_elem is not None:
+			result["mutation"] = ET.tostring(mutation_elem, encoding="unicode")
+			# 特殊处理PROCEDURE积木
+			if result.get("type", "").startswith("procedures"):
+				XMLParser._parse_procedure_mutation(mutation_elem, result)
+		# 解析输入项和语句
+		inputs = {}
+		statements = {}
+		shadows = {}
+		for child in element:
+			if child.tag in {"value", "statement"}:
+				name = child.get("name")
+				if not name:
+					continue
+				# 检查是否有影子积木
+				shadow_elem = child.find("shadow")
+				if shadow_elem is not None:
+					shadow_xml = ET.tostring(shadow_elem, encoding="unicode")
+					shadows[name] = shadow_xml
+				# 检查是否有普通积木
+				block_elem = child.find("block")
+				if block_elem is not None:
+					block_data = XMLParser._parse_element(block_elem)
+					if child.tag == "value":
+						inputs[name] = block_data
+					else:
+						statements[name] = block_data
+				# 如果是语句但没有内容,添加空语句
+				if child.tag == "statement" and name not in statements:
+					statements[name] = {"type": "input_statement"}
+		if inputs:
+			result["inputs"] = inputs
+		if statements:
+			result["statements"] = statements
+		if shadows:
+			result["shadows"] = shadows
+		# 解析next
+		next_elem = element.find("next")
+		if next_elem is not None:
+			block_elem = next_elem.find("block")
+			if block_elem is not None:
+				result["next"] = XMLParser._parse_element(block_elem)
+		return result
+
+	@staticmethod
+	def _parse_procedure_mutation(mutation_elem: ET.Element, result: dict[str, Any]) -> None:
+		"""解析PROCEDURE积木的mutation"""
+		# 解析参数
+		args = []
+		for arg_elem in mutation_elem.findall("arg"):
+			arg_info = {"id": arg_elem.get("id", ""), "name": arg_elem.get("name", ""), "type": arg_elem.get("type", "String")}
+			args.append(arg_info)
+		# 解析参数影子积木
+		param_shadows = []
+		for shadow_elem in mutation_elem.findall("procedures_2_parameter_shadow"):
+			shadow_info = {"name": shadow_elem.get("name", ""), "value": shadow_elem.get("value", "")}
+			param_shadows.append(shadow_info)
+		result["args"] = args
+		result["param_shadows"] = param_shadows
+		# 如果是函数调用,保存关联信息
+		if "def_id" in mutation_elem.attrib:
+			result["def_id"] = mutation_elem.get("def_id")
+		if "name" in mutation_elem.attrib:
+			result["procedure_name"] = mutation_elem.get("name")
+
+	@staticmethod
+	def to_xml(block_data: dict[str, Any]) -> str:
+		"""将积木数据转换为XML字符串"""
+		root_tag = "shadow" if block_data.get("is_shadow") else "block"
+		root = ET.Element(root_tag)
+		# 添加属性
+		if "type" in block_data:
+			root.set("type", block_data["type"])
+		if "id" in block_data:
+			root.set("id", block_data["id"])
+		# 添加字段
+		for field_name, field_value in block_data.get("fields", {}).items():
+			field_elem = ET.SubElement(root, "field")
+			field_elem.set("name", field_name)
+			field_elem.text = str(field_value)
+			# 添加字段约束
+			constraints = block_data.get("field_constraints", {}).get(field_name)
+			if constraints:
+				field_elem.set("constraints", constraints)
+		# 添加mutation
+		mutation = block_data.get("mutation")
+		if mutation and TypeChecker.is_valid_xml_string(mutation):
+			try:
+				mutation_elem = ET.fromstring(mutation)
+				root.append(mutation_elem)
+			except ET.ParseError:
+				pass
+		# 添加输入项
+		for input_name, input_data in block_data.get("inputs", {}).items():
+			if isinstance(input_data, dict):
+				value_elem = ET.SubElement(root, "value")
+				value_elem.set("name", input_name)
+				# 递归添加子积木
+				block_elem = XMLParser._dict_to_element(input_data)
+				value_elem.append(block_elem)
+		# 添加语句
+		for stmt_name, stmt_data in block_data.get("statements", {}).items():
+			if isinstance(stmt_data, dict):
+				stmt_elem = ET.SubElement(root, "statement")
+				stmt_elem.set("name", stmt_name)
+				# 递归添加子积木
+				block_elem = XMLParser._dict_to_element(stmt_data)
+				stmt_elem.append(block_elem)
+		# 添加影子积木
+		for shadow_name, shadow_xml in block_data.get("shadows", {}).items():
+			if shadow_xml and TypeChecker.is_valid_xml_string(shadow_xml):
+				try:
+					shadow_elem = ET.fromstring(shadow_xml)
+					shadow_elem.set("name", shadow_name)
+					# 找到对应的value或statement元素
+					for elem in root.findall(f".//*[@name='{shadow_name}']"):
+						elem.append(shadow_elem)
+				except ET.ParseError:
+					pass
+		# 添加next
+		next_data = block_data.get("next")
+		if next_data and isinstance(next_data, dict):
+			next_elem = ET.SubElement(root, "next")
+			block_elem = XMLParser._dict_to_element(next_data)
+			next_elem.append(block_elem)
+		return ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+	@staticmethod
+	def _dict_to_element(data: dict[str, Any]) -> ET.Element:
+		"""将字典转换为XML元素"""
+		element = ET.Element("block")
+		if "type" in data:
+			element.set("type", data["type"])
+		if "id" in data:
+			element.set("id", data["id"])
+		# 递归处理子元素
+		for key, value in data.items():
+			if key == "fields":
+				for field_name, field_value in value.items():
+					field_elem = ET.SubElement(element, "field")
+					field_elem.set("name", field_name)
+					field_elem.text = str(field_value)
+			elif key in {"inputs", "statements"}:
+				tag = "value" if key == "inputs" else "statement"
+				for input_name, input_data in value.items():
+					if isinstance(input_data, dict):
+						input_elem = ET.SubElement(element, tag)
+						input_elem.set("name", input_name)
+						child_elem = XMLParser._dict_to_element(input_data)
+						input_elem.append(child_elem)
+		return element
+
+
 # ============================================================================
 # Repository模式实现 - 增强版
 # ============================================================================
 class BlockRepository:
-	"""
-	增强版积木仓库
-	支持高效的按类型、父级、位置、分类查找,减少重复遍历
-	"""
+	"""增强版积木仓库"""
 
 	def __init__(self) -> None:
 		self._blocks_by_id: dict[str, Block] = {}
@@ -166,7 +436,7 @@ class BlockRepository:
 		self._blocks_by_parent: dict[str, list[Block]] = defaultdict(list)
 		self._blocks_by_category: dict[BlockCategory, list[Block]] = defaultdict(list)
 		self._blocks_by_location_index: dict[tuple[int, int], list[Block]] = defaultdict(list)
-		self._location_grid_size: int = 50  # 位置网格大小
+		self._location_grid_size: int = 50
 
 	def _get_grid_key(self, x: float, y: float) -> tuple[int, int]:
 		"""获取位置网格键"""
@@ -199,33 +469,17 @@ class BlockRepository:
 		block = self._blocks_by_id[block_id]
 		# 从所有索引中移除
 		if block.type in self._blocks_by_type:
-			type_list = self._blocks_by_type[block.type]
-			for i, b in enumerate(type_list):
-				if b.id == block_id:
-					type_list.pop(i)
-					break
+			self._blocks_by_type[block.type] = [b for b in self._blocks_by_type[block.type] if b.id != block_id]
 		if block.parent_id and block.parent_id in self._blocks_by_parent:
-			parent_list = self._blocks_by_parent[block.parent_id]
-			for i, b in enumerate(parent_list):
-				if b.id == block_id:
-					parent_list.pop(i)
-					break
+			self._blocks_by_parent[block.parent_id] = [b for b in self._blocks_by_parent[block.parent_id] if b.id != block_id]
 		config = BLOCK_CONFIG.get(BlockType(block.type), {})
 		category = config.get("category")
 		if category and category in self._blocks_by_category:
-			category_list = self._blocks_by_category[category]
-			for i, b in enumerate(category_list):
-				if b.id == block_id:
-					category_list.pop(i)
-					break
+			self._blocks_by_category[category] = [b for b in self._blocks_by_category[category] if b.id != block_id]
 		if block.location and len(block.location) >= 2:
 			grid_key = self._get_grid_key(block.location[0], block.location[1])
 			if grid_key in self._blocks_by_location_index:
-				location_list = self._blocks_by_location_index[grid_key]
-				for i, b in enumerate(location_list):
-					if b.id == block_id:
-						location_list.pop(i)
-						break
+				self._blocks_by_location_index[grid_key] = [b for b in self._blocks_by_location_index[grid_key] if b.id != block_id]
 		del self._blocks_by_id[block_id]
 		return True
 
@@ -246,9 +500,8 @@ class BlockRepository:
 		return self._blocks_by_category.get(category, []).copy()
 
 	def find_by_location(self, x: float, y: float, radius: float = 10.0) -> list[Block]:
-		"""根据位置查找附近的积木(使用空间索引优化)"""
+		"""根据位置查找附近的积木"""
 		result = []
-		# 计算搜索的网格范围
 		min_grid_x = int((x - radius) // self._location_grid_size)
 		max_grid_x = int((x + radius) // self._location_grid_size)
 		min_grid_y = int((y - radius) // self._location_grid_size)
@@ -270,7 +523,7 @@ class BlockRepository:
 		return [block for block in self._blocks_by_id.values() if criteria_func(block)]
 
 	def find_connected_blocks(self, start_block_id: str) -> list[Block]:
-		"""查找与指定积木相连的所有积木(BFS搜索)"""
+		"""查找与指定积木相连的所有积木"""
 		result = []
 		visited = set()
 		queue = deque([start_block_id])
@@ -326,10 +579,7 @@ class BlockRepository:
 # Builder模式实现 - 增强版
 # ============================================================================
 class BlockBuilder:
-	"""
-	增强版积木构建器
-	提供完整的链式API,支持复杂积木创建
-	"""
+	"""增强版积木构建器"""
 
 	def __init__(self, block_type: str) -> None:
 		self._block = Block(type=block_type)
@@ -378,12 +628,30 @@ class BlockBuilder:
 		self._block.inputs[name] = block.to_dict()
 		return self
 
-	def with_shadow(self, name: str, _shadow_type: str, shadow_value: Any = None, **kwargs: Any) -> BlockBuilder:
+	def with_shadow(self, name: str, shadow_type: str, shadow_value: Any = None, **kwargs: Any) -> BlockBuilder:
 		"""添加影子积木"""
 		if shadow_value is None and "xml_string" in kwargs:
 			shadow_xml = kwargs["xml_string"]
 		elif shadow_value is not None:
-			shadow_xml = shadow_value.xml_string if isinstance(shadow_value, ShadowXML) else str(shadow_value)
+			if isinstance(shadow_value, ShadowXML):
+				shadow_xml = shadow_value.xml_string
+			else:
+				# 创建简单的影子积木XML
+				shadow_root = ET.Element("shadow")
+				shadow_root.set("type", shadow_type)
+				if shadow_type == "math_number":
+					field_elem = ET.SubElement(shadow_root, "field")
+					field_elem.set("name", "NUM")
+					field_elem.set("allow_text", "true")
+					field_elem.text = str(shadow_value)
+				elif shadow_type == "text":
+					field_elem = ET.SubElement(shadow_root, "field")
+					field_elem.set("name", "TEXT")
+					field_elem.text = str(shadow_value)
+				elif shadow_type == "procedures_2_parameter_shadow":
+					shadow_root.set("name", kwargs.get("name", ""))
+					shadow_root.set("value", str(shadow_value))
+				shadow_xml = ET.tostring(shadow_root, encoding="unicode")
 		else:
 			shadow_xml = ""
 		self._block.shadows[name] = shadow_xml
@@ -423,10 +691,10 @@ class BlockBuilder:
 		"""设置属性"""
 		if property_name == "shield":
 			self._block.shield = bool(value)
+		if property_name == "is_shadow":
+			self._block.is_shadow = bool(value)
 		elif property_name == "is_output":
 			self._block.is_output = bool(value)
-		elif property_name == "is_shadow":
-			self._block.is_shadow = bool(value)
 		elif property_name == "collapsed":
 			self._block.collapsed = bool(value)
 		elif property_name == "disabled":
@@ -439,14 +707,19 @@ class BlockBuilder:
 			self._block.editable = bool(value)
 		elif property_name == "visible":
 			self._block.visible = str(value)
+		elif property_name == "comment":
+			self._block.comment = str(value) if value is not None else None
 		return self
 
 	def build(self) -> Block:
 		"""构建积木"""
 		# 应用默认配置
 		config = self._config
-		if config and "color" in config and "color" not in self._block.field_extra_attr:
-			self._block.field_extra_attr["color"] = config["color"]
+		if config:
+			if "color" in config and "color" not in self._block.field_extra_attr:
+				self._block.field_extra_attr["color"] = config["color"]
+			if "style" in config and "style" not in self._block.field_extra_attr:
+				self._block.field_extra_attr["style"] = config["style"]
 		return self._block
 
 	# 工厂方法 - 常用积木
@@ -572,6 +845,40 @@ class BlockBuilder:
 		"""从现有积木创建Builder"""
 		builder = cls(block.type)
 		builder._block = block
+		return builder
+
+	@classmethod
+	def create_procedure_definition(cls, name: str, params: list[dict[str, str]]) -> BlockBuilder:
+		"""创建函数定义积木"""
+		builder = cls(BlockType.PROCEDURES_DEFNORETURN.value)
+		builder.with_field("NAME", name)
+		# 创建mutation XML
+		mutation_root = ET.Element("mutation")
+		mutation_root.set("xmlns", "http://www.w3.org/1999/xhtml")
+		for i, param in enumerate(params):
+			arg_elem = ET.SubElement(mutation_root, "arg")
+			arg_elem.set("id", f"param{i}")
+			arg_elem.set("name", param.get("name", f"参数{i + 1}"))
+			arg_elem.set("type", param.get("type", "Number"))
+		mutation_xml = ET.tostring(mutation_root, encoding="unicode")
+		builder.with_mutation(mutation_xml)
+		return builder
+
+	@classmethod
+	def create_procedure_call(cls, name: str, def_id: str, params: list[dict[str, Any]]) -> BlockBuilder:
+		"""创建函数调用积木"""
+		builder = cls(BlockType.PROCEDURES_CALLNORETURN.value)
+		builder.with_field("NAME", name)
+		# 创建mutation XML
+		mutation_root = ET.Element("mutation")
+		mutation_root.set("name", name)
+		mutation_root.set("def_id", def_id)
+		for param in params:
+			shadow_elem = ET.SubElement(mutation_root, "procedures_2_parameter_shadow")
+			shadow_elem.set("name", param.get("name", ""))
+			shadow_elem.set("value", str(param.get("value", "0")))
+		mutation_xml = ET.tostring(mutation_root, encoding="unicode")
+		builder.with_mutation(mutation_xml)
 		return builder
 
 
@@ -789,6 +1096,8 @@ class ShadowXML:
 	visible: bool = True
 	inline: bool = False
 	fields: dict[str, str] = field(default_factory=dict)
+	is_shadow: bool = True
+	deletable: bool = False
 
 	@classmethod
 	def from_xml(cls, xml_str: str) -> ShadowXML:
@@ -803,6 +1112,10 @@ class ShadowXML:
 				name = field_elem.get("name")
 				if name:
 					fields[name] = field_elem.text or ""
+			# 检查是否为影子积木
+			is_shadow = root.tag == "shadow"
+			# 检查是否可删除
+			deletable = root.get("deletable", "false") == "true"
 			return cls(
 				xml_string=xml_str,
 				type=root.get("type", ""),
@@ -810,6 +1123,8 @@ class ShadowXML:
 				visible=root.get("visible", "visible") == "visible",
 				inline=root.get("inline", "false") == "true",
 				fields=fields,
+				is_shadow=is_shadow,
+				deletable=deletable,
 			)
 		except ET.ParseError:
 			return cls(xml_string=xml_str)
@@ -823,6 +1138,8 @@ class ShadowXML:
 			"visible": self.visible,
 			"inline": self.inline,
 			"fields": self.fields.copy(),
+			"is_shadow": self.is_shadow,
+			"deletable": self.deletable,
 		}
 
 
@@ -908,160 +1225,56 @@ class ShadowManager:
 class Block:
 	"""KN积木结构 - 匹配实际JSON数据结构"""
 
-	# KN实际JSON字段
+	# 基础标识属性
 	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	type: str = ""
-	location: list[float] | None = None
-	shield: bool = False
-	parent_id: str | None = None
-	mutation: str = ""
-	is_output: bool = False
 	is_shadow: bool = False
-	fields: dict[str, Any] = field(default_factory=dict)
-	field_constraints: dict[str, Any] = field(default_factory=dict)
-	field_extra_attr: dict[str, Any] = field(default_factory=dict)
-	# 特殊字段 - 实际KN结构
-	shadows: dict[str, str] = field(default_factory=dict)  # XML字符串
-	inputs: dict[str, dict] = field(default_factory=dict)  # 嵌套字典
-	statements: dict[str, dict] = field(default_factory=dict)  # 嵌套字典
-	next: dict | None = None  # 嵌套字典,非Block对象引用
-	# 内部操作字段(保留,但不输出到JSON)
+	# 显示与控制属性
+	comment: str | None = None
 	collapsed: bool = False
 	disabled: bool = False
 	deletable: bool = True
 	movable: bool = True
 	editable: bool = True
-	visible: str = "visible"  # 保持为字符串类型以兼容原有代码
-	comment: str | None = None
-	# 影子积木管理器(保留,用于内部操作)
+	visible: str = "visible"
+	# 布局属性
+	location: list[float] | None = None
+	parent_id: str | None = None
+	# 功能属性
+	is_output: bool = False
+	mutation: str = ""
+	shadows: dict[str, str] = field(default_factory=dict)  # XML字符串
+	fields: dict[str, Any] = field(default_factory=dict)
+	field_constraints: dict[str, Any] = field(default_factory=dict)
+	field_extra_attr: dict[str, Any] = field(default_factory=dict)
+	# 连接关系
+	inputs: dict[str, dict] = field(default_factory=dict)
+	next: dict | None = None
+	# 内部字段(不输出到JSON)
+	statements: dict[str, dict] = field(default_factory=dict)
+	shield: bool = False
 	shadow_manager: ShadowManager | None = field(default_factory=lambda: None)
 	_parsed_shadows: dict[str, ShadowXML] = field(default_factory=dict)
+	# PROCEDURE特定字段
+	def_id: str | None = None
+	procedure_name: str | None = None
+	args: list[dict[str, Any]] = field(default_factory=list)
+	param_shadows: list[dict[str, Any]] = field(default_factory=list)
 
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
 			self.id = str(uuid.uuid4())
-		if not self.fields:
-			self.fields = {}
-		if not self.shadows:
-			self.shadows = {}
-		if not self.inputs:
-			self.inputs = {}
-		if not self.statements:
-			self.statements = {}
-		if not self.field_constraints:
-			self.field_constraints = {}
-		if not self.field_extra_attr:
-			self.field_extra_attr = {}
-
-	def to_dict(self) -> dict[str, Any]:
-		"""转换为字典 - 匹配KN输出格式"""
-		result: dict[str, Any] = {
-			"id": self.id,
-			"type": self.type,
-			"shield": self.shield,
-			"fields": self.fields.copy(),
-			"shadows": self.shadows.copy(),
-			"mutation": self.mutation,
-			"is_output": self.is_output,
-			"is_shadow": self.is_shadow,
-			"field_constraints": self.field_constraints.copy(),
-			"field_extra_attr": self.field_extra_attr.copy(),
-		}
-		if self.location is not None:
-			result["location"] = self.location.copy()
-		if self.parent_id is not None:
-			result["parent_id"] = self.parent_id
-		if self.inputs:
-			result["inputs"] = self.inputs.copy()
-		if self.statements:
-			result["statements"] = self.statements.copy()
-		if self.next is not None:
-			result["next"] = self.next
-		return result
-
-	@classmethod
-	def from_dict(cls, data: dict[str, Any]) -> Block:
-		"""从字典创建块 - 匹配KN实际JSON结构"""
-		block_type = JSONConverter.ensure_str(data.get("type"))
-		fields = JSONConverter.ensure_dict(data.get("fields"))
-		if block_type in {"procedures_2_callnoreturn", "procedures_2_callreturn"}:
-			return cls._create_procedure_call_block(data, block_type)
-		block = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
-			type=block_type,
-			location=JSONConverter.ensure_list(data.get("location")),
-			shield=JSONConverter.ensure_bool(data.get("shield", False)),
-			parent_id=data.get("parent_id"),
-			mutation=JSONConverter.ensure_str(data.get("mutation", "")),
-			is_output=JSONConverter.ensure_bool(data.get("is_output", False)),
-			is_shadow=JSONConverter.ensure_bool(data.get("is_shadow", False)),
-			fields=fields,
-			field_constraints=JSONConverter.ensure_dict(data.get("field_constraints", {})),
-			field_extra_attr=JSONConverter.ensure_dict(data.get("field_extra_attr", {})),
-			shadows=JSONConverter.ensure_dict(data.get("shadows", {})),
-		)
-		inputs_data = data.get("inputs", {})
-		if isinstance(inputs_data, dict):
-			block.inputs.update(inputs_data)
-		statements_data = data.get("statements", {})
-		if isinstance(statements_data, dict):
-			block.statements.update(statements_data)
-		next_data = data.get("next")
-		if isinstance(next_data, dict):
-			block.next = next_data
-		return block
-
-	@classmethod
-	def _create_procedure_call_block(cls, data: dict[str, Any], block_type: str) -> Block:
-		"""创建过程调用块"""
-		block_id = JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4()))
-		fields = JSONConverter.ensure_dict(data.get("fields", {}))
-		mutation = JSONConverter.ensure_str(data.get("mutation", ""))
-		procedure_id = fields.get("NAME", "")
-		params_info = cls._parse_procedure_mutation(mutation)
-		block = cls(
-			id=block_id,
-			type=block_type,
-			fields=fields,
-			mutation=mutation,
-			parent_id=data.get("parent_id"),
-			location=JSONConverter.ensure_list(data.get("location")),
-			shield=JSONConverter.ensure_bool(data.get("shield", False)),
-		)
-		block.fields["procedure_id"] = procedure_id
-		block.fields["params_info"] = params_info
-		if "inputs" in data:
-			inputs_dict = JSONConverter.ensure_dict(data.get("inputs"))
-			block.inputs.update(inputs_dict)
-		if data.get("next"):
-			block.next = data["next"]
-		return block
-
-	@classmethod
-	def _parse_procedure_mutation(cls, mutation_xml: str) -> dict[str, Any]:
-		"""解析过程调用的mutation XML"""
-		if not mutation_xml:
-			return {}
-		try:
-			root = ET.fromstring(mutation_xml)
-			result: dict[str, Any] = {
-				"def_id": root.get("def_id", ""),
-				"name": root.get("name", ""),
-				"type": root.get("type", "NORMAL"),
-				"args": [],
-			}
-			for arg_elem in root.findall("arg"):
-				arg_info = {
-					"id": arg_elem.get("id", ""),
-					"content": arg_elem.get("content", ""),
-					"type": arg_elem.get("type", ""),
-				}
-				result["args"].append(arg_info)
-		except ET.ParseError:
-			return {}
-		else:
-			return result
+		# 根据类型设置默认属性
+		config = BLOCK_CONFIG.get(BlockType(self.type), {})
+		if config:
+			if "color" in config and "color" not in self.field_extra_attr:
+				self.field_extra_attr["color"] = config["color"]
+			if "style" in config and "style" not in self.field_extra_attr:
+				self.field_extra_attr["style"] = config["style"]
+		# 如果是影子积木,设置不可删除
+		if self.is_shadow:
+			self.deletable = False
 
 	def get_all_blocks(self) -> list[Block]:
 		"""获取此块及其所有子块"""
@@ -1094,6 +1307,219 @@ class Block:
 				return block
 		return None
 
+	# 修复 to_xml 方法,确保它调用 XMLParser.to_xml
+	def to_xml(self) -> str:
+		"""转换为XML字符串"""
+		return XMLParser.to_xml(self.to_dict())
+
+	# 修复 from_xml 方法,确保它调用 XMLParser.parse_xml
+	@classmethod
+	def from_xml(cls, xml_str: str) -> Block:
+		"""从XML字符串创建积木块"""
+		try:
+			block_data = XMLParser.parse_xml(xml_str)
+			return cls.from_dict(block_data)
+		except Exception as e:
+			msg = f"XML解析错误: {e}"
+			raise ValueError(msg)  # noqa: B904
+
+	# 在 to_dict 方法中添加 shield 字段
+	def to_dict(self) -> dict[str, Any]:
+		"""转换为字典 - 匹配文档中的积木结构"""
+		result: dict[str, Any] = {
+			"id": self.id,
+			"type": self.type,
+			"is_shadow": self.is_shadow,
+			"collapsed": self.collapsed,
+			"disabled": self.disabled,
+			"deletable": self.deletable,
+			"movable": self.movable,
+			"editable": self.editable,
+			"visible": self.visible,
+			"is_output": self.is_output,
+			"mutation": self.mutation,
+			"fields": self.fields.copy(),
+			"field_constraints": self.field_constraints.copy(),
+			"field_extra_attr": self.field_extra_attr.copy(),
+			"inputs": self.inputs.copy(),
+			"shield": self.shield,  # 添加 shield 字段
+		}
+		if self.comment is not None:
+			result["comment"] = self.comment
+		if self.location is not None:
+			result["location"] = self.location.copy()
+		if self.parent_id is not None:
+			result["parent_id"] = self.parent_id
+		if self.shadows:
+			result["shadows"] = self.shadows.copy()
+		if self.next is not None:
+			result["next"] = self.next
+		if self.statements:
+			result["statements"] = self.statements.copy()
+		# PROCEDURE特定字段
+		if self.def_id is not None:
+			result["def_id"] = self.def_id
+		if self.procedure_name is not None:
+			result["procedure_name"] = self.procedure_name
+		if self.args:
+			result["args"] = self.args.copy()
+		if self.param_shadows:
+			result["param_shadows"] = self.param_shadows.copy()
+		return result
+
+	# 在 from_dict 方法中添加 shield 字段处理
+	@classmethod
+	def from_dict(cls, data: dict[str, Any]) -> Block:
+		"""从字典创建块"""
+		block_type = JSONConverter.ensure_str(data.get("type"))
+		# 检查是否为PROCEDURE类积木
+		if block_type.startswith("procedures_"):
+			return cls._create_procedure_block(data, block_type)
+		# 创建普通积木
+		block = cls(
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			type=block_type,
+			is_shadow=JSONConverter.ensure_bool(data.get("is_shadow", False)),
+			comment=data.get("comment"),
+			collapsed=JSONConverter.ensure_bool(data.get("collapsed", False)),
+			disabled=JSONConverter.ensure_bool(data.get("disabled", False)),
+			deletable=JSONConverter.ensure_bool(data.get("deletable", True)),
+			movable=JSONConverter.ensure_bool(data.get("movable", True)),
+			editable=JSONConverter.ensure_bool(data.get("editable", True)),
+			visible=JSONConverter.ensure_str(data.get("visible", "visible")),
+			location=JSONConverter.ensure_list(data.get("location")),
+			parent_id=data.get("parent_id"),
+			is_output=JSONConverter.ensure_bool(data.get("is_output", False)),
+			mutation=JSONConverter.ensure_str(data.get("mutation", "")),
+			shadows=JSONConverter.ensure_dict(data.get("shadows", {})),
+			fields=JSONConverter.ensure_dict(data.get("fields", {})),
+			field_constraints=JSONConverter.ensure_dict(data.get("field_constraints", {})),
+			field_extra_attr=JSONConverter.ensure_dict(data.get("field_extra_attr", {})),
+			shield=JSONConverter.ensure_bool(data.get("shield", False)),  # 添加 shield 字段
+		)
+		# 处理输入项
+		inputs_data = data.get("inputs", {})
+		if isinstance(inputs_data, dict):
+			block.inputs.update(inputs_data)
+		# 处理语句
+		statements_data = data.get("statements", {})
+		if isinstance(statements_data, dict):
+			block.statements.update(statements_data)
+		# 处理next
+		next_data = data.get("next")
+		if isinstance(next_data, dict):
+			block.next = next_data
+		return block
+
+	@classmethod
+	def _create_procedure_block(cls, data: dict[str, Any], block_type: str) -> Block:
+		"""创建PROCEDURE类积木"""
+		block = cls.from_dict(data)  # 先创建基础积木
+		# 解析mutation中的参数信息
+		mutation = data.get("mutation", "")
+		if mutation:
+			block.parse_procedure_mutation(mutation)
+		# 设置PROCEDURE特定字段
+		if "def_id" in data:
+			block.def_id = data["def_id"]
+		if "procedure_name" in data:
+			block.procedure_name = data["procedure_name"]
+		if "args" in data:
+			block.args = JSONConverter.ensure_list(data["args"])
+		if "param_shadows" in data:
+			block.param_shadows = JSONConverter.ensure_list(data["param_shadows"])
+		# 根据积木类型设置特定属性
+		if block_type == BlockType.PROCEDURES_DEFNORETURN.value:
+			block.is_output = False
+			# 动态生成参数输入项
+			block.generate_param_inputs()
+		elif block_type == BlockType.PROCEDURES_RETURN_VALUE.value:
+			block.is_output = True
+		elif block_type == BlockType.PROCEDURES_CALLNORETURN.value:
+			block.is_output = False
+			block.generate_arg_inputs()
+		elif block_type == BlockType.PROCEDURES_CALLRETURN.value:
+			block.is_output = True
+			block.generate_arg_inputs()
+		elif block_type in {BlockType.PROCEDURES_STABLE_PARAMETER.value, BlockType.PROCEDURES_PARAMETER.value}:
+			block.is_output = True
+		elif block_type == BlockType.PROCEDURES_PARAMETER_SHADOW.value:
+			block.is_shadow = True
+			block.deletable = False
+			block.is_output = True
+		return block
+
+	def parse_procedure_mutation(self, mutation_xml: str) -> None:
+		"""解析PROCEDURE积木的mutation"""
+		if not mutation_xml:
+			return
+		try:
+			root = ET.fromstring(mutation_xml)
+			# 解析参数
+			self.args = []
+			for arg_elem in root.findall("arg"):
+				arg_info = {"id": arg_elem.get("id", ""), "name": arg_elem.get("name", ""), "type": arg_elem.get("type", "String")}
+				self.args.append(arg_info)
+			# 解析参数影子积木
+			self.param_shadows = []
+			for shadow_elem in root.findall("procedures_2_parameter_shadow"):
+				shadow_info = {"name": shadow_elem.get("name", ""), "value": shadow_elem.get("value", "")}
+				self.param_shadows.append(shadow_info)
+			# 如果是函数调用,保存关联信息
+			def_id = root.get("def_id")
+			if def_id:
+				self.def_id = def_id
+			name = root.get("name")
+			if name:
+				self.procedure_name = name
+		except ET.ParseError:
+			pass
+
+	def generate_param_inputs(self) -> None:
+		"""为函数定义生成参数输入项"""
+		if not self.args:
+			return
+		# 清空现有输入项(除了STACK)
+		new_inputs = {}
+		if "STACK" in self.inputs:
+			new_inputs["STACK"] = self.inputs["STACK"]
+		# 为每个参数生成输入项
+		for i, arg in enumerate(self.args):
+			input_name = f"PARAMS{i}"
+			new_inputs[input_name] = {"type": "input_value", "check": [arg.get("type", "String")], "name": arg.get("name", f"参数{i + 1}")}
+		self.inputs = new_inputs
+
+	def generate_arg_inputs(self) -> None:
+		"""为函数调用生成参数输入项"""
+		if not self.args:
+			return
+		# 清空现有输入项(除了NAME)
+		new_inputs = {}
+		if "NAME" in self.inputs:
+			new_inputs["NAME"] = self.inputs["NAME"]
+		# 为每个参数生成输入项
+		for i, arg in enumerate(self.args):
+			input_name = f"ARG{i}"
+			arg_type = arg.get("type", "String")
+			# 创建输入项配置
+			input_config: dict = {"type": "input_value", "check": [arg_type]}
+			# 检查是否有对应的影子积木
+			shadow_value = None
+			for shadow in self.param_shadows:
+				if shadow.get("name") == arg.get("name"):
+					shadow_value = shadow.get("value")
+					break
+			if shadow_value is not None:
+				# 创建影子积木
+				shadow_block: dict = {
+					"type": "math_number" if arg_type == "Number" else "text",
+					"is_shadow": True,
+					"fields": {"NUM" if arg_type == "Number" else "TEXT": shadow_value},
+				}
+				input_config["shadow"] = shadow_block
+			new_inputs[input_name] = input_config
+		self.inputs = new_inputs
+
 	def parse_shadows(self) -> dict[str, ShadowXML]:
 		"""解析影子积木XML"""
 		if not self._parsed_shadows:
@@ -1103,90 +1529,12 @@ class Block:
 					self._parsed_shadows[key] = ShadowXML.from_xml(xml_str)
 		return self._parsed_shadows
 
-	def to_xml(self, *, include_shadows: bool = True, include_location: bool = True) -> str:
-		"""转换为XML字符串"""
-		root = ET.Element("shadow" if self.is_shadow else "block")
-		root.set("type", self.type)
-		root.set("id", self.id)
-		if include_location and self.location is not None and len(self.location) >= 2:
-			root.set("x", str(self.location[0]))
-			root.set("y", str(self.location[1]))
-		if self.mutation:
-			try:
-				mutation_elem = ET.fromstring(self.mutation)
-				root.append(mutation_elem)
-			except ET.ParseError:
-				mutation_elem = ET.Element("mutation")
-				root.append(mutation_elem)
-		for field_name, field_value in self.fields.items():
-			if field_value is not None:
-				field_elem = ET.Element("field")
-				field_elem.set("name", field_name)
-				field_elem.text = str(field_value)
-				root.append(field_elem)
-		if include_shadows and self.shadows:
-			for shadow_name, shadow_xml in self.shadows.items():
-				if shadow_xml:
-					try:
-						shadow_elem = ET.fromstring(shadow_xml)
-						shadow_elem.set("name", shadow_name)
-						root.append(shadow_elem)
-					except ET.ParseError:
-						pass
-		return ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-	@classmethod
-	def from_xml(cls, xml_str: str) -> Block:
-		"""从XML字符串创建积木块"""
-		try:
-			root = ET.fromstring(xml_str)
-		except ET.ParseError as e:
-			error_msg = f"XML解析错误: {e}"
-			raise ValueError(error_msg) from e
-		block_type = root.get("type", "")
-		block_id = root.get("id", str(uuid.uuid4()))
-		is_shadow = root.tag in {"shadow", "empty"}
-		block = cls(
-			id=block_id,
-			type=block_type,
-			is_shadow=is_shadow,
-			editable=root.tag != "empty",
-		)
-		x = root.get("x")
-		y = root.get("y")
-		if x is not None and y is not None:
-			try:
-				block.location = [float(x), float(y)]
-			except ValueError:
-				block.location = [0.0, 0.0]
-		if root.get("disabled") == "true":
-			block.disabled = True
-		if root.get("collapsed") == "true":
-			block.collapsed = True
-		if root.get("deletable") == "false":
-			block.deletable = False
-		if root.get("movable") == "false":
-			block.movable = False
-		if root.get("editable") == "false":
-			block.editable = False
-		visible = root.get("visible")
-		if visible is not None:
-			block.visible = visible
-		mutation_elem = root.find("mutation")
-		if mutation_elem is not None:
-			block.mutation = ET.tostring(mutation_elem, encoding="unicode")
-		for field_elem in root.findall("field"):
-			field_name = field_elem.get("name")
-			if field_name is not None and field_elem.text is not None:
-				block.fields[field_name] = field_elem.text
-		return block
-
 	def add_shadow(self, shadow_block: ShadowBlock, input_name: str | None = None) -> str:
 		"""添加影子积木"""
-		shadow_block.parent_id = self.id
-		shadow_block.input_name = input_name
 		if self.shadow_manager is None:
 			self.shadow_manager = ShadowManager()
+		shadow_block.parent_id = self.id
+		shadow_block.input_name = input_name
 		return self.shadow_manager.add_shadow_block(shadow_block, self.id)
 
 	def get_shadows(self) -> list[ShadowBlock]:
@@ -1200,6 +1548,25 @@ class Block:
 		if self.shadow_manager is None:
 			return None
 		return self.shadow_manager.get_input_shadow(self.id, input_name)
+
+	def validate_constraints(self) -> tuple[bool, list[str]]:
+		"""验证积木的约束"""
+		errors = []
+		# 验证字段约束
+		for field_name, field_value in self.fields.items():
+			constraint_str = self.field_constraints.get(field_name)
+			if constraint_str:
+				constraint = ConstraintManager.parse_constraints(constraint_str)
+				is_valid, error_msg = ConstraintManager.validate_numeric_constraint(field_value, constraint)
+				if not is_valid:
+					errors.append(f"字段 '{field_name}' 验证失败: {error_msg}")
+		# 验证类型约束
+		config = BLOCK_CONFIG.get(BlockType(self.type), {})
+		output_types = config.get("output_types")
+		if output_types and self.is_output:
+			# 这里需要根据实际输出类型进行验证
+			pass
+		return len(errors) == 0, errors
 
 
 # ============================================================================
@@ -1263,11 +1630,11 @@ class Procedure:
 
 
 # ============================================================================
-# 原有影子积木系统(保留以支持原有代码)
+# 影子积木系统
 # ============================================================================
 @dataclass
 class ShadowBlock:
-	"""影子积木(完整版) - 保留以支持原有代码"""
+	"""影子积木(完整版)"""
 
 	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	type: str = ""
@@ -1302,12 +1669,7 @@ class ShadowBlock:
 		"""初始化后处理"""
 		if not self.id:
 			self.id = str(uuid.uuid4())
-		if not self.fields:
-			self.fields = {}
-		if not self.field_constraints:
-			self.field_constraints = {}
-		if not self.connection_constraints:
-			self.connection_constraints = {}
+		# 根据影子类型设置属性
 		if self.shadow_type == ShadowType.EMPTY:
 			self.editable = False
 			self.is_detachable = False
@@ -1968,7 +2330,7 @@ class KNProject:
 			# 添加场景的积木
 			blocks_elem = ET.SubElement(scene_elem, "blocks")
 			for block in scene.blocks:
-				block_xml = block.to_xml(include_shadows=True, include_location=True)
+				block_xml = block.to_xml()
 				block_elem = ET.fromstring(block_xml)
 				blocks_elem.append(block_elem)
 		# 添加角色
@@ -1980,7 +2342,7 @@ class KNProject:
 			# 添加角色的积木
 			blocks_elem = ET.SubElement(actor_elem, "blocks")
 			for block in actor.blocks:
-				block_xml = block.to_xml(include_shadows=True, include_location=True)
+				block_xml = block.to_xml()
 				block_elem = ET.fromstring(block_xml)
 				blocks_elem.append(block_elem)
 		return ET.tostring(root, encoding="unicode", xml_declaration=True)
