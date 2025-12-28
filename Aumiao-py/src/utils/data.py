@@ -22,11 +22,17 @@ class PathConfig:
 	CURRENT_DIR = Path.cwd()
 	DATA_DIR = CURRENT_DIR / "data"
 	DOWNLOAD_DIR = CURRENT_DIR / "download"
-	PLUGIN_PATH = CURRENT_DIR / "plugins"
+	PLUGIN_DIR = CURRENT_DIR / "plugins"
+	CACHE_DIR = CURRENT_DIR / "cache"
+	JS_DIR: Path = CURRENT_DIR / "js_module"
+	# 文件夹嵌套文件夹
+	COMPILE_FILE_PATH = DOWNLOAD_DIR / "compile"
+	FICTION_FILE_PATH = DOWNLOAD_DIR / "fiction"
 	# 数据文件路径
-	CACHE_FILE_PATH = DATA_DIR / "cache.json"
+	CACHE_FILE_PATH = CACHE_DIR / "info.json"
+	CAPTCHA_FILE_PATH: Path = CACHE_DIR / "captcha.jpg"
 	DATA_FILE_PATH = DATA_DIR / "data.json"
-	HISTORY_FILE_PATH = DATA_DIR / "history.json"
+	HISTORY_FILE_PATH = CACHE_DIR / "history.json"
 	SETTING_FILE_PATH = DATA_DIR / "setting.json"
 	TOKEN_FILE_PATH = DATA_DIR / "token.txt"
 

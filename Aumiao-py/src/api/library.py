@@ -43,6 +43,11 @@ class NovelDataFetcher:
 		response = self._client.send_request(endpoint="/api/fanfic/type", method="GET")
 		return response.json()
 
+	# 获取推荐小说
+	def fetch_recommend_novel(self) -> None:
+		response = self._client.send_request(method="GET", endpoint="/api/fanfic/list/recommend")
+		return response.json()
+
 	# 获取小说列表
 	def fetch_novel_list(
 		self,
@@ -87,7 +92,9 @@ class NovelDataFetcher:
 	# 获取小说章节信息
 	def fetch_chapter_details(self, chapter_id: int) -> dict:
 		response = self._client.send_request(
-			endpoint=f"/web/fanfic/section/{chapter_id}",
+			# endpoint=f"/web/fanfic/section/{chapter_id}",
+			# 猫门!这是一个更新的api
+			endpoint=f"/api/fanfic/section/{chapter_id}",
 			method="GET",
 		)
 		return response.json()
