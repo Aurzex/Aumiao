@@ -207,7 +207,16 @@ class NovelActionHandler:
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	# 更新小说
-	def update_novel(self, novel_id: int, title: str, introduction: str, category_id: int, status: int, *, return_data: bool = True) -> bool | dict:
+	def update_novel(
+		self,
+		novel_id: int,
+		title: str,
+		introduction: str,
+		category_id: int,
+		status: int,
+		*,
+		return_data: bool = True,
+	) -> bool | dict:
 		payload = {
 			"title": title,
 			"introduction": introduction,
@@ -222,7 +231,16 @@ class NovelActionHandler:
 		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 创建小说
-	def create_novel(self, title: str, section_title: str, draft: str, cover_pic: str, words_num: int, *, return_data: bool = True) -> bool | dict:
+	def create_novel(
+		self,
+		title: str,
+		section_title: str,
+		draft: str,
+		cover_pic: str,
+		words_num: int,
+		*,
+		return_data: bool = True,
+	) -> bool | dict:
 		payload = {
 			"title": title,
 			"section_title": section_title,
