@@ -336,7 +336,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 def plugin_manager(_account_data_manager: AccountDataManager) -> None:
 	"""插件管理"""
 	printer.print_header("插件管理")
-	plugin_manager = plugin.LazyPluginManager(data.PathConfig.PLUGIN_PATH)
+	plugin_manager = plugin.LazyPluginManager(data.PathConfig.PLUGIN_DIR)
 	console = plugin.PluginConsole(plugin_manager)
 	console.run()
 

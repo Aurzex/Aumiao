@@ -423,7 +423,7 @@ jobs:
           # 复制必要文件
           $essentialFiles = @(
               "./${{ env.PROJECT_DIR }}/README.md",
-              "./${{ env.PROJECT_DIR }}/DISCLAIMER.txt"
+              "./${{ env.PROJECT_DIR }}/document/DISCLAIMER.txt"
           )
           foreach ($file in $essentialFiles) {
               if (Test-Path $file) {

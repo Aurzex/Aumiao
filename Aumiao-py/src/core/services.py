@@ -736,9 +736,9 @@ class Motion(ClassUnion):
 		print(f"正在下载: {info['title']}-{info['nickname']}")
 		print(f"简介: {info['introduction']}")
 		print(f"类别: {info['fanfic_type_name']}")
-		print(f"词数: {info['total_words']}")
+		print(f"词数: {info['total_words']} 收藏数: {info['collect_times']}")
 		print(f"更新时间: {self._tool.TimeUtils().format_timestamp(info['update_time'])}")
-		fiction_dir = data.PathConfig.DOWNLOAD_DIR / f"{info['title']}-{info['nickname']}"
+		fiction_dir = data.PathConfig.FICTION_FILE_PATH / f"{info['title']}-{info['nickname']}"
 		fiction_dir.mkdir(parents=True, exist_ok=True)
 		for section in details["data"]["sectionList"]:
 			section_id = section["id"]
@@ -1103,7 +1103,7 @@ class KnEditor:
 			else:
 				print("场景未找到")
 		elif sub_choice == "4":
-			if not self.editor.current_scene_id:
+			if not self.editor.current_entity_id:
 				print("请先选择场景")
 				return
 			block_type = input("积木类型: ").strip()
@@ -1149,7 +1149,7 @@ class KnEditor:
 			else:
 				print("角色未找到")
 		elif sub_choice == "4":
-			if not self.editor.current_actor_id:
+			if not self.editor.current_entity_id:
 				print("请先选择角色")
 				return
 			block_type = input("积木类型: ").strip()

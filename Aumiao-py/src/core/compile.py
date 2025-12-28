@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 from src.api import community
 from src.utils import acquire
+from src.utils.data import PathConfig
 from src.utils.tool import Crypto
 
 client = acquire.ClientFactory().create_codemao_client()
@@ -882,7 +883,7 @@ class Decompiler:
 			"NEMO": NemoDecompiler,
 		}
 
-	def decompile(self, work_id: int, output_dir: str = "decompiled") -> str:
+	def decompile(self, work_id: int, output_dir: Path) -> str:
 		"""
 		反编译作品
 		Args:
@@ -905,7 +906,7 @@ class Decompiler:
 		return self._save_result(result, work_info, output_dir)
 
 	@staticmethod
-	def _save_result(result: dict[str, Any] | str, work_info: WorkInfo, output_dir: str) -> str:
+	def _save_result(result: dict[str, Any] | str, work_info: WorkInfo, output_dir: Path) -> str:
 		"""保存反编译结果"""
 		FileHelper.ensure_dir(output_dir)
 		if work_info.is_nemo:
@@ -914,7 +915,7 @@ class Decompiler:
 			msg = "Nemo作品应该返回字符串路径"
 			raise TypeError(msg)
 		file_name = FileHelper.safe_filename(work_info.name, work_info.id, work_info.file_extension.lstrip("."))
-		file_path = Path(output_dir) / file_name
+		file_path = output_dir / file_name
 		if isinstance(result, dict):
 			FileHelper.write_json(file_path, result)
 		else:
@@ -923,7 +924,7 @@ class Decompiler:
 		return str(file_path)
 
 
-def decompile_work(work_id: int, output_dir: str = "decompiled") -> str:
+def decompile_work(work_id: int) -> str:
 	"""
 	反编译作品
 	Args:
@@ -933,4 +934,5 @@ def decompile_work(work_id: int, output_dir: str = "decompiled") -> str:
 		保存的文件路径
 	"""
 	decompiler = Decompiler()
+	output_dir = PathConfig().COMPILE_FILE_PATH
 	return decompiler.decompile(work_id, output_dir)

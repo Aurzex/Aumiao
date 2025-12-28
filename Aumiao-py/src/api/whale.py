@@ -1,21 +1,18 @@
 from collections.abc import Generator
-from pathlib import Path
 from re import findall
 from typing import ClassVar, Literal
 
-from src.utils import acquire, data, file
+from src.utils import acquire, file
 from src.utils.acquire import HTTPStatus
+from src.utils.data import PathConfig
 from src.utils.decorator import singleton
-
-CAPTCHA_DIR: Path = data.PathConfig.CURRENT_DIR / "captcha.jpg"
-JS_DIR: Path = data.PathConfig.CURRENT_DIR / "js_module"
 
 
 @singleton
 class AuthManager:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
-		self._captcha_img_path = CAPTCHA_DIR
+		self._captcha_img_path = PathConfig().CAPTCHA_FILE_PATH
 
 	def authenticate_user(self, username: str, password: str, key: int, code: str) -> dict:
 		payload = {"username": username, "password": password, "key": key, "code": code}
@@ -30,7 +27,7 @@ class AuthManager:
 		response = self._client.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
 		if response.status_code == HTTPStatus.OK.value:
 			file.CodeMaoFile().file_write(path=self._captcha_img_path, content=response.content, method="wb")
-			print(f"请到 {CAPTCHA_DIR} 查看验证码")
+			print(f"请到 {PathConfig().CAPTCHA_FILE_PATH} 查看验证码")
 		else:
 			print(f"获取验证码失败, 错误代码{response.status_code}")
 		return response.cookies
@@ -273,7 +270,7 @@ class RequestExtractor:
 
 	def fetch_js_module(self) -> None:
 		for item in self.js_module:
-			js_path = JS_DIR / f"{item['num']}.{item['hash']}.js"
+			js_path = PathConfig().JS_DIR / f"{item['num']}.{item['hash']}.js"
 			response = self._client.send_request(endpoint=f"https://whale.codemao.cn/static/js/{item['num']}.{item['hash']}.js", method="GET", log=False)
 			if response.status_code == HTTPStatus.OK.value:
 				file.CodeMaoFile().file_write(path=js_path, content=response.content, method="wb")
