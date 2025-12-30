@@ -39,6 +39,7 @@ class PathConfig:
 	@classmethod
 	def ensure_directories(cls) -> None:
 		"""确保所有必要的目录存在"""
+		cls.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 		cls.DATA_DIR.mkdir(parents=True, exist_ok=True)
 		cls.DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
