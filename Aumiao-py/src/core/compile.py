@@ -1,11 +1,10 @@
-import hashlib
 import json
 import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, ClassVar
 
-from src.api import community
+from src.api import auth
 from src.utils import acquire
 from src.utils.data import PathConfig
 from src.utils.tool import Crypto
@@ -14,18 +13,13 @@ from src.utils.tool import Crypto
 class Configuration:
 	"""配置管理器"""
 
-	# 客户端配置
 	CLIENT_FACTORY = acquire.ClientFactory()
-	# 解密配置
+	AUTHENTICATOR = auth.Authenticator()
 	CRYPTO_SALT = bytes(range(31))
 	CLIENT_SECRET = "pBlYqXbJDu"  # noqa: S105
-	# 网络配置
-	TIMESTAMP_API = community.DataFetcher()
 	BASE_URL = "https://api.codemao.cn"
 	CREATION_BASE_URL = "https://api-creation.codemao.cn"
-	# 文件配置
 	DEFAULT_OUTPUT_DIR = PathConfig().COMPILE_FILE_PATH
-	# 工具类配置
 	TOOLBOX_CATEGORIES: ClassVar = [
 		"action",
 		"advanced",
@@ -297,23 +291,12 @@ class InternalImplementations:
 	class NekoDecompiler(BaseDecompiler):
 		"""NEKO作品反编译器"""
 
-		@staticmethod
-		def _generate_device_auth(timestamp: int, client_id: str | None = None) -> dict:
-			"""生成设备认证数据"""
-			if client_id is None:
-				chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-				client_id = "".join(chars[random.randint(0, 35)] for _ in range(8))
-			sign_str = f"{Configuration.CLIENT_SECRET}{timestamp}{client_id}"
-			sign = hashlib.sha256(sign_str.encode()).hexdigest().upper()
-			return {"sign": sign, "timestamp": timestamp, "client_id": client_id}
-
 		def decompile(self) -> dict[str, Any]:
 			"""反编译NEKO作品"""
 			print(f"🔓 开始解密NEKO作品: {self.work_info.id}")
 			# 获取作品详情以获取加密文件URL
-			timestamp: int = Configuration.TIMESTAMP_API.fetch_current_timestamp_10()["data"]
 			detail_url = f"{Configuration.CREATION_BASE_URL}/neko/community/player/published-work-detail/{self.work_info.id}"
-			device_auth_dict = self._generate_device_auth(timestamp)
+			device_auth_dict = auth.Authenticator().generate_x_device_auth()
 			device_auth_json = json.dumps(device_auth_dict)
 			headers = {"x-creation-tools-device-auth": device_auth_json}
 			try:

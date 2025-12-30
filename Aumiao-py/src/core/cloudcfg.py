@@ -11,7 +11,7 @@ from typing import Any, cast
 import httpx
 import websocket
 
-from src.api.auth import CloudAuthenticator
+from src.api.auth import Authenticator
 from src.core.base import (
 	DataConfig,
 	DataType,
@@ -26,7 +26,7 @@ from src.core.base import (
 )
 
 # ==============================
-# 类型别名定义
+# 类型别名定义 (Type Aliases)
 # ==============================
 CloudValueType = int | str
 CloudListValueType = list[CloudValueType]
@@ -39,10 +39,10 @@ RankingReceivedCallbackType = Callable[["PrivateCloudVariable", list[dict[str, A
 
 
 # ==============================
-# 工具类
+# 工具类 (Utilities)
 # ==============================
 class DisplayHelper:
-	"""显示辅助类,处理长文本截断和格式化显示"""
+	"""显示辅助类 - 使用外部导入的DisplayConfig"""
 
 	@staticmethod
 	def truncate_value(value: Any, max_length: int = DisplayConfig.MAX_DISPLAY_LENGTH) -> str:
@@ -52,14 +52,14 @@ class DisplayHelper:
 		str_value = str(value)
 		if len(str_value) <= max_length:
 			return str_value
-		# 对于列表,显示前几个和后几个元素
+		# 对于列表的特殊处理
 		if isinstance(value, list):
 			if len(value) <= DisplayConfig.MAX_LIST_DISPLAY_ELEMENTS:
 				return str(value)
 			first_part = value[: DisplayConfig.PARTIAL_LIST_DISPLAY_COUNT]
 			last_part = value[-DisplayConfig.PARTIAL_LIST_DISPLAY_COUNT :]
 			return f"[{', '.join(map(str, first_part))}, ..., {', '.join(map(str, last_part))}]"
-		# 对于长字符串,截取前后部分
+		# 对于长字符串
 		half_length = max_length // 2 - len(DisplayConfig.TRUNCATED_SUFFIX) // 2
 		return f"{str_value[:half_length]}{DisplayConfig.TRUNCATED_SUFFIX}{str_value[-half_length:]}"
 
@@ -78,7 +78,7 @@ class WorkInfo:
 
 
 # ==============================
-# 云数据核心类
+# 内部实现 (Core Implementation)
 # ==============================
 class CloudDataItem:
 	"""云数据项基类"""
@@ -101,7 +101,7 @@ class CloudDataItem:
 
 	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
 		"""触发数据变更回调"""
-		for callback in self._change_callbacks[:]:  # 使用副本以防回调中修改列表
+		for callback in self._change_callbacks[:]:
 			try:
 				callback(old_value, new_value, source)
 			except Exception as error:
@@ -133,7 +133,7 @@ class CloudVariable(CloudDataItem):
 		if not isinstance(value, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_VARIABLE_TYPE)
 		old_value = self.value
-		self.value: int | str = value
+		self.value = value
 		self.emit_change(old_value, value, "local")
 		return True
 
@@ -142,11 +142,9 @@ class CloudVariable(CloudDataItem):
 		if not isinstance(old_value, (int, str)) or not isinstance(new_value, (int, str)):
 			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
-		old_value_cast = old_value
-		new_value_cast = new_value
-		for callback in self._change_callbacks[:]:  # 使用副本以防回调中修改列表
+		for callback in self._change_callbacks[:]:
 			try:
-				callback(old_value_cast, new_value_cast, source)
+				callback(old_value, new_value, source)
 			except Exception as error:
 				print(f"{ErrorMessages.CLOUD_VARIABLE_CALLBACK}: {error}")
 
@@ -169,7 +167,7 @@ class PrivateCloudVariable(CloudVariable):
 
 	def emit_ranking(self, ranking_data: list[dict[str, Any]]) -> None:
 		"""触发排行榜数据接收回调"""
-		for callback in self._ranking_callbacks[:]:  # 使用副本以防回调中修改列表
+		for callback in self._ranking_callbacks[:]:
 			try:
 				callback(ranking_data)
 			except Exception as error:
@@ -218,7 +216,7 @@ class CloudList(CloudDataItem):
 
 	def _emit_operation(self, operation: str, *args: object) -> None:
 		"""触发列表操作回调"""
-		for callback in self._operation_callbacks[operation][:]:  # 使用副本以防回调中修改列表
+		for callback in self._operation_callbacks[operation][:]:
 			try:
 				callback(*args)
 			except Exception as error:
@@ -341,7 +339,6 @@ class CloudList(CloudDataItem):
 
 	def copy_from(self, source_list: list[CloudValueType]) -> bool:
 		"""从源列表复制数据"""
-		# 优化:检查前几个元素类型,而不是全部
 		if source_list and not isinstance(source_list[0], (int, str)):
 			return False
 		old_value = self.value.copy()
@@ -351,12 +348,12 @@ class CloudList(CloudDataItem):
 
 
 class CloudConnection:
-	"""云连接核心类,负责WebSocket连接和消息处理"""
+	"""云连接核心类 - 使用外部导入的配置"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self.work_id = work_id
 		self.editor = editor
-		self.authenticator = CloudAuthenticator(authorization_token)
+		self.authenticator = Authenticator(authorization_token)
 		self.websocket_client: websocket.WebSocketApp | None = None
 		self.connected = False
 		self.auto_reconnect = True
@@ -382,7 +379,7 @@ class CloudConnection:
 		self._ping_active = False
 		self._join_sent = False
 		self._work_info: WorkInfo | None = None
-		self._connection_lock = threading.RLock()  # 使用RLock支持嵌套锁
+		self._connection_lock = threading.RLock()
 		self._pending_requests_lock = threading.Lock()
 		self._last_activity_time = 0.0
 		self._websocket_thread: threading.Thread | None = None
@@ -462,7 +459,7 @@ class CloudConnection:
 	def _emit_event(self, event: str, *args: object) -> None:
 		"""触发事件回调"""
 		if event in self._callbacks:
-			for callback in self._callbacks[event][:]:  # 使用副本以防回调中修改列表
+			for callback in self._callbacks[event][:]:
 				try:
 					callback(*args)
 				except Exception as error:
@@ -527,7 +524,6 @@ class CloudConnection:
 			ping_interval = handshake_data.get("pingInterval", DataConfig.PING_INTERVAL_MS)
 			ping_timeout = handshake_data.get("pingTimeout", DataConfig.PING_TIMEOUT_MS)
 			print(f"✓ 握手成功, ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")
-			# 使用服务器返回的ping_interval配置WebSocket心跳
 			self._start_ping(ping_interval)
 			if self.websocket_client:
 				self.websocket_client.send(WebSocketConfig.CONNECT_MESSAGE)
@@ -555,14 +551,11 @@ class CloudConnection:
 				message_type = data_list[0]
 				message_data = data_list[1]
 				print(f"处理云消息: {message_type}, 数据: {DisplayHelper.truncate_value(message_data)}")
-				# 修复:更健壮的JSON解析逻辑
 				if isinstance(message_data, str):
 					try:
-						# 尝试解析内部的JSON字符串
 						parsed_data = json.loads(message_data)
 						message_data = parsed_data
 					except json.JSONDecodeError:
-						# 如果解析失败,保持原字符串
 						print(f"警告: 无法解析消息数据为JSON: {message_data[:100]}...")
 				self._handle_cloud_message(message_type, message_data)
 		except json.JSONDecodeError as error:
@@ -577,7 +570,7 @@ class CloudConnection:
 			self.send_message(SendMessageType.JOIN, str(self.work_id))
 
 	def _start_ping(self, interval: int) -> None:
-		"""启动ping线程,使用服务器返回的ping间隔"""
+		"""启动ping线程"""
 		if self._ping_thread is not None:
 			self._ping_active = False
 			self._ping_thread.join(timeout=1.0)
@@ -634,10 +627,8 @@ class CloudConnection:
 	def _handle_receive_all_data(self, data: list[dict[str, Any]] | object) -> None:
 		"""处理接收完整数据消息"""
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
-		# 修复:处理数据可能是字符串的情况
 		if isinstance(data, str):
 			try:
-				# 如果数据是字符串,尝试解析为JSON
 				data = json.loads(data)
 			except json.JSONDecodeError as e:
 				print(f"数据解析失败: {e}")
@@ -662,7 +653,6 @@ class CloudConnection:
 			if not all([cloud_variable_id, name, value is not None, data_type is not None]):
 				print(f"数据项缺少必要字段: {DisplayHelper.truncate_value(item)}")
 				return
-			# 修复:确保数据类型的正确性
 			try:
 				data_type = int(data_type)
 			except (ValueError, TypeError):
@@ -837,19 +827,17 @@ class CloudConnection:
 		self._stop_ping()
 		print(f"连接已关闭: {close_status_code} - {close_msg}")
 		self._emit_event("close", close_status_code, close_msg)
-		# 只有在之前是已连接状态且不是主动关闭时才尝试重连
 		if was_connected and self.auto_reconnect and not self._is_closing:
 			if self.reconnect_attempts < self.max_reconnect_attempts:
 				self.reconnect_attempts += 1
-				# 使用指数退避策略
-				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)  # 最大5分钟
+				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
 				print(f"尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}),等待 {delay} 秒...")
 				threading.Timer(delay, self._safe_reconnect).start()
 			else:
 				print(f"已达到最大重连次数 ({self.max_reconnect_attempts}),停止重连")
 
 	def _safe_reconnect(self) -> None:
-		"""安全重连,检查当前状态"""
+		"""安全重连"""
 		with self._connection_lock:
 			if self.connected or self._is_closing:
 				return
@@ -888,11 +876,9 @@ class CloudConnection:
 
 	def connect(self) -> None:
 		"""建立云连接"""
-		# 如果正在关闭,则不连接
 		if self._is_closing:
 			return
 		try:
-			# 先清理旧连接
 			self._cleanup_connection()
 			with self._connection_lock:
 				self.connected = False
@@ -915,7 +901,6 @@ class CloudConnection:
 			)
 
 			def run_websocket() -> None:
-				"""运行WebSocket客户端"""
 				try:
 					if self.websocket_client:
 						self.websocket_client.run_forever(
@@ -946,7 +931,6 @@ class CloudConnection:
 		"""检查连接健康状态"""
 		if not self.connected:
 			return False
-		# 检查最后活动时间
 		if self._last_activity_time > 0:
 			inactive_time = time.time() - self._last_activity_time
 			if inactive_time > DataConfig.MAX_INACTIVITY_TIME:
@@ -991,10 +975,8 @@ class CloudConnection:
 
 	def get_private_variable(self, name: str) -> PrivateCloudVariable | None:
 		"""获取私有变量"""
-		# 优化查找逻辑
 		if name in self.private_variables:
 			return self.private_variables[name]
-		# 如果是数字ID,也可能存储在字典中
 		try:
 			if name.isdigit():
 				return self.private_variables.get(name)
@@ -1171,8 +1153,11 @@ class CloudConnection:
 		print("=" * 50)
 
 
+# ==============================
+# 高级接口 (API Layer)
+# ==============================
 class CloudManager:
-	"""云数据管理器,提供高级API"""
+	"""云数据管理器 - 高级API"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self.connection = CloudConnection(work_id, editor, authorization_token)
@@ -1209,11 +1194,10 @@ class CloudCommandLineInterface(cmd.Cmd):
 		self.connection = cloud_manager.connection
 		self.prompt = "云数据> "
 		self.intro = self._get_welcome_message()
-		# 注册排行榜回调
 		self.connection.on_ranking_received(self._print_ranking_result)
 
 	def _get_welcome_message(self) -> str:
-		"""生成欢迎消息,包含可用变量信息"""
+		"""生成欢迎消息"""
 		welcome = "欢迎使用云数据交互式命令行! 输入 help 或 ? 查看可用命令。\n"
 		if self.connection.data_ready:
 			available = self.manager.get_available_variables()
@@ -1254,7 +1238,6 @@ class CloudCommandLineInterface(cmd.Cmd):
 		stop = None
 		while not stop:
 			try:
-				# 动态更新提示符显示状态
 				status_indicator = "✓" if self.connection.connected else "✗"
 				data_indicator = "✓" if self.connection.data_ready else "✗"
 				self.prompt = f"云数据[{status_indicator}{data_indicator}]> "
@@ -1268,6 +1251,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 				print()
 				break
 
+	# ========== 命令方法 ==========
 	def do_status(self, _arg: str) -> None:
 		"""查看连接状态和数据状态"""
 		print(f"连接状态: {'已连接' if self.connection.connected else '未连接'}")
@@ -1424,7 +1408,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 
 	@staticmethod
 	def _parse_value(value: str) -> int | str:
-		"""解析输入的值,尝试转换为整数"""
+		"""解析输入的值"""
 		try:
 			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
 				return int(value)
@@ -1433,7 +1417,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		return value
 
 	def do_list_ops(self, arg: str) -> None:
-		"""云列表操作 (list_operations的简短版本)
+		"""云列表操作
 		用法:
 			list_ops push <列表名> <值>      # 追加元素
 			list_ops pop <列表名>            # 弹出最后一个元素
@@ -1585,8 +1569,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 	@staticmethod
 	def help_list_ops() -> None:
 		"""显示列表操作帮助"""
-		print(
-			"""
+		print("""
 		列表操作命令:
 		list_ops push <列表名> <值>      - 向列表末尾添加元素
 		list_ops pop <列表名>            - 移除并返回列表最后一个元素
@@ -1597,8 +1580,7 @@ class CloudCommandLineInterface(cmd.Cmd):
 		list_ops replace <列表名> <位置> <值> - 替换指定位置的元素
 		list_ops clear <列表名>          - 清空列表所有元素
 		list_ops get <列表名> <位置>     - 获取指定位置的元素
-		""",
-		)
+		""")
 
 	def do_ranking(self, arg: str) -> None:
 		"""获取私有变量的排行榜
