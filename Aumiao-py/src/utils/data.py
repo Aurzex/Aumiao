@@ -20,11 +20,11 @@ class PathConfig:
 	"""集中管理所有路径配置"""
 
 	CURRENT_DIR = Path.cwd()
+	CACHE_DIR = CURRENT_DIR / "cache"
 	DATA_DIR = CURRENT_DIR / "data"
 	DOWNLOAD_DIR = CURRENT_DIR / "download"
-	PLUGIN_DIR = CURRENT_DIR / "plugins"
-	CACHE_DIR = CURRENT_DIR / "cache"
 	JS_DIR: Path = CURRENT_DIR / "js_module"
+	PLUGIN_DIR = CURRENT_DIR / "plugins"
 	# 文件夹嵌套文件夹
 	COMPILE_FILE_PATH = DOWNLOAD_DIR / "compile"
 	FICTION_FILE_PATH = DOWNLOAD_DIR / "fiction"

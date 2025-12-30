@@ -1,19 +1,16 @@
 """服务类:认证管理、文件上传、高级服务"""
 
 import contextlib
-import re
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from json import JSONDecodeError, loads
 from pathlib import Path
-from random import choice
 from time import sleep
 from typing import ClassVar, Literal, cast
 
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, data, decorator, tool
 from src.core.compile import decompile_work
 from src.core.editorkn import KNEditor, KNProject
-from src.core.process import CommentProcessor, FileProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
+from src.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
 from src.utils.acquire import HTTPStatus
 
@@ -57,6 +54,10 @@ class FileUploader(ClassUnion):
 class WorkParser(ClassUnion):
 	"""作品解析处理器"""
 
+	def __init__(self) -> None:
+		super().__init__()
+		self.process = ReplyProcessor()
+
 	def execute_auto_reply_work(self, data: data.CodeMaoData, valid_reply_types: set[str]) -> bool:
 		"""
 		自动回复作品/帖子评论和回复,包含作品解析功能
@@ -97,7 +98,7 @@ class WorkParser(ClassUnion):
 					continue
 				processed_ids.add(reply_id)
 				# 2. 解析content字段
-				content_data = self._parse_content_field(reply)
+				content_data = self.process.parse_content_field(reply)
 				if content_data is None:
 					continue
 				# 3. 提取必要信息
@@ -112,9 +113,9 @@ class WorkParser(ClassUnion):
 					continue
 				source_type = "work" if reply_type.startswith("WORK") else "post"
 				# 5. 提取文本内容
-				comment_text = self._extract_comment_text(reply_type, message_info)
+				comment_text = self.process.extract_comment_text(reply_type, message_info)
 				# 6. 解析目标ID和父ID
-				target_id, parent_id = self._extract_target_and_parent_ids(reply_type, reply, message_info, business_id, source_type)
+				target_id, parent_id = self.process.extract_target_and_parent_ids(reply_type, reply, message_info, business_id, source_type)
 				# 7. 检查是否包含作品解析关键词
 				if "@作品解析:" in comment_text:
 					# 处理作品解析请求
@@ -130,9 +131,9 @@ class WorkParser(ClassUnion):
 					)
 					continue  # 跳过普通回复流程
 				# 8. 原有关键词匹配逻辑
-				chosen, matched_keyword = self._match_keyword(comment_text, formatted_answers, formatted_replies)
+				chosen, matched_keyword = self.process.match_keyword(comment_text, formatted_answers, formatted_replies)
 				# 9. 打印日志
-				self._log_reply_info(reply_id, reply_type, source_type, sender_nickname, sender_id, business_name, comment_text, matched_keyword, chosen)
+				self.process.log_reply_info(reply_id, reply_type, source_type, sender_nickname, sender_id, business_name, comment_text, matched_keyword, chosen)
 				# 10. 发送回复
 				result = self._send_reply(source_type=source_type, business_id=business_id, target_id=target_id, parent_id=parent_id, content=chosen)
 				if result:
@@ -166,7 +167,7 @@ class WorkParser(ClassUnion):
 		print(f"原始内容: {comment_text}")
 		try:
 			# 1. 提取作品链接或ID
-			work_info = self._extract_work_info(comment_text)
+			work_info = self.process.extract_work_info(comment_text)
 			if not work_info:
 				print("未找到有效的作品链接或ID")
 				return
@@ -186,10 +187,10 @@ class WorkParser(ClassUnion):
 			print(f"作者: {author_nickname} (ID: {work_author_id})")
 			print(f"发送者是否为作者: {'是' if is_author else '否'}")
 			# 4. 解析命令
-			commands = self._parse_commands(comment_text)
+			commands = self.process.parse_commands(comment_text)
 			print(f"解析到命令: {commands or '无'}")
 			# 5. 生成基础解析报告
-			report = self._generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
+			report = self.process.generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
 			# 6. 如果是作者且有编译命令,执行编译并生成CDN链接
 			cdn_links = []
 			if is_author and commands and "compile" in commands:
@@ -197,14 +198,14 @@ class WorkParser(ClassUnion):
 				cdn_link = self._handle_work_compilation(work_id, work_details)
 				if cdn_link:
 					print("作品编译完成,CDN链接已生成")
-					cdn_links = self._split_long_cdn_link(cdn_link)
+					cdn_links = self.process.split_long_cdn_link(cdn_link)
 				else:
 					print("作品编译失败")
 					cdn_links = ["编译失败,请检查作品类型"]
 			# 7. 准备所有要发送的消息
 			messages_to_send = []
 			# 添加报告消息
-			report_parts = self._split_long_message(report)
+			report_parts = self.process.split_long_message(report)
 			messages_to_send.extend(report_parts)
 			# 添加CDN链接消息
 			if cdn_links:
@@ -215,7 +216,7 @@ class WorkParser(ClassUnion):
 				print("作者身份确认,准备多位置处理")
 				# 发送作品评论
 				print(f"发送作品评论到作品 {work_id}:")
-				self._send_messages_with_delay(
+				self.process.send_messages_with_delay(
 					messages=messages_to_send,
 					send_func=lambda msg: self._work_motion.create_work_comment(work_id=work_id, comment=msg, return_data=True),
 					comment_type="作品评论",
@@ -223,7 +224,7 @@ class WorkParser(ClassUnion):
 				# 如果在帖子中,也发送到帖子
 				if source_type == "post" and target_id > 0:
 					print(f"发送回复到帖子评论 {target_id}:")
-					self._send_messages_with_delay(
+					self.process.send_messages_with_delay(
 						messages=messages_to_send,
 						send_func=lambda msg: self._forum_motion.create_comment_reply(reply_id=target_id, parent_id=parent_id, content=msg, return_data=True),
 						comment_type="帖子回复",
@@ -233,7 +234,7 @@ class WorkParser(ClassUnion):
 				# 非作者:只在帖子下回复评论
 				if source_type == "post" and target_id > 0:
 					print(f"发送回复到帖子评论 {target_id}:")
-					self._send_messages_with_delay(
+					self.process.send_messages_with_delay(
 						messages=messages_to_send,
 						send_func=lambda msg: self._forum_motion.create_comment_reply(reply_id=target_id, parent_id=parent_id, content=msg, return_data=True),
 						comment_type="帖子回复",
@@ -242,139 +243,6 @@ class WorkParser(ClassUnion):
 					print("当前通知来自作品,非作者无法回复,跳过")
 		except Exception as e:
 			print(f"处理作品解析时发生错误: {e!s}")
-
-	@staticmethod
-	def _send_messages_with_delay(messages: list[str], send_func: Callable, comment_type: str = "评论", delay_seconds: int = 5) -> None:
-		"""
-		发送多条消息,每条消息间隔指定时间
-		"""
-		if not messages:
-			print("没有消息需要发送")
-			return
-		for i, message in enumerate(messages, 1):
-			print(f"\n{'-' * 20}")
-			print(f"发送{comment_type} {i}/{len(messages)}")
-			print(f"内容长度: {len(message)}")
-			try:
-				result = send_func(message)
-				if result:
-					print(f"{comment_type} {i} 发送成功")
-				else:
-					print(f"{comment_type} {i} 发送失败")
-				# 如果不是最后一条消息,等待间隔
-				if i < len(messages):
-					print(f"等待 {delay_seconds} 秒后发送下一条...")
-					sleep(delay_seconds)
-			except Exception as e:
-				print(f"发送{comment_type} {i} 时发生错误: {e!s}")
-				# 发生错误时仍然等待间隔,避免过于频繁
-				if i < len(messages):
-					sleep(delay_seconds)
-
-	@staticmethod
-	def _split_long_message(message: str, max_length: int = 280) -> list[str]:
-		"""
-		分割长消息为多个不超过限制的部分
-		"""
-		if len(message) <= max_length:
-			return [message]
-		print(f"消息过长 ({len(message)} > {max_length}), 开始分割...")
-		parts = []
-		current_part = ""
-		# 按句子分割,保持句子完整性
-		sentences = message.split(" | ")
-		for sentence in sentences:
-			# 如果当前句子本身就很长,需要进一步分割
-			if len(sentence) > max_length:
-				# 按逗号分割
-				sub_sentences = sentence.split(",")
-				for sub_sentence in sub_sentences:
-					if len(current_part) + len(sub_sentence) + 3 <= max_length:
-						current_part += sub_sentence + ","
-					else:
-						if current_part:
-							parts.append(current_part.rstrip(","))
-						current_part = sub_sentence + ","
-			else:
-				# 检查添加这个句子是否会超过限制
-				separator = " | " if current_part else ""
-				if len(current_part) + len(separator) + len(sentence) <= max_length:
-					current_part += separator + sentence
-				else:
-					if current_part:
-						parts.append(current_part)
-					current_part = sentence
-		# 添加最后一部分
-		if current_part:
-			parts.append(current_part)
-		# 添加序号
-		result = []
-		total_parts = len(parts)
-		for i, part in enumerate(parts, 1):
-			numbered_part = f"[{i}/{total_parts}] {part}"
-			result.append(numbered_part)
-		print(f"分割为 {len(result)} 部分")
-		for i, part in enumerate(result, 1):
-			print(f"  部分 {i}: {len(part)} 字符")
-		return result
-
-	@staticmethod
-	def _split_long_cdn_link(cdn_link: str) -> list[str]:
-		"""
-		处理长CDN链接,如果太长则分割
-		"""
-		# 保护链接
-		protected_link = WorkParser._protect_cdn_link(cdn_link)
-		# 如果链接本身就很长,可能需要分割
-		if len(protected_link) <= 280:
-			return [f"编译文件: {protected_link}"]
-		print(f"CDN链接过长 ({len(protected_link)}), 尝试分割...")
-		# 将链接分割成多个部分
-		chunk_size = 250  # 每个部分的最大长度
-		chunks = []
-		for i in range(0, len(protected_link), chunk_size):
-			chunk = protected_link[i : i + chunk_size]
-			chunks.append(chunk)
-		result = []
-		total_chunks = len(chunks)
-		for i, chunk in enumerate(chunks, 1):
-			message = f"编译文件部分 {i}/{total_chunks}: {chunk}"
-			result.append(message)
-		return result
-
-	@staticmethod
-	def _generate_work_report(work_details: dict, commands: list, *, is_author: bool) -> str:
-		"""
-		生成作品解析报告
-		"""
-		work_name = work_details.get("work_name", "未知作品")
-		author_nickname = work_details.get("user_info", {}).get("nickname", "未知作者")
-		work_id = work_details.get("id", 0)
-		view_times = work_details.get("view_times", 0)
-		praise_times = work_details.get("praise_times", 0)
-		collect_times = work_details.get("collect_times", 0)
-		# n_roles = work_details.get("n_roles", 0)
-		# n_brick = work_details.get("n_brick", 0)
-		# 构建报告各部分
-		parts = [
-			"作品解析报告",
-			f"作品名称: {work_name}",
-			f"作者: {author_nickname} (ID: {work_id})",
-			"数据统计:",
-			f"  浏览量: {view_times}",
-			f"  点赞数: {praise_times}",
-			f"  收藏数: {collect_times}",
-			# f"  角色数: {n_roles}",
-			# f"  积木数: {n_brick}",
-		]
-		if is_author:
-			parts.append("验证: 您是该作品的作者")
-			if "compile" in commands:
-				parts.append("编译命令已接收,正在处理...")
-		else:
-			parts.append("提示: 非作者身份,编译功能不可用")
-		# 用分隔符连接各部分
-		return " | ".join(parts)
 
 	@staticmethod
 	def _handle_work_compilation(work_id: int, work_details: dict) -> str | None:
@@ -400,143 +268,6 @@ class WorkParser(ClassUnion):
 		except Exception as e:
 			print(f"编译作品时发生错误: {e!s}")
 			return None
-
-	@staticmethod
-	def _protect_cdn_link(link: str) -> str:
-		"""
-		使用空白字符保护CDN链接
-		"""
-		protected = ""
-		for char in link:
-			protected += char + "\u200b\u200d"
-		return protected.rstrip("\u200b\u200d")
-
-	@staticmethod
-	def _extract_work_info(comment_text: str) -> dict | None:
-		"""
-		从评论中提取作品信息
-		"""
-		# 支持的格式:@作品解析:https://shequ.codemao.cn/work/123456
-		# 或:@作品解析:123456
-		# 查找链接中的作品ID
-		pattern = r"@作品解析:.*?(?:work/|workId=)(\d+)"
-		match = re.search(pattern, comment_text)
-		if match:
-			work_id = int(match.group(1))
-			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
-		# 如果没有链接,尝试直接提取数字ID
-		pattern2 = r"@作品解析:.*?(\d+)"
-		match2 = re.search(pattern2, comment_text)
-		if match2:
-			work_id = int(match2.group(1))
-			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
-		return None
-
-	@staticmethod
-	def _parse_commands(comment_text: str) -> list[str]:
-		"""
-		解析评论中的命令(只保留解析和编译)
-		"""
-		commands = []
-		# 检测解析命令(默认就有)
-		if "解析" in comment_text or "analyze" in comment_text.lower():
-			commands.append("analyze")
-		# 检测编译命令
-		if "编译" in comment_text or "compile" in comment_text.lower():
-			commands.append("compile")
-		return commands
-
-	# 辅助方法
-	@staticmethod
-	def _parse_content_field(reply: dict) -> dict | None:
-		"""解析content字段"""
-		content_data = {}
-		try:
-			if isinstance(reply.get("content"), str):
-				content_data = loads(reply["content"])
-			elif isinstance(reply.get("content"), dict):
-				content_data = reply["content"]
-		except (JSONDecodeError, TypeError) as e:
-			print(f"解析content失败: {e}")
-			return None
-		else:
-			return content_data
-
-	@staticmethod
-	def _extract_comment_text(reply_type: str, message_info: dict) -> str:
-		"""提取评论文本"""
-		if reply_type in {"WORK_COMMENT", "POST_COMMENT"}:
-			return message_info.get("comment", "")
-		return message_info.get("reply", "")
-
-	def _extract_target_and_parent_ids(self, reply_type: str, reply: dict, message_info: dict, business_id: int, source_type: Literal["work", "post", "shop"]) -> tuple[int, int]:
-		"""提取目标ID和父ID"""
-		target_id = 0
-		parent_id = 0
-		if reply_type.endswith("_COMMENT"):
-			target_id = int(reply.get("reference_id", 0))
-			if not target_id:
-				target_id = int(message_info.get("comment_id", 0))
-			parent_id = 0
-		else:
-			parent_id = int(reply.get("reference_id", 0))
-			if not parent_id:
-				parent_id = int(message_info.get("replied_id", 0))
-			comment_ids = [
-				str(item)
-				for item in Obtain().get_comments_detail(
-					com_id=business_id,
-					source=source_type,
-					method="comment_id",
-				)
-				if isinstance(item, (int, str))
-			]
-			target_id_str = str(message_info.get("reply_id", ""))
-			found = self._tool.StringProcessor().find_substrings(
-				text=target_id_str,
-				candidates=comment_ids,
-			)[0]
-			target_id = int(found) if found else 0
-		return target_id, parent_id
-
-	@staticmethod
-	def _match_keyword(comment_text: str, formatted_answers: dict, formatted_replies: list) -> tuple:
-		"""匹配关键词"""
-		chosen = ""
-		matched_keyword = None
-		for keyword, resp in formatted_answers.items():
-			if keyword in comment_text:
-				matched_keyword = keyword
-				chosen = choice(resp) if isinstance(resp, list) else resp
-				break
-		if not chosen:
-			chosen = choice(formatted_replies)
-		return chosen, matched_keyword
-
-	@staticmethod
-	def _log_reply_info(
-		reply_id: int,
-		reply_type: str,
-		source_type: str,
-		sender_nickname: str,
-		sender_id: int,
-		business_name: str,
-		comment_text: str,
-		matched_keyword: str,
-		chosen: str,
-	) -> None:
-		"""记录回复信息"""
-		print(f"\n{'=' * 40}")
-		print(f"处理新通知 [ID: {reply_id}]")
-		print(f"类型: {reply_type} ({'作品' if source_type == 'work' else '帖子'})")
-		print(f"发送者: {sender_nickname} (ID: {sender_id})")
-		print(f"来源: {business_name}")
-		print(f"内容: {comment_text}")
-		if matched_keyword:
-			print(f"匹配到关键词: 「{matched_keyword}」")
-		else:
-			print("未匹配关键词,使用随机回复")
-		print(f"选择回复: 【{chosen}】")
 
 	def _send_reply(self, source_type: str, business_id: int, target_id: int, parent_id: int, content: str) -> bool | dict:
 		"""发送回复"""
