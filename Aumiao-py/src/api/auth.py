@@ -251,7 +251,7 @@ class AuthManager:
 		return response.json()
 
 
-class CloudAuthenticator:
+class Authenticator:
 	"""云服务认证管理器"""
 
 	CLIENT_SECRET = "pBlYqXbJDu"  # noqa: S105
