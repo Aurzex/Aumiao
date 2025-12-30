@@ -19,27 +19,6 @@ REPORT_BATCH_THRESHOLD: int = 15
 VALID_REPLY_TYPES: set[str] = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
 
 
-# ==============================
-# 类型定义
-# ==============================
-class FormattedAnswer(TypedDict):
-	"""格式化答案类型"""
-
-	question: str
-	responses: list[str] | str
-
-
-class ReplyType(Enum):
-	"""回复类型枚举"""
-
-	WORK_COMMENT = "WORK_COMMENT"
-	WORK_REPLY = "WORK_REPLY"
-	WORK_REPLY_REPLY = "WORK_REPLY_REPLY"
-	POST_COMMENT = "POST_COMMENT"
-	POST_REPLY = "POST_REPLY"
-	POST_REPLY_REPLY = "POST_REPLY_REPLY"
-
-
 class ReportRecord(TypedDict):
 	"""举报记录类型"""
 
