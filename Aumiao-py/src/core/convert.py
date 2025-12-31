@@ -40,8 +40,7 @@ class VoxReader:
 	@staticmethod
 	def read_vox(filename: str) -> VoxModel:  # noqa: PLR0914
 		"""读取vox文件"""
-		with Path(filename).open("rb") as f:
-			data = f.read()
+		data = Path(filename).read_bytes()
 		# 检查文件头
 		magic = data[0:4]
 		if magic != b"VOX ":
