@@ -824,7 +824,6 @@ class Union:
 		self._client = acquire.ClientFactory().create_codemao_client()
 		# 认证模块
 		self._auth = auth.AuthManager()
-		self._whale_routine = whale.AuthManager()
 		# 社区模块
 		self._community_motion = community.UserAction()
 		self._community_obtain = community.DataFetcher()

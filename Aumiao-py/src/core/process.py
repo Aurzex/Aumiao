@@ -1,5 +1,3 @@
-"""处理器类:评论处理和举报处理"""
-
 import re
 from collections import defaultdict
 from collections.abc import Callable, Generator
@@ -10,6 +8,7 @@ from time import sleep
 from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
+from src.api import auth
 from src.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, ReportRecord, SourceConfig, data, decorator
 from src.core.retrieve import Obtain
 from src.utils import acquire
@@ -1138,7 +1137,7 @@ class ReportProcessor(ClassUnion):
 			if not violation_success:
 				self._printer.print_message(f"[{idx}/{len(violations)}] 处理失败,跳过: {violation}", "WARNING")
 		# 7. 举报完成:恢复管理员账号
-		self.auth_manager._restore_admin_account()  # noqa: SLF001
+		auth.AuthManager().terminate_session()
 		self._printer.print_message(f"自动举报完成,成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
 	def _execute_report_action(
@@ -1200,65 +1199,6 @@ class ReportAuthManager(ClassUnion):
 		self.auth_method = "grab"
 		super().__init__()
 
-	def execute_admin_login(self) -> None:
-		"""执行管理员登录(支持Token/账密两种方式)"""
-		self._printer.print_header("=== 登录管理后台 ===")
-		choice = self._printer.get_valid_input(prompt="请选择登录方式: 1.Token登录 2.账密登录", valid_options={"1", "2"})
-		if choice == "1":
-			self._handle_token_login()
-		else:
-			self._handle_password_login()
-
-	def _handle_token_login(self) -> None:
-		"""处理Token登录:直接配置认证Token"""
-		token = self._printer.prompt_input("请输入 Authorization Token")
-		self._whale_routine.configure_authentication_token(token)
-		self._printer.print_message("Token登录成功", "SUCCESS")
-
-	def _handle_password_login(self) -> None:
-		"""处理账密登录:支持验证码重试,优化错误处理"""
-
-		# 根本原理:验证码并非完全随机生成,而是使用确定性算法,根据“时间戳”和“序列位置”计算得出。
-		# 验证码池:系统为每个请求的时间戳维护一个虚拟的、按需生成的验证码序列。你每次请求并不是从一个预先生好的池子里取,而是实时计算出该时间戳对应的第N个验证码。
-		# 一次性使用:每个验证码在成功验证后立即失效,不能重复使用。
-		# 序列连续性:对同一时间戳的连续请求,会按顺序生成该序列中的不同验证码。
-		# 时间戳隔离:不同时间戳对应的验证码序列完全独立,无法交叉使用。
-		# 长期有效性:系统缺乏对客户端时间戳的时效性校验,导致很久之前的时间戳仍然可以生成有效的验证码序列。
-		def input_account() -> tuple[str, str]:
-			"""内部函数:获取用户名和密码(统一命名为account)"""
-			username = self._printer.prompt_input("请输入用户名")
-			password = self._printer.prompt_input("请输入密码")
-			return username, password
-
-		def input_captcha(timestamp: int) -> tuple[str, Any]:
-			"""内部函数:获取验证码和Cookie"""
-			self._printer.print_message("正在获取验证码...", "INFO")
-			cookies = self._whale_routine.fetch_verification_captcha(timestamp=timestamp)
-			captcha = self._printer.prompt_input("请输入验证码")
-			return captcha, cookies
-
-		# 登录循环:直到成功或用户中断(实际可加重试次数限制)
-		timestamp = self._tool.TimeUtils().current_timestamp(13)  # 13位时间戳
-		username, password = input_account()
-		captcha, _ = input_captcha(timestamp=timestamp)
-		while True:
-			# 调用鲸平台认证接口
-			response = self._whale_routine.authenticate_user(username=username, password=password, key=timestamp, code=captcha)
-			# 登录成功:配置Token并退出循环
-			if "token" in response:
-				self._whale_routine.configure_authentication_token(response["token"])
-				self._printer.print_message("账密登录成功", "SUCCESS")
-				break
-			# 登录失败:根据错误码处理
-			if "error_code" in response:
-				self._printer.print_message(response["error_msg"], "ERROR")
-				# 密码错误/参数无效:重新输入账号
-				if response["error_code"] in {"Admin-Password-Error@Community-Admin", "Param - Invalid @ Common"}:
-					username, password = input_account()
-				# 重新获取验证码和时间戳(无论何种错误,验证码均失效)
-				timestamp = self._tool.TimeUtils().current_timestamp(13)
-				captcha, _ = input_captcha(timestamp=timestamp)
-
 	def load_student_accounts(self) -> None:
 		"""加载学生账号:用于自动举报,支持实时获取/文件加载"""
 		# 切换到普通账号上下文(加载学生账号需普通权限)
@@ -1266,7 +1206,7 @@ class ReportAuthManager(ClassUnion):
 		# 询问是否加载学生账号
 		if self._printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			self._printer.print_message("未加载学生账号,自动举报功能不可用", "WARNING")
-			self._restore_admin_account()
+			auth.AuthManager().restore_admin_account()
 			return
 		# 选择账号获取方式(实时获取/文件加载)
 		method = self._printer.get_valid_input(prompt="选择模式(load.加载文件 grab.实时获取)", valid_options={"load", "grab"}, cast_type=str)
@@ -1292,7 +1232,7 @@ class ReportAuthManager(ClassUnion):
 			self.student_accounts = []
 			self.student_tokens = []
 		# 恢复管理员账号上下文(加载完成后切回管理员)
-		self._restore_admin_account()
+		auth.AuthManager().restore_admin_account()
 
 	def switch_to_student_account(self) -> bool:
 		"""切换到学生账号:供举报处理类调用,返回切换结果"""
@@ -1323,16 +1263,6 @@ class ReportAuthManager(ClassUnion):
 			return False  # 切换失败
 		else:
 			return True
-
-	def _restore_admin_account(self) -> None:
-		"""恢复管理员账号:封装重复切换逻辑,避免代码冗余"""
-		self._client.switch_identity(token=self._client.token.judgement, identity="judgement")
-
-	def terminate_session(self) -> None:
-		"""终止当前会话:清理资源并恢复管理员账号"""
-		self._whale_routine.terminate_session()
-		self._restore_admin_account()
-		self._printer.print_message("已终止会话并恢复管理员账号", "INFO")
 
 
 class FileUploaderProtocol(Protocol):

@@ -7,6 +7,7 @@ from pathlib import Path
 from time import sleep
 from typing import ClassVar, Literal, cast
 
+from src.api import auth
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, data, decorator, tool
 from src.core.compile import decompile_work
 from src.core.editorkn import KNEditor, KNProject
@@ -736,7 +737,7 @@ class Report(ClassUnion):
 		# 3. 处理结束:统计结果 + 终止会话
 		self.printer.print_header("=== 处理结果统计 ===")
 		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
-		self.report.terminate_session()
+		auth.AuthManager().terminate_session()
 
 
 class KnEditor:
