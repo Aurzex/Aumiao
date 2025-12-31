@@ -215,8 +215,7 @@ class InternalImplementations:
 		@staticmethod
 		def write_binary(path: str | Path, data: bytes) -> None:
 			"""写入二进制文件"""
-			with Path(path).open("wb") as f:
-				f.write(data)
+			Path(path).write_bytes(data)
 
 	class ShadowBuilder:
 		"""阴影积木构建器"""

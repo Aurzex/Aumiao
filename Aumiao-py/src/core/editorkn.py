@@ -2566,8 +2566,7 @@ class KNEditor:
 
 	def import_from_xml_file(self, filepath: str | Path) -> None:
 		"""从XML文件导入项目"""
-		with Path(filepath).open(encoding="utf-8") as f:
-			xml_content = f.read()
+		xml_content = Path(filepath).read_text(encoding="utf-8")
 		self.project = KNProject.from_xml(xml_content)
 		print(f"已从XML导入项目: {self.project.project_name}")
 		self._record_state()
@@ -2691,8 +2690,7 @@ class KNEditor:
 	def export_to_xml_file(self, filepath: str | Path) -> None:
 		"""导出项目为XML文件"""
 		xml_content = self.project.to_xml()
-		with Path(filepath).open("w", encoding="utf-8") as f:
-			f.write(xml_content)
+		Path(filepath).write_text(xml_content, encoding="utf-8")
 		print(f"项目已导出为XML: {filepath}")
 
 	def export(self, filepath: str | Path, formats: str = "json", indent: int = 2) -> None:
