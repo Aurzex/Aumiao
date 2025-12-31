@@ -9,38 +9,6 @@ from src.utils.decorator import singleton
 
 
 @singleton
-class AuthManager:
-	def __init__(self) -> None:
-		self._client = acquire.CodeMaoClient()
-		self._captcha_img_path = PathConfig().CAPTCHA_FILE_PATH
-
-	def authenticate_user(self, username: str, password: str, key: int, code: str) -> dict:
-		payload = {"username": username, "password": password, "key": key, "code": code}
-		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/login", method="POST", payload=payload)
-		return response.json()
-
-	def terminate_session(self) -> bool:
-		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/logout", method="DELETE")
-		return response.status_code == HTTPStatus.NO_CONTENT.value
-
-	def fetch_verification_captcha(self, timestamp: int) -> ...:
-		response = self._client.send_request(endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}", method="GET", log=False)
-		if response.status_code == HTTPStatus.OK.value:
-			file.CodeMaoFile().file_write(path=self._captcha_img_path, content=response.content, method="wb")
-			print(f"请到 {PathConfig().CAPTCHA_FILE_PATH} 查看验证码")
-		else:
-			print(f"获取验证码失败, 错误代码{response.status_code}")
-		return response.cookies
-
-	def fetch_user_dashboard_data(self) -> dict:
-		response = self._client.send_request(endpoint="https://api-whale.codemao.cn/admins/info", method="GET")
-		return response.json()
-
-	def configure_authentication_token(self, token: str) -> None:
-		self._client.switch_identity(token=token, identity="judgement")
-
-
-@singleton
 class ReportFetcher:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()

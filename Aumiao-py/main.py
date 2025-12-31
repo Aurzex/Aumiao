@@ -7,11 +7,12 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
-from src import auth, user, whale
+from src import auth, user
+from src.api.auth import AuthManager
 from src.core.base import Index
 from src.core.compile import decompile_work
 from src.core.deepser import CodeMaoTool
-from src.core.process import FileProcessor, ReportAuthManager
+from src.core.process import FileProcessor
 from src.core.services import FileUploader, MillenniumEntanglement, Motion, Report
 from src.utils import data, plugin, tool
 
@@ -249,8 +250,10 @@ def reply_work(_account_data_manager: AccountDataManager) -> None:
 def handle_report(_account_data_manager: AccountDataManager) -> None:
 	"""处理举报"""
 	printer.print_header("处理举报")
-	ReportAuthManager().execute_admin_login()
-	judgment_data = whale.AuthManager().fetch_user_dashboard_data()
+	identity = printer.prompt_input("请输入用户名")
+	password = printer.prompt_input("请输入密码")
+	AuthManager().login(identity=identity, password=password, role="admin")
+	judgment_data = AuthManager().fetch_admin_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
 	Report().execute_report_handle(admin_id=admin_id)
