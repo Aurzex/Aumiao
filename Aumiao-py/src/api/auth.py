@@ -272,7 +272,6 @@ class AuthManager:
 		self,
 		username: str | None,
 		password: str | None,
-		max_retries: int = 3,
 	) -> dict[str, Any]:
 		"""
 		处理管理员账密登录
