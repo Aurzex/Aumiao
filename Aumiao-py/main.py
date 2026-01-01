@@ -222,7 +222,7 @@ def clear_comments(_account_data_manager: AccountDataManager) -> None:
 	action_type = get_enum_input("请输入操作类型", {"ads", "duplicates", "blacklist"})
 	source = cast("Literal['work', 'post']", source)
 	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
-	Motion().clear_comments(source=source, action_type=action_type)
+	Motion().remove_comments_by_type(source=source, action_type=action_type)
 	print(printer.color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
 
 
@@ -233,7 +233,7 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 	printer.print_header("清除红点提醒")
 	method = get_enum_input("请输入方法", {"nemo", "web"})
 	method = cast("Literal['nemo', 'web']", method)
-	Motion().clear_red_point(method=method)
+	Motion().mark_notifications_as_read(method=method)
 	print(printer.color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
 
 
@@ -242,7 +242,7 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 def reply_work(_account_data_manager: AccountDataManager) -> None:
 	"""自动回复作品"""
 	printer.print_header("自动回复")
-	Motion().execute_auto_reply()
+	Motion().process_auto_replies()
 	print(printer.color_text("已成功执行自动回复", "SUCCESS"))
 
 
@@ -256,7 +256,7 @@ def handle_report(_account_data_manager: AccountDataManager) -> None:
 	judgment_data = AuthManager().fetch_admin_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-	Report().execute_report_handle(admin_id=admin_id)
+	Report().process_reports_loop(admin_id=admin_id)
 	print(printer.color_text("已成功处理举报", "SUCCESS"))
 
 
@@ -274,7 +274,7 @@ def download_fiction(_account_data_manager: AccountDataManager) -> None:
 	"""下载小说"""
 	printer.print_header("下载小说")
 	fiction_id = get_positive_int_input("请输入小说ID")
-	Motion().execute_download_fiction(fiction_id=fiction_id)
+	Motion().download_novel_content(fiction_id=fiction_id)
 	print(printer.color_text("小说下载完成", "SUCCESS"))
 
 
@@ -284,7 +284,7 @@ def generate_nemo_code(_account_data_manager: AccountDataManager) -> None:
 	"""生成喵口令"""
 	printer.print_header("生成喵口令")
 	work_id = get_positive_int_input("请输入作品编号")
-	Motion().generate_nemo_code(work_id=work_id)
+	Motion().generate_miao_code(work_id=work_id)
 	print(printer.color_text("生成完成", "SUCCESS"))
 
 
@@ -318,7 +318,7 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 		print(printer.color_text("文件或路径不存在", "ERROR"))
 		return
 	method = cast("Literal['pgaot', 'codemao','codegame']", method)
-	url = FileUploader().upload_file(method=method, file_path=file_path)
+	url = FileUploader().upload_file_or_dir(method=method, file_path=file_path)
 	print(f"保存地址: {url}")
 	print(printer.color_text("文件上传成功", "SUCCESS"))
 
