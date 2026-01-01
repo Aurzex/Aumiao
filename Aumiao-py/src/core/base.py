@@ -46,6 +46,7 @@ class HTTPConfig:
 class WebSocketConfig:
 	"""WebSocket相关配置"""
 
+	# ping间隔: 60000ms, ping超时: 180000ms
 	PING_MESSAGE: str = "2"
 	PONG_MESSAGE: str = "3"
 	CONNECT_MESSAGE: str = "40"
@@ -53,8 +54,8 @@ class WebSocketConfig:
 	EVENT_MESSAGE_PREFIX: str = "42"
 	HANDSHAKE_MESSAGE_PREFIX: str = "0"
 	TRANSPORT_TYPE: str = "websocket"
-	PING_INTERVAL: int = 20
-	PING_TIMEOUT: int = 10
+	PING_INTERVAL: int = 180
+	PING_TIMEOUT: int = 60
 	MESSAGE_TYPE_LENGTH: int = 2
 
 
