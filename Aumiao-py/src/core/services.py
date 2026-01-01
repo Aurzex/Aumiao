@@ -22,7 +22,7 @@ class FileUploader(ClassUnion):
 		super().__init__()
 		self.uploader = FileProcessor()
 
-	def upload_file(
+	def upload_file_or_dir(
 		self,
 		method: Literal["pgaot", "codemao", "codegame"],
 		file_path: Path,
@@ -57,9 +57,9 @@ class WorkParser(ClassUnion):
 
 	def __init__(self) -> None:
 		super().__init__()
-		self.process = ReplyProcessor()
+		self.processor = ReplyProcessor()
 
-	def execute_auto_reply_work(self, data: data.CodeMaoData, valid_reply_types: set[str]) -> bool:
+	def process_auto_replies(self, data: data.CodeMaoData, valid_reply_types: set[str]) -> bool:
 		"""
 		自动回复作品/帖子评论和回复,包含作品解析功能
 		Args:
@@ -99,7 +99,7 @@ class WorkParser(ClassUnion):
 					continue
 				processed_ids.add(reply_id)
 				# 2. 解析content字段
-				content_data = self.process.parse_content_field(reply)
+				content_data = self.processor.parse_content_field(reply)
 				if content_data is None:
 					continue
 				# 3. 提取必要信息
@@ -114,13 +114,13 @@ class WorkParser(ClassUnion):
 					continue
 				source_type = "work" if reply_type.startswith("WORK") else "post"
 				# 5. 提取文本内容
-				comment_text = self.process.extract_comment_text(reply_type, message_info)
+				comment_text = self.processor.extract_comment_text(reply_type, message_info)
 				# 6. 解析目标ID和父ID
-				target_id, parent_id = self.process.extract_target_and_parent_ids(reply_type, reply, message_info, business_id, source_type)
+				target_id, parent_id = self.processor.extract_target_and_parent_ids(reply_type, reply, message_info, business_id, source_type)
 				# 7. 检查是否包含作品解析关键词
 				if "@作品解析:" in comment_text:
 					# 处理作品解析请求
-					self._handle_work_parsing(
+					self._handle_work_parsing_request(
 						comment_text=comment_text,
 						sender_id=sender_id,
 						sender_nickname=sender_nickname,
@@ -132,9 +132,9 @@ class WorkParser(ClassUnion):
 					)
 					continue  # 跳过普通回复流程
 				# 8. 原有关键词匹配逻辑
-				chosen, matched_keyword = self.process.match_keyword(comment_text, formatted_answers, formatted_replies)
+				chosen, matched_keyword = self.processor.match_keyword(comment_text, formatted_answers, formatted_replies)
 				# 9. 打印日志
-				self.process.log_reply_info(reply_id, reply_type, source_type, sender_nickname, sender_id, business_name, comment_text, matched_keyword, chosen)
+				self.processor.log_reply_info(reply_id, reply_type, source_type, sender_nickname, sender_id, business_name, comment_text, matched_keyword, chosen)
 				# 10. 发送回复
 				result = self._send_reply(source_type=source_type, business_id=business_id, target_id=target_id, parent_id=parent_id, content=chosen)
 				if result:
@@ -148,7 +148,7 @@ class WorkParser(ClassUnion):
 		print(f"\n处理完成,共处理 {len(processed_ids)} 条通知")
 		return True
 
-	def _handle_work_parsing(  # noqa: PLR0915
+	def _handle_work_parsing_request(  # noqa: PLR0915
 		self,
 		comment_text: str,
 		sender_id: int,
@@ -168,7 +168,7 @@ class WorkParser(ClassUnion):
 		print(f"原始内容: {comment_text}")
 		try:
 			# 1. 提取作品链接或ID
-			work_info = self.process.extract_work_info(comment_text)
+			work_info = self.processor.extract_work_info(comment_text)
 			if not work_info:
 				print("未找到有效的作品链接或ID")
 				return
@@ -188,25 +188,25 @@ class WorkParser(ClassUnion):
 			print(f"作者: {author_nickname} (ID: {work_author_id})")
 			print(f"发送者是否为作者: {'是' if is_author else '否'}")
 			# 4. 解析命令
-			commands = self.process.parse_commands(comment_text)
+			commands = self.processor.parse_commands(comment_text)
 			print(f"解析到命令: {commands or '无'}")
 			# 5. 生成基础解析报告
-			report = self.process.generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
+			report = self.processor.generate_work_report(work_details=work_details, is_author=is_author, commands=commands)
 			# 6. 如果是作者且有编译命令,执行编译并生成CDN链接
 			cdn_links = []
 			if is_author and commands and "compile" in commands:
 				print("检测到编译命令,开始编译作品...")
-				cdn_link = self._handle_work_compilation(work_id, work_details)
+				cdn_link = self._compile_work_to_cdn(work_id, work_details)
 				if cdn_link:
 					print("作品编译完成,CDN链接已生成")
-					cdn_links = self.process.split_long_cdn_link(cdn_link)
+					cdn_links = self.processor.split_long_cdn_link(cdn_link)
 				else:
 					print("作品编译失败")
 					cdn_links = ["编译失败,请检查作品类型"]
 			# 7. 准备所有要发送的消息
 			messages_to_send = []
 			# 添加报告消息
-			report_parts = self.process.split_long_message(report)
+			report_parts = self.processor.split_long_message(report)
 			messages_to_send.extend(report_parts)
 			# 添加CDN链接消息
 			if cdn_links:
@@ -217,7 +217,7 @@ class WorkParser(ClassUnion):
 				print("作者身份确认,准备多位置处理")
 				# 发送作品评论
 				print(f"发送作品评论到作品 {work_id}:")
-				self.process.send_messages_with_delay(
+				self.processor.send_messages_with_delay(
 					messages=messages_to_send,
 					send_func=lambda msg: self._work_motion.create_work_comment(work_id=work_id, comment=msg, return_data=True),
 					comment_type="作品评论",
@@ -225,7 +225,7 @@ class WorkParser(ClassUnion):
 				# 如果在帖子中,也发送到帖子
 				if source_type == "post" and target_id > 0:
 					print(f"发送回复到帖子评论 {target_id}:")
-					self.process.send_messages_with_delay(
+					self.processor.send_messages_with_delay(
 						messages=messages_to_send,
 						send_func=lambda msg: self._forum_motion.create_comment_reply(reply_id=target_id, parent_id=parent_id, content=msg, return_data=True),
 						comment_type="帖子回复",
@@ -235,7 +235,7 @@ class WorkParser(ClassUnion):
 				# 非作者:只在帖子下回复评论
 				if source_type == "post" and target_id > 0:
 					print(f"发送回复到帖子评论 {target_id}:")
-					self.process.send_messages_with_delay(
+					self.processor.send_messages_with_delay(
 						messages=messages_to_send,
 						send_func=lambda msg: self._forum_motion.create_comment_reply(reply_id=target_id, parent_id=parent_id, content=msg, return_data=True),
 						comment_type="帖子回复",
@@ -246,7 +246,7 @@ class WorkParser(ClassUnion):
 			print(f"处理作品解析时发生错误: {e!s}")
 
 	@staticmethod
-	def _handle_work_compilation(work_id: int, work_details: dict) -> str | None:
+	def _compile_work_to_cdn(work_id: int, work_details: dict) -> str | None:
 		"""
 		处理作品编译流程并返回CDN链接
 		"""
@@ -307,7 +307,7 @@ class Motion(ClassUnion):
 		),
 	}
 
-	def clear_comments(
+	def remove_comments_by_type(
 		self,
 		source: Literal["work", "post"],
 		action_type: Literal["ads", "duplicates", "blacklist"],
@@ -361,7 +361,7 @@ class Motion(ClassUnion):
 			print(f"已删除: {entry}")
 		return True
 
-	def clear_red_point(self, method: Literal["nemo", "web"] = "web") -> bool:
+	def mark_notifications_as_read(self, method: Literal["nemo", "web"] = "web") -> bool:
 		"""清除未读消息红点提示
 		Args:
 			method: 处理模式
@@ -419,27 +419,27 @@ class Motion(ClassUnion):
 			print(f"清除红点过程中发生异常: {e}")
 			return False
 
-	def execute_auto_reply(self) -> bool:
+	def process_auto_replies(self) -> bool:
 		"""执行自动回复"""
 		data = self._data
 		valid_reply_types = VALID_REPLY_TYPES
 		# 使用作品解析器执行自动回复
-		return WorkParser().execute_auto_reply_work(data, valid_reply_types)
+		return WorkParser().process_auto_replies(data, valid_reply_types)
 
-	def like_all_work(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
+	def like_and_collect_user_works(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
 		self._work_motion.execute_toggle_follow(user_id=int(user_id))  # 优化方法名:manage→execute_toggle
 		for item in works_list:
 			item["id"] = cast("int", item["id"])
 			self._work_motion.execute_toggle_like(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 			self._work_motion.execute_toggle_collection(work_id=item["id"])  # 优化方法名:manage→execute_toggle
 
-	def like_my_novel(self, novel_list: list[dict]) -> None:
+	def toggle_novel_favorites(self, novel_list: list[dict]) -> None:
 		for item in novel_list:
 			item["id"] = cast("int", item["id"])
 			self._novel_motion.execute_toggle_novel_favorite(item["id"])
 
 	# 常驻置顶
-	def execute_maintain_top(self, method: Literal["shop", "novel"]) -> None:  # 优化方法名:添加execute_前缀
+	def update_workshop_or_publish_chapters(self, method: Literal["shop", "novel"]) -> None:  # 优化方法名:添加execute_前缀
 		if method == "shop":
 			detail = self._shop_obtain.fetch_workshop_details_list()
 			description = self._shop_obtain.fetch_workshop_details(detail["work_subject_id"])["description"]
@@ -462,7 +462,7 @@ class Motion(ClassUnion):
 		status = self._user_obtain.fetch_account_details()
 		return f"禁言状态{status['voice_forbidden']}, 签订友好条约{status['has_signed']}"
 
-	def execute_download_fiction(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
+	def download_novel_content(self, fiction_id: int) -> None:  # 优化方法名:添加execute_前缀
 		details = self._novel_obtain.fetch_novel_details(fiction_id)
 		info = details["data"]["fanficInfo"]
 		print(f"正在下载: {info['title']}-{info['nickname']}")
@@ -480,7 +480,7 @@ class Motion(ClassUnion):
 			formatted_content = self._tool.DataConverter().html_to_text(content, merge_empty_lines=True)
 			self._file.file_write(path=section_path, content=formatted_content)
 
-	def generate_nemo_code(self, work_id: int) -> None:
+	def generate_miao_code(self, work_id: int) -> None:
 		try:
 			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
 			work_info = self._client.send_request(endpoint=work_info_url, method="GET").json()  # 统一客户端调用
@@ -508,7 +508,7 @@ class Motion(ClassUnion):
 			print(f"An error occurred: {e!s}")
 
 	@staticmethod
-	def check_user_comments_stats(comments_data: list[dict], min_comments: int = 1) -> None:
+	def analyze_user_comments_statistics(comments_data: list[dict], min_comments: int = 1) -> None:
 		"""通过统计作品评论信息查看违规情况
 		Args:
 			comments_data: 用户评论数据列表
@@ -531,7 +531,7 @@ class Motion(ClassUnion):
 				print(f"  {i}. {comment}")
 			print("*" * 50)
 
-	def batch_report_post(self, timeline: int) -> None:
+	def report_recent_posts(self, timeline: int) -> None:
 		"""
 		实现风纪欲望的小帮手
 		"""
@@ -556,7 +556,7 @@ class Motion(ClassUnion):
 		{"id": 228, "name": "奇怪的小蜜桃"},
 	]
 
-	def fetch_admin_statistics(self) -> None:
+	def print_admin_statistics(self) -> None:
 		"""批量获取所有管理员的统计信息"""
 		print("管理员处理统计报表")
 		print("-" * 50)
@@ -588,9 +588,9 @@ class MillenniumEntanglement(ClassUnion):
 
 		def action() -> None:
 			if content_type == "work":
-				Motion().like_all_work(user_id=str(user_id), works_list=target_list)
+				Motion().like_and_collect_user_works(user_id=str(user_id), works_list=target_list)
 			else:
-				Motion().like_my_novel(novel_list=target_list)
+				Motion().toggle_novel_favorites(novel_list=target_list)
 
 		Obtain().process_edu_accounts(limit=None, action=action())
 
@@ -672,7 +672,7 @@ class MillenniumEntanglement(ClassUnion):
 			msg = f"不支持的来源类型 {source_type}"
 			raise TypeError(msg)
 
-	def execute_report_action(
+	def report_item(
 		self,
 		source_key: Literal["forum", "work", "shop"],
 		target_id: int,
@@ -733,7 +733,7 @@ class Report(ClassUnion):
 		self.processed_count = 0
 		self.printer = tool.Printer()  # 添加打印机实例
 
-	def execute_report_handle(self, admin_id: int) -> None:
+	def process_reports_loop(self, admin_id: int) -> None:
 		"""举报处理主流程:加载账号 → 循环处理 → 统计结果"""
 		self.printer.print_header("=== 举报处理系统 ===")
 		# 1. 加载学生账号(用于自动举报)
@@ -767,7 +767,7 @@ class KnEditor:
 	def __init__(self) -> None:
 		self.editor = KNEditor()
 
-	def handle_menu_choice(self, choice: str) -> bool:  # noqa: PLR0915
+	def handle_menu_selection(self, choice: str) -> bool:  # noqa: PLR0915
 		"""处理菜单选择"""
 		if choice == "1":
 			project_name = input("请输入项目名称: ").strip()
@@ -819,7 +819,7 @@ class KnEditor:
 		elif choice == "9":
 			self.handle_resource_management()
 		elif choice == "10":
-			self.handle_export_xml()
+			self.handle_xml_export()
 		elif choice == "11":
 			self.handle_search()
 		elif choice == "12":
@@ -977,7 +977,7 @@ class KnEditor:
 			for var in self.editor.project.variables.values():
 				print(f"  {var.get('name', 'Unknown')}: {var.get('value', 'N/A')}")
 
-	def handle_export_xml(self) -> None:
+	def handle_xml_export(self) -> None:
 		"""处理XML导出"""
 		if not self.editor.project:
 			print("请先加载或创建项目")
@@ -1016,7 +1016,7 @@ class KnEditor:
 			else:
 				print("场景未找到")
 
-	def init_loop(self) -> None:
+	def run(self) -> None:
 		# 主循环
 		while True:
 			print("\n请选择操作:")
@@ -1033,5 +1033,5 @@ class KnEditor:
 			print("11. 查找积木/角色/场景")
 			print("12. 退出")
 			choice = input("请输入选项 (1-12): ").strip()
-			if not self.handle_menu_choice(choice):
+			if not self.handle_menu_selection(choice):
 				break

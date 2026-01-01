@@ -1,11 +1,11 @@
 import cmd
-import contextlib
 import json
 import shlex
 import threading
 import time
 import traceback
 from collections.abc import Callable
+from contextlib import suppress
 from typing import Any, cast
 
 import httpx
@@ -112,11 +112,15 @@ class CloudVariable(CloudDataItem):
 	"""云变量基类"""
 
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudValueType) -> None:
+		# 调用父类初始化,父类会创建_change_callbacks列表
 		super().__init__(connection, cloud_variable_id, name, value)
-		self._change_callbacks: list[ChangeCallbackType] = []
+		# 注意:我们不在这里重新定义_change_callbacks,而是使用父类的
+		# 父类的_change_callbacks类型是list[Callable[..., None]]
+		# 但我们需要确保注册的回调是ChangeCallbackType类型
 
 	def on_change(self, callback: ChangeCallbackType) -> None:
 		"""注册变量变更回调"""
+		# 将ChangeCallbackType添加到父类的回调列表中
 		self._change_callbacks.append(callback)
 
 	def remove_change_callback(self, callback: ChangeCallbackType) -> None:
@@ -139,12 +143,18 @@ class CloudVariable(CloudDataItem):
 
 	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
 		"""触发变量变更回调"""
+		# 类型检查:确保是int或str类型
 		if not isinstance(old_value, (int, str)) or not isinstance(new_value, (int, str)):
 			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
+		# 类型转换,因为我们知道回调是ChangeCallbackType
+		old_val = cast("CloudValueType", old_value)
+		new_val = cast("CloudValueType", new_value)
+		# 调用所有回调
 		for callback in self._change_callbacks[:]:
 			try:
-				callback(old_value, new_value, source)
+				# 回调类型被注解为ChangeCallbackType
+				callback(old_val, new_val, source)
 			except Exception as error:
 				print(f"{ErrorMessages.CLOUD_VARIABLE_CALLBACK}: {error}")
 
@@ -192,6 +202,8 @@ class CloudList(CloudDataItem):
 
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudListValueType) -> None:
 		super().__init__(connection, cloud_variable_id, name, value or [])
+		# 注意:我们不需要在CloudList中重新定义_change_callbacks
+		# 使用父类的回调列表,类型为list[Callable[..., None]]
 		self._operation_callbacks: dict[str, list[ListOperationCallbackType]] = {
 			"push": [],
 			"pop": [],
@@ -203,6 +215,22 @@ class CloudList(CloudDataItem):
 			"clear": [],
 			"replace_last": [],
 		}
+
+	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
+		"""触发数据变更回调"""
+		# CloudList的值应该是列表类型
+		if not isinstance(old_value, list) or not isinstance(new_value, list):
+			print(f"警告: 云列表值类型不匹配, 期望 list, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
+			return
+		# 类型转换
+		old_list = cast("CloudListValueType", old_value)
+		new_list = cast("CloudListValueType", new_value)
+		# 调用父类的回调(如果有)
+		for callback in self._change_callbacks[:]:
+			try:
+				callback(old_list, new_list, source)
+			except Exception as error:
+				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
 	def on_operation(self, operation: str, callback: ListOperationCallbackType) -> None:
 		"""注册列表操作回调"""
@@ -384,6 +412,8 @@ class CloudConnection:
 		self._last_activity_time = 0.0
 		self._websocket_thread: threading.Thread | None = None
 		self._is_closing = False
+		self._variables_lock = threading.RLock()  # 添加变量操作锁
+		self._lists_lock = threading.RLock()  # 添加列表操作锁
 
 	def _get_work_info(self) -> WorkInfo:
 		"""获取作品信息"""
@@ -493,15 +523,23 @@ class CloudConnection:
 	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
 		"""WebSocket消息处理"""
 		self._last_activity_time = time.time()
-		try:
-			if isinstance(message, bytes):
-				message = message.decode("utf-8")
-			message_str = str(message)
-			# 处理ping消息
-			if message_str == WebSocketConfig.PING_MESSAGE:
-				if self.websocket_client:
-					self.websocket_client.send(WebSocketConfig.PONG_MESSAGE)
+		# 快速处理ping消息
+		if isinstance(message, bytes):
+			try:
+				message_str = message.decode("utf-8")
+			except UnicodeDecodeError:
+				print("错误: 无法解码WebSocket消息")
 				return
+		else:
+			message_str = str(message)
+		# 处理ping消息
+		if message_str == WebSocketConfig.PING_MESSAGE:
+			if self.websocket_client:
+				with suppress(Exception):
+					self.websocket_client.send(WebSocketConfig.PONG_MESSAGE)
+			return
+		# 处理其他消息
+		try:
 			# 处理握手消息
 			if message_str.startswith(WebSocketConfig.HANDSHAKE_MESSAGE_PREFIX):
 				self._handle_handshake_message(message_str)
@@ -514,6 +552,11 @@ class CloudConnection:
 			if message_str.startswith(WebSocketConfig.EVENT_MESSAGE_PREFIX):
 				self._handle_event_message(message_str)
 				return
+			# 未知消息类型
+			if len(message_str) < 50:
+				print(f"收到未知消息: {message_str}")
+			else:
+				print(f"收到未知消息: {message_str[:50]}...")
 		except Exception as error:
 			print(f"处理消息时出错: {error}")
 
@@ -648,7 +691,7 @@ class CloudConnection:
 		try:
 			cloud_variable_id = item.get("cvid")
 			name = item.get("name")
-			value = cast("CloudValueType", item.get("value"))
+			value = item.get("value")
 			data_type: int = cast("int", item.get("type"))
 			if not all([cloud_variable_id, name, value is not None, data_type is not None]):
 				print(f"数据项缺少必要字段: {DisplayHelper.truncate_value(item)}")
@@ -658,14 +701,48 @@ class CloudConnection:
 			except (ValueError, TypeError):
 				print(f"无效的数据类型: {data_type}")
 				return
-			data_creators = {
-				DataType.PRIVATE_VARIABLE.value: self._create_private_variable,
-				DataType.PUBLIC_VARIABLE.value: self._create_public_variable,
-				DataType.LIST.value: self._create_cloud_list,
-			}
-			creator = data_creators.get(data_type)
-			if creator:
-				creator(str(cloud_variable_id), str(name), value)
+			# 根据数据类型调用不同的创建函数,避免类型错误
+			if data_type == DataType.PRIVATE_VARIABLE.value:
+				# 私有变量:需要 CloudValueType (int | str)
+				if not isinstance(value, (int, str)):
+					print(f"警告: 私有变量值类型错误, 期望 int 或 str, 得到 {type(value)}")
+					# 尝试转换
+					try:
+						value = int(value) if isinstance(value, (float, bool)) else str(value)
+					except Exception:
+						value = str(value)
+				self._create_private_variable(str(cloud_variable_id), str(name), cast("CloudValueType", value))
+			elif data_type == DataType.PUBLIC_VARIABLE.value:
+				# 公有变量:需要 CloudValueType (int | str)
+				if not isinstance(value, (int, str)):
+					print(f"警告: 公有变量值类型错误, 期望 int 或 str, 得到 {type(value)}")
+					# 尝试转换
+					try:
+						value = int(value) if isinstance(value, (float, bool)) else str(value)
+					except Exception:
+						value = str(value)
+				self._create_public_variable(str(cloud_variable_id), str(name), cast("CloudValueType", value))
+			elif data_type == DataType.LIST.value:
+				# 列表类型:需要 CloudListValueType (list[CloudValueType])
+				if not isinstance(value, list):
+					print(f"警告: 列表数据不是列表类型, 进行转换: {type(value)} -> list")
+					value = []
+				# 确保列表元素类型正确
+				validated_list: CloudListValueType = []
+				if isinstance(value, list):
+					for item_val in value:
+						if isinstance(item_val, (int, str)):
+							validated_list.append(item_val)
+						else:
+							# 尝试转换非法的列表元素
+							try:
+								if isinstance(item_val, (float, bool)):
+									validated_list.append(int(item_val))
+								else:
+									validated_list.append(str(item_val))
+							except Exception:
+								validated_list.append(str(item_val))
+				self._create_cloud_list(str(cloud_variable_id), str(name), validated_list)
 			else:
 				print(f"未知数据类型: {data_type}")
 		except Exception as error:
@@ -674,22 +751,23 @@ class CloudConnection:
 	def _create_private_variable(self, cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		"""创建私有变量"""
 		variable = PrivateCloudVariable(self, cloud_variable_id, name, value)
-		self.private_variables[name] = variable
-		self.private_variables[cloud_variable_id] = variable
+		with self._variables_lock:
+			self.private_variables[name] = variable
+			self.private_variables[cloud_variable_id] = variable
 
 	def _create_public_variable(self, cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		"""创建公有变量"""
 		variable = PublicCloudVariable(self, cloud_variable_id, name, value)
-		self.public_variables[name] = variable
-		self.public_variables[cloud_variable_id] = variable
+		with self._variables_lock:
+			self.public_variables[name] = variable
+			self.public_variables[cloud_variable_id] = variable
 
-	def _create_cloud_list(self, cloud_variable_id: str, name: str, value: object) -> None:
+	def _create_cloud_list(self, cloud_variable_id: str, name: str, value: CloudListValueType) -> None:
 		"""创建云列表"""
-		if not isinstance(value, list):
-			value = []
 		cloud_list = CloudList(self, cloud_variable_id, name, value)
-		self.lists[name] = cloud_list
-		self.lists[cloud_variable_id] = cloud_list
+		with self._lists_lock:
+			self.lists[name] = cloud_list
+			self.lists[cloud_variable_id] = cloud_list
 
 	def _handle_update_private_variable(self, data: dict[str, Any] | object) -> None:
 		"""处理更新私有变量消息"""
@@ -866,13 +944,35 @@ class CloudConnection:
 	def _cleanup_connection(self) -> None:
 		"""清理连接资源"""
 		self._stop_ping()
+		# 清理WebSocket连接
 		if self.websocket_client:
-			with contextlib.suppress(Exception):
+			try:
+				# 尝试正常关闭
 				self.websocket_client.close()
-			self.websocket_client = None
+			except Exception as e:
+				print(e)
+			finally:
+				self.websocket_client = None
+		# 清理线程
 		if self._websocket_thread and self._websocket_thread.is_alive():
-			self._websocket_thread.join(timeout=2.0)
+			# 等待线程结束,但不要太久
+			self._websocket_thread.join(timeout=1.0)
 			self._websocket_thread = None
+		# 清理数据(需要加锁)
+		with self._variables_lock:
+			self.private_variables.clear()
+			self.public_variables.clear()
+		with self._lists_lock:
+			self.lists.clear()
+		# 重置状态
+		with self._connection_lock:
+			self.connected = False
+			self.data_ready = False
+			self._join_sent = False
+		with self._pending_requests_lock:
+			self._pending_ranking_requests.clear()
+		self.online_users = 0
+		self._last_activity_time = 0.0
 
 	def connect(self) -> None:
 		"""建立云连接"""
@@ -921,10 +1021,16 @@ class CloudConnection:
 		"""关闭云连接"""
 		self._is_closing = True
 		self.auto_reconnect = False
+		# 首先标记为断开状态
 		with self._connection_lock:
+			was_connected = self.connected
 			self.connected = False
+		if was_connected:
+			print("正在关闭连接...")
+		# 清理连接资源
 		self._cleanup_connection()
-		self.clear_callbacks()
+		# 清理回调(可选,取决于需求)
+		# self.clear_callbacks()
 		print("连接已关闭")
 
 	def check_connection_health(self) -> bool:
@@ -975,48 +1081,54 @@ class CloudConnection:
 
 	def get_private_variable(self, name: str) -> PrivateCloudVariable | None:
 		"""获取私有变量"""
-		if name in self.private_variables:
-			return self.private_variables[name]
-		try:
-			if name.isdigit():
-				return self.private_variables.get(name)
-		except (AttributeError, ValueError):
-			pass
-		return None
+		with self._variables_lock:
+			if name in self.private_variables:
+				return self.private_variables[name]
+			try:
+				if name.isdigit():
+					return self.private_variables.get(name)
+			except (AttributeError, ValueError):
+				pass
+			return None
 
 	def get_public_variable(self, name: str) -> PublicCloudVariable | None:
 		"""获取公有变量"""
-		if name in self.public_variables:
-			return self.public_variables[name]
-		try:
-			if name.isdigit():
-				return self.public_variables.get(name)
-		except (AttributeError, ValueError):
-			pass
-		return None
+		with self._variables_lock:
+			if name in self.public_variables:
+				return self.public_variables[name]
+			try:
+				if name.isdigit():
+					return self.public_variables.get(name)
+			except (AttributeError, ValueError):
+				pass
+			return None
 
 	def get_list(self, name: str) -> CloudList | None:
 		"""获取云列表"""
-		if name in self.lists:
-			return self.lists[name]
-		try:
-			if name.isdigit():
-				return self.lists.get(name)
-		except (AttributeError, ValueError):
-			pass
-		return None
+		with self._lists_lock:
+			if name in self.lists:
+				return self.lists[name]
+			try:
+				if name.isdigit():
+					return self.lists.get(name)
+			except (AttributeError, ValueError):
+				pass
+			return None
 
 	def get_all_private_variables(self) -> dict[str, PrivateCloudVariable]:
 		"""获取所有私有变量"""
-		return {k: v for k, v in self.private_variables.items() if not k.isdigit()}
+		with self._variables_lock:
+			return {k: v for k, v in self.private_variables.items() if not k.isdigit()}
 
 	def get_all_public_variables(self) -> dict[str, PublicCloudVariable]:
 		"""获取所有公有变量"""
-		return {k: v for k, v in self.public_variables.items() if not k.isdigit()}
+		with self._variables_lock:
+			return {k: v for k, v in self.public_variables.items() if not k.isdigit()}
 
 	def get_all_lists(self) -> dict[str, CloudList]:
 		"""获取所有云列表"""
-		return {k: v for k, v in self.lists.items() if not k.isdigit()}
+		with self._lists_lock:
+			return {k: v for k, v in self.lists.items() if not k.isdigit()}
 
 	def set_private_variable(self, name: str, value: int | str) -> bool:
 		"""设置私有变量值"""
