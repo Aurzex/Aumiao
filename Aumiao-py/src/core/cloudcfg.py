@@ -5,7 +5,6 @@ import threading
 import time
 import traceback
 from collections.abc import Callable
-from contextlib import suppress
 from typing import Any, cast
 
 import httpx
@@ -379,19 +378,19 @@ class CloudConnection:
 	"""云连接核心类 - 使用外部导入的配置"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
-		self.work_id = work_id
-		self.editor = editor
+		self._ping_thread: threading.Thread | None = None
 		self.authenticator = Authenticator(authorization_token)
-		self.websocket_client: websocket.WebSocketApp | None = None
-		self.connected = False
 		self.auto_reconnect = True
-		self.reconnect_interval = DataConfig.RECONNECT_INTERVAL
-		self.reconnect_attempts = 0
+		self.connected = False
+		self.editor = editor
+		self.lists: dict[str, CloudList] = {}
 		self.max_reconnect_attempts = DataConfig.MAX_RECONNECT_ATTEMPTS
 		self.private_variables: dict[str, PrivateCloudVariable] = {}
 		self.public_variables: dict[str, PublicCloudVariable] = {}
-		self.lists: dict[str, CloudList] = {}
-		self._ping_thread: threading.Thread | None = None
+		self.reconnect_attempts = 0
+		self.reconnect_interval = DataConfig.RECONNECT_INTERVAL
+		self.websocket_client: websocket.WebSocketApp | None = None
+		self.work_id = work_id
 		self._callbacks: dict[str, list[Callable[..., None]]] = {
 			"open": [],
 			"close": [],
@@ -401,19 +400,21 @@ class CloudConnection:
 			"online_users_change": [],
 			"ranking_received": [],
 		}
-		self.online_users = 0
-		self.data_ready = False
-		self._pending_ranking_requests: list[PrivateCloudVariable] = []
-		self._ping_active = False
-		self._join_sent = False
-		self._work_info: WorkInfo | None = None
 		self._connection_lock = threading.RLock()
-		self._pending_requests_lock = threading.Lock()
-		self._last_activity_time = 0.0
-		self._websocket_thread: threading.Thread | None = None
 		self._is_closing = False
-		self._variables_lock = threading.RLock()  # 添加变量操作锁
+		self._join_sent = False
+		self._last_activity_time = 0.0
 		self._lists_lock = threading.RLock()  # 添加列表操作锁
+		self._pending_ranking_requests: list[PrivateCloudVariable] = []
+		self._pending_requests_lock = threading.Lock()
+		self._ping_active = False
+		self._ping_interval = 0
+		self._ping_timeout = 0
+		self._variables_lock = threading.RLock()  # 添加变量操作锁
+		self._websocket_thread: threading.Thread | None = None
+		self._work_info: WorkInfo | None = None
+		self.data_ready = False
+		self.online_users = 0
 
 	def _get_work_info(self) -> WorkInfo:
 		"""获取作品信息"""
@@ -523,20 +524,16 @@ class CloudConnection:
 	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
 		"""WebSocket消息处理"""
 		self._last_activity_time = time.time()
-		# 快速处理ping消息
 		if isinstance(message, bytes):
 			try:
 				message_str = message.decode("utf-8")
 			except UnicodeDecodeError:
-				print("错误: 无法解码WebSocket消息")
 				return
 		else:
 			message_str = str(message)
-		# 处理ping消息
-		if message_str == WebSocketConfig.PING_MESSAGE:
-			if self.websocket_client:
-				with suppress(Exception):
-					self.websocket_client.send(WebSocketConfig.PONG_MESSAGE)
+		# 更新活动时间,但不处理ping消息(库会自动处理)
+		if message_str in {WebSocketConfig.PING_MESSAGE, WebSocketConfig.PONG_MESSAGE}:
+			# 这些由库自动处理,我们只记录活动
 			return
 		# 处理其他消息
 		try:
@@ -564,10 +561,10 @@ class CloudConnection:
 		"""处理握手消息"""
 		try:
 			handshake_data = json.loads(message[1:])
-			ping_interval = handshake_data.get("pingInterval", DataConfig.PING_INTERVAL_MS)
-			ping_timeout = handshake_data.get("pingTimeout", DataConfig.PING_TIMEOUT_MS)
-			print(f"✓ 握手成功, ping间隔: {ping_interval}ms, ping超时: {ping_timeout}ms")
-			self._start_ping(ping_interval)
+			self._ping_interval = handshake_data.get("pingInterval", 25000)
+			self._ping_timeout = handshake_data.get("pingTimeout", 60000)
+			print(f"✓ 握手成功, ping间隔: {self._ping_interval}ms, ping超时: {self._ping_timeout}ms")
+			# 不启动自定义ping线程, 让websocket库处理
 			if self.websocket_client:
 				self.websocket_client.send(WebSocketConfig.CONNECT_MESSAGE)
 				print("✓ 已发送连接请求")
