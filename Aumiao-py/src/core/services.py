@@ -545,6 +545,29 @@ class Motion(ClassUnion):
 			if create_time > timeline:
 				print(f"帖子{single['title']}-ID{single['id']}-发布于{self._tool.TimeUtils().format_timestamp(create_time)}")
 
+	admins_list: ClassVar = [
+		{"id": 220, "name": "石榴 Grant"},
+		{"id": 222, "name": "shidang88"},
+		{"id": 223, "name": "喵鱼a"},
+		{"id": 224, "name": "沙雕的初小白"},
+		{"id": 225, "name": "旁观者JErS"},
+		{"id": 226, "name": "宜壳乐Cat"},
+		{"id": 227, "name": "凌风光耀Aug"},
+		{"id": 228, "name": "奇怪的小蜜桃"},
+	]
+
+	def fetch_admin_statistics(self) -> None:
+		"""批量获取所有管理员的统计信息"""
+		print("管理员处理统计报表")
+		print("-" * 50)
+		for admin in self.admins_list:
+			comment_count = self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status="ALL", filter_type="admin_id", target_id=cast("int", admin["id"]))["total"]
+			work_count = self._whale_obtain.fetch_work_reports_total(source_type="ALL", status="ALL", filter_type="admin_id", target_id=cast("int", admin["id"]))["total"]
+			print(f"{admin['name']} (ID: {admin['id']}):")
+			print(f"  评论举报处理数: {comment_count}")
+			print(f"  作品举报处理数: {work_count}")
+			print()
+
 
 @decorator.singleton
 class MillenniumEntanglement(ClassUnion):
