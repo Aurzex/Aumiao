@@ -5,13 +5,13 @@
 本插件系统允许开发者扩展应用程序功能，而无需修改主程序代码。插件可以：
 
 1. 提供新的命令和功能
-2. **动态修改现有模块的代码**（通过行号插入、模式匹配插入、函数重写）
+2. **动态修改现有模块的代码** (通过行号插入、模式匹配插入、函数重写)
 3. 响应插件加载和卸载事件
 4. 管理配置和持久化数据
 
 ## 插件结构
 
-每个插件必须是一个独立的 Python 模块（.py 文件），并包含一个名为`Plugin`的类，该类继承自`BasePlugin`。
+每个插件必须是一个独立的 Python 模块 (.py 文件)，并包含一个名为 `Plugin` 的类，该类继承自 `BasePlugin`。
 
 ### 必需部分
 
@@ -71,13 +71,13 @@ class Plugin(BasePlugin):
 
 ### 三种修改方式
 
-#### 1. **行号注入**（不推荐 - 易受代码变动影响）
+#### 1. **行号注入**(不推荐 - 易受代码变动影响)
 
 ```python
 self.inject_at_line("target_module", 42, "print('注入的代码')", position='before')
 ```
 
-#### 2. **模式匹配注入**（中等可靠性）
+#### 2. **模式匹配注入**(中等可靠性)
 
 ```python
 self.inject_at_pattern(
@@ -88,7 +88,7 @@ self.inject_at_pattern(
 )
 ```
 
-#### 3. **函数重写**（推荐 - 最可靠）
+#### 3. **函数重写**(推荐 - 最可靠)
 
 ```python
 def new_function(self, *args, **kwargs):
@@ -107,7 +107,7 @@ self.rewrite_function("target_module", "target_function", new_function)
 
 代码修改必须在目标模块**被导入之前**应用。如果目标模块已经加载，修改可能不会生效。
 
-**解决方案：**
+**解决方案**：
 
 ```python
 def on_load(self, config: dict[str, Any]) -> None:
@@ -132,7 +132,7 @@ def _backup_original_functions(self):
 def apply_code_modifications(self):
     """应用代码修改"""
     try:
-        # 方法1: 直接函数替换（最可靠）
+        # 方法1: 直接函数替换(最可靠)
         import target_module
         target_module.function_to_modify = self.new_implementation
 
@@ -158,7 +158,7 @@ def on_unload(self):
 
 ### 配置模式支持的类型
 
-- `bool`: 布尔值（true/false, 1/0, yes/no）
+- `bool`: 布尔值 (true/false, 1/0, yes/no)
 - `int`: 整数
 - `float`: 浮点数
 - `str`: 字符串
@@ -272,7 +272,7 @@ class Plugin(BasePlugin):
         try:
             import src.community as community
 
-            # 方法1: 直接替换（最可靠）
+            # 方法1: 直接替换(最可靠)
             community.authenticate_with_token = self.new_authenticate_function
 
             # 方法2: 使用系统的重写功能
@@ -333,7 +333,7 @@ class Plugin(BasePlugin):
 
 #### Q: 代码修改没有生效？
 
-**A:** 检查目标模块是否已加载，使用重新加载：
+**A**: 检查目标模块是否已加载，使用重新加载：
 
 ```python
 import importlib
@@ -343,7 +343,7 @@ if "target_module" in sys.modules:
 
 #### Q: 插件加载失败？
 
-**A:** 检查：
+**A**: 检查：
 
 - 所有必需属性是否正确定义
 - register() 返回正确的格式
@@ -351,7 +351,7 @@ if "target_module" in sys.modules:
 
 #### Q: 配置不保存？
 
-**A:** 确保使用正确的配置键名，并在修改后调用保存：
+**A**: 确保使用正确的配置键名，并在修改后调用保存：
 
 ```python
 self.manager.update_config(plugin_name, new_config)
