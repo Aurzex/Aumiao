@@ -9,7 +9,7 @@ from typing import ClassVar, Literal, cast
 
 from src.api import auth
 from src.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, data, decorator, tool
-from src.core.compile import decompile_work
+from src.core.compile import CodemaoDecompiler
 from src.core.editorkn import KNEditor, KNProject
 from src.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from src.core.retrieve import Obtain
@@ -259,7 +259,7 @@ class WorkParser(ClassUnion):
 				print("不支持NEMO作品上传到编程猫CDN")
 				return None
 			# 解压作品文件
-			file_path = Path(decompile_work(work_id=work_id))
+			file_path = Path(CodemaoDecompiler().decompile(work_id=work_id))
 			# 上传文件到CDN
 			return FileProcessor().handle_file_upload(
 				file_path=file_path,
