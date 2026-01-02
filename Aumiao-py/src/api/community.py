@@ -3,7 +3,6 @@ from functools import lru_cache
 from typing import Literal
 
 from src.utils import acquire
-from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
@@ -64,7 +63,6 @@ class DataFetcher:
 		limit: int = 15,
 	) -> Generator[dict]:
 		params = {"query_type": types}
-
 		return self._client.fetch_paginated_data(
 			endpoint="/web/message-record",
 			params=params,
@@ -290,6 +288,53 @@ class DataFetcher:
 		response = self._client.send_request(endpoint="https://api-wechatsbp-codemaster.codemao.cn/user/info/certificate", params=params, method="GET")
 		return response.json()
 
+	# 获取未读板块消息数量
+	# TODO @Aurzex: 功能待确认
+	def fetch_board_unread_count(self, board_id: int) -> dict:
+		response = self._client.send_request(method="GET", endpoint=f"/web/forums/boards/{board_id}/unread-count")
+		return response.json()
+
+	# 获取活动页面
+	def fetch_studio_info(self, studio_id: int) -> dict:
+		response = self._client.send_request(method="GET", endpoint=f"/web/studios/{studio_id}")
+		return response.json()
+
+	# 获取活动帖子
+	def fetch_studio_posts_gen(self, studio_id: int, limit: int | None = 24) -> Generator[dict]:
+		params = {"limit": 50, "offset": 0, "studio_id": studio_id, "sort": "-created_at"}
+		return self._client.fetch_paginated_data(
+			endpoint="/web/forums/posts",
+			params=params,
+			limit=limit,
+		)
+
+	# 获取活动教程
+	def fetch_studio_courses_gen(self, studio_id: int, limit: int | None = 100) -> Generator[dict]:
+		params = {"limit": 50, "offset": 0}
+		return self._client.fetch_paginated_data(
+			endpoint=f"/web/studios/{studio_id}/courses",
+			params=params,
+			limit=limit,
+		)
+
+	# 获取活动作品
+	def fetch_studio_works_gen(self, studio_id: int, limit: int | None = 24) -> Generator[dict]:
+		params = {"limit": 50, "offset": 0, "sort": "-n_likes"}
+		return self._client.fetch_paginated_data(
+			endpoint=f"/web/studios/{studio_id}/works",
+			params=params,
+			limit=limit,
+		)
+
+	# 获取活动参加者
+	def fetch_studio_participators_gen(self, studio_id: int, limit: int | None = 24) -> Generator[dict]:
+		params = {"limit": 50, "offset": 0}
+		return self._client.fetch_paginated_data(
+			endpoint=f"/web/studios/{studio_id}/participators",
+			params=params,
+			limit=limit,
+		)
+
 
 @singleton
 class UserAction:
@@ -300,7 +345,7 @@ class UserAction:
 	# 签订友好协议
 	def execute_sign_agreement(self) -> bool:
 		response = self._client.send_request(endpoint="/nemo/v3/user/level/signature", method="POST")
-		return response.status_code == HTTPStatus.OK.value
+		return response.status_code == acquire.HTTPStatus.OK.value
 
 	# 获取用户协议
 	def fetch_agreements(self) -> dict:
@@ -336,4 +381,4 @@ class UserAction:
 			endpoint=f"/web/message-record/{message_id}",
 			method="DELETE",
 		)
-		return response.status_code == HTTPStatus.NO_CONTENT.value
+		return response.status_code == acquire.HTTPStatus.NO_CONTENT.value
