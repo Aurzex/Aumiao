@@ -35,6 +35,7 @@ class PathConfig:
 	HISTORY_FILE_PATH = CACHE_DIR / "history.json"
 	SETTING_FILE_PATH = DATA_DIR / "setting.json"
 	TOKEN_FILE_PATH = DATA_DIR / "token.txt"
+	PASSWORD_FILE_PATH = DATA_DIR / "password.txt"
 
 	@classmethod
 	def ensure_directories(cls) -> None:

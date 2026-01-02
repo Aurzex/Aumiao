@@ -316,6 +316,17 @@ class DataFetcher:
 			limit=limit,
 		)
 
+	def fetch_class_students_total(self, invalid: int = 1) -> dict[Literal["total", "total_pages"], int]:
+		data = {"invalid": invalid}
+		params = {"page": 1, "limit": 100}
+		return self._client.get_pagination_total(
+			endpoint="https://eduzone.codemao.cn/edu/zone/students",
+			params=params,
+			payload=data,
+			fetch_method="POST",
+			config={"amount_key": "limit", "offset_key": "page"},
+		)
+
 	def fetch_class_students_gen(self, invalid: int = 1, limit: int | None = 100) -> Generator[dict]:
 		data = {"invalid": invalid}
 		params = {"page": 1, "limit": 100}
