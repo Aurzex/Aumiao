@@ -11,7 +11,7 @@ class Plugin(BasePlugin):
 
 	@property
 	def PLUGIN_DESCRIPTION(self) -> str:
-		return "一个简单的问候插件,提供多种问候功能"
+		return "一个简单的问候插件, 提供多种问候功能"
 
 	@property
 	def PLUGIN_VERSION(self) -> str:
@@ -71,7 +71,7 @@ class Plugin(BasePlugin):
 		"""重复问候指定次数
 		Args:
 			name: 要问候的人名
-			count: 重复次数 (最大不超过配置中的max_repeat_count)
+			count: 重复次数 (最大不超过配置中的 max_repeat_count)
 		"""
 		max_count = self.config.get("max_repeat_count", 3)
 		actual_count = min(count, max_count)

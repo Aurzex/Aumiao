@@ -35,22 +35,22 @@ class Entity:
 
 
 class IDGenerator:
-	"""ID生成器"""
+	"""ID 生成器"""
 
 	@staticmethod
 	def generate_uuid() -> str:
-		"""生成UUID"""
+		"""生成 UUID"""
 		return str(uuid.uuid4())
 
 	@staticmethod
 	def generate_id(length: int = 20) -> str:
-		"""生成随机ID(兼容旧格式)"""
+		"""生成随机 ID (兼容旧格式)"""
 		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		return "".join(random.choice(chars) for _ in range(length))
 
 	@staticmethod
 	def generate_short_id() -> str:
-		"""生成短ID"""
+		"""生成短 ID"""
 		return IDGenerator.generate_id(8)
 
 
@@ -71,9 +71,9 @@ class WorkParser:
 	def parse(self) -> None:
 		"""解析作品数据"""
 		print("开始解析作品数据...")
-		# 检查是否有theatre字段
+		# 检查是否有 theatre 字段
 		if "theatre" not in self.work_data:
-			print("错误: 作品文件中缺少'theatre'字段")
+			print("错误: 作品文件中缺少 'theatre' 字段")
 			return
 		# 解析场景
 		self._parse_scenes()
@@ -88,11 +88,11 @@ class WorkParser:
 		print(f"解析完成: {len(self.entities)} 个实体")
 
 	def _parse_scenes(self) -> None:
-		"""解析场景 - 修复: 场景在theatre.scenes字典中"""
+		"""解析场景 - 修复: 场景在 theatre.scenes 字典中"""
 		theatre = self.work_data.get("theatre", {})
 		scenes = theatre.get("scenes", {})
 		if not isinstance(scenes, dict):
-			print(f"  警告: 场景数据格式无效: {type(scenes)}")
+			print(f"警告: 场景数据格式无效: {type(scenes)}")
 			return
 		for scene_id, scene_data in scenes.items():
 			if isinstance(scene_data, dict):
@@ -104,16 +104,16 @@ class WorkParser:
 				)
 				self.entities[scene.id] = scene
 				self.id_maps["scenes"][scene.id] = scene.id
-				print(f"  场景: {scene.name} ({scene.id})")
+				print(f"场景: {scene.name} ({scene.id})")
 			else:
-				print(f"  警告: 跳过无效的场景数据: {scene_id}")
+				print(f"警告: 跳过无效的场景数据: {scene_id}")
 
 	def _parse_actors(self) -> None:
-		"""解析演员 - 修复: 演员在theatre.actors字典中"""
+		"""解析演员 - 修复: 演员在 theatre.actors 字典中"""
 		theatre = self.work_data.get("theatre", {})
 		actors = theatre.get("actors", {})
 		if not isinstance(actors, dict):
-			print(f"  警告: 演员数据格式无效: {type(actors)}")
+			print(f"警告: 演员数据格式无效: {type(actors)}")
 			return
 		for actor_id, actor_data in actors.items():
 			if isinstance(actor_data, dict):
@@ -125,16 +125,16 @@ class WorkParser:
 				)
 				self.entities[actor.id] = actor
 				self.id_maps["actors"][actor.id] = actor.id
-				print(f"  演员: {actor.name} ({actor.id})")
+				print(f"演员: {actor.name} ({actor.id})")
 			else:
-				print(f"  警告: 跳过无效的演员数据: {actor_id}")
+				print(f"警告: 跳过无效的演员数据: {actor_id}")
 
 	def _parse_groups(self) -> None:
-		"""解析组 - 修复: 组在theatre.groups字典中"""
+		"""解析组 - 修复: 组在 theatre.groups 字典中"""
 		theatre = self.work_data.get("theatre", {})
 		groups = theatre.get("groups", {})
 		if not isinstance(groups, dict):
-			print(f"  警告: 组数据格式无效: {type(groups)}")
+			print(f"警告: 组数据格式无效: {type(groups)}")
 			return
 		for group_id, group_data in groups.items():
 			if isinstance(group_data, dict):
@@ -146,16 +146,16 @@ class WorkParser:
 				)
 				self.entities[group.id] = group
 				self.id_maps["groups"][group.id] = group.id
-				print(f"  组: {group.name} ({group.id})")
+				print(f"组: {group.name} ({group.id})")
 			else:
-				print(f"  警告: 跳过无效的组数据: {group_id}")
+				print(f"警告: 跳过无效的组数据: {group_id}")
 
 	def _parse_styles(self) -> None:
-		"""解析样式 - 修复: 样式在theatre.styles字典中"""
+		"""解析样式 - 修复: 样式在 theatre.styles 字典中"""
 		theatre = self.work_data.get("theatre", {})
 		styles = theatre.get("styles", {})
 		if not isinstance(styles, dict):
-			print(f"  警告: 样式数据格式无效: {type(styles)}")
+			print(f"警告: 样式数据格式无效: {type(styles)}")
 			return
 		for style_id, style_data in styles.items():
 			if isinstance(style_data, dict):
@@ -167,15 +167,15 @@ class WorkParser:
 				)
 				self.entities[style.id] = style
 				self.id_maps["styles"][style.id] = style.id
-				print(f"  样式: {style.name} ({style.id})")
+				print(f"样式: {style.name} ({style.id})")
 			else:
-				print(f"  警告: 跳过无效的样式数据: {style_id}")
+				print(f"警告: 跳过无效的样式数据: {style_id}")
 
 	def _parse_variables(self) -> None:
-		"""解析变量 - 修复: 变量在cloud_variables字典中"""
+		"""解析变量 - 修复: 变量在 cloud_variables 字典中"""
 		variables_dict = self.work_data.get("cloud_variables", {})
 		if not isinstance(variables_dict, dict):
-			print(f"  警告: 变量数据格式无效: {type(variables_dict)}")
+			print(f"警告: 变量数据格式无效: {type(variables_dict)}")
 			return
 		for var_name, var_value in variables_dict.items():
 			variable = Entity(
@@ -186,7 +186,7 @@ class WorkParser:
 			)
 			self.entities[variable.id] = variable
 			self.id_maps["variables"][variable.id] = variable.id
-			print(f"  变量: {variable.name} = {var_value}")
+			print(f"变量: {variable.name} = {var_value}")
 
 
 class WorkEditor:
@@ -197,20 +197,20 @@ class WorkEditor:
 		self.work_data = work_parser.work_data.copy()
 
 	def remap_ids(self) -> None:
-		"""重新映射所有ID"""
-		print("\n开始重新映射ID...")
-		# 生成新的ID映射
+		"""重新映射所有 ID"""
+		print("\n 开始重新映射 ID...")
+		# 生成新的 ID 映射
 		self._generate_id_maps()
-		# 更新所有实体的ID
+		# 更新所有实体的 ID
 		self._update_entity_ids()
 		# 更新所有引用关系
 		self._update_references()
-		print("ID重新映射完成!")
+		print("ID 重新映射完成!")
 
 	def _generate_id_maps(self) -> None:
-		"""生成ID映射表"""
-		print("  生成新的ID映射表...")
-		# 为每种实体类型生成新ID
+		"""生成 ID 映射表"""
+		print("生成新的 ID 映射表...")
+		# 为每种实体类型生成新 ID
 		for entity_id, entity in self.parser.entities.items():
 			entity_type = entity.entity_type
 			new_id = IDGenerator.generate_uuid()
@@ -227,21 +227,21 @@ class WorkEditor:
 				self.parser.id_maps["variables"][entity_id] = new_id
 
 	def _update_entity_ids(self) -> None:
-		"""更新实体ID"""
-		print("  更新实体ID...")
-		# 更新场景ID
+		"""更新实体 ID"""
+		print("更新实体 ID...")
+		# 更新场景 ID
 		self._update_scene_ids()
-		# 更新演员ID
+		# 更新演员 ID
 		self._update_actor_ids()
-		# 更新组ID
+		# 更新组 ID
 		self._update_group_ids()
-		# 更新样式ID
+		# 更新样式 ID
 		self._update_style_ids()
-		# 更新变量ID
+		# 更新变量 ID
 		self._update_variable_ids()
 
 	def _update_scene_ids(self) -> None:
-		"""更新场景ID"""
+		"""更新场景 ID"""
 		theatre = self.work_data.get("theatre", {})
 		scenes = theatre.get("scenes", {})
 		new_scenes = {}
@@ -249,14 +249,14 @@ class WorkEditor:
 			old_id_str = str(old_id)
 			if old_id_str in self.parser.id_maps["scenes"]:
 				new_id = self.parser.id_maps["scenes"][old_id_str]
-				# 更新场景自身ID
+				# 更新场景自身 ID
 				if isinstance(scene_data, dict):
 					scene_data["id"] = new_id
 					new_scenes[new_id] = scene_data
 			else:
 				new_scenes[old_id_str] = scene_data
 		theatre["scenes"] = new_scenes
-		# 更新scenes_order中的ID
+		# 更新 scenes_order 中的 ID
 		if "scenes_order" in theatre:
 			new_order = []
 			for old_id in theatre["scenes_order"]:
@@ -268,7 +268,7 @@ class WorkEditor:
 			theatre["scenes_order"] = new_order
 
 	def _update_actor_ids(self) -> None:
-		"""更新演员ID"""
+		"""更新演员 ID"""
 		theatre = self.work_data.get("theatre", {})
 		actors = theatre.get("actors", {})
 		new_actors = {}
@@ -276,7 +276,7 @@ class WorkEditor:
 		for old_id, actor_data in actors.items():
 			old_id_str = str(old_id)
 			if isinstance(actor_data, dict):
-				# 更新ID
+				# 更新 ID
 				if old_id_str in self.parser.id_maps["actors"]:
 					new_id = self.parser.id_maps["actors"][old_id_str]
 					actor_data["id"] = new_id
@@ -290,14 +290,14 @@ class WorkEditor:
 		theatre["actors"] = new_actors
 
 	def _update_group_ids(self) -> None:
-		"""更新组ID"""
+		"""更新组 ID"""
 		theatre = self.work_data.get("theatre", {})
 		groups = theatre.get("groups", {})
 		new_groups = {}
 		for old_id, group_data in groups.items():
 			old_id_str = str(old_id)
 			if isinstance(group_data, dict):
-				# 更新ID
+				# 更新 ID
 				if old_id_str in self.parser.id_maps["groups"]:
 					new_id = self.parser.id_maps["groups"][old_id_str]
 					group_data["id"] = new_id
@@ -317,7 +317,7 @@ class WorkEditor:
 		theatre["groups"] = new_groups
 
 	def _update_style_ids(self) -> None:
-		"""更新样式ID"""
+		"""更新样式 ID"""
 		theatre = self.work_data.get("theatre", {})
 		styles = theatre.get("styles", {})
 		new_styles = {}
@@ -333,13 +333,13 @@ class WorkEditor:
 		theatre["styles"] = new_styles
 
 	def _update_variable_ids(self) -> None:
-		"""更新变量ID - 修复: 变量名不变,只更新值"""
-		# 变量名通常保持不变,只更新值
+		"""更新变量 ID - 修复: 变量名不变, 只更新值"""
+		# 变量名通常保持不变, 只更新值
 		# 如果有需要可以在这里添加变量名映射逻辑
 
 	def _update_references(self) -> None:
 		"""更新所有引用关系"""
-		print("  更新引用关系...")
+		print("更新引用关系...")
 		# 更新场景引用
 		self._update_scene_references()
 		# 更新演员引用
@@ -397,12 +397,12 @@ class WorkEditor:
 		groups = theatre.get("groups", {})
 		for group_data in groups.values():
 			if isinstance(group_data, dict):
-				# 更新组内演员引用(已在_update_group_ids中处理)
+				# 更新组内演员引用 (已在_update_group_ids 中处理)
 				pass
 
 	def _update_block_references(self) -> None:
 		"""更新积木数据中的引用"""
-		print("  更新积木数据中的引用...")
+		print("更新积木数据中的引用...")
 		# 更新场景积木数据
 		self._update_entity_block_data("scenes")
 		# 更新演员积木数据
@@ -430,51 +430,51 @@ class WorkEditor:
 					self._replace_ids_in_block_data(group_data["block_data_json"])
 
 	def _replace_ids_in_block_data(self, block_data: dict[str, Any]) -> None:
-		"""在积木数据中替换ID"""
+		"""在积木数据中替换 ID"""
 		if not block_data:
 			return
-		# 替换blocks中的ID引用
+		# 替换 blocks 中的 ID 引用
 		if "blocks" in block_data:
 			blocks = block_data["blocks"]
 			new_blocks = {}
 			for block_id, block_info in blocks.items():
 				if isinstance(block_info, dict):
-					# 更新block自身的ID
+					# 更新 block 自身的 ID
 					new_block_id = block_id
 					for id_map in self.parser.id_maps.values():
 						for old_id, new_id in id_map.items():
 							if old_id == block_id:
 								new_block_id = new_id
 								break
-					# 替换block内容中的ID
+					# 替换 block 内容中的 ID
 					self._replace_ids_in_dict(block_info)
 					new_blocks[new_block_id] = block_info
 			block_data["blocks"] = new_blocks
-		# 替换connections中的ID引用
+		# 替换 connections 中的 ID 引用
 		if "connections" in block_data:
 			connections = block_data["connections"]
 			new_connections = {}
 			for block_id, conn_info in connections.items():
 				if isinstance(conn_info, dict):
-					# 更新block ID
+					# 更新 block ID
 					new_block_id = block_id
 					for id_map in self.parser.id_maps.values():
 						for old_id, new_id in id_map.items():
 							if old_id == block_id:
 								new_block_id = new_id
 								break
-					# 替换连接中的ID
+					# 替换连接中的 ID
 					self._replace_ids_in_dict(conn_info)
 					new_connections[new_block_id] = conn_info
 			block_data["connections"] = new_connections
 
 	def _replace_ids_in_dict(self, data: dict[str, Any]) -> None:
-		"""递归替换字典中的ID"""
+		"""递归替换字典中的 ID"""
 		if not isinstance(data, dict):
 			return
 		for key, value in data.items():
 			if isinstance(value, str):
-				# 替换字符串中的ID
+				# 替换字符串中的 ID
 				for id_map in self.parser.id_maps.values():
 					for old_id, new_id in id_map.items():
 						if old_id in value:
@@ -571,15 +571,15 @@ class InteractiveEditor:
 		print("Kitten/Codemao 作品文件解析编辑工具 - 修复版")
 		print("=" * 60)
 		while True:
-			print("\n主菜单:")
-			print("  1. 加载作品文件")
-			print("  2. 查看作品信息")
-			print("  3. 重新映射ID")
-			print("  4. 分析积木结构")
-			print("  5. 编辑实体")
-			print("  6. 保存作品")
-			print("  7. 退出")
-			choice = input("请选择操作 (1-7): ").strip()
+			print("\n 主菜单:")
+			print("1. 加载作品文件")
+			print("2. 查看作品信息")
+			print("3. 重新映射 ID")
+			print("4. 分析积木结构")
+			print("5. 编辑实体")
+			print("6. 保存作品")
+			print("7. 退出")
+			choice = input("请选择操作 (1-7):").strip()
 			if choice == "1":
 				self.load_work()
 			elif choice == "2":
@@ -596,11 +596,11 @@ class InteractiveEditor:
 				print("退出程序")
 				break
 			else:
-				print("无效选择,请重新输入")
+				print("无效选择, 请重新输入")
 
 	def load_work(self) -> None:
 		"""加载作品文件"""
-		filepath = input("请输入作品文件路径: ").strip()
+		filepath = input("请输入作品文件路径:").strip()
 		path = pathlib.Path(filepath)
 		if not path.exists():
 			print(f"错误: 文件不存在 - {filepath}")
@@ -613,10 +613,10 @@ class InteractiveEditor:
 				self.work_parser.parse()
 				self.work_editor = WorkEditor(self.work_parser)
 				print(f"作品文件加载成功: {filepath}")
-				print(f"项目名称: {self.work_data.get('project_name', '未知')}")
-				print(f"应用版本: {self.work_data.get('application_version', '未知')}")
+				print(f"项目名称: {self.work_data.get('project_name', ' 未知 ')}")
+				print(f"应用版本: {self.work_data.get('application_version', ' 未知 ')}")
 		except json.JSONDecodeError as e:
-			print(f"JSON解析失败: {e}")
+			print(f"JSON 解析失败: {e}")
 		except Exception as e:
 			print(f"加载失败: {e}")
 
@@ -625,33 +625,32 @@ class InteractiveEditor:
 		if not self.work_data or not self.work_parser:
 			print("请先加载作品文件")
 			return
-
-		print("\n作品信息:")
-		work_data = self.work_data  # 确保不是None
-		print(f"  项目名称: {work_data.get('project_name', '未知')}")
-		print(f"  应用版本: {work_data.get('application_version', '未知')}")
-		# 获取theatre信息
+		print("\n 作品信息:")
+		work_data = self.work_data  # 确保不是 None
+		print(f"项目名称: {work_data.get('project_name', ' 未知 ')}")
+		print(f"应用版本: {work_data.get('application_version', ' 未知 ')}")
+		# 获取 theatre 信息
 		theatre = work_data.get("theatre", {})
-		print(f"  场景数量: {len(theatre.get('scenes', {}))}")
-		print(f"  演员数量: {len(theatre.get('actors', {}))}")
-		print(f"  组数量: {len(theatre.get('groups', {}))}")
-		print(f"  样式数量: {len(theatre.get('styles', {}))}")
-		print(f"  变量数量: {len(work_data.get('cloud_variables', {}))}")
+		print(f"场景数量: {len(theatre.get('scenes', {}))}")
+		print(f"演员数量: {len(theatre.get('actors', {}))}")
+		print(f"组数量: {len(theatre.get('groups', {}))}")
+		print(f"样式数量: {len(theatre.get('styles', {}))}")
+		print(f"变量数量: {len(work_data.get('cloud_variables', {}))}")
 		# 显示场景顺序
 		scenes_order = theatre.get("scenes_order", [])
 		if scenes_order:
-			print(f"  场景顺序: {', '.join(map(str, scenes_order))}")
+			print(f"场景顺序: {', '.join(map(str, scenes_order))}")
 		# 显示实体列表
-		print("\n实体列表:")
+		print("\n 实体列表:")
 		for entity in self.work_parser.entities.values():
-			print(f"  {entity.entity_type.value}: {entity.name} ({entity.id[:8]}...)")
+			print(f"{entity.entity_type.value}: {entity.name} ({entity.id[:8]}...)")
 
 	def remap_ids(self) -> None:
-		"""重新映射ID"""
+		"""重新映射 ID"""
 		if not self.work_editor:
 			print("请先加载作品文件")
 			return
-		confirm = input("确定要重新映射所有ID吗? (y/n): ").strip().lower()
+		confirm = input("确定要重新映射所有 ID 吗? (y/n):").strip().lower()
 		if confirm == "y":
 			self.work_editor.remap_ids()
 
@@ -660,55 +659,54 @@ class InteractiveEditor:
 		if not self.work_data:
 			print("请先加载作品文件")
 			return
-
 		theatre = self.work_data.get("theatre", {})
 		# 分析场景积木
 		scenes = theatre.get("scenes", {})
 		for scene_id, scene_data in scenes.items():
 			if isinstance(scene_data, dict) and "block_data_json" in scene_data:
 				analysis = BlockAnalyzer.analyze_block_structure(scene_data["block_data_json"])
-				print(f"\n场景 '{scene_data.get('name', scene_id)}' 积木分析:")
+				print(f"\n 场景 '{scene_data.get('name', scene_id)}' 积木分析:")
 				self._print_block_analysis(analysis)
 		# 分析演员积木
 		actors = theatre.get("actors", {})
 		for actor_id, actor_data in actors.items():
 			if isinstance(actor_data, dict) and "block_data_json" in actor_data:
 				analysis = BlockAnalyzer.analyze_block_structure(actor_data["block_data_json"])
-				print(f"\n演员 '{actor_data.get('name', actor_id)}' 积木分析:")
+				print(f"\n 演员 '{actor_data.get('name', actor_id)}' 积木分析:")
 				self._print_block_analysis(analysis)
 
 	@staticmethod
 	def _print_block_analysis(analysis: dict[str, Any]) -> None:
 		"""打印积木分析结果"""
 		if not analysis or analysis["total_blocks"] == 0:
-			print("  无积木数据")
+			print("无积木数据")
 			return
-		print(f"  总积木数: {analysis['total_blocks']}")
-		print(f"  阴影积木: {analysis['shadows']}")
-		print(f"  事件积木: {analysis.get('events', 0)}")
-		print(f"  控制积木: {analysis.get('controls', 0)}")
-		print(f"  运算积木: {analysis.get('operators', 0)}")
-		print(f"  运动积木: {analysis.get('motions', 0)}")
-		print(f"  外观积木: {analysis.get('looks', 0)}")
+		print(f"总积木数: {analysis['total_blocks']}")
+		print(f"阴影积木: {analysis['shadows']}")
+		print(f"事件积木: {analysis.get('events', 0)}")
+		print(f"控制积木: {analysis.get('controls', 0)}")
+		print(f"运算积木: {analysis.get('operators', 0)}")
+		print(f"运动积木: {analysis.get('motions', 0)}")
+		print(f"外观积木: {analysis.get('looks', 0)}")
 		if analysis.get("block_types"):
-			print("\n  积木类型分布 (前10):")
+			print("\n  积木类型分布 (前 10):")
 			for block_type, count in sorted(
 				analysis["block_types"].items(),
 				key=operator.itemgetter(1),
 				reverse=True,
 			)[:10]:
-				print(f"    {block_type}: {count}")
+				print(f"{block_type}: {count}")
 
 	def edit_entities(self) -> None:
 		"""编辑实体"""
 		if not self.work_parser:
 			print("请先加载作品文件")
 			return
-		print("\n编辑实体:")
-		print("  1. 重命名实体")
-		print("  2. 删除实体")
-		print("  3. 添加新实体")
-		choice = input("请选择操作 (1-3): ").strip()
+		print("\n 编辑实体:")
+		print("1. 重命名实体")
+		print("2. 删除实体")
+		print("3. 添加新实体")
+		choice = input("请选择操作 (1-3):").strip()
 		if choice == "1":
 			self.rename_entity()
 		elif choice == "2":
@@ -723,15 +721,15 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		entity_id = input("请输入实体ID: ").strip()
+		entity_id = input("请输入实体 ID:").strip()
 		if entity_id not in self.work_parser.entities:
-			print(f"错误: 实体ID不存在 - {entity_id}")
+			print(f"错误: 实体 ID 不存在 - {entity_id}")
 			return
 		entity = self.work_parser.entities[entity_id]
-		new_name = input(f"请输入新名称 (当前: {entity.name}): ").strip()
+		new_name = input(f"请输入新名称 (当前: {entity.name}):").strip()
 		if new_name:
 			entity.name = new_name
-			# 更新work_data中的名称
+			# 更新 work_data 中的名称
 			entity_type = entity.entity_type
 			theatre = self.work_data.get("theatre", {})
 			if entity_type == EntityType.SCENE:
@@ -757,21 +755,21 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		entity_id = input("请输入要删除的实体ID: ").strip()
+		entity_id = input("请输入要删除的实体 ID:").strip()
 		if entity_id not in self.work_parser.entities:
-			print(f"错误: 实体ID不存在 - {entity_id}")
+			print(f"错误: 实体 ID 不存在 - {entity_id}")
 			return
 		entity = self.work_parser.entities[entity_id]
-		confirm = input(f"确定要删除 {entity.name} ({entity_id}) 吗? (y/n): ").strip().lower()
+		confirm = input(f"确定要删除 {entity.name} ({entity_id}) 吗? (y/n):").strip().lower()
 		if confirm == "y":
-			# 从work_data中删除实体
+			# 从 work_data 中删除实体
 			entity_type = entity.entity_type
 			theatre = self.work_data.get("theatre", {})
 			if entity_type == EntityType.SCENE:
 				scenes = theatre.get("scenes", {})
 				if entity_id in scenes:
 					del scenes[entity_id]
-					# 从scenes_order中移除
+					# 从 scenes_order 中移除
 					if "scenes_order" in theatre:
 						theatre["scenes_order"] = [sid for sid in theatre["scenes_order"] if str(sid) != entity_id]
 			elif entity_type == EntityType.ACTOR:
@@ -807,11 +805,11 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		print("\n添加新实体:")
-		print("  1. 添加演员")
-		print("  2. 添加变量")
-		print("  3. 添加场景")
-		choice = input("请选择实体类型 (1-3): ").strip()
+		print("\n 添加新实体:")
+		print("1. 添加演员")
+		print("2. 添加变量")
+		print("3. 添加场景")
+		choice = input("请选择实体类型 (1-3):").strip()
 		if choice == "1":
 			self.add_actor()
 		elif choice == "2":
@@ -826,7 +824,7 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		name = input("请输入演员名称: ").strip()
+		name = input("请输入演员名称:").strip()
 		if not name:
 			print("名称不能为空")
 			return
@@ -838,10 +836,10 @@ class InteractiveEditor:
 			return
 		print("可用场景:")
 		for scene_id, scene_data in scenes.items():
-			print(f"  {scene_id}: {scene_data.get('name', '未命名')}")
-		scene_id = input("请输入场景ID: ").strip()
+			print(f"{scene_id}: {scene_data.get('name', ' 未命名 ')}")
+		scene_id = input("请输入场景 ID:").strip()
 		if scene_id not in scenes:
-			print(f"错误: 场景ID不存在 - {scene_id}")
+			print(f"错误: 场景 ID 不存在 - {scene_id}")
 			return
 		new_actor = {
 			"id": IDGenerator.generate_uuid(),
@@ -862,7 +860,7 @@ class InteractiveEditor:
 			"y": 0,
 			"block_data_json": {"blocks": {}, "connections": {}, "comments": {}},
 		}
-		# 添加到work_data
+		# 添加到 work_data
 		if "actors" not in theatre:
 			theatre["actors"] = {}
 		theatre["actors"][new_actor["id"]] = new_actor
@@ -873,8 +871,8 @@ class InteractiveEditor:
 			entity_type=EntityType.ACTOR,
 			data=new_actor,
 		)
-		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore[reportArgumentType]
-		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore[reportArgumentType]
+		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore [reportArgumentType]
+		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore [reportArgumentType]
 		print(f"演员 {name} 添加成功")
 
 	def add_variable(self) -> None:
@@ -882,14 +880,14 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		name = input("请输入变量名称: ").strip()
+		name = input("请输入变量名称:").strip()
 		if not name:
 			print("名称不能为空")
 			return
-		value = input("请输入变量值: ").strip()
+		value = input("请输入变量值:").strip()
 		if not value:
 			value = "0"
-		# 添加到work_data
+		# 添加到 work_data
 		if "cloud_variables" not in self.work_data:
 			self.work_data["cloud_variables"] = {}
 		self.work_data["cloud_variables"][name] = value
@@ -909,7 +907,7 @@ class InteractiveEditor:
 		if not self.work_parser or not self.work_data:
 			print("请先加载作品文件")
 			return
-		name = input("请输入场景名称: ").strip()
+		name = input("请输入场景名称:").strip()
 		if not name:
 			print("名称不能为空")
 			return
@@ -931,12 +929,12 @@ class InteractiveEditor:
 			"x": 0,
 			"y": 0,
 		}
-		# 添加到work_data
+		# 添加到 work_data
 		theatre = self.work_data.get("theatre", {})
 		if "scenes" not in theatre:
 			theatre["scenes"] = {}
 		theatre["scenes"][new_scene["id"]] = new_scene
-		# 添加到scenes_order
+		# 添加到 scenes_order
 		if "scenes_order" not in theatre:
 			theatre["scenes_order"] = []
 		theatre["scenes_order"].append(new_scene["id"])
@@ -956,7 +954,7 @@ class InteractiveEditor:
 		if not self.work_editor:
 			print("请先加载作品文件")
 			return
-		filepath = input("请输入保存路径 (直接回车使用默认路径): ").strip()
+		filepath = input("请输入保存路径 (直接回车使用默认路径):").strip()
 		if not filepath:
 			timestamp = time.strftime("%Y%m%d_%H%M%S")
 			filepath = f"work_modified_{timestamp}.json"
@@ -982,9 +980,9 @@ def main() -> None:
 			editor.work_parser.parse()
 			editor.work_editor = WorkEditor(editor.work_parser)
 			print(f"已加载作品文件: {filepath}")
-			print(f"项目名称: {work_data.get('project_name', '未知')}")
+			print(f"项目名称: {work_data.get('project_name', ' 未知 ')}")
 		except json.JSONDecodeError as e:
-			print(f"JSON解析失败: {e}")
+			print(f"JSON 解析失败: {e}")
 			return
 		except Exception as e:
 			print(f"加载失败: {e}")

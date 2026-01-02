@@ -11,7 +11,7 @@ class WorkshopDataFetcher:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 
-	# 获取工作室简介(简易, 需登录工作室成员账号)
+	# 获取工作室简介 (简易, 需登录工作室成员账号)
 	def fetch_workshop_info(self) -> dict:
 		response = self._client.send_request(endpoint="/web/work_shops/simple", method="GET")
 		return response.json()
@@ -59,7 +59,7 @@ class WorkshopDataFetcher:
 			limit=limit,
 		)
 
-	# 获取工作室详情列表,包括成员和作品
+	# 获取工作室详情列表, 包括成员和作品
 	def fetch_workshop_details_list(
 		self,
 		levels: list[int] | int = [1, 2, 3, 4],
@@ -124,7 +124,7 @@ class WorkshopActionHandler:
 
 	# 更新工作室简介
 	def update_workshop_details(self, description: str, workshop_id: str, name: str, preview_url: str) -> bool:
-		# 发送请求,更新工作室简介
+		# 发送请求, 更新工作室简介
 		response = self._client.send_request(
 			endpoint="/web/work_shops/update",
 			method="POST",
@@ -140,7 +140,7 @@ class WorkshopActionHandler:
 
 	# 创建工作室
 	def create_workshop(self, name: str, description: str, preview_url: str) -> dict:
-		# 发送请求,创建工作室
+		# 发送请求, 创建工作室
 		response = self._client.send_request(
 			endpoint="/web/work_shops/create",
 			method="POST",
@@ -155,7 +155,7 @@ class WorkshopActionHandler:
 
 	# 解散工作室
 	def delete_workshop(self, workshop_id: int) -> bool:
-		# 发送请求,解散工作室
+		# 发送请求, 解散工作室
 		response = self._client.send_request(
 			endpoint="/web/work_shops/dissolve",
 			method="POST",
@@ -166,7 +166,7 @@ class WorkshopActionHandler:
 
 	# 在指定工作室投稿作品
 	def create_work_contribution(self, workshop_id: int, work_id: int) -> bool:
-		# 发送请求,在指定工作室投稿作品
+		# 发送请求, 在指定工作室投稿作品
 		response = self._client.send_request(
 			endpoint="/web/work_shops/works/contribute",
 			method="POST",
@@ -177,7 +177,7 @@ class WorkshopActionHandler:
 
 	# 在指定工作室删除作品
 	def delete_workshop_work(self, workshop_id: int, work_id: int) -> bool:
-		# 发送请求,在指定工作室删除作品
+		# 发送请求, 在指定工作室删除作品
 		response = self._client.send_request(
 			endpoint="/web/work_shops/works/remove",
 			method="POST",
@@ -199,7 +199,7 @@ class WorkshopActionHandler:
 
 	# 审核已经申请加入工作室的用户
 	def execute_review_join_application(self, workshop_id: int, status: Literal["UNACCEPTED", "ACCEPTED"], user_id: int) -> bool:
-		# 发送请求,审核已经申请加入工作室的用户
+		# 发送请求, 审核已经申请加入工作室的用户
 		response = self._client.send_request(
 			endpoint="/web/work_shops/users/audit",
 			method="POST",

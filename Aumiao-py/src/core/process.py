@@ -23,12 +23,12 @@ class CommentProcessor:
 	def process_item(
 		self,
 		item: dict[str, Any],
-		config: ...,  # 实际使用时应替换为SourceConfig类型
+		config: ...,  # 实际使用时应替换为 SourceConfig 类型
 		action_type: str,
 		params: dict[Literal["ads", "blacklist", "spam_max"], Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
-		"""处理项目主入口,根据action_type分发到对应处理策略"""
+		"""处理项目主入口, 根据 action_type 分发到对应处理策略"""
 		item_id = int(item["id"])
 		comments = config.get_comments(self, item_id)
 		title = item.get(config.title_key, "")
@@ -44,7 +44,7 @@ class CommentProcessor:
 		self._process_strategies[action_type] = handler
 
 	def _get_strategy(self, action_type: str) -> Callable:
-		"""获取处理策略,不存在则抛出异常"""
+		"""获取处理策略, 不存在则抛出异常"""
 		strategy = self._process_strategies.get(action_type)
 		if not strategy:
 			msg = f"未支持的处理类型: {action_type}"
@@ -64,7 +64,7 @@ class CommentProcessor:
 		self,
 		comments: list[dict[str, Any]],
 		item_id: int,
-		title: str,  # 预留参数,保持策略接口一致性  # noqa: ARG002
+		title: str,  # 预留参数, 保持策略接口一致性  # noqa: ARG002
 		params: dict[str, Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
@@ -90,7 +90,7 @@ class CommentProcessor:
 		params: dict[str, Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
-		"""处理异常评论 广告/黑名单:"""
+		"""处理异常评论 广告 / 黑名单:"""
 		for comment in comments:
 			# 跳过置顶评论
 			if comment.get("is_top"):
@@ -120,10 +120,10 @@ class CommentProcessor:
 	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
 		"""记录日志并添加标识到目标列表"""
 		# 日志模板配置
-		log_templates = {"ads": "广告{type} [{title}]{parent} : {content}", "blacklist": "黑名单{type} [{title}]{parent} : {nickname}"}
-		# 区分评论/回复类型
+		log_templates = {"ads": "广告 {type} [{title}]{parent} : {content}", "blacklist": "黑名单 {type} [{title}]{parent} : {nickname}"}
+		# 区分评论 / 回复类型
 		log_type = "回复" if ":reply" in identifier else "评论"
-		parent_info = f" (父内容: {parent_content[:20]}...)" if parent_content else ""
+		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
 		# 生成日志信息
 		if action_type in log_templates:
 			log_message = log_templates[action_type].format(
@@ -149,14 +149,14 @@ class ReplyProcessor:
 	@staticmethod
 	def send_messages_with_delay(messages: list[str], send_func: Callable, comment_type: str = "评论", delay_seconds: int = 5) -> None:
 		"""
-		发送多条消息,每条消息间隔指定时间
+		发送多条消息, 每条消息间隔指定时间
 		"""
 		if not messages:
 			print("没有消息需要发送")
 			return
 		for i, message in enumerate(messages, 1):
-			print(f"\n{'-' * 20}")
-			print(f"发送{comment_type} {i}/{len(messages)}")
+			print(f"\n {'-' * 20}")
+			print(f"发送 {comment_type} {i}/{len(messages)}")
 			print(f"内容长度: {len(message)}")
 			try:
 				result = send_func(message)
@@ -164,13 +164,13 @@ class ReplyProcessor:
 					print(f"{comment_type} {i} 发送成功")
 				else:
 					print(f"{comment_type} {i} 发送失败")
-				# 如果不是最后一条消息,等待间隔
+				# 如果不是最后一条消息, 等待间隔
 				if i < len(messages):
 					print(f"等待 {delay_seconds} 秒后发送下一条...")
 					sleep(delay_seconds)
 			except Exception as e:
-				print(f"发送{comment_type} {i} 时发生错误: {e!s}")
-				# 发生错误时仍然等待间隔,避免过于频繁
+				print(f"发送 {comment_type} {i} 时发生错误: {e!s}")
+				# 发生错误时仍然等待间隔, 避免过于频繁
 				if i < len(messages):
 					sleep(delay_seconds)
 
@@ -184,10 +184,10 @@ class ReplyProcessor:
 		print(f"消息过长 ({len(message)} > {max_length}), 开始分割...")
 		parts = []
 		current_part = ""
-		# 按句子分割,保持句子完整性
-		sentences = message.split(" | ")
+		# 按句子分割, 保持句子完整性
+		sentences = message.split("|")
 		for sentence in sentences:
-			# 如果当前句子本身就很长,需要进一步分割
+			# 如果当前句子本身就很长, 需要进一步分割
 			if len(sentence) > max_length:
 				# 按逗号分割
 				sub_sentences = sentence.split(",")
@@ -200,7 +200,7 @@ class ReplyProcessor:
 						current_part = sub_sentence + ","
 			else:
 				# 检查添加这个句子是否会超过限制
-				separator = " | " if current_part else ""
+				separator = "|" if current_part else ""
 				if len(current_part) + len(separator) + len(sentence) <= max_length:
 					current_part += separator + sentence
 				else:
@@ -218,19 +218,19 @@ class ReplyProcessor:
 			result.append(numbered_part)
 		print(f"分割为 {len(result)} 部分")
 		for i, part in enumerate(result, 1):
-			print(f"  部分 {i}: {len(part)} 字符")
+			print(f"部分 {i}: {len(part)} 字符")
 		return result
 
 	def split_long_cdn_link(self, cdn_link: str) -> list[str]:
 		"""
-		处理长CDN链接,如果太长则分割
+		处理长 CDN 链接, 如果太长则分割
 		"""
 		# 保护链接
 		protected_link = self._protect_cdn_link(cdn_link)
-		# 如果链接本身就很长,可能需要分割
+		# 如果链接本身就很长, 可能需要分割
 		if len(protected_link) <= 280:
 			return [f"编译文件: {protected_link}"]
-		print(f"CDN链接过长 ({len(protected_link)}), 尝试分割...")
+		print(f"CDN 链接过长 ({len(protected_link)}), 尝试分割...")
 		# 将链接分割成多个部分
 		chunk_size = 250  # 每个部分的最大长度
 		chunks = []
@@ -255,33 +255,33 @@ class ReplyProcessor:
 		view_times = work_details.get("view_times", 0)
 		praise_times = work_details.get("praise_times", 0)
 		collect_times = work_details.get("collect_times", 0)
-		# n_roles = work_details.get("n_roles", 0)
-		# n_brick = work_details.get("n_brick", 0)
+		# n_roles = work_details.get ("n_roles", 0)
+		# n_brick = work_details.get ("n_brick", 0)
 		# 构建报告各部分
 		parts = [
 			"作品解析报告",
 			f"作品名称: {work_name}",
 			f"作者: {author_nickname} (ID: {work_id})",
 			"数据统计:",
-			f"  浏览量: {view_times}",
-			f"  点赞数: {praise_times}",
-			f"  收藏数: {collect_times}",
-			# f"  角色数: {n_roles}",
-			# f"  积木数: {n_brick}",
+			f"浏览量: {view_times}",
+			f"点赞数: {praise_times}",
+			f"收藏数: {collect_times}",
+			# f"角色数: {n_roles}",
+			# f"积木数: {n_brick}",
 		]
 		if is_author:
 			parts.append("验证: 您是该作品的作者")
 			if "compile" in commands:
-				parts.append("编译命令已接收,正在处理...")
+				parts.append("编译命令已接收, 正在处理...")
 		else:
-			parts.append("提示: 非作者身份,编译功能不可用")
+			parts.append("提示: 非作者身份, 编译功能不可用")
 		# 用分隔符连接各部分
-		return " | ".join(parts)
+		return "|".join(parts)
 
 	@staticmethod
 	def _protect_cdn_link(link: str) -> str:
 		"""
-		使用空白字符保护CDN链接
+		使用空白字符保护 CDN 链接
 		"""
 		protected = ""
 		for char in link:
@@ -295,13 +295,13 @@ class ReplyProcessor:
 		"""
 		# 支持的格式:@作品解析:https://shequ.codemao.cn/work/123456
 		# 或:@作品解析:123456
-		# 查找链接中的作品ID
+		# 查找链接中的作品 ID
 		pattern = r"@作品解析:.*?(?:work/|workId=)(\d+)"
 		match = re.search(pattern, comment_text)
 		if match:
 			work_id = int(match.group(1))
 			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/{work_id}"}
-		# 如果没有链接,尝试直接提取数字ID
+		# 如果没有链接, 尝试直接提取数字 ID
 		pattern2 = r"@作品解析:.*?(\d+)"
 		match2 = re.search(pattern2, comment_text)
 		if match2:
@@ -312,10 +312,10 @@ class ReplyProcessor:
 	@staticmethod
 	def parse_commands(comment_text: str) -> list[str]:
 		"""
-		解析评论中的命令(只保留解析和编译)
+		解析评论中的命令 (只保留解析和编译)
 		"""
 		commands = []
-		# 检测解析命令(默认就有)
+		# 检测解析命令 (默认就有)
 		if "解析" in comment_text or "analyze" in comment_text.lower():
 			commands.append("analyze")
 		# 检测编译命令
@@ -326,7 +326,7 @@ class ReplyProcessor:
 	# 辅助方法
 	@staticmethod
 	def parse_content_field(reply: dict) -> dict | None:
-		"""解析content字段"""
+		"""解析 content 字段"""
 		content_data = {}
 		try:
 			if isinstance(reply.get("content"), str):
@@ -334,7 +334,7 @@ class ReplyProcessor:
 			elif isinstance(reply.get("content"), dict):
 				content_data = reply["content"]
 		except (JSONDecodeError, TypeError) as e:
-			print(f"解析content失败: {e}")
+			print(f"解析 content 失败: {e}")
 			return None
 		else:
 			return content_data
@@ -348,7 +348,7 @@ class ReplyProcessor:
 
 	@staticmethod
 	def extract_target_and_parent_ids(reply_type: str, reply: dict, message_info: dict, business_id: int, source_type: Literal["work", "post", "shop"]) -> tuple[int, int]:
-		"""提取目标ID和父ID"""
+		"""提取目标 ID 和父 ID"""
 		target_id = 0
 		parent_id = 0
 		if reply_type.endswith("_COMMENT"):
@@ -404,16 +404,16 @@ class ReplyProcessor:
 		chosen: str,
 	) -> None:
 		"""记录回复信息"""
-		print(f"\n{'=' * 40}")
+		print(f"\n {'=' * 40}")
 		print(f"处理新通知 [ID: {reply_id}]")
-		print(f"类型: {reply_type} ({'作品' if source_type == 'work' else '帖子'})")
+		print(f"类型: {reply_type} ({' 作品 ' if source_type == 'work' else ' 帖子 '})")
 		print(f"发送者: {sender_nickname} (ID: {sender_id})")
 		print(f"来源: {business_name}")
 		print(f"内容: {comment_text}")
 		if matched_keyword:
 			print(f"匹配到关键词: 「{matched_keyword}」")
 		else:
-			print("未匹配关键词,使用随机回复")
+			print("未匹配关键词, 使用随机回复")
 		print(f"选择回复: 【{chosen}】")
 
 
@@ -428,10 +428,10 @@ class ReportTypeRegistry:
 		"""设置默认操作配置"""
 		self.default_actions = {
 			"D": ActionConfig("D", "删除", "删除内容", "DELETE"),
-			"S": ActionConfig("S", "禁言7天", "禁言用户7天", "MUTE_SEVEN_DAYS"),
-			"T": ActionConfig("T", "禁言3月", "禁言用户3个月", "MUTE_THREE_MONTHS"),
+			"S": ActionConfig("S", "禁言 7 天", "禁言用户 7 天", "MUTE_SEVEN_DAYS"),
+			"T": ActionConfig("T", "禁言 3 月", "禁言用户 3 个月", "MUTE_THREE_MONTHS"),
 			"U": ActionConfig("U", "取消发布", "取消作品发布", "UNLOAD"),
-			"P": ActionConfig("P", "通过", "通过举报,不做处理", "PASS"),
+			"P": ActionConfig("P", "通过", "通过举报, 不做处理", "PASS"),
 			"C": ActionConfig("C", "查看详情", "查看详细信息", "DETAIL"),
 			"F": ActionConfig("F", "检查违规", "检查其他违规内容", "CHECK_VIOLATION"),
 			"J": ActionConfig("J", "跳过", "跳过当前举报", "SKIP"),
@@ -439,7 +439,7 @@ class ReportTypeRegistry:
 
 	def register(self, report_type: str, config: SourceConfig) -> None:
 		"""注册举报类型配置"""
-		# 如果未指定可用操作,使用默认操作
+		# 如果未指定可用操作, 使用默认操作
 		if config.available_actions is None or len(config.available_actions) == 0:
 			config.available_actions = list(self.default_actions.values())
 		self._registry[report_type] = config
@@ -458,13 +458,13 @@ class ReportTypeRegistry:
 	def get_available_actions(self, report_type: str) -> list[ActionConfig]:
 		"""获取指定举报类型的可用操作"""
 		config = self.get_config(report_type)
-		return [action for action in config.available_actions if action.enabled]  # pyright: ignore[reportOptionalIterable]
+		return [action for action in config.available_actions if action.enabled]  # pyright: ignore [reportOptionalIterable]
 
 	def get_action_prompt(self, report_type: str) -> str:
 		"""生成操作提示字符串"""
 		actions = self.get_available_actions(report_type)
 		prompt_parts = [f"{action.key}({action.name})" for action in actions]
-		return "选择操作: " + ", ".join(prompt_parts)
+		return "选择操作:" + ",".join(prompt_parts)
 
 	def is_action_available(self, report_type: str, action_key: str) -> bool:
 		"""检查指定操作是否可用于该举报类型"""
@@ -504,8 +504,8 @@ class ReportFetcher(ClassUnion):
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
-					self.registry.default_actions["S"],  # 禁言7天
-					self.registry.default_actions["T"],  # 禁言3月
+					self.registry.default_actions["S"],  # 禁言 7 天
+					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
@@ -551,8 +551,8 @@ class ReportFetcher(ClassUnion):
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
-					self.registry.default_actions["S"],  # 禁言7天
-					self.registry.default_actions["T"],  # 禁言3月
+					self.registry.default_actions["S"],  # 禁言 7 天
+					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
@@ -576,8 +576,8 @@ class ReportFetcher(ClassUnion):
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
-					self.registry.default_actions["S"],  # 禁言7天
-					self.registry.default_actions["T"],  # 禁言3月
+					self.registry.default_actions["S"],  # 禁言 7 天
+					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
 					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
@@ -599,7 +599,7 @@ class ReportFetcher(ClassUnion):
 			# 创建举报记录
 			record = ReportRecord(
 				item=item_ndd,
-				report_type=report_type,  # pyright: ignore[reportArgumentType]
+				report_type=report_type,  # pyright: ignore [reportArgumentType]
 				item_id=str(item_ndd[config.item_id_field]),
 				content=item_ndd[config.content_field],
 				processed=False,
@@ -702,13 +702,13 @@ class ReportProcessor(ClassUnion):
 		# 分块获取和处理举报信息
 		for chunk in self.fetcher.fetch_reports_chunked(status="TOBEDONE"):
 			chunk_count += 1  # noqa: SIM113
-			self._printer.print_message(f"处理第 {chunk_count} 块数据,共 {len(chunk)} 条举报", "INFO")
+			self._printer.print_message(f"处理第 {chunk_count} 块数据, 共 {len(chunk)} 条举报", "INFO")
 			# 处理当前块
 			chunk_processed = self._process_chunk(chunk, admin_id)
 			total_processed += chunk_processed
-			self._printer.print_message(f"第 {chunk_count} 块处理完成,处理了 {chunk_processed} 条举报", "SUCCESS")
-			# 移除询问是否继续的代码,直接处理下一块
-		self._printer.print_message(f"所有举报处理完成,共处理 {total_processed} 条举报", "SUCCESS")
+			self._printer.print_message(f"第 {chunk_count} 块处理完成, 处理了 {chunk_processed} 条举报", "SUCCESS")
+			# 移除询问是否继续的代码, 直接处理下一块
+		self._printer.print_message(f"所有举报处理完成, 共处理 {total_processed} 条举报", "SUCCESS")
 		return total_processed
 
 	def _pass_all_pending_reports(self, admin_id: int) -> int:
@@ -718,12 +718,12 @@ class ReportProcessor(ClassUnion):
 		chunk_count = 0
 		for chunk in self.fetcher.fetch_reports_chunked(status="TOBEDONE"):
 			chunk_count += 1  # noqa: SIM113
-			self._printer.print_message(f"处理第 {chunk_count} 块数据,共 {len(chunk)} 条举报", "INFO")
+			self._printer.print_message(f"处理第 {chunk_count} 块数据, 共 {len(chunk)} 条举报", "INFO")
 			# 批量通过当前块中的所有举报
 			chunk_processed = self._pass_chunk_reports(chunk, admin_id)
 			total_processed += chunk_processed
-			self._printer.print_message(f"第 {chunk_count} 块处理完成,通过了 {chunk_processed} 条举报", "SUCCESS")
-		self._printer.print_message(f"一键通过完成,共通过 {total_processed} 条待处理举报", "SUCCESS")
+			self._printer.print_message(f"第 {chunk_count} 块处理完成, 通过了 {chunk_processed} 条举报", "SUCCESS")
+		self._printer.print_message(f"一键通过完成, 共通过 {total_processed} 条待处理举报", "SUCCESS")
 		return total_processed
 
 	def _pass_chunk_reports(self, chunk: list[ReportRecord], admin_id: int) -> int:
@@ -770,7 +770,7 @@ class ReportProcessor(ClassUnion):
 		# 构建批量组
 		batch_groups = []
 		processed_record_ids = set()
-		# 同ID分组
+		# 同 ID 分组
 		for item_id, record_ids in item_id_groups.items():
 			if len(record_ids) >= self.batch_config["duplicate_threshold"]:
 				batch_groups.append(BatchGroup("item_id", item_id, tuple(record_ids)))
@@ -797,7 +797,7 @@ class ReportProcessor(ClassUnion):
 
 	def _handle_batch_group(self, group: BatchGroup, chunk: list[ReportRecord], admin_id: int) -> None:
 		"""处理批量组"""
-		self._printer.print_message(f"处理批量组 [{group.group_type}] {group.group_key} (共{len(group.record_ids)}条举报)", "INFO")
+		self._printer.print_message(f"处理批量组 [{group.group_type}] {group.group_key} (共 {len(group.record_ids)} 条举报)", "INFO")
 		# 检查是否有保存的批量动作
 		saved_action = self.batch_manager.get_batch_action(group.group_type, group.group_key)
 		if saved_action:
@@ -826,12 +826,12 @@ class ReportProcessor(ClassUnion):
 						elif self.fetcher.registry.is_action_available(record["report_type"], first_action):
 							self._apply_action(record, first_action, admin_id)
 						else:
-							self._printer.print_message(f"动作 {first_action} 对类型 {record['report_type']} 不可用,跳过记录 {record['item']['id']}", "WARNING")
+							self._printer.print_message(f"动作 {first_action} 对类型 {record['report_type']} 不可用, 跳过记录 {record['item']['id']}", "WARNING")
 						self.batch_manager.mark_record_processed(record["item"]["id"])
 
 	@staticmethod
 	def _find_record_by_id(chunk: list[ReportRecord], record_id: str) -> ReportRecord | None:
-		"""根据记录ID在块中查找记录"""
+		"""根据记录 ID 在块中查找记录"""
 		for record in chunk:
 			if record["item"]["id"] == record_id:
 				return record
@@ -849,7 +849,7 @@ class ReportProcessor(ClassUnion):
 		handle_method(report_id=record["item"]["id"], resolution=self.STATUS_MAP[action], admin_id=admin_id)
 		record["processed"] = True
 		record["action"] = action
-		action_config = next((ac for ac in config.available_actions if ac.key == action), None)  # pyright: ignore[reportOptionalIterable]
+		action_config = next((ac for ac in config.available_actions if ac.key == action), None)  # pyright: ignore [reportOptionalIterable]
 		action_name = action_config.name if action_config else action
 		self._printer.print_message(f"已应用操作: {action_name}", "SUCCESS")
 
@@ -869,7 +869,7 @@ class ReportProcessor(ClassUnion):
 		user_id_str = item_ndd[f"{config.user_field}_id"]
 		user_id = int(user_id_str) if user_id_str != "UNKNOWN" and user_id_str.isdigit() else None
 		if user_id and user_id in self.OFFICIAL_IDS:
-			self._printer.print_message("这是一条官方发布的内容,自动通过", "WARNING")
+			self._printer.print_message("这是一条官方发布的内容, 自动通过", "WARNING")
 			self._apply_action(record, "P", admin_id)
 			return "P"
 		# 获取可用操作
@@ -893,23 +893,23 @@ class ReportProcessor(ClassUnion):
 					adjusted_source_type = self.SOURCE_TYPE_MAP[report_type]
 					self._check_violation(
 						source_id=item_ndd[config.source_id_field],
-						source_type=adjusted_source_type,  # pyright: ignore[reportArgumentType]
+						source_type=adjusted_source_type,  # pyright: ignore [reportArgumentType]
 						board_name=item_ndd.get("board_name", "UNKNOWN"),
 						user_id=user_id_str,
 					)
-					# 检查违规后继续选择操作,不标记为已处理
+					# 检查违规后继续选择操作, 不标记为已处理
 					continue
 				self._printer.print_message("该类型不支持检查违规操作", "ERROR")
 				continue
 			if choice == "J":
 				self._printer.print_message("已跳过该举报", "INFO")
-				# 跳过也不标记为已处理,让用户后续可以重新处理
+				# 跳过也不标记为已处理, 让用户后续可以重新处理
 				return None
 
 	def _display_report_details(self, item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
 		"""显示举报详情"""
 		self._printer.print_header("=== 举报详情 ===")
-		self._printer.print_message(f"举报ID: {item_ndd['id']}", "INFO")
+		self._printer.print_message(f"举报 ID: {item_ndd['id']}", "INFO")
 		self._printer.print_message(f"举报类型: {report_type}", "INFO")
 		# 显示内容
 		content = item_ndd[config.content_field]
@@ -959,11 +959,11 @@ class ReportProcessor(ClassUnion):
 
 	def _check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:
 		"""检查举报内容违规"""
-		# 这里实现违规检查逻辑,可以从旧版代码移植
+		# 这里实现违规检查逻辑, 可以从旧版代码移植
 		self._printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id:
-			self._printer.print_message("无效的来源ID,无法检查违规", "ERROR")
+			self._printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
 			return
 		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
 		# 分析违规评论
@@ -971,9 +971,9 @@ class ReportProcessor(ClassUnion):
 		if not violations:
 			self._printer.print_message("未检测到违规评论", "INFO")
 			return
-		# 执行自动举报(用学生账号)
+		# 执行自动举报 (用学生账号)
 		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
-		# 2. 帖子的违规检查:重复发帖(同一用户发布同标题帖子过多)
+		# 2. 帖子的违规检查: 重复发帖 (同一用户发布同标题帖子过多)
 		if source_type == "post" and user_id and user_id != "UNKNOWN":
 			try:
 				# 搜索同标题的帖子
@@ -986,16 +986,16 @@ class ReportProcessor(ClassUnion):
 				)
 				# 超过阈值判定为垃圾帖
 				if len(user_posts) >= self._setting.PARAMETER.spam_del_max:
-					self._printer.print_message(f"警告:用户{user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次(疑似垃圾帖)", "WARNING")
+					self._printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
 			except Exception as e:
 				self._printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
 
 	def _analyze_comment_violations(self, source_id: int, source_type: Literal["post", "work", "shop"], board_name: str) -> list[str]:
-		"""分析评论违规内容:广告、黑名单、重复评论"""
+		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
 			# 1. 获取评论详情列表
 			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments")
-			# 2. 违规检查参数(广告关键词、黑名单、垃圾帖阈值)
+			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
 				"ads": self._data.USER_DATA.ads,
 				"blacklist": self._data.USER_DATA.black_room,
@@ -1003,7 +1003,7 @@ class ReportProcessor(ClassUnion):
 			}
 			# 3. 调用评论处理器分析违规
 			comment_processor = CommentProcessor()
-			# 临时配置类:适配评论处理器的参数要求
+			# 临时配置类: 适配评论处理器的参数要求
 
 			class CommentCheckConfig:
 				title_key = "title"  # 标题字段名
@@ -1023,17 +1023,17 @@ class ReportProcessor(ClassUnion):
 					params=check_params,
 					target_lists=violation_targets,
 				)
-			# 合并所有违规内容(去重,避免重复举报)
+			# 合并所有违规内容 (去重, 避免重复举报)
 			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
 		except Exception as e:
 			self._printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
 	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0915
-		"""处理自动举报:用学生账号批量举报违规评论"""
+		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查学生账号是否可用
 		if not (self.auth_manager.student_accounts or self.auth_manager.student_tokens):
-			self._printer.print_message("未加载学生账号,无法执行自动举报", "WARNING")
+			self._printer.print_message("未加载学生账号, 无法执行自动举报", "WARNING")
 			return
 		# 2. 询问是否执行自动举报
 		if self._printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
@@ -1055,9 +1055,9 @@ class ReportProcessor(ClassUnion):
 		}
 		source_key = source_key_map[source_type]
 		# 5. 准备账号管理
-		# 复制可用账号列表,避免修改原列表
+		# 复制可用账号列表, 避免修改原列表
 		available_accounts = self.auth_manager.student_accounts.copy() if self.auth_manager.auth_method == "grab" else self.auth_manager.student_tokens.copy()
-		self._printer.print_message(f"开始自动举报(共 {len(violations)} 条违规内容)", "INFO")
+		self._printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
 		success_count = 0
 		# 6. 处理每条违规内容
 		for idx, violation in enumerate(violations, 1):
@@ -1068,17 +1068,17 @@ class ReportProcessor(ClassUnion):
 				continue
 			item_id_part = violation_parts[0].split(".")
 			if len(item_id_part) < 2:
-				self._printer.print_message(f"违规ID格式错误: {violation_parts[0]}", "ERROR")
+				self._printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
 				continue
 			_, comment_id = item_id_part
 			is_reply = "reply" in violation
-			# 查找父评论ID
+			# 查找父评论 ID
 			parent_id, _ = self._tool.StringProcessor().find_substrings(text=comment_id, candidates=violations)
 			parent_id = int(parent_id) if parent_id and parent_id != "UNKNOWN" else None
 			# 为当前违规项尝试举报
 			violation_success = False
 			retry_count = 0
-			max_retries = min(3, len(available_accounts))  # 最多重试3次或可用账号数
+			max_retries = min(3, len(available_accounts))  # 最多重试 3 次或可用账号数
 			while not violation_success and retry_count < max_retries and available_accounts:
 				# 切换学生账号
 				if self.auth_manager.auth_method == "grab":
@@ -1086,18 +1086,18 @@ class ReportProcessor(ClassUnion):
 				else:
 					self.auth_manager.student_tokens = available_accounts.copy()
 				if not self.auth_manager.switch_to_student_account():
-					# 切换失败,移除当前账号并重试
+					# 切换失败, 移除当前账号并重试
 					if available_accounts:
 						available_accounts.pop(0)
 					retry_count += 1
 					continue
-				# 获取当前学生账号ID
+				# 获取当前学生账号 ID
 				try:
 					user_details = self._user_obtain.fetch_account_details()
 					user_details_ndd = data.NestedDefaultDict(user_details)
 					reporter_id = user_details_ndd["id"]
 					if reporter_id == "UNKNOWN":
-						msg = "获取学生账号ID失败"
+						msg = "获取学生账号 ID 失败"
 						raise ValueError(msg)  # noqa: TRY301
 				except Exception as e:
 					self._printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
@@ -1133,12 +1133,12 @@ class ReportProcessor(ClassUnion):
 					if available_accounts:
 						available_accounts.pop(0)
 					retry_count += 1
-			# 如果当前违规项处理失败,记录日志
+			# 如果当前违规项处理失败, 记录日志
 			if not violation_success:
-				self._printer.print_message(f"[{idx}/{len(violations)}] 处理失败,跳过: {violation}", "WARNING")
-		# 7. 举报完成:恢复管理员账号
+				self._printer.print_message(f"[{idx}/{len(violations)}] 处理失败, 跳过: {violation}", "WARNING")
+		# 7. 举报完成: 恢复管理员账号
 		auth.AuthManager().terminate_session()
-		self._printer.print_message(f"自动举报完成,成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
+		self._printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
 	def _execute_report_action(
 		self,
@@ -1153,20 +1153,20 @@ class ReportProcessor(ClassUnion):
 		is_reply: bool = False,
 		description: str = "",
 	) -> bool:
-		"""执行举报操作:根据来源类型调用不同模块的举报接口"""
+		"""执行举报操作: 根据来源类型调用不同模块的举报接口"""
 		try:
 			match source_key:
-				# 作品模块:举报作品评论
+				# 作品模块: 举报作品评论
 				case "work":
 					return self._work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
-				# 论坛模块:举报帖子评论/回复
+				# 论坛模块: 举报帖子评论 / 回复
 				case "forum":
-					item_type = "COMMENT" if is_reply else "REPLY"  # 回复/普通评论区分
+					item_type = "COMMENT" if is_reply else "REPLY"  # 回复 / 普通评论区分
 					return self._forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
-				# 店铺模块:举报店铺评论/回复
+				# 店铺模块: 举报店铺评论 / 回复
 				case "shop":
 					if is_reply and parent_id is not None:
-						# 回复类型:需传入父评论ID
+						# 回复类型: 需传入父评论 ID
 						return self._shop_motion.execute_report_comment(
 							comment_id=target_id,
 							reason_content=reason_content,
@@ -1175,7 +1175,7 @@ class ReportProcessor(ClassUnion):
 							comment_parent_id=parent_id,
 							description=description,
 						)
-					# 普通评论:无需父ID
+					# 普通评论: 无需父 ID
 					return self._shop_motion.execute_report_comment(
 						comment_id=target_id,
 						reason_content=reason_content,
@@ -1183,7 +1183,7 @@ class ReportProcessor(ClassUnion):
 						reporter_id=reporter_id,
 						description=description,
 					)
-			# 未知来源类型:举报失败
+			# 未知来源类型: 举报失败
 		except Exception as e:
 			self._printer.print_message(f"举报操作失败: {e!s}", "ERROR")
 			return False
@@ -1200,20 +1200,20 @@ class ReportAuthManager(ClassUnion):
 		super().__init__()
 
 	def load_student_accounts(self) -> None:
-		"""加载学生账号:用于自动举报,支持实时获取/文件加载"""
-		# 切换到普通账号上下文(加载学生账号需普通权限)
+		"""加载学生账号: 用于自动举报, 支持实时获取 / 文件加载"""
+		# 切换到普通账号上下文 (加载学生账号需普通权限)
 		self._client.switch_identity(token=self._client.token.average, identity="average")
 		# 询问是否加载学生账号
 		if self._printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			self._printer.print_message("未加载学生账号,自动举报功能不可用", "WARNING")
+			self._printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
 			auth.AuthManager().restore_admin_account()
 			return
-		# 选择账号获取方式(实时获取/文件加载)
-		method = self._printer.get_valid_input(prompt="选择模式(load.加载文件 grab.实时获取)", valid_options={"load", "grab"}, cast_type=str)
-		self.auth_method = cast("Literal['load', 'grab']", method)
+		# 选择账号获取方式 (实时获取 / 文件加载)
+		method = self._printer.get_valid_input(prompt="选择模式 (load. 加载文件 grab. 实时获取)", valid_options={"load", "grab"}, cast_type=str)
+		self.auth_method = cast("Literal ['load', 'grab']", method)
 		try:
 			if method == "grab":
-				# 实时获取学生账号(调用Obtain工具)
+				# 实时获取学生账号 (调用 Obtain 工具)
 				account_count = self._printer.get_valid_input(
 					prompt="输入获取账号数",
 					cast_type=int,
@@ -1222,29 +1222,29 @@ class ReportAuthManager(ClassUnion):
 				self.student_accounts = list(Obtain().switch_edu_account(limit=account_count, return_method="list"))
 				self._printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 			elif method == "load":
-				# 从文件加载学生账号Token(文件路径在data模块定义)
+				# 从文件加载学生账号 Token (文件路径在 data 模块定义)
 				token_list = self._file.read_line(data.PathConfig.TOKEN_FILE_PATH)
 				self.student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
-				self._printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号Token", "SUCCESS")
+				self._printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号 Token", "SUCCESS")
 		except Exception as e:
-			# 捕获所有异常(文件不存在、接口错误等)
+			# 捕获所有异常 (文件不存在、接口错误等)
 			self._printer.print_message(f"加载学生账号失败: {e!s}", "ERROR")
 			self.student_accounts = []
 			self.student_tokens = []
-		# 恢复管理员账号上下文(加载完成后切回管理员)
+		# 恢复管理员账号上下文 (加载完成后切回管理员)
 		auth.AuthManager().restore_admin_account()
 
 	def switch_to_student_account(self) -> bool:
-		"""切换到学生账号:供举报处理类调用,返回切换结果"""
-		# 确定可用账号列表(实时获取的账密 / 文件加载的Token)
+		"""切换到学生账号: 供举报处理类调用, 返回切换结果"""
+		# 确定可用账号列表 (实时获取的账密 / 文件加载的 Token)
 		available_accounts = self.student_accounts or self.student_tokens
 		if not available_accounts:
 			return False
-		# 随机选择一个账号(避免重复使用)
+		# 随机选择一个账号 (避免重复使用)
 		selected_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
 		try:
 			if self.auth_method == "grab":
-				# 实时获取的账号:用账密认证
+				# 实时获取的账号: 用账密认证
 				username, password = selected_account
 				self._printer.print_message(f"切换学生账号: {id(username)}", "INFO")
 				sleep(2)  # 避免接口限流
@@ -1254,7 +1254,7 @@ class ReportAuthManager(ClassUnion):
 					status="edu",  # 教育账号标识
 				)
 			else:
-				# 文件加载的账号:用Token切换
+				# 文件加载的账号: 用 Token 切换
 				token = cast("str", selected_account)
 				self._printer.print_message(f"切换学生账号: {id(token)}", "INFO")
 				self._client.switch_identity(token=token, identity="edu")
@@ -1287,7 +1287,7 @@ class FileProcessor(ClassUnion):
 		file_size = file_path.stat().st_size
 		if file_size > MAX_SIZE_BYTES:
 			size_mb = file_size / 1024 / 1024
-			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+			print(f"警告: 文件 {file_path.name} 大小 {size_mb:.2f} MB 超过 15MB 限制, 跳过上传")
 			return None
 		# 使用重构后的统一上传接口
 		url = uploader().upload(file_path=file_path, method=method, save_path=save_path)
@@ -1316,7 +1316,7 @@ class FileProcessor(ClassUnion):
 					file_size = child_file.stat().st_size
 					if file_size > MAX_SIZE_BYTES:
 						size_mb = file_size / 1024 / 1024
-						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f}MB 超过 15MB 限制,跳过上传")
+						print(f"警告: 文件 {child_file.name} 大小 {size_mb:.2f} MB 超过 15MB 限制, 跳过上传")
 						results[str(child_file)] = None
 						continue
 					# 计算保存路径
@@ -1344,10 +1344,10 @@ class FileProcessor(ClassUnion):
 
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:  # noqa: PLR0915
 		"""
-		打印上传历史记录(使用通用数据查看器)
+		打印上传历史记录 (使用通用数据查看器)
 		Args:
-			limit: 每页显示记录数(默认10条)
-			reverse: 是否按时间倒序显示(最新的在前)
+			limit: 每页显示记录数 (默认 10 条)
+			reverse: 是否按时间倒序显示 (最新的在前)
 		"""
 		history_list = self._upload_history.data.history
 		if not history_list:
@@ -1372,7 +1372,7 @@ class FileProcessor(ClassUnion):
 			return file_name.replace("\\", "/")
 
 		def format_url_display(save_url: str) -> str:
-			"""格式化URL显示"""
+			"""格式化 URL 显示"""
 			url = save_url.replace("\\", "/")
 			parsed_url = urlparse(url)
 			host = parsed_url.hostname
@@ -1412,22 +1412,22 @@ class FileProcessor(ClassUnion):
 			self._printer.print_message(f"文件大小: {record.file_size}", "INFO")
 			self._printer.print_message(f"上传方式: {record.method}", "INFO")
 			self._printer.print_message(f"上传时间: {upload_time}", "INFO")
-			self._printer.print_message(f"完整URL: {record.save_url}", "INFO")
+			self._printer.print_message(f"完整 URL: {record.save_url}", "INFO")
 			# 验证链接有效性
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
 			self._printer.print_message(f"链接状态: {status}", "INFO")
 			if record.save_url.startswith("http"):
-				self._printer.print_message("提示: 复制上方URL到浏览器可直接访问或下载", "INFO")
+				self._printer.print_message("提示: 复制上方 URL 到浏览器可直接访问或下载", "INFO")
 			self._printer.print_message("-" * 60, "INFO")
-			input("按Enter键返回...")
+			input("按 Enter 键返回...")
 
 		def validate_url_only(record: data.UploadHistory) -> None:
 			"""仅验证链接"""
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
 			self._printer.print_message(f"链接 '{record.save_url}' 状态: {status}", "INFO")
-			input("按Enter键返回...")
+			input("按 Enter 键返回...")
 
 		custom_operations = {
 			"查看详情": show_record_detail,
@@ -1453,18 +1453,18 @@ class FileProcessor(ClassUnion):
 
 	def _validate_url(self, url: str) -> bool:
 		"""
-		验证URL链接是否有效
-		先使用HEAD请求检查,若返回无效状态则尝试GET请求验证内容
+		验证 URL 链接是否有效
+		先使用 HEAD 请求检查, 若返回无效状态则尝试 GET 请求验证内容
 		"""
 		try:
-			# 首先尝试HEAD请求
+			# 首先尝试 HEAD 请求
 			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
-			if response.status_code == acquire.HTTPStatus.OK.value:  # 直接使用200状态码
+			if response.status_code == acquire.HTTPStatus.OK.value:  # 直接使用 200 状态码
 				content_length = response.headers.get("Content-Length")
-				# 如果有Content-Length且大于0,或者没有Content-Length都认为是有效的
+				# 如果有 Content-Length 且大于 0, 或者没有 Content-Length 都认为是有效的
 				if not content_length or int(content_length) > 0:
 					return True
-			# HEAD请求失败或内容长度为0,尝试GET请求
+			# HEAD 请求失败或内容长度为 0, 尝试 GET 请求
 			response = self._client.send_request(endpoint=url, method="GET", timeout=5, log=False)
 			if response.status_code != acquire.HTTPStatus.OK.value:
 				return False

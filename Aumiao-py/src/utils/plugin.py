@@ -13,30 +13,28 @@ from src.utils import data, tool
 
 printer = tool.Printer()
 T = TypeVar("T")
-
 """
 插件开发规范:
-1. 每个插件必须是一个独立的Python模块(.py文件或包)
+1. 每个插件必须是一个独立的 Python 模块 (.py 文件或包)
 2. 每个插件必须包含一个名为 'Plugin' 的类
-3. Plugin类必须实现以下内容:
-    - 类属性:
-        PLUGIN_NAME: 插件名称(字符串)
-        PLUGIN_DESCRIPTION: 插件描述(字符串)
-        PLUGIN_VERSION: 插件版本(字符串)
-        PLUGIN_CONFIG_SCHEMA: 插件配置模式(字典), 定义配置结构
-        PLUGIN_DEFAULT_CONFIG: 插件默认配置(字典)
-    - 方法:
-        register() -> dict: 返回要暴露的方法字典
-            格式: {"方法名": (方法对象, "方法描述")}
-        on_load(config: dict): 插件加载时调用, 传入当前配置
-        on_unload(): 插件卸载时调用
+3. Plugin 类必须实现以下内容:
+	- 类属性:
+		PLUGIN_NAME: 插件名称 (字符串)
+		PLUGIN_DESCRIPTION: 插件描述 (字符串)
+		PLUGIN_VERSION: 插件版本 (字符串)
+		PLUGIN_CONFIG_SCHEMA: 插件配置模式 (字典), 定义配置结构
+		PLUGIN_DEFAULT_CONFIG: 插件默认配置 (字典)
+	- 方法:
+		register() -> dict: 返回要暴露的方法字典
+			格式: {"方法名": (方法对象, "方法描述")}
+		on_load (config: dict): 插件加载时调用, 传入当前配置
+		on_unload(): 插件卸载时调用
 4. 插件可以放置在任意目录, 但需要被插件管理器扫描到
-
 新增功能:
 5. 插件现在可以修改其他模块的代码:
-    - 通过 inject_code_at_line() 在指定行号插入代码
-    - 通过 inject_code_at_pattern() 基于代码模式插入代码
-    - 通过 rewrite_function() 完全重写函数
+	- 通过 inject_code_at_line() 在指定行号插入代码
+	- 通过 inject_code_at_pattern() 基于代码模式插入代码
+	- 通过 rewrite_function() 完全重写函数
 6. 插件方法可以定义参数类型和默认值, 系统会自动提示用户输入
 """
 
@@ -54,46 +52,37 @@ class CodeModificationManager:
 		"""在指定模块的指定行号插入代码"""
 		if module_name not in self.line_injections:
 			self.line_injections[module_name] = []
-
 		self.line_injections[module_name].append({"line": line_number, "code": code, "position": position})
 
 	def inject_code_at_pattern(self, module_name, pattern, code, position="after") -> None:  # noqa: ANN001
 		"""基于代码模式插入代码"""
 		if module_name not in self.pattern_injections:
 			self.pattern_injections[module_name] = []
-
 		self.pattern_injections[module_name].append({"pattern": re.compile(pattern), "code": code, "position": position})
 
 	def rewrite_function(self, module_name, function_name, new_function) -> None:  # noqa: ANN001
 		"""完全重写函数"""
 		if module_name not in self.function_rewrites:
 			self.function_rewrites[module_name] = {}
-
 		self.function_rewrites[module_name][function_name] = new_function
 
 	def apply_modifications(self, module_name: str) -> None:
 		"""应用所有修改到指定模块"""
 		if module_name not in sys.modules or module_name in self.modified_modules:
 			return
-
 		module = sys.modules[module_name]
-
 		try:
 			# 获取模块源代码
 			source = inspect.getsource(module)
 			modified_source = self._apply_all_modifications(module_name, source)
-
 			if modified_source != source:
 				# 编译并执行修改后的代码
-				code = compile(modified_source, module.__file__, "exec")  # pyright: ignore[reportArgumentType]
+				code = compile(modified_source, module.__file__, "exec")  # pyright: ignore [reportArgumentType]
 				exec(code, module.__dict__)  # noqa: S102
-
 			# 应用函数重写
 			self._apply_function_rewrites(module_name, module)
-
 			self.modified_modules.add(module_name)
 			print(f"代码修改已应用到模块: {module_name}")
-
 		except Exception as e:
 			print(f"应用代码修改到 {module_name} 失败: {e}")
 			traceback.print_exc()
@@ -102,33 +91,27 @@ class CodeModificationManager:
 		"""应用所有代码修改"""
 		lines = source.split("\n")
 		modifications = []
-
 		# 收集行号注入
 		for injection in self.line_injections.get(module_name, []):
 			line_num = injection["line"]
 			if 0 <= line_num - 1 < len(lines):
 				modifications.append({"line": line_num - 1, "code": injection["code"], "position": injection["position"]})
-
 		# 收集模式匹配注入
 		for injection in self.pattern_injections.get(module_name, []):
 			for i, line in enumerate(lines):
 				if injection["pattern"].search(line):
 					modifications.append({"line": i, "code": injection["code"], "position": injection["position"]})
-
-		# 按行号倒序应用修改(避免影响行号)
+		# 按行号倒序应用修改 (避免影响行号)
 		modifications.sort(key=operator.itemgetter("line"), reverse=True)
-
 		for mod in modifications:
 			indent = self._get_indentation(lines[mod["line"]])
 			injected_code = f"{indent}{mod['code']}"
-
 			if mod["position"] == "before":
 				lines.insert(mod["line"], injected_code)
 			elif mod["position"] == "after":
 				lines.insert(mod["line"] + 1, injected_code)
 			elif mod["position"] == "replace":
 				lines[mod["line"]] = injected_code
-
 		return "\n".join(lines)
 
 	def _apply_function_rewrites(self, module_name, module) -> None:  # noqa: ANN001
@@ -179,7 +162,7 @@ class BasePlugin(ABC):
 
 	def on_load(self, _config: dict[str, Any]) -> None:
 		"""插件加载时的回调, 传入当前配置"""
-		print(f"[系统] 插件 {self.PLUGIN_NAME} v{self.PLUGIN_VERSION} 已加载")
+		print(f"[系统] 插件 {self.PLUGIN_NAME} v {self.PLUGIN_VERSION} 已加载")
 		self.apply_code_modifications()
 
 	def on_unload(self) -> None:
@@ -213,10 +196,8 @@ class LazyPluginManager:
 		self.loaded_plugins: dict[str, BasePlugin] = {}  # 已加载的插件 {plugin_name: plugin_instance}
 		self.command_map: dict[str, tuple[str, str]] = {}  # 命令映射 {command_name: (plugin_name, method_name)}
 		self.plugin_modules: dict[str, Any] = {}  # 已加载的模块 {plugin_name: module}
-
 		# 代码修改管理器
 		self.code_modifier = CodeModificationManager()
-
 		# 扫描插件
 		self.scan_plugins()
 
@@ -233,7 +214,7 @@ class LazyPluginManager:
 			self.plugin_info[plugin_name] = {"module_name": module_name, "status": "scanned", "commands": {}}
 
 	def get_plugin_list(self) -> dict[str, dict]:
-		"""获取插件列表(不加载插件)"""
+		"""获取插件列表 (不加载插件)"""
 		result: dict[str, dict] = {}
 		for name, info in self.plugin_info.items():
 			# 如果插件已加载过, 则包含更多信息
@@ -317,12 +298,10 @@ class LazyPluginManager:
 		"""获取方法的签名信息"""
 		signature = inspect.signature(method)
 		type_hints = get_type_hints(method)
-
 		params = {}
 		for name, param in signature.parameters.items():
 			if name == "self":
 				continue
-
 			param_info = {
 				"name": name,
 				"default": param.default if param.default is not param.empty else None,
@@ -331,7 +310,6 @@ class LazyPluginManager:
 				"annotation": param.annotation if param.annotation is not param.empty else Any,
 			}
 			params[name] = param_info
-
 		return {"params": params, "return_type": type_hints.get("return", Any)}
 
 	@staticmethod
@@ -400,7 +378,7 @@ class LazyPluginManager:
 	def load_config(self, plugin_name: str) -> dict[str, Any]:
 		"""从全局配置管理器加载插件配置"""
 		default_config: dict[str, Any] = {}
-		# 获取默认配置(需要先加载插件)
+		# 获取默认配置 (需要先加载插件)
 		if plugin_name in self.loaded_plugins:
 			default_config = self.loaded_plugins[plugin_name].PLUGIN_DEFAULT_CONFIG
 		try:
@@ -502,24 +480,22 @@ class PluginConsole:
 		keyword = printer.prompt_input("输入搜索关键词")
 		if not keyword:
 			return
-
 		results = self.manager.search_plugins(keyword)
 		if not results:
 			printer.prompt_input("未找到匹配的插件, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header("搜索结果")
 		for name, info in results.items():
 			status = "已加载" if info["status"] == "loaded" else "未加载"
 			status_color = "SUCCESS" if info["status"] == "loaded" else "COMMENT"
 			status_text = printer.color_text(f"({status})", status_color)
 			print(f"- {name} {status_text}")
-			print(f"  描述: {info['description']}")
+			print(f"描述: {info['description']}")
 			if "version" in info:
-				print(f"  版本: {info['version']}")
+				print(f"版本: {info['version']}")
 			if info.get("commands"):
-				commands_text = printer.color_text(", ".join(info["commands"]), "MENU_ITEM")
-				print(f"  命令: {commands_text}")
+				commands_text = printer.color_text(",".join(info["commands"]), "MENU_ITEM")
+				print(f"命令: {commands_text}")
 		printer.prompt_input("按回车键返回", "COMMENT")
 
 	def use_plugin(self) -> None:
@@ -529,7 +505,6 @@ class PluginConsole:
 		if not plugins:
 			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header("可用插件")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
@@ -537,14 +512,10 @@ class PluginConsole:
 			status_color = "SUCCESS" if plugins[name]["status"] == "loaded" else "COMMENT"
 			status_text = printer.color_text(f"({status})", status_color)
 			print(f"{idx:2d}. {name} {status_text}")
-
-		print(" 0. 返回")
-
-		choice = printer.get_valid_input("请选择插件编号 (输入0返回)", valid_options=range(len(plugin_names) + 1), cast_type=int)
-
+		print("0. 返回")
+		choice = printer.get_valid_input("请选择插件编号 (输入 0 返回)", valid_options=range(len(plugin_names) + 1), cast_type=int)
 		if choice == 0:
 			return
-
 		plugin_name = plugin_names[choice - 1]
 		self.use_plugin_commands(plugin_name)
 
@@ -554,30 +525,23 @@ class PluginConsole:
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
-
 		while True:
 			# 获取插件命令
 			commands = self.manager.get_plugin_commands(plugin_name)
 			if not commands:
 				printer.prompt_input(f"插件 {plugin_name} 没有可用命令, 按回车键返回", "COMMENT")
 				return
-
 			printer.print_header(f"{plugin_name} 的命令列表")
 			command_names = list(commands.keys())
 			for idx, cmd in enumerate(command_names, 1):
 				info = commands[cmd]
 				print(f"{idx:2d}. {printer.color_text(cmd, 'MENU_ITEM')} - {info['description']}")
-
-			print(" 0. 返回")
-
+			print("0. 返回")
 			choice = printer.get_valid_input("请选择命令编号", valid_options=range(len(command_names) + 1), cast_type=int)
-
 			if choice == 0:
 				break
-
 			command_name = command_names[choice - 1]
 			self.execute_command(plugin_name, command_name, commands[command_name])
-
 			# 执行完命令后不立即返回, 而是继续显示命令列表
 
 	@staticmethod
@@ -586,29 +550,23 @@ class PluginConsole:
 		method = command_info["method"]
 		signature = command_info.get("signature", {})
 		params = signature.get("params", {})
-
 		# 收集参数
 		args = []
 		kwargs = {}
-
 		printer.print_header(f"执行命令: {command_name}")
-
 		if params:
 			print("请提供参数:")
 			for param_name, param_info in params.items():
 				param_type = param_info["type"]
 				has_default = param_info["has_default"]
 				default_value = param_info["default"]
-
 				# 构建提示信息
-				prompt = f"  {param_name} ({param_type.__name__})"
+				prompt = f"{param_name} ({param_type.__name__})"
 				if has_default:
-					prompt += f" [默认: {default_value}]"
-				prompt += ": "
-
+					prompt += f"[默认: {default_value}]"
+				prompt += ":"
 				# 获取用户输入
 				value_input = input(prompt).strip()
-
 				if not value_input and has_default:
 					# 使用默认值
 					value = default_value
@@ -630,11 +588,9 @@ class PluginConsole:
 					except ValueError:
 						printer.print_message(f"无法将 '{value_input}' 转换为 {param_type.__name__}", "ERROR")
 						return
-
 				kwargs[param_name] = value
 		else:
 			printer.print_message("此命令不需要参数", "COMMENT")
-
 		# 执行命令
 		try:
 			result = method(*args, **kwargs)
@@ -651,30 +607,23 @@ class PluginConsole:
 		if not plugins:
 			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header("插件列表")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
 			print(f"{idx:2d}. {name}")
-
-		print(" 0. 返回")
-
+		print("0. 返回")
 		choice = printer.get_valid_input("请选择插件查看配置", valid_options=range(len(plugin_names) + 1), cast_type=int)
-
 		if choice == 0:
 			return
-
 		plugin_name = plugin_names[choice - 1]
 		# 确保插件已加载
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
-
 		config = self.manager.get_config(plugin_name)
 		if config is None:
 			printer.prompt_input("无可用配置, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header(f"{plugin_name} 的配置")
 		for key, value in config.items():
 			print(f"- {printer.color_text(key, 'MENU_ITEM')}: {value}")
@@ -686,48 +635,37 @@ class PluginConsole:
 		if not plugins:
 			printer.prompt_input("没有可用插件, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header("插件列表")
 		plugin_names = list(plugins.keys())
 		for idx, name in enumerate(plugin_names, 1):
 			print(f"{idx:2d}. {name}")
-
-		print(" 0. 返回")
-
+		print("0. 返回")
 		choice = printer.get_valid_input("请选择插件更新配置", valid_options=range(len(plugin_names) + 1), cast_type=int)
-
 		if choice == 0:
 			return
-
 		plugin_name = plugin_names[choice - 1]
 		# 确保插件已加载
 		if not self.manager.load_plugin(plugin_name):
 			printer.prompt_input(f"无法加载插件 {plugin_name}, 按回车键返回", "ERROR")
 			return
-
 		# 获取当前配置
 		current_config = self.manager.get_config(plugin_name)
 		if current_config is None:
 			printer.prompt_input("无可用配置, 按回车键返回", "COMMENT")
 			return
-
 		printer.print_header(f"{plugin_name} 的当前配置")
 		for key, value in current_config.items():
 			print(f"- {printer.color_text(key, 'MENU_ITEM')}: {value}")
-
 		# 获取新配置
 		new_config: dict[str, Any] = {}
 		printer.print_header("输入新配置 (输入空值保持原配置)")
-
 		for key, current_value in current_config.items():
 			value_type = type(current_value)
-			prompt = f"{key} ({value_type.__name__}) [当前: {current_value}]: "
+			prompt = f"{key} ({value_type.__name__}) [当前: {current_value}]:"
 			new_value = input(prompt).strip()
-
 			if not new_value:
 				new_config[key] = current_value
 				continue
-
 			# 尝试转换类型
 			try:
 				if value_type is int:
@@ -741,7 +679,6 @@ class PluginConsole:
 			except ValueError:
 				printer.print_message(f"无法转换 {key} 的值, 使用原值", "ERROR")
 				new_config[key] = current_value
-
 		# 更新配置
 		if self.manager.update_config(plugin_name, new_config):
 			printer.prompt_input("配置更新成功, 按回车键返回", "SUCCESS")

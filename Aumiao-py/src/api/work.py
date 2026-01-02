@@ -5,14 +5,14 @@ from src.utils import acquire
 from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
-# 定义HTTP方法选择类型
+# 定义 HTTP 方法选择类型
 SelectMethod = Literal["POST", "DELETE"]
 
 
 @singleton
 class WorkManager:
 	def __init__(self) -> None:
-		"""初始化作品管理类,创建CodeMaoClient实例"""
+		"""初始化作品管理类, 创建 CodeMaoClient 实例"""
 		self._client = acquire.CodeMaoClient()
 
 	def create_kitten_work(
@@ -27,14 +27,14 @@ class WorkManager:
 		save_type: int = 2,
 	) -> dict:
 		"""
-		创建Kitten作品
+		创建 Kitten 作品
 		Args:
 			name: 作品名称
-			work_url: 作品URL
-			preview: 预览图URL
+			work_url: 作品 URL
+			preview: 预览图 URL
 			version: 作品版本
-			orientation: 作品方向(1=横屏,2=竖屏)
-			sample_id: 样本ID(可选)
+			orientation: 作品方向 (1 = 横屏,2 = 竖屏)
+			sample_id: 样本 ID (可选)
 			work_source_label: 作品来源标签
 			save_type: 保存类型
 		Returns:
@@ -74,21 +74,21 @@ class WorkManager:
 		user_labels: list = [],
 	) -> bool:
 		"""
-		发布Kitten作品
+		发布 Kitten 作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			name: 作品名称
 			description: 作品描述
 			operation: 操作说明
 			labels: 作品标签列表
-			cover_url: 封面URL
+			cover_url: 封面 URL
 			bcmc_url: BCMC URL
-			work_url: 作品URL
-			fork_enable: 是否允许分叉(0=不允许,1=允许)
-			if_default_cover: 封面类型(1=默认,2=自定义)
+			work_url: 作品 URL
+			fork_enable: 是否允许分叉 (0 = 不允许,1 = 允许)
+			if_default_cover: 封面类型 (1 = 默认,2 = 自定义)
 			version: 作品版本
-			cover_type: 封面类型(可选)
-			user_labels: 用户标签列表(可选)
+			cover_type: 封面类型 (可选)
+			user_labels: 用户标签列表 (可选)
 		Returns:
 			发布是否成功
 		"""
@@ -128,19 +128,19 @@ class WorkManager:
 		n_roles: int = 2,
 	) -> dict:
 		"""
-		创建KN作品或更新作品信息
+		创建 KN 作品或更新作品信息
 		Args:
 			name: 作品名称
-			bcm_version: BCM版本
-			preview_url: 预览URL
-			work_url: 作品URL
-			save_type: 保存类型(可选)
-			stage_type: 舞台类型(可选)
-			work_classify: 作品分类(可选)
-			hardware_mode: 硬件模式(可选)
-			blink_mode: 闪烁模式(可选)
-			n_blocks: 积木数量(可选)
-			n_roles: 角色数量(可选)
+			bcm_version: BCM 版本
+			preview_url: 预览 URL
+			work_url: 作品 URL
+			save_type: 保存类型 (可选)
+			stage_type: 舞台类型 (可选)
+			work_classify: 作品分类 (可选)
+			hardware_mode: 硬件模式 (可选)
+			blink_mode: 闪烁模式 (可选)
+			n_blocks: 积木数量 (可选)
+			n_roles: 角色数量 (可选)
 		Returns:
 			创建的作品信息字典
 		"""
@@ -179,19 +179,19 @@ class WorkManager:
 		cover_url: str = "",
 	) -> bool:
 		"""
-		发布KN作品
+		发布 KN 作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			name: 作品名称
-			preview_url: 预览URL
+			preview_url: 预览 URL
 			description: 作品描述
 			operation: 操作说明
-			fork_enable: 分叉权限(0=不允许,1=允许,2=仅粉丝允许)
-			if_default_cover: 封面类型(1=默认,2=自定义)
+			fork_enable: 分叉权限 (0 = 不允许,1 = 允许,2 = 仅粉丝允许)
+			if_default_cover: 封面类型 (1 = 默认,2 = 自定义)
 			bcmc_url: BCMC URL
-			work_url: 作品URL
-			bcm_version: BCM版本
-			cover_url: 封面URL(可选)
+			work_url: 作品 URL
+			bcm_version: BCM 版本
+			cover_url: 封面 URL (可选)
 		Returns:
 			发布是否成功
 		"""
@@ -218,8 +218,8 @@ class WorkManager:
 		"""
 		关注或取消关注用户
 		Args:
-			user_id: 用户ID
-			method: HTTP方法(POST=关注,DELETE=取消关注)
+			user_id: 用户 ID
+			method: HTTP 方法 (POST = 关注,DELETE = 取消关注)
 		Returns:
 			操作是否成功
 		"""
@@ -234,8 +234,8 @@ class WorkManager:
 		"""
 		收藏或取消收藏作品
 		Args:
-			work_id: 作品ID
-			method: HTTP方法(POST=收藏,DELETE=取消收藏)
+			work_id: 作品 ID
+			method: HTTP 方法 (POST = 收藏,DELETE = 取消收藏)
 		Returns:
 			操作是否成功
 		"""
@@ -250,8 +250,8 @@ class WorkManager:
 		"""
 		点赞或取消点赞作品
 		Args:
-			work_id: 作品ID
-			method: HTTP方法(POST=点赞,DELETE=取消点赞)
+			work_id: 作品 ID
+			method: HTTP 方法 (POST = 点赞,DELETE = 取消点赞)
 		Returns:
 			操作是否成功
 		"""
@@ -266,7 +266,7 @@ class WorkManager:
 		"""
 		分享作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			分享是否成功
 		"""
@@ -281,12 +281,12 @@ class WorkManager:
 		"""
 		添加作品评论
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			comment: 评论内容
-			emoji: 表情内容(可选)
+			emoji: 表情内容 (可选)
 			return_data: 是否返回完整响应数据
 		Returns:
-			操作结果(成功状态或完整响应数据)
+			操作结果 (成功状态或完整响应数据)
 		"""
 		response = self._client.send_request(
 			endpoint=f"/creation-tools/v1/works/{work_id}/comment",
@@ -311,12 +311,12 @@ class WorkManager:
 		回复作品评论
 		Args:
 			comment: 回复内容
-			work_id: 作品ID
-			comment_id: 评论ID
-			parent_id: 父评论ID(可选)
+			work_id: 作品 ID
+			comment_id: 评论 ID
+			parent_id: 父评论 ID (可选)
 			return_data: 是否返回完整响应数据
 		Returns:
-			操作结果(成功状态或完整响应数据)
+			操作结果 (成功状态或完整响应数据)
 		"""
 		data = {"parent_id": parent_id, "content": comment}
 		response = self._client.send_request(
@@ -330,8 +330,8 @@ class WorkManager:
 		"""
 		删除作品评论
 		Args:
-			work_id: 作品ID
-			comment_id: 评论ID
+			work_id: 作品 ID
+			comment_id: 评论 ID
 		Returns:
 			删除是否成功
 		"""
@@ -347,7 +347,7 @@ class WorkManager:
 		Args:
 			describe: 举报描述
 			reason: 举报原因
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			举报是否成功
 		"""
@@ -368,12 +368,12 @@ class WorkManager:
 		"""
 		置顶或取消置顶评论
 		Args:
-			method: HTTP方法(PUT=置顶,DELETE=取消置顶)
-			work_id: 作品ID
-			comment_id: 评论ID
+			method: HTTP 方法 (PUT = 置顶,DELETE = 取消置顶)
+			work_id: 作品 ID
+			comment_id: 评论 ID
 			return_data: 是否返回完整响应数据
 		Returns:
-			操作结果(成功状态或完整响应数据)
+			操作结果 (成功状态或完整响应数据)
 		"""
 		response = self._client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
 		return response.status_code == HTTPStatus.NO_CONTENT.value
@@ -382,9 +382,9 @@ class WorkManager:
 		"""
 		点赞或取消点赞评论
 		Args:
-			work_id: 作品ID
-			comment_id: 评论ID
-			method: HTTP方法(POST=点赞,DELETE=取消点赞)
+			work_id: 作品 ID
+			comment_id: 评论 ID
+			method: HTTP 方法 (POST = 点赞,DELETE = 取消点赞)
 		Returns:
 			操作是否成功
 		"""
@@ -399,8 +399,8 @@ class WorkManager:
 		"""
 		举报作品评论
 		Args:
-			work_id: 作品ID
-			comment_id: 评论ID
+			work_id: 作品 ID
+			comment_id: 评论 ID
 			reason: 举报原因
 		Returns:
 			举报是否成功
@@ -420,7 +420,7 @@ class WorkManager:
 		"""
 		启用作品协作功能
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			操作是否成功
 		"""
@@ -433,9 +433,9 @@ class WorkManager:
 
 	def delete_kitten_draft(self, work_id: int) -> bool:
 		"""
-		删除未发布的Kitten作品草稿
+		删除未发布的 Kitten 作品草稿
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			删除是否成功
 		"""
@@ -447,10 +447,10 @@ class WorkManager:
 
 	def delete_kn_draft(self, work_id: int, force: Literal[1, 2]) -> bool:
 		"""
-		删除未发布的KN作品草稿
+		删除未发布的 KN 作品草稿
 		Args:
-			work_id: 作品ID
-			force: 强制删除模式(1=网页端,2=手机端)
+			work_id: 作品 ID
+			force: 强制删除模式 (1 = 网页端,2 = 手机端)
 		Returns:
 			删除是否成功
 		"""
@@ -466,7 +466,7 @@ class WorkManager:
 		"""
 		取消发布作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			操作是否成功
 		"""
@@ -479,9 +479,9 @@ class WorkManager:
 
 	def execute_unpublish_work_web(self, work_id: int) -> bool:
 		"""
-		通过Web端取消发布作品
+		通过 Web 端取消发布作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			操作是否成功
 		"""
@@ -494,9 +494,9 @@ class WorkManager:
 
 	def execute_unpublish_kn_work(self, work_id: int) -> bool:
 		"""
-		取消发布KN作品
+		取消发布 KN 作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			操作是否成功
 		"""
@@ -508,7 +508,7 @@ class WorkManager:
 
 	def execute_empty_kitten_trash(self) -> bool:
 		"""
-		清空Kitten作品回收站
+		清空 Kitten 作品回收站
 		Returns:
 			操作是否成功
 		"""
@@ -520,7 +520,7 @@ class WorkManager:
 
 	def execute_empty_kn_trash(self) -> bool:
 		"""
-		清空KN作品回收站
+		清空 KN 作品回收站
 		Returns:
 			操作是否成功
 		"""
@@ -541,10 +541,10 @@ class WorkManager:
 		"""
 		重命名作品
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			name: 新名称
-			work_type: 作品类型(可选)
-			is_check_name: 是否检查名称有效性(可选)
+			work_type: 作品类型 (可选)
+			is_check_name: 是否检查名称有效性 (可选)
 		Returns:
 			重命名是否成功
 		"""
@@ -566,7 +566,7 @@ class WorkDataFetcher:
 		"""
 		获取作品评论生成器
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			limit: 获取评论数量限制
 		Returns:
 			评论数据生成器
@@ -583,7 +583,7 @@ class WorkDataFetcher:
 		"""
 		获取作品详细信息
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			作品详细信息字典
 		"""
@@ -595,11 +595,11 @@ class WorkDataFetcher:
 
 	def fetch_kitten_work_details(self, work_id: int) -> dict:
 		"""
-		获取Kitten作品详细信息
+		获取 Kitten 作品详细信息
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
-			Kitten作品详细信息字典
+			Kitten 作品详细信息字典
 		"""
 		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/kitten/work/detail/{work_id}",
@@ -609,11 +609,11 @@ class WorkDataFetcher:
 
 	def fetch_kn_work_details(self, work_id: int) -> dict:
 		"""
-		获取KN作品详细信息
+		获取 KN 作品详细信息
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
-			KN作品详细信息字典
+			KN 作品详细信息字典
 		"""
 		response = self._client.send_request(
 			endpoint=f"https://api-creation.codemao.cn/neko/works/{work_id}",
@@ -623,9 +623,9 @@ class WorkDataFetcher:
 
 	def fetch_kn_publish_status(self, work_id: int) -> dict:
 		"""
-		获取KN作品发布状态
+		获取 KN 作品发布状态
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			发布状态信息字典
 		"""
@@ -637,9 +637,9 @@ class WorkDataFetcher:
 
 	def fetch_kn_work_state(self, work_id: int) -> dict:
 		"""
-		获取KN作品状态
+		获取 KN 作品状态
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			作品状态信息字典
 		"""
@@ -651,9 +651,9 @@ class WorkDataFetcher:
 
 	def fetch_web_recommendations(self, work_id: int) -> dict:
 		"""
-		获取Web端相关作品推荐
+		获取 Web 端相关作品推荐
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			推荐作品信息字典
 		"""
@@ -665,9 +665,9 @@ class WorkDataFetcher:
 
 	def fetch_nemo_recommendations(self, work_id: int) -> dict:
 		"""
-		获取Nemo端相关作品推荐
+		获取 Nemo 端相关作品推荐
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			推荐作品信息字典
 		"""
@@ -683,7 +683,7 @@ class WorkDataFetcher:
 		"""
 		获取作品元数据
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			作品元数据字典
 		"""
@@ -694,7 +694,7 @@ class WorkDataFetcher:
 		"""
 		获取作品标签
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			作品标签信息字典
 		"""
@@ -708,16 +708,16 @@ class WorkDataFetcher:
 
 	def fetch_kitten_tags(self) -> dict:
 		"""
-		获取所有Kitten作品标签
+		获取所有 Kitten 作品标签
 		Returns:
-			Kitten标签列表字典
+			Kitten 标签列表字典
 		"""
 		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/kitten/work/labels", method="GET")
 		return response.json()
 
 	def fetch_kitten_default_covers(self) -> dict:
 		"""
-		获取Kitten默认封面
+		获取 Kitten 默认封面
 		Returns:
 			默认封面列表字典
 		"""
@@ -731,7 +731,7 @@ class WorkDataFetcher:
 		"""
 		获取作品最近使用的封面
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			最近封面列表字典
 		"""
@@ -746,7 +746,7 @@ class WorkDataFetcher:
 		验证作品名称是否可用
 		Args:
 			name: 作品名称
-			work_id: 作品ID(可选)
+			work_id: 作品 ID (可选)
 		Returns:
 			验证结果字典
 		"""
@@ -758,7 +758,7 @@ class WorkDataFetcher:
 		"""
 		获取作者作品集
 		Args:
-			user_id: 用户ID
+			user_id: 用户 ID
 		Returns:
 			作者作品集字典
 		"""
@@ -769,7 +769,7 @@ class WorkDataFetcher:
 		"""
 		获取作品源代码
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			源代码信息字典
 		"""
@@ -781,11 +781,11 @@ class WorkDataFetcher:
 
 	def fetch_new_works_web(self, limit: int = 15, offset: int = 0, *, origin: bool = False) -> dict:
 		"""
-		获取Web端最新作品
+		获取 Web 端最新作品
 		Args:
 			limit: 获取数量
-			offset: 偏移量(可选)
-			origin: 是否只获取原创作品(可选)
+			offset: 偏移量 (可选)
+			origin: 是否只获取原创作品 (可选)
 		Returns:
 			最新作品列表字典
 		"""
@@ -800,11 +800,11 @@ class WorkDataFetcher:
 
 	def fetch_themed_works_web(self, limit: int, offset: int = 0, subject_id: int = 0) -> dict:
 		"""
-		获取Web端主题作品
+		获取 Web 端主题作品
 		Args:
 			limit: 获取数量
-			offset: 偏移量(可选)
-			subject_id: 主题ID(可选)
+			offset: 偏移量 (可选)
+			subject_id: 主题 ID (可选)
 		Returns:
 			主题作品列表字典
 		"""
@@ -819,7 +819,7 @@ class WorkDataFetcher:
 
 	def fetch_nemo_discover(self) -> dict:
 		"""
-		获取Nemo端发现页作品
+		获取 Nemo 端发现页作品
 		Returns:
 			发现页作品列表字典
 		"""
@@ -833,11 +833,11 @@ class WorkDataFetcher:
 		offset: int = 0,
 	) -> dict:
 		"""
-		获取Nemo端最新作品
+		获取 Nemo 端最新作品
 		Args:
 			types: 作品类型
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			最新作品列表字典
 		"""
@@ -847,9 +847,9 @@ class WorkDataFetcher:
 
 	def fetch_random_subjects(self) -> list[int]:
 		"""
-		获取随机作品主题ID列表
+		获取随机作品主题 ID 列表
 		Returns:
-			主题ID列表
+			主题 ID 列表
 		"""
 		response = self._client.send_request(endpoint="/nemo/v3/work-subject/random", method="GET")
 		return response.json()
@@ -858,7 +858,7 @@ class WorkDataFetcher:
 		"""
 		获取主题详细信息
 		Args:
-			ids: 主题ID
+			ids: 主题 ID
 		Returns:
 			主题信息字典
 		"""
@@ -869,9 +869,9 @@ class WorkDataFetcher:
 		"""
 		获取主题下作品
 		Args:
-			ids: 主题ID
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			ids: 主题 ID
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			主题作品列表字典
 		"""
@@ -883,8 +883,8 @@ class WorkDataFetcher:
 		"""
 		获取所有主题作品
 		Args:
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			主题作品列表字典
 		"""
@@ -896,8 +896,8 @@ class WorkDataFetcher:
 		"""
 		获取或删除协作邀请码
 		Args:
-			work_id: 作品ID
-			method: HTTP方法(GET=获取,DELETE=删除)
+			work_id: 作品 ID
+			method: HTTP 方法 (GET = 获取,DELETE = 删除)
 		Returns:
 			协作信息字典
 		"""
@@ -911,8 +911,8 @@ class WorkDataFetcher:
 		"""
 		获取协作者列表生成器
 		Args:
-			work_id: 作品ID
-			limit: 获取数量限制(可选)
+			work_id: 作品 ID
+			limit: 获取数量限制 (可选)
 		Returns:
 			协作者列表生成器
 		"""
@@ -931,7 +931,7 @@ class WorkDataFetcher:
 		"""
 		获取协作状态
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			协作状态字典
 		"""
@@ -943,9 +943,9 @@ class WorkDataFetcher:
 
 	def fetch_work_lineage_web(self, work_id: int) -> dict:
 		"""
-		获取Web端作品谱系
+		获取 Web 端作品谱系
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			谱系信息字典
 		"""
@@ -954,9 +954,9 @@ class WorkDataFetcher:
 
 	def fetch_work_lineage_nemo(self, work_id: int) -> dict:
 		"""
-		获取Nemo端作品谱系
+		获取 Nemo 端作品谱系
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			谱系信息字典
 		"""
@@ -965,9 +965,9 @@ class WorkDataFetcher:
 
 	def fetch_kn_work_versions(self, work_id: int) -> dict:
 		"""
-		获取KN作品历史版本
+		获取 KN 作品历史版本
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			版本历史字典
 		"""
@@ -979,11 +979,11 @@ class WorkDataFetcher:
 
 	def fetch_kitten_trash_gen(self, version_no: Literal["KITTEN_V3", "KITTEN_V4"], work_status: str = "CYCLED", limit: int | None = 30) -> Generator[dict]:
 		"""
-		获取Kitten回收站作品生成器
+		获取 Kitten 回收站作品生成器
 		Args:
 			version_no: 版本号
-			work_status: 作品状态(可选)
-			limit: 获取数量限制(可选)
+			work_status: 作品状态 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			回收站作品生成器
 		"""
@@ -1003,10 +1003,10 @@ class WorkDataFetcher:
 		"""
 		获取海龟编辑器回收站作品生成器
 		Args:
-			language_type: 语言类型(可选)
-			work_status: 作品状态(可选)
-			published_status: 发布状态(可选)
-			limit: 获取数量限制(可选)
+			language_type: 语言类型 (可选)
+			work_status: 作品状态 (可选)
+			published_status: 发布状态 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			回收站作品生成器
 		"""
@@ -1027,8 +1027,8 @@ class WorkDataFetcher:
 		"""
 		获取代码岛回收站作品生成器
 		Args:
-			work_status: 作品状态(可选)
-			limit: 获取数量限制(可选)
+			work_status: 作品状态 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			回收站作品生成器
 		"""
@@ -1047,8 +1047,8 @@ class WorkDataFetcher:
 		"""
 		获取小说回收站生成器
 		Args:
-			fiction_status: 小说状态(可选)
-			limit: 获取数量限制(可选)
+			fiction_status: 小说状态 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			回收站生成器
 		"""
@@ -1065,11 +1065,11 @@ class WorkDataFetcher:
 
 	def fetch_kn_trash_gen(self, name: str = "", work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
-		获取KN回收站作品生成器
+		获取 KN 回收站作品生成器
 		Args:
-			name: 搜索名称(可选)
-			work_business_classify: 作品业务分类(可选)
-			limit: 获取数量限制(可选)
+			name: 搜索名称 (可选)
+			work_business_classify: 作品业务分类 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			回收站作品生成器
 		"""
@@ -1088,12 +1088,12 @@ class WorkDataFetcher:
 
 	def search_kn_works_gen(self, name: str, status: int = 1, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
-		搜索KN作品生成器
+		搜索 KN 作品生成器
 		Args:
 			name: 搜索名称
-			status: 作品状态(可选)
-			work_business_classify: 作品业务分类(可选)
-			limit: 获取数量限制(可选)
+			status: 作品状态 (可选)
+			work_business_classify: 作品业务分类 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			作品生成器
 		"""
@@ -1112,11 +1112,11 @@ class WorkDataFetcher:
 
 	def search_published_kn_works_gen(self, name: str, work_business_classify: int = 1, limit: int | None = 24) -> Generator[dict]:
 		"""
-		搜索已发布KN作品生成器
+		搜索已发布 KN 作品生成器
 		Args:
 			name: 搜索名称
-			work_business_classify: 作品业务分类(可选)
-			limit: 获取数量限制(可选)
+			work_business_classify: 作品业务分类 (可选)
+			limit: 获取数量限制 (可选)
 		Returns:
 			作品生成器
 		"""
@@ -1134,9 +1134,9 @@ class WorkDataFetcher:
 
 	def fetch_kn_variables(self, work_id: int) -> dict:
 		"""
-		获取KN作品变量列表
+		获取 KN 作品变量列表
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 		Returns:
 			变量列表字典
 		"""
@@ -1150,9 +1150,9 @@ class WorkDataFetcher:
 		"""
 		获取积木或角色资源包
 		Args:
-			types: 资源类型(block=积木,character=角色)
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			types: 资源类型 (block = 积木,character = 角色)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			资源包字典
 		"""
@@ -1176,8 +1176,8 @@ class WorkDataFetcher:
 		"""
 		获取动态作品
 		Args:
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			动态作品字典
 		"""
@@ -1209,8 +1209,8 @@ class WorkDataFetcher:
 		通过名称搜索作品
 		Args:
 			name: 搜索名称
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			搜索结果字典
 		"""
@@ -1228,11 +1228,11 @@ class WorkDataFetcher:
 
 	def search_works_by_name_nemo(self, name: str, limit: int = 20, offset: int = 0) -> dict:
 		"""
-		通过名称搜索作品(版本2)
+		通过名称搜索作品 (版本 2)
 		Args:
 			name: 搜索名称
-			limit: 获取数量(可选)
-			offset: 偏移量(可选)
+			limit: 获取数量 (可选)
+			offset: 偏移量 (可选)
 		Returns:
 			搜索结果字典
 		"""

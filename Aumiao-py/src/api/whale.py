@@ -66,7 +66,7 @@ class ReportFetcher:
 	def fetch_post_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
-		board_id: int | None = None,  # 新增分区ID参数
+		board_id: int | None = None,  # 新增分区 ID 参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
@@ -81,7 +81,7 @@ class ReportFetcher:
 	def fetch_post_reports_total(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
-		board_id: int | None = None,  # 新增分区ID参数
+		board_id: int | None = None,  # 新增分区 ID 参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 	) -> dict[Literal["total", "total_pages"], int]:
@@ -95,7 +95,7 @@ class ReportFetcher:
 	def fetch_discussion_reports_gen(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
-		board_id: int | None = None,  # 新增分区ID参数
+		board_id: int | None = None,  # 新增分区 ID 参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 		limit: int | None = 15,
@@ -110,7 +110,7 @@ class ReportFetcher:
 	def fetch_discussion_reports_total(
 		self,
 		status: Literal["TOBEDONE", "DONE", "ALL"],
-		board_id: int | None = None,  # 新增分区ID参数
+		board_id: int | None = None,  # 新增分区 ID 参数
 		filter_type: Literal["post_id"] | None = None,
 		target_id: int | None = None,
 	) -> dict[Literal["total", "total_pages"], int]:
@@ -243,7 +243,7 @@ class RequestExtractor:
 			if response.status_code == HTTPStatus.OK.value:
 				file.CodeMaoFile().file_write(path=js_path, content=response.content, method="wb")
 			else:
-				print(f"获取js-{item['func']}失败! ")
+				print(f"获取 js-{item['func']} 失败!")
 
 	@staticmethod
 	def extract_requests(
@@ -253,10 +253,10 @@ class RequestExtractor:
 		"""
 		从代码中提取指定请求方式的链接
 		参数:
-			code: 待解析的JS代码字符串
-			methods: 期望提取的请求方式(单个字符串或列表), 如"get"、["get", "post"]
+			code: 待解析的 JS 代码字符串
+			methods: 期望提取的请求方式 (单个字符串或列表), 如 "get"、["get", "post"]
 		返回:
-			提取到的请求链接列表,格式为 "方法: 链接"
+			提取到的请求链接列表, 格式为 "方法: 链接"
 		"""
 		methods = [methods.lower()] if isinstance(methods, str) else [m.lower() for m in methods]
 		methods_pattern = "|".join(methods)

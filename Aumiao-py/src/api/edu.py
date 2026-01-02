@@ -8,7 +8,7 @@ from src.utils.acquire import HTTPStatus
 from src.utils.decorator import singleton
 
 
-# params中的{"_": timestamp}可以替换为{"TIME": timestamp}
+# params 中的 {"_": timestamp} 可以替换为 {"TIME": timestamp}
 @singleton
 class UserAction:
 	def __init__(self) -> None:
@@ -441,16 +441,16 @@ class DataFetcher:
 		return response.json()
 
 	# 获取云端存储的所有平台的作品
-	# mark_status中1为已评分,2为未评分
-	# updated_at_from&updated_at_to按字面意思,传参时为timestamp
-	# max_score&min_score按字面意思,传参时值为0-100,且都为整十数
-	# teachingRecordId为上课记录id
-	# status为发布状态,100为已发布,1为未发布
-	# name用于区分作品名
-	# type为作品类型,源码编辑器为1,海龟编辑器2.0(c++)为16,代码岛2.0为5,海龟编辑器为7,nemo为8
-	# version用于区分源码编辑器4.0和源码编辑器,在请求中,源码编辑器4.0的version为4,源码编辑器不填
-	# 返回数据中的praise_times为点赞量
-	# 返回数据中的language_type貌似用来区分海龟编辑器2.0(c++)与海龟编辑器,海龟编辑器的language_type为3
+	# mark_status 中 1 为已评分,2 为未评分
+	# updated_at_from&updated_at_to 按字面意思, 传参时为 timestamp
+	# max_score&min_score 按字面意思, 传参时值为 0-100, 且都为整十数
+	# teachingRecordId 为上课记录 id
+	# status 为发布状态,100 为已发布,1 为未发布
+	# name 用于区分作品名
+	# type 为作品类型, 源码编辑器为 1, 海龟编辑器 2.0 (c++) 为 16, 代码岛 2.0 为 5, 海龟编辑器为 7,nemo 为 8
+	# version 用于区分源码编辑器 4.0 和源码编辑器, 在请求中, 源码编辑器 4.0 的 version 为 4, 源码编辑器不填
+	# 返回数据中的 praise_times 为点赞量
+	# 返回数据中的 language_type 貌似用来区分海龟编辑器 2.0 (c++) 与海龟编辑器, 海龟编辑器的 language_type 为 3
 	def fetch_all_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
@@ -463,9 +463,9 @@ class DataFetcher:
 		)
 
 	# 获取老师管理的作品
-	# class_id为班级id,mark_status为评分状态,max_score&min_score为分数范围,name为作品名
-	# status为发布状态,updated_at_from&updated_at_to为时间戳范围,username为学生id
-	# type为作品类型,teachingRecordId为上课记录id
+	# class_id 为班级 id,mark_status 为评分状态,max_score&min_score 为分数范围,name 为作品名
+	# status 为发布状态,updated_at_from&updated_at_to 为时间戳范围,username 为学生 id
+	# type 为作品类型,teachingRecordId 为上课记录 id
 	def fetch_managed_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
@@ -478,8 +478,8 @@ class DataFetcher:
 		)
 
 	# 获取我的作品
-	# mark_status为评分状态,max_score&min_score为分数范围,name为作品名
-	# status为发布状态,updated_at_from&updated_at_to为时间戳范围
+	# mark_status 为评分状态,max_score&min_score 为分数范围,name 为作品名
+	# status 为发布状态,updated_at_from&updated_at_to 为时间戳范围
 	def fetch_personal_works_gen(self, limit: int | None = 50) -> Generator[dict]:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"page": 1, "TIME": timestamp}
@@ -492,7 +492,7 @@ class DataFetcher:
 		)
 
 	# 获取周作品统计数据
-	# year传参示例:2024,class_id为None时返回全部班级的数据
+	# year 传参示例:2024,class_id 为 None 时返回全部班级的数据
 	def fetch_work_analytics(self, class_id: int | None, year: int, month: int) -> dict:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		formatted_month = f"{month:02d}"

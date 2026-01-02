@@ -1,4 +1,4 @@
-"""基础定义和核心Union类"""
+"""基础定义和核心 Union 类"""
 
 from collections import namedtuple
 from collections.abc import Callable, Generator
@@ -35,7 +35,7 @@ class ReportRecord(TypedDict):
 # ==============================
 @dataclass(frozen=True)
 class HTTPConfig:
-	"""HTTP相关配置"""
+	"""HTTP 相关配置"""
 
 	SUCCESS_CODE: int = 200
 	CONNECTION_TIMEOUT: int = 30
@@ -44,9 +44,9 @@ class HTTPConfig:
 
 @dataclass(frozen=True)
 class WebSocketConfig:
-	"""WebSocket相关配置"""
+	"""WebSocket 相关配置"""
 
-	# ping间隔: 60000ms, ping超时: 180000ms
+	# ping 间隔: 60000ms, ping 超时: 180000ms
 	PING_MESSAGE: str = "2"
 	PONG_MESSAGE: str = "3"
 	CONNECT_MESSAGE: str = "40"
@@ -115,12 +115,12 @@ class ErrorMessages:
 	EVENT_CALLBACK: str = "事件回调执行错误"
 	SEND_MESSAGE: str = "发送消息错误"
 	CONNECTION: str = "连接错误"
-	WEB_SOCKET_RUN: str = "WebSocket运行错误"
+	WEB_SOCKET_RUN: str = "WebSocket 运行错误"
 	CLOSE_CONNECTION: str = "关闭连接时出错"
 	GET_SERVER_TIME: str = "获取服务器时间失败"
 	HANDSHAKE_DATA_PARSE: str = "握手数据解析失败"
 	HANDSHAKE_PROCESSING: str = "握手处理错误"
-	JSON_PARSE: str = "JSON解析错误"
+	JSON_PARSE: str = "JSON 解析错误"
 	CLOUD_MESSAGE_PROCESSING: str = "云消息处理错误"
 	CREATE_DATA_ITEM: str = "创建数据项时出错"
 	INVALID_RANKING_DATA: str = "无效的排行榜数据格式"
@@ -128,7 +128,7 @@ class ErrorMessages:
 	NO_PENDING_REQUESTS: str = "收到排行榜数据但没有待处理的请求"
 	INVALID_VARIABLE_TYPE: str = "云变量值必须是整数或字符串"
 	INVALID_LIST_ITEM_TYPE: str = "列表元素必须是整数或字符串"
-	INVALID_RANKING_ORDER: str = "排序顺序必须是1(正序)或-1(逆序)"
+	INVALID_RANKING_ORDER: str = "排序顺序必须是 1 (正序) 或 - 1 (逆序)"
 	INVALID_RANKING_LIMIT: str = "限制数量必须是正整数"
 
 
@@ -193,7 +193,7 @@ class ShadowType(Enum):
 	VALUE = "value"
 	REPLACEABLE = "replaceable"
 	STATEMENT = "statement"
-	PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增:PROCEDURE参数影子积木
+	PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增:PROCEDURE 参数影子积木
 
 
 class ShadowCategory(Enum):
@@ -203,7 +203,7 @@ class ShadowCategory(Enum):
 	PLACEHOLDER = "placeholder"
 	INPUT_TEMPLATE = "input_template"
 	TOOLBOX_PREVIEW = "toolbox_preview"
-	PARAMETER = "parameter"  # 新增:参数影子积木
+	PARAMETER = "parameter"  # 新增: 参数影子积木
 
 
 class ColorFormat(Enum):
@@ -344,7 +344,7 @@ class BlockType(Enum):
 	WARP = "warp"
 	TELL = "tell"
 	SYNC_TELL = "sync_tell"
-	# 动作/运动类
+	# 动作 / 运动类
 	SELF_GO_FORWARD = "self_go_forward"
 	SELF_MOVE_SPECIFY = "self_move_specify"
 	SELF_MOVE_TO = "self_move_to"
@@ -372,7 +372,7 @@ class BlockType(Enum):
 	CLEAR_ALL_EFFECTS = "clear_all_effects"
 	SET_TOP_BOTTOM_LAYER = "set_top_bottom_layer"
 	GET_STYLES = "get_styles"
-	# 对话/界面类
+	# 对话 / 界面类
 	CREATE_STAGE_DIALOG = "create_stage_dialog"
 	SELF_DIALOG_WAIT = "self_dialog_wait"
 	SELF_DIALOG = "self_dialog"
@@ -448,7 +448,7 @@ class BlockType(Enum):
 	SELF_SET_PEN_COLOR = "self_set_pen_color"
 	IMAGE_STAMP = "image_stamp"
 	STAMP = "stamp"
-	# 函数/过程类 - 根据文档更新
+	# 函数 / 过程类 - 根据文档更新
 	PROCEDURES_DEFNORETURN = "procedures_2_defnoreturn"
 	PROCEDURES_RETURN_VALUE = "procedures_2_return_value"
 	PROCEDURES_CALLRETURN = "procedures_2_callreturn"
@@ -456,7 +456,7 @@ class BlockType(Enum):
 	PROCEDURES_STABLE_PARAMETER = "procedures_2_stable_parameter"
 	PROCEDURES_PARAMETER = "procedures_2_parameter"
 	PROCEDURES_ACTOR_PARAM = "procedures_2_actor_param"
-	PROCEDURES_PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增:参数影子积木
+	PROCEDURES_PARAMETER_SHADOW = "procedures_2_parameter_shadow"  # 新增: 参数影子积木
 	# 动画类
 	SELF_STRESS_ANIMATION = "self_stress_animation"
 	SELF_APPEAR_ANIMATION = "self_appear_animation"
@@ -475,23 +475,23 @@ class BlockType(Enum):
 	FACE_TO_BODY_PART = "face_to_body_part"
 	GET_POSITION_OF_BODY_PART = "get_position_of_body_part"
 	RECOGNIZE_GESTURE = "recognize_gesture"
-	# 认知AI类
+	# 认知 AI 类
 	ENABLE_FACE_DETECT_BY_ACTOR = "enable_face_detect_by_actor"
 	ENABLE_OBJECT_DETECT_BY_ACTOR = "enable_object_detect_by_actor"
 	GET_FACE_DETECTION_RESULT = "get_face_detection_result"
 	CHECK_EMOTION = "check_emotion"
 	CHECK_GENDER = "check_gender"
-	# AI对话类
+	# AI 对话类
 	AI_CHAT_ASK = "ai_chat_ask"
 	AI_CHAT_ANSWER = "ai_chat_answer"
 	SET_SYSTEM_PRESET = "set_system_preset"
 	NEW_CONVERSATION = "new_conversation"
-	# 分类AI类
+	# 分类 AI 类
 	EVALUATE_ACTOR_STYLE = "evaluate_actor_style"
 	EVALUATE_PHOTO = "evaluate_photo"
 	EVALUATE_CAMERA = "evaluate_camera"
 	GET_EVALUATE_CLASS_NAME = "get_evaluate_class_name"
-	# 在线/排名类
+	# 在线 / 排名类
 	SHOW_HIDE_RANKING = "show_hide_ranking"
 	UPDATE_RANKING = "update_ranking"
 	USER_RANKING_INFO = "user_ranking_info"
@@ -638,7 +638,7 @@ BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 	BlockType.PROCEDURES_CALLNORETURN: {
 		"category": BlockCategory.PROCEDURE,
 		"fields": ["NAME"],
-		"inputs": ["NAME"],  # 动态生成ARG输入项
+		"inputs": ["NAME"],  # 动态生成 ARG 输入项
 		"output": False,
 		"color": "#FF6680",  # ORANGE_4
 		"can_have_previous": True,
@@ -647,7 +647,7 @@ BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 	BlockType.PROCEDURES_CALLRETURN: {
 		"category": BlockCategory.PROCEDURE,
 		"fields": ["NAME"],
-		"inputs": ["NAME"],  # 动态生成ARG输入项
+		"inputs": ["NAME"],  # 动态生成 ARG 输入项
 		"output": True,
 		"color": "#FF6680",  # ORANGE_4
 		"can_have_previous": False,
@@ -810,18 +810,18 @@ class SourceConfig:
 		"""初始化后处理"""
 		if self.available_actions is None:
 			self.available_actions = []
-		self.available_actions = cast("list[ActionConfig]", self.available_actions)
+		self.available_actions = cast("list [ActionConfig]", self.available_actions)
 
 
 # ==============================
-# 核心Union类
+# 核心 Union 类
 # ==============================
 @decorator.singleton
 class Union:
 	"""核心联合类 - 整合所有功能模块"""
 
 	def __init__(self) -> None:
-		# API客户端
+		# API 客户端
 		self._client = acquire.ClientFactory().create_codemao_client()
 		# 认证模块
 		self._auth = auth.AuthManager()
@@ -877,12 +877,12 @@ class Index(ClassUnion):
 
 	def _print_title(self, title: str) -> None:
 		"""打印标题"""
-		print(f"\n{self.COLOR_TITLE}{'*' * 22} {title} {'*' * 22}{self.COLOR_RESET}")
+		print(f"\n {self.COLOR_TITLE}{'*' * 22} {title} {'*' * 22}{self.COLOR_RESET}")
 
 	def _print_slogan(self) -> None:
 		"""打印标语"""
-		print(f"\n{self.COLOR_SLOGAN}{self._setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
-		print(f"{self.COLOR_VERSION}版本号: {self._setting.PROGRAM.VERSION}{self.COLOR_RESET}")
+		print(f"\n {self.COLOR_SLOGAN}{self._setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
+		print(f"{self.COLOR_VERSION} 版本号: {self._setting.PROGRAM.VERSION}{self.COLOR_RESET}")
 
 	def _print_lyric(self) -> None:
 		"""打印歌词"""
@@ -893,8 +893,8 @@ class Index(ClassUnion):
 	def _print_announcements(self) -> None:
 		"""打印公告"""
 		self._print_title("公告")
-		print(f"{self.COLOR_LINK}编程猫社区行为守则 https://shequ.codemao.cn/community/1619098{self.COLOR_RESET}")
-		print(f"{self.COLOR_LINK}2025编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855{self.COLOR_RESET}")
+		print(f"{self.COLOR_LINK} 编程猫社区行为守则 https://shequ.codemao.cn/community/1619098{self.COLOR_RESET}")
+		print(f"{self.COLOR_LINK} 2025 编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855{self.COLOR_RESET}")
 
 	def _print_user_data(self) -> None:
 		"""打印用户数据"""
@@ -933,7 +933,7 @@ class Tool(ClassUnion):
 			"view": response["view_times"],
 			"timestamp": timestamp,
 		}
-		# 如果有缓存数据,进行对比分析
+		# 如果有缓存数据, 进行对比分析
 		if self._cache_manager.data:
 			self._tool.DataAnalyzer().compare_datasets(
 				before=self._cache_manager.data,

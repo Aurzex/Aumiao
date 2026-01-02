@@ -28,7 +28,7 @@ class AppConfig:
 
 	MAX_MENU_KEY_LENGTH: int = 2
 	LOG_LEVEL: str = "ERROR"
-	LOG_FORMAT: str = "%(asctime)s - %(levelname)s - %(message)s"  # cSpell:ignore levelname
+	LOG_FORMAT: str = "%(asctime) s - %(levelname) s - %(message) s"  # cSpell:ignore levelname
 	LOG_FILE: str = "app.log"
 	# 菜单相关常量
 	MENU_ITEMS: dict[str, tuple[str, bool, bool]] = None  # type: ignore  # noqa: PGH003
@@ -78,7 +78,7 @@ def setup_logging() -> None:
 		format=config.LOG_FORMAT,
 		encoding="utf-8",
 	)
-	# 可选:添加控制台日志输出
+	# 可选: 添加控制台日志输出
 	console_handler = logging.StreamHandler()
 	console_handler.setLevel(logging.ERROR)
 	formatter = logging.Formatter(config.LOG_FORMAT)
@@ -88,7 +88,7 @@ def setup_logging() -> None:
 
 
 def enable_vt_mode() -> None:
-	"""启用Windows虚拟终端模式"""
+	"""启用 Windows 虚拟终端模式"""
 	if platform.system() == "Windows":
 		from ctypes import windll  # noqa: PLC0415
 
@@ -96,8 +96,8 @@ def enable_vt_mode() -> None:
 			kernel32 = windll.kernel32
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 		except OSError:
-			logger.exception("启用VT模式失败")
-			print(printer.color_text("警告: 无法启用虚拟终端模式,颜色显示可能不正常", "ERROR"))
+			logger.exception("启用 VT 模式失败")
+			print(printer.color_text("警告: 无法启用虚拟终端模式, 颜色显示可能不正常", "ERROR"))
 
 
 def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -152,7 +152,7 @@ class AccountDataManager:
 		self._is_logged_in = False
 
 	def get_account_id(self) -> str | None:
-		"""获取账户ID - 优化字典访问"""
+		"""获取账户 ID - 优化字典访问"""
 		account_data = self._account_data.get("ACCOUNT_DATA", {})
 		return account_data.get("id")
 
@@ -160,8 +160,8 @@ class AccountDataManager:
 def print_account_info(account_data: dict) -> None:
 	"""显示账户详细信息"""
 	info = account_data.get("ACCOUNT_DATA", {})
-	print(printer.color_text(f"登录成功! 欢迎 {info.get('nickname', '未知用户')}", "SUCCESS"))
-	print(printer.color_text(f"用户ID: {info.get('id', 'N/A')}", "COMMENT"))
+	print(printer.color_text(f"登录成功! 欢迎 {info.get('nickname', ' 未知用户 ')}", "SUCCESS"))
+	print(printer.color_text(f"用户 ID: {info.get('id', 'N/A')}", "COMMENT"))
 	print(printer.color_text(f"创作等级: {info.get('author_level', 'N/A')}", "COMMENT"))
 
 
@@ -220,8 +220,8 @@ def clear_comments(_account_data_manager: AccountDataManager) -> None:
 	printer.print_header("清除评论")
 	source = get_enum_input("请输入来源类型", {"work", "post"})
 	action_type = get_enum_input("请输入操作类型", {"ads", "duplicates", "blacklist"})
-	source = cast("Literal['work', 'post']", source)
-	action_type = cast("Literal['ads', 'duplicates', 'blacklist']", action_type)
+	source = cast("Literal ['work', 'post']", source)
+	action_type = cast("Literal ['ads', 'duplicates', 'blacklist']", action_type)
 	Motion().remove_comments_by_type(source=source, action_type=action_type)
 	print(printer.color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
 
@@ -232,7 +232,7 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 	"""清除红点提醒"""
 	printer.print_header("清除红点提醒")
 	method = get_enum_input("请输入方法", {"nemo", "web"})
-	method = cast("Literal['nemo', 'web']", method)
+	method = cast("Literal ['nemo', 'web']", method)
 	Motion().mark_notifications_as_read(method=method)
 	print(printer.color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
 
@@ -273,7 +273,7 @@ def check_account_status(_account_data_manager: AccountDataManager) -> None:
 def download_fiction(_account_data_manager: AccountDataManager) -> None:
 	"""下载小说"""
 	printer.print_header("下载小说")
-	fiction_id = get_positive_int_input("请输入小说ID")
+	fiction_id = get_positive_int_input("请输入小说 ID")
 	Motion().download_novel_content(fiction_id=fiction_id)
 	print(printer.color_text("小说下载完成", "SUCCESS"))
 
@@ -302,12 +302,12 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 	"""上传文件"""
 	printer.print_header("上传文件")
 	print(printer.color_text("上传方法说明: \n", "INFO"))
-	print(printer.color_text("编程猫于10月22日对对象存储进行限制", "INFO"))
-	print(printer.color_text("关闭了文件上传接口, 并更换域名*.codemao.cn -> *.bcmcdn.com", "INFO"))  # cSpell:ignore bcmcdn
-	print(printer.color_text("因此现在只能使用codemao选项, 然而保着收集api的原则, 过时的api不会删除, 只标记为弃用\n", "INFO"))
-	print(printer.color_text("- codemao: 上传到bcmcdn域名", "PROMPT"))  # cSpell:ignore bcmcdn
-	print(printer.color_text("- codegame: 上传到static域名", "COMMENT"))
-	print(printer.color_text("- pgaot: 上传到static域名", "COMMENT"))
+	print(printer.color_text("编程猫于 10 月 22 日对对象存储进行限制", "INFO"))
+	print(printer.color_text("关闭了文件上传接口, 并更换域名 *.codemao.cn -> *.bcmcdn.com", "INFO"))  # cSpell:ignore bcmcdn
+	print(printer.color_text("因此现在只能使用 codemao 选项, 然而保着收集 api 的原则, 过时的 api 不会删除, 只标记为弃用 \n", "INFO"))
+	print(printer.color_text("- codemao: 上传到 bcmcdn 域名", "PROMPT"))  # cSpell:ignore bcmcdn
+	print(printer.color_text("- codegame: 上传到 static 域名", "COMMENT"))
+	print(printer.color_text("- pgaot: 上传到 static 域名", "COMMENT"))
 	method = get_enum_input("请输入方法", {"pgaot", "codemao", "codegame"})
 	file_path_str = printer.prompt_input("请输入文件或文件夹路径")
 	file_path = Path(file_path_str.strip())
@@ -317,7 +317,7 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 	else:
 		print(printer.color_text("文件或路径不存在", "ERROR"))
 		return
-	method = cast("Literal['pgaot', 'codemao','codegame']", method)
+	method = cast("Literal ['pgaot', 'codemao','codegame']", method)
 	url = FileUploader().upload_file_or_dir(method=method, file_path=file_path)
 	print(f"保存地址: {url}")
 	print(printer.color_text("文件上传成功", "SUCCESS"))
@@ -329,7 +329,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 	"""用户登出"""
 	printer.print_header("账户登出")
 	method = get_enum_input("请输入方法", {"web"})
-	method = cast("Literal['web']", method)
+	method = cast("Literal ['web']", method)
 	auth.AuthManager().execute_logout(method)
 	account_data_manager.clear()
 	print(printer.color_text("已成功登出账户", "SUCCESS"))
@@ -348,7 +348,7 @@ def plugin_manager(_account_data_manager: AccountDataManager) -> None:
 def decompile_works(_account_data_manager: AccountDataManager) -> None:
 	"""编译作品"""
 	printer.print_header("编译作品")
-	work_id = get_positive_int_input("请输入作品ID")
+	work_id = get_positive_int_input("请输入作品 ID")
 	output_path = decompile_work(work_id)
 	print(printer.color_text(f"✓ 反编译完成: {output_path}", "SUCCESS"))
 
@@ -356,8 +356,8 @@ def decompile_works(_account_data_manager: AccountDataManager) -> None:
 @handle_errors
 @require_login
 def interactive_chat(account_data_manager: AccountDataManager) -> None:
-	"""AI聊天"""
-	printer.print_header("AI聊天")
+	"""AI 聊天"""
+	printer.print_header("AI 聊天")
 	token = account_data_manager.token
 	CodeMaoTool().interactive_chat(token)
 
@@ -365,7 +365,7 @@ def interactive_chat(account_data_manager: AccountDataManager) -> None:
 @handle_errors
 @require_login
 def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
-	"""处理隐藏功能.仅管理员可访问"""
+	"""处理隐藏功能. 仅管理员可访问"""
 	encrypted_result = tool.Encrypt().decrypt(AUI)
 	decrypted_str = "".join(str(item) for item in encrypted_result) if isinstance(encrypted_result, list) else str(encrypted_result)
 	user_input = printer.prompt_input("请输入验证码")
@@ -377,12 +377,12 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	print(printer.color_text("3. 账号提权", "COMMENT"))
 	sub_choice = get_enum_input("操作选择", {"1", "2", "3"})
 	if sub_choice == "1":
-		user_id = get_positive_int_input("训练师ID")
+		user_id = get_positive_int_input("训练师 ID")
 		MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = get_enum_input("模式", {"delete", "create", "token"})
-		mode = cast("Literal['delete', 'create','token']", mode)
+		mode = cast("Literal ['delete', 'create','token']", mode)
 		limit = get_positive_int_input("数量", max_value=100)
 		MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
@@ -446,7 +446,7 @@ class MenuSystem:
 			print(printer.color_text(menu_text, color_type))
 
 	def handle_choice(self, choice: str) -> bool:
-		"""处理菜单选择,返回是否继续运行"""
+		"""处理菜单选择, 返回是否继续运行"""
 		if choice not in self.menu_options:
 			print(printer.color_text("无效的输入, 请重新选择", "ERROR"))
 			return True
@@ -459,7 +459,7 @@ class MenuSystem:
 			return True
 		# 执行处理器
 		option.handler()
-		return choice != "00"  # 选择退出时返回False
+		return choice != "00"  # 选择退出时返回 False
 
 	def get_valid_choices(self) -> set[str]:
 		"""获取有效的菜单选项"""
@@ -468,23 +468,23 @@ class MenuSystem:
 
 def pause_for_continue() -> None:
 	"""暂停等待继续"""
-	input(f"\n{printer.color_text('⏎ 按回车键继续...', 'PROMPT')}")
+	input(f"\n {printer.color_text('⏎ 按回车键继续...', 'PROMPT')}")
 
 
 def handle_keyboard_interrupt() -> None:
 	"""处理键盘中断"""
-	print(f"\n{printer.color_text('程序被用户中断', 'ERROR')}")
+	print(f"\n {printer.color_text(' 程序被用户中断 ', 'ERROR')}")
 
 
 def handle_unexpected_error() -> None:
 	"""处理未预期错误"""
 	logger.error("程序发生未处理异常")
-	print(f"\n{printer.color_text('程序发生错误', 'ERROR')}")
+	print(f"\n {printer.color_text(' 程序发生错误 ', 'ERROR')}")
 
 
 def prompt_exit() -> None:
 	"""提示退出"""
-	input(f"\n{printer.color_text('⏎ 按回车键退出程序', 'PROMPT')}")
+	input(f"\n {printer.color_text('⏎ 按回车键退出程序 ', 'PROMPT')}")
 
 
 def get_menu_choice(_menu_system: MenuSystem) -> str:

@@ -36,7 +36,7 @@ class ClientConfig:
 
 
 class HTTPStatus(Enum):
-	"""HTTP状态码枚举"""
+	"""HTTP 状态码枚举"""
 
 	CREATED = 201
 	FORBIDDEN = 403
@@ -62,11 +62,11 @@ FetchMethod = Literal["GET", "POST"]
 
 # ==================== 接口定义 ====================
 class IHTTPClient(ABC):
-	"""HTTP客户端接口"""
+	"""HTTP 客户端接口"""
 
 	@abstractmethod
 	def send_request(self, method: str, endpoint: str) -> Response:
-		"""发送HTTP请求"""
+		"""发送 HTTP 请求"""
 
 	@abstractmethod
 	def update_headers(self, headers: dict[str, str]) -> None:
@@ -102,11 +102,11 @@ class IHTTPClient(ABC):
 
 
 class IWebSocketClient(ABC):
-	"""WebSocket客户端接口"""
+	"""WebSocket 客户端接口"""
 
 	@abstractmethod
 	def connect(self, url: str) -> bool:
-		"""连接WebSocket"""
+		"""连接 WebSocket"""
 
 	@abstractmethod
 	def disconnect(self) -> None:
@@ -136,7 +136,7 @@ class IFileUploader(ABC):
 # ==================== 身份管理器 ====================
 @dataclass
 class Token:
-	"""Token管理"""
+	"""Token 管理"""
 
 	average: str = field(default="", metadata={"track": True})
 	edu: str = field(default="", metadata={"track": False})
@@ -168,7 +168,7 @@ class IdentityManager:
 		if identity not in self._token_map:
 			error_msg = f"无效的身份: {identity}"
 			raise ValueError(error_msg)
-		# 备份当前令牌(如果非空)
+		# 备份当前令牌 (如果非空)
 		current_token = self.get_current_token()
 		if current_token and self._current_identity != "blank":
 			self._backup_tokens[self._current_identity] = current_token
@@ -177,7 +177,7 @@ class IdentityManager:
 			setattr(self.tokens, self._token_map[identity], token)
 			self._current_identity = identity
 		else:
-			print(f"警告:尝试设置空令牌到身份 {identity}")
+			print(f"警告: 尝试设置空令牌到身份 {identity}")
 
 	def restore_identity(self, identity: str) -> bool:
 		"""恢复特定身份的令牌"""
@@ -198,15 +198,15 @@ class IdentityManager:
 				self._backup_tokens[self._current_identity] = current_token
 
 	def get_current_token(self) -> str:
-		"""获取当前token - 修复版本"""
+		"""获取当前 token - 修复版本"""
 		token = getattr(self.tokens, self._token_map[self._current_identity])
-		return token or ""  # 确保返回字符串,避免 None
+		return token or ""  # 确保返回字符串, 避免 None
 
 	def get_identity_headers(self) -> dict[str, str]:
 		"""获取身份认证头 - 修复版本"""
 		token = self.get_current_token()
 		if not token or not token.strip():
-			print(f"警告:身份 '{self._current_identity}' 的令牌为空,无法生成认证头")
+			print(f"警告: 身份 '{self._current_identity}' 的令牌为空, 无法生成认证头")
 			return {}
 		return {"Authorization": f"Bearer {token}"}
 
@@ -218,7 +218,7 @@ class IdentityManager:
 
 # ==================== 基础实现 ====================
 class BaseHTTPClient:
-	"""基础HTTP客户端 - 优化版"""
+	"""基础 HTTP 客户端 - 优化版"""
 
 	_DEFAULT_PAGE_SIZE = 15
 	_MIN_PAGE_SIZE = 1
@@ -247,7 +247,7 @@ class BaseHTTPClient:
 		*,
 		log: bool = True,
 	) -> Response:
-		"""统一的HTTP请求方法"""
+		"""统一的 HTTP 请求方法"""
 		url = endpoint if endpoint.startswith("http") else f"{self.config.base_url}{endpoint}"
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
@@ -281,8 +281,8 @@ class BaseHTTPClient:
 		request_headers = {**self._http_client.headers, **(headers or {})}
 		# 检查 Authorization 头是否为空
 		auth_header = request_headers.get("Authorization", "")
-		if auth_header and (not auth_header.strip() or auth_header == "Bearer "):
-			print("警告:Authorization 头为空,移除该头")
+		if auth_header and (not auth_header.strip() or auth_header == "Bearer"):
+			print("警告:Authorization 头为空, 移除该头")
 			request_headers.pop("Authorization", None)
 		# 处理文件上传时的头
 		if files:
@@ -301,7 +301,7 @@ class BaseHTTPClient:
 		headers: dict[str, str],
 		timeout: float,
 	) -> Response:
-		"""执行HTTP请求"""
+		"""执行 HTTP 请求"""
 		request_args: dict[str, Any] = {"method": method.upper(), "url": url, "params": params, "headers": headers, "timeout": timeout}
 		if files:
 			request_args.update({"data": data, "files": files})
@@ -312,7 +312,7 @@ class BaseHTTPClient:
 	@staticmethod
 	def _handle_retry(error: Exception, attempt: int) -> None:
 		"""处理重试逻辑"""
-		print(f"请求失败,第 {attempt + 1} 次重试: {error}")
+		print(f"请求失败, 第 {attempt + 1} 次重试: {error}")
 
 	def update_headers(self, headers: dict[str, str]) -> None:
 		"""更新请求头 - 修复版本"""
@@ -329,7 +329,7 @@ class BaseHTTPClient:
 	def _prepare_pagination_params(self, params: dict[str, Any], amount_key: str, *, include_first_page: bool) -> dict[str, Any]:
 		"""准备分页请求参数"""
 		request_params = params.copy()
-		# 如果不包含第一页数据,使用较小页面大小快速获取元数据
+		# 如果不包含第一页数据, 使用较小页面大小快速获取元数据
 		if not include_first_page and amount_key in request_params:
 			request_params[amount_key] = self._DEFAULT_PAGE_SIZE
 		return request_params
@@ -427,7 +427,7 @@ class BaseHTTPClient:
 		if pagination_method == "offset":
 			page_params[offset_key] = first_page_size + (page_idx - 1) * items_per_page
 		elif pagination_method == "page":
-			page_params[offset_key] = page_idx + 1  # 第一页已经获取,从第二页开始
+			page_params[offset_key] = page_idx + 1  # 第一页已经获取, 从第二页开始
 		else:
 			error_msg = f"不支持的分页方式: {pagination_method}"
 			raise ValueError(error_msg)
@@ -564,7 +564,7 @@ class BaseHTTPClient:
 		self._file_handler.file_write(path=self.log_file, content=log_entry, method="a")
 
 	def close(self) -> None:
-		"""关闭HTTP客户端"""
+		"""关闭 HTTP 客户端"""
 		self._http_client.close()
 
 	def __enter__(self) -> "BaseHTTPClient":
@@ -577,13 +577,13 @@ class BaseHTTPClient:
 # ==================== 具体实现 ====================
 @singleton
 class CodeMaoClient(BaseHTTPClient):
-	"""编程猫HTTP客户端 - 修复版本"""
+	"""编程猫 HTTP 客户端 - 修复版本"""
 
 	def __init__(self) -> None:
 		setting_manager: SettingManager = setting.SettingManager()
 		config = ClientConfig(log_requests=setting_manager.data.PARAMETER.log)
 		super().__init__(config)
-		# 修复:只创建一个 IdentityManager 实例
+		# 修复: 只创建一个 IdentityManager 实例
 		self.identity_manager = IdentityManager()
 		self.token = self.identity_manager.tokens  # 使用同一个实例
 		# 初始化时设置默认请求头
@@ -598,12 +598,12 @@ class CodeMaoClient(BaseHTTPClient):
 	def switch_identity(self, identity: str, token: str) -> None:
 		"""切换身份并更新请求头 - 修复版本"""
 		if not token or not token.strip():
-			print(f"警告:尝试为身份 '{identity}' 设置空令牌")
+			print(f"警告: 尝试为身份 '{identity}' 设置空令牌")
 			return
 		# 验证身份类型
 		valid_identities = ["average", "edu", "judgement", "blank"]
 		if identity not in valid_identities:
-			print(f"错误:无效的身份类型 '{identity}',有效身份:{valid_identities}")
+			print(f"错误: 无效的身份类型 '{identity}', 有效身份:{valid_identities}")
 			return
 		try:
 			# 使用身份管理器切换身份
@@ -614,13 +614,13 @@ class CodeMaoClient(BaseHTTPClient):
 				self.update_headers(identity_headers)
 				print(f"已切换到身份: {identity}")
 			else:
-				print(f"警告:身份 '{identity}' 的认证头为空")
+				print(f"警告: 身份 '{identity}' 的认证头为空")
 		except Exception as e:
 			print(f"切换身份失败: {e}")
 
 
 class CodeMaoWebSocketClient(IWebSocketClient):
-	"""编程猫WebSocket客户端 - 修复版本"""
+	"""编程猫 WebSocket 客户端 - 修复版本"""
 
 	def __init__(self) -> None:
 		self._ws_app = None
@@ -628,7 +628,7 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 		self._message_queue = []
 
 	def connect(self, url: str) -> bool:
-		"""连接WebSocket"""
+		"""连接 WebSocket"""
 		try:
 			self._ws_app = websocket.create_connection(
 				url,
@@ -643,50 +643,50 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 				sslopt={"cert_reqs": 0},
 			)
 			self._connected = True
-			print(f"WebSocket连接已建立: {url}")
+			print(f"WebSocket 连接已建立: {url}")
 		except Exception as e:
-			print(f"WebSocket连接失败: {e}")
+			print(f"WebSocket 连接失败: {e}")
 			self._connected = False
 			return False
 		else:
 			return True
 
 	def disconnect(self) -> None:
-		"""断开WebSocket连接"""
+		"""断开 WebSocket 连接"""
 		if self._ws_app:
 			with contextlib.suppress(Exception):
 				self._ws_app.close()
 			self._ws_app = None
 		self._connected = False
-		print("WebSocket连接已断开")
+		print("WebSocket 连接已断开")
 
 	def send(self, message: str | dict[str, Any]) -> bool:
-		"""发送WebSocket消息"""
+		"""发送 WebSocket 消息"""
 		if not self._ws_app or not self._connected:
-			print("WebSocket未连接")
+			print("WebSocket 未连接")
 			return False
 		try:
 			if isinstance(message, dict):
 				message = dumps(message, ensure_ascii=False)
 			self._ws_app.send(message)
 		except Exception as e:
-			print(f"发送WebSocket消息失败: {e}")
+			print(f"发送 WebSocket 消息失败: {e}")
 			return False
 		else:
 			return True
 
 	def receive(self, timeout: float = 30.0) -> str | bytes | None:
-		"""接收WebSocket消息"""
+		"""接收 WebSocket 消息"""
 		if not self._ws_app or not self._connected:
 			return None
 		try:
 			self._ws_app.settimeout(timeout)
 			message = self._ws_app.recv()
 		except websocket.WebSocketTimeoutException:
-			print("接收WebSocket消息超时")
+			print("接收 WebSocket 消息超时")
 			return None
 		except Exception as e:
-			print(f"接收WebSocket消息失败: {e}")
+			print(f"接收 WebSocket 消息失败: {e}")
 			return None
 		else:
 			return message
@@ -724,12 +724,12 @@ class FileUploader(IFileUploader):
 			"codegame": self._upload_codegame,
 			"codemao": self._upload_codemao,
 		}
-		# 为文件上传创建独立session避免影响主会话
+		# 为文件上传创建独立 session 避免影响主会话
 		self._upload_session = httpx.Client()
 
 	@staticmethod
 	def generate_id(length: int = 20) -> str:
-		"""生成随机ID"""
+		"""生成随机 ID"""
 		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		return "".join(choice(chars) for _ in range(length))
 
@@ -741,7 +741,7 @@ class FileUploader(IFileUploader):
 		return self._upload_strategies[method](file_path, save_path)
 
 	def _upload_pgaot(self, file_path: Path, save_path: str) -> str:
-		"""Pgaot上传"""
+		"""Pgaot 上传"""
 		with file_path.open("rb") as f:
 			files = {"file": (file_path.name, f)}
 			data = {"path": save_path}
@@ -749,7 +749,7 @@ class FileUploader(IFileUploader):
 		return response.json()["url"]
 
 	def _upload_codegame(self, file_path: Path, save_path: str) -> str:
-		"""CodeGame上传"""
+		"""CodeGame 上传"""
 		token_info = self._get_codegame_token(save_path, file_path)
 		with file_path.open("rb") as f:
 			files = {"file": (file_path.name, f)}
@@ -763,7 +763,7 @@ class FileUploader(IFileUploader):
 		return f"{token_info['pic_host']}/{result['key']}"
 
 	def _upload_codemao(self, file_path: Path, save_path: str) -> str:
-		"""CodeMao上传"""
+		"""CodeMao 上传"""
 		random_str = self.generate_id(4)
 		name_parts = file_path.stem, random_str
 		unique_filename = f"{'_'.join(name_parts)}{file_path.suffix}"
@@ -800,7 +800,7 @@ class FileUploader(IFileUploader):
 		return response
 
 	def _get_codemao_token(self, file_path: str) -> dict[str, Any]:
-		"""获取CodeMao上传token"""
+		"""获取 CodeMao 上传 token"""
 		params = {
 			"projectName": "community_frontend",
 			"filePaths": file_path,
@@ -819,7 +819,7 @@ class FileUploader(IFileUploader):
 		}
 
 	def _get_codegame_token(self, prefix: str, file_path: Path) -> dict[str, Any]:
-		"""获取CodeGame上传token"""
+		"""获取 CodeGame 上传 token"""
 		params = {"prefix": prefix, "bucket": "static", "type": file_path.suffix}
 		response = self.client.send_request("GET", "https://oversea-api.code.game/tiger/kitten/cdn/token/1", params=params)
 		data = response.json()
@@ -841,23 +841,23 @@ class ClientFactory:
 
 	@staticmethod
 	def create_http_client(config: ClientConfig | None = None) -> BaseHTTPClient:
-		"""创建HTTP客户端"""
+		"""创建 HTTP 客户端"""
 		config = config or ClientConfig()
 		return BaseHTTPClient(config)
 
 	@staticmethod
 	def create_codemao_client() -> CodeMaoClient:
-		"""创建编程猫HTTP客户端"""
+		"""创建编程猫 HTTP 客户端"""
 		return CodeMaoClient()
 
 	@staticmethod
 	def create_websocket_client() -> CodeMaoWebSocketClient:
-		"""创建WebSocket客户端"""
+		"""创建 WebSocket 客户端"""
 		return CodeMaoWebSocketClient()
 
 	@staticmethod
 	def create_codemao_websocket_client() -> CodeMaoWebSocketClient:
-		"""创建编程猫WebSocket客户端"""
+		"""创建编程猫 WebSocket 客户端"""
 		return CodeMaoWebSocketClient()
 
 	@staticmethod

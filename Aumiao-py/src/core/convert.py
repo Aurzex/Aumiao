@@ -32,29 +32,29 @@ class VoxModel:
 
 
 class VoxReader:
-	"""Vox文件读取器"""
+	"""Vox 文件读取器"""
 
 	VOX_VERSION = 150
 	CHUNK_HEADER_SIZE = 12
 
 	@staticmethod
 	def read_vox(filename: str) -> VoxModel:  # noqa: PLR0914
-		"""读取vox文件"""
+		"""读取 vox 文件"""
 		data = Path(filename).read_bytes()
 		# 检查文件头
 		magic = data[0:4]
-		if magic != b"VOX ":
+		if magic != b"VOX":
 			error_msg = "无效的 VOX 文件"
 			raise ValueError(error_msg)
 		version = struct.unpack("<I", data[4:8])[0]
 		if version != VoxReader.VOX_VERSION:
 			print(f"警告: VOX 版本 {version}, 期望 {VoxReader.VOX_VERSION}")
-		# 查找MAIN块
+		# 查找 MAIN 块
 		main_chunk = VoxReader._find_chunk(data[8:], b"MAIN")
 		if not main_chunk:
 			error_msg = "未找到 MAIN 块"
 			raise ValueError(error_msg)
-		# 在MAIN块中查找SIZE和XYZI
+		# 在 MAIN 块中查找 SIZE 和 XYZI
 		size_chunk = VoxReader._find_chunk(main_chunk, b"SIZE")
 		xyzi_chunk = VoxReader._find_chunk(main_chunk, b"XYZI")
 		rgba_chunk = VoxReader._find_chunk(main_chunk, b"RGBA")
@@ -62,7 +62,7 @@ class VoxReader:
 			error_msg = "未找到 SIZE 或 XYZI 块"
 			raise ValueError(error_msg)
 		# 读取尺寸
-		size_data = size_chunk[8:20]  # 跳过chunk id和内容大小
+		size_data = size_chunk[8:20]  # 跳过 chunk id 和内容大小
 		size_x, size_y, size_z = struct.unpack("<III", size_data[:12])
 		# 读取体素数据
 		xyzi_data = xyzi_chunk[8:]
@@ -85,14 +85,14 @@ class VoxReader:
 
 	@staticmethod
 	def _find_chunk(data: bytes, chunk_id: bytes) -> bytes | None:
-		"""在数据中查找指定chunk"""
+		"""在数据中查找指定 chunk"""
 		pos = 0
 		while pos < len(data):
 			if len(data) - pos < VoxReader.CHUNK_HEADER_SIZE:
 				break
 			current_id = data[pos : pos + 4]
 			content_size = struct.unpack("<I", data[pos + 4 : pos + 8])[0]
-			# children_size变量未使用,但为了完整性保留
+			# children_size 变量未使用, 但为了完整性保留
 			_ = struct.unpack("<I", data[pos + 8 : pos + 12])[0]
 			if current_id == chunk_id:
 				return data[pos : pos + VoxReader.CHUNK_HEADER_SIZE + content_size]
@@ -112,11 +112,11 @@ class VoxReader:
 
 
 class VoxWriter:
-	"""Vox文件写入器"""
+	"""Vox 文件写入器"""
 
 	@staticmethod
 	def write_vox(model: VoxModel, filename: str) -> None:
-		"""写入vox文件"""
+		"""写入 vox 文件"""
 		chunks = []
 		# SIZE chunk
 		size_data = struct.pack("<III", model.size_x, model.size_y, model.size_z)
@@ -139,7 +139,7 @@ class VoxWriter:
 		main_content = b"".join(chunks)
 		main_chunk = VoxWriter._create_chunk(b"MAIN", main_content, 0)
 		# 文件头
-		header = b"VOX " + struct.pack("<I", VoxReader.VOX_VERSION)
+		header = b"VOX" + struct.pack("<I", VoxReader.VOX_VERSION)
 		# 写入文件
 		with Path(filename).open("wb") as f:
 			f.write(header)
@@ -147,13 +147,13 @@ class VoxWriter:
 
 	@staticmethod
 	def _create_chunk(chunk_id: bytes, content: bytes, children_size: int = 0) -> bytes:
-		"""创建chunk"""
+		"""创建 chunk"""
 		content_size = len(content)
 		return chunk_id + struct.pack("<III", content_size, children_size, 0) + content
 
 
 class Box3Converter:
-	"""Box3转换器"""
+	"""Box3 转换器"""
 
 	MAX_PALETTE_SIZE = 256
 
@@ -317,7 +317,7 @@ class Box3Converter:
 		return tuple(result)
 
 	def vox2blocks(self, vox_file: str, scale: float = 0.25, axis: str = "xzy") -> dict[str, int]:
-		"""Vox模型转方块建筑"""
+		"""Vox 模型转方块建筑"""
 		try:
 			print(f"正在读取 VOX 文件: {vox_file}")
 			vox_model = VoxReader.read_vox(vox_file)
@@ -337,7 +337,7 @@ class Box3Converter:
 				# 轴排列
 				x, y, z = self._axis_permute(x, y, z, scaled_size, axis)
 				# 获取颜色并找到最接近的方块
-				color = vox_model.palette[voxel.color_index - 1]  # 颜色索引从1开始
+				color = vox_model.palette[voxel.color_index - 1]  # 颜色索引从 1 开始
 				block_name = self._nearest_color(color, self.color_blocks)
 				block_id = self.blocks_data["name2id"].get(block_name, 0)  # 默认为空气
 				# 存储方块
@@ -347,9 +347,9 @@ class Box3Converter:
 				# 显示进度
 				if (i + 1) % 1000 == 0 or (i + 1) == len(vox_model.voxels):
 					print(f"进度: {i + 1}/{len(vox_model.voxels)} 体素")
-			print("\n方块统计:")
+			print("\n 方块统计:")
 			for block_name, count in sorted(block_count.items(), key=operator.itemgetter(1), reverse=True):
-				print(f"  {block_name}: {count}")
+				print(f"{block_name}: {count}")
 		except Exception as e:
 			error_msg = f"Vox 转方块转换失败: {e!s}"
 			raise Exception(error_msg) from e  # noqa: TRY002
@@ -357,7 +357,7 @@ class Box3Converter:
 			return blocks
 
 	def blocks2vox(self, blocks_data: dict[str, int], axis: str = "xzy", custom_colors: dict[str, Color] | None = None) -> VoxModel:
-		"""方块建筑转Vox模型"""
+		"""方块建筑转 Vox 模型"""
 		try:
 			print("正在处理方块数据...")
 			# 合并自定义颜色
@@ -377,7 +377,7 @@ class Box3Converter:
 			print(f"模型尺寸: {size[0]} x {size[1]} x {size[2]}")
 			print(f"方块数量: {len(blocks_data)}")
 			# 创建调色板
-			palette = [Color(0, 0, 0, 0)]  # 索引0为透明
+			palette = [Color(0, 0, 0, 0)]  # 索引 0 为透明
 			block_to_color_index: dict[int, int] = {}
 			# 为每个方块类型分配颜色索引
 			unique_blocks = set(blocks_data.values())
@@ -396,10 +396,10 @@ class Box3Converter:
 						color_index = len(palette)
 						palette.append(color)
 					else:
-						# 调色板已满,使用最接近的颜色
-						color_index = 1  # 默认使用索引1
+						# 调色板已满, 使用最接近的颜色
+						color_index = 1  # 默认使用索引 1
 				block_to_color_index[block_id] = color_index
-			# 填充调色板到256色
+			# 填充调色板到 256 色
 			while len(palette) < self.MAX_PALETTE_SIZE:
 				palette.append(Color(0, 0, 0, 0))
 			print(f"调色板颜色数量: {len([c for c in palette if c.a > 0])}")
@@ -444,19 +444,19 @@ def load_blocks_data(input_file: str) -> dict[str, int]:
 
 
 def get_file_path(prompt: str, extension: str = "") -> str:
-	"""获取文件路径,支持相对路径和绝对路径"""
+	"""获取文件路径, 支持相对路径和绝对路径"""
 	while True:
 		path = input(prompt).strip()
 		if not path:
-			print("路径不能为空,请重新输入")
+			print("路径不能为空, 请重新输入")
 			continue
-		# 如果指定了扩展名,检查文件扩展名
+		# 如果指定了扩展名, 检查文件扩展名
 		if extension and not path.lower().endswith(extension.lower()):
 			path += extension
 		if Path(path).exists():
 			return path
 		print(f"文件不存在: {path}")
-		retry = input("是否重新输入? (y/n): ").lower()
+		retry = input("是否重新输入? (y/n):").lower()
 		if retry != "y":
 			return path
 
@@ -465,7 +465,7 @@ def get_float_input(prompt: str, default: float = 0.25) -> float:
 	"""获取浮点数输入"""
 	while True:
 		try:
-			value = input(f"{prompt} (默认: {default}): ").strip()
+			value = input(f"{prompt} (默认: {default}):").strip()
 			if not value:
 				return default
 			return float(value)
@@ -477,11 +477,11 @@ def get_axis_input(prompt: str, default: str = "xzy") -> str:
 	"""获取轴排列输入"""
 	AXIS_LENGTH = 3  # noqa: N806
 	while True:
-		value = input(f"{prompt} (默认: {default}): ").strip()
+		value = input(f"{prompt} (默认: {default}):").strip()
 		if not value:
 			return default
 		if len(value) != AXIS_LENGTH:
-			print("轴排列必须是3个字符")
+			print("轴排列必须是 3 个字符")
 			continue
 		valid_chars = set("xyzXYZ")
 		if all(c in valid_chars for c in value):
@@ -492,7 +492,7 @@ def get_axis_input(prompt: str, default: str = "xzy") -> str:
 def show_menu() -> None:
 	"""显示主菜单"""
 	print("\n" + "=" * 50)
-	print("          Box3 Voxel 转换工具")
+	print("Box3 Voxel 转换工具")
 	print("=" * 50)
 	print("1. Vox 模型转方块建筑")
 	print("2. 方块建筑转 Vox 模型")
@@ -503,23 +503,23 @@ def show_menu() -> None:
 
 def show_color_mapping(converter: Box3Converter) -> None:
 	"""显示颜色映射"""
-	print("\n方块颜色映射:")
+	print("\n 方块颜色映射:")
 	print("-" * 40)
 	for block_name, color in converter.color_blocks.items():
 		if block_name != "air":  # 跳过空气方块
-			print(f"{block_name:15} -> RGB({color.r:3}, {color.g:3}, {color.b:3})")
+			print(f"{block_name:15} -> RGB ({color.r:3}, {color.g:3}, {color.b:3})")
 
 
 def vox_to_blocks_interactive(converter: Box3Converter) -> None:
 	"""交互式 Vox 转方块转换"""
-	print("\n[Vox 转方块建筑]")
+	print("\n [Vox 转方块建筑]")
 	# 获取输入文件
-	vox_file = get_file_path("请输入 VOX 文件路径: ", ".vox")
+	vox_file = get_file_path("请输入 VOX 文件路径:", ".vox")
 	# 获取参数
 	scale = get_float_input("请输入缩放比例", 0.25)
 	axis = get_axis_input("请输入轴排列", "xzy")
 	# 获取输出文件
-	output_file = input("请输入输出 JSON 文件路径 (默认: output.json): ").strip()
+	output_file = input("请输入输出 JSON 文件路径 (默认: output.json):").strip()
 	if not output_file:
 		output_file = "output.json"
 	if not output_file.endswith(".json"):
@@ -530,22 +530,22 @@ def vox_to_blocks_interactive(converter: Box3Converter) -> None:
 		# 保存结果
 		save_blocks_data(blocks, output_file)
 		print("\n✅ 转换完成!")
-		print(f"   输入: {vox_file}")
-		print(f"   输出: {output_file}")
-		print(f"   生成方块: {len(blocks)} 个")
+		print(f"输入: {vox_file}")
+		print(f"输出: {output_file}")
+		print(f"生成方块: {len(blocks)} 个")
 	except Exception as e:
 		print(f"\n❌ 转换失败: {e!s}")
 
 
 def blocks_to_vox_interactive(converter: Box3Converter) -> None:
 	"""交互式方块转 Vox 转换"""
-	print("\n[方块建筑转 Vox 模型]")
+	print("\n [方块建筑转 Vox 模型]")
 	# 获取输入文件
-	json_file = get_file_path("请输入 JSON 文件路径: ", ".json")
+	json_file = get_file_path("请输入 JSON 文件路径:", ".json")
 	# 获取参数
 	axis = get_axis_input("请输入轴排列", "xzy")
 	# 获取输出文件
-	output_file = input("请输入输出 VOX 文件路径 (默认: output.vox): ").strip()
+	output_file = input("请输入输出 VOX 文件路径 (默认: output.vox):").strip()
 	if not output_file:
 		output_file = "output.vox"
 	if not output_file.endswith(".vox"):
@@ -558,9 +558,9 @@ def blocks_to_vox_interactive(converter: Box3Converter) -> None:
 		# 保存结果
 		VoxWriter.write_vox(vox_model, output_file)
 		print("\n✅ 转换完成!")
-		print(f"   输入: {json_file}")
-		print(f"   输出: {output_file}")
-		print(f"   生成体素: {len(vox_model.voxels)} 个")
+		print(f"输入: {json_file}")
+		print(f"输出: {output_file}")
+		print(f"生成体素: {len(vox_model.voxels)} 个")
 	except Exception as e:
 		print(f"\n❌ 转换失败: {e!s}")
 
@@ -573,7 +573,7 @@ def main() -> None:
 		print("✅ 转换器初始化完成")
 		while True:
 			show_menu()
-			choice = input("请选择操作 (1-4): ").strip()
+			choice = input("请选择操作 (1-4):").strip()
 			if choice == "1":
 				vox_to_blocks_interactive(converter)
 			elif choice == "2":
@@ -584,8 +584,8 @@ def main() -> None:
 				print("感谢使用 Box3 Voxel 转换工具!")
 				break
 			else:
-				print("无效选择,请重新输入")
-			input("\n按回车键继续...")
+				print("无效选择, 请重新输入")
+			input("\n 按回车键继续...")
 	except Exception as e:
 		print(f"初始化失败: {e!s}")
 		input("按回车键退出...")

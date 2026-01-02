@@ -14,7 +14,7 @@ from websocket import WebSocketApp
 class CodeMaoConfig:
 	"""配置管理类"""
 
-	# WebSocket配置
+	# WebSocket 配置
 	WS_BASE_URL = "wss://cr-aichat.codemao.cn/aichat/"
 	WS_PARAMS: ClassVar = {
 		"stag": 6,
@@ -33,7 +33,7 @@ class CodeMaoConfig:
 		"Cache-Control": "no-cache",
 		"Pragma": "no-cache",
 	}
-	# SSL配置
+	# SSL 配置
 	SSL_OPTIONS: ClassVar = {"cert_reqs": 0}
 	# 超时配置
 	CONNECT_TIMEOUT = 10
@@ -45,7 +45,7 @@ class CodeMaoConfig:
 
 	@classmethod
 	def build_websocket_url(cls, token: str) -> str:
-		"""构建WebSocket URL"""
+		"""构建 WebSocket URL"""
 		params = {**cls.WS_PARAMS, "token": token}
 		query_string = "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
 		return f"{cls.WS_BASE_URL}?{query_string}"
@@ -87,9 +87,9 @@ class EventHandler:
 			print(message)
 
 
-# ==================== WebSocket连接管理 ====================
+# ==================== WebSocket 连接管理 ====================
 class WebSocketManager:
-	"""WebSocket连接管理器"""
+	"""WebSocket 连接管理器"""
 
 	def __init__(self, token: str, event_handler: EventHandler) -> None:
 		self.token = token
@@ -98,9 +98,9 @@ class WebSocketManager:
 		self.connected = False
 
 	def connect(self) -> bool:
-		"""连接到WebSocket服务器"""
+		"""连接到 WebSocket 服务器"""
 		if not self.token:
-			self.handler.log("错误: 未提供token")
+			self.handler.log("错误: 未提供 token")
 			return False
 		self.handler.log("连接到服务器...")
 		self.ws = WebSocketApp(
@@ -130,7 +130,7 @@ class WebSocketManager:
 		return self.connected
 
 	def _on_message(self, _ws: object, message: str) -> None:
-		"""WebSocket消息处理"""
+		"""WebSocket 消息处理"""
 		try:
 			if message.startswith("0"):  # 连接确认
 				self.handler.log("连接建立")
@@ -138,7 +138,7 @@ class WebSocketManager:
 				if self.ws:
 					self.ws.send("2")  # pong
 			elif message.startswith("40"):  # 连接成功
-				self.handler.log("Socket.IO连接成功")
+				self.handler.log("Socket.IO 连接成功")
 			elif message.startswith("42"):  # 事件消息
 				event_data = json.loads(message[2:])
 				self.handler.handle_event(event_data[0], event_data[1] if len(event_data) > 1 else {})
@@ -147,25 +147,25 @@ class WebSocketManager:
 			self.handler.emit_event(str(e), "error")
 
 	def _on_error(self, _ws: object, error: object) -> None:
-		"""WebSocket错误处理"""
-		error_msg = f"WebSocket错误: {error}"
+		"""WebSocket 错误处理"""
+		error_msg = f"WebSocket 错误: {error}"
 		self.handler.log(error_msg)
 		self.handler.emit_event(error_msg, "error")
 
 	def _on_close(self, _ws: object, _close_status_code: int | None = None, _close_msg: str | None = None) -> None:
-		"""WebSocket关闭处理"""
+		"""WebSocket 关闭处理"""
 		self.handler.log("连接关闭")
 		self.connected = False
 
 	def _on_open(self, ws: WebSocketApp) -> None:
-		"""WebSocket打开处理"""
-		self.handler.log("WebSocket连接建立")
+		"""WebSocket 打开处理"""
+		self.handler.log("WebSocket 连接建立")
 		self.connected = True
 		ws.send("40")
 
 		def send_join() -> None:
 			time.sleep(1)
-			ws.send('42["join"]')
+			ws.send('42 ["join"]')
 
 		threading.Thread(target=send_join, daemon=True).start()
 
@@ -181,9 +181,9 @@ class WebSocketManager:
 		self.connected = False
 
 
-# ==================== AI聊天核心实现 ====================
+# ==================== AI 聊天核心实现 ====================
 class CodeMaoAICore(EventHandler):
-	"""CodeMao AI聊天核心实现"""
+	"""CodeMao AI 聊天核心实现"""
 
 	def __init__(self, token: str, *, verbose: bool = False) -> None:
 		super().__init__(verbose=verbose)
@@ -202,7 +202,7 @@ class CodeMaoAICore(EventHandler):
 
 	@staticmethod
 	def _generate_session_id() -> str:
-		"""生成会话ID"""
+		"""生成会话 ID"""
 		return "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
 
 	def handle_event(self, event_name: str, payload: dict[str, Any]) -> None:
@@ -221,7 +221,7 @@ class CodeMaoAICore(EventHandler):
 		"""处理连接确认"""
 		if payload.get("code") == 1:
 			self._user_info.update(payload.get("data", {}))
-			self.log(f"连接确认 - 剩余对话次数: {self._user_info.get('chat_count', '未知')}")
+			self.log(f"连接确认 - 剩余对话次数: {self._user_info.get('chat_count', ' 未知 ')}")
 
 	def _handle_join_ack(self, payload: dict[str, Any]) -> None:
 		"""处理加入确认"""
@@ -229,7 +229,7 @@ class CodeMaoAICore(EventHandler):
 			data = payload.get("data", {})
 			self.user_id = data.get("user_id")
 			self.search_session = data.get("search_session")
-			self.log(f"加入成功 - 用户ID: {self.user_id}, 会话: {self.search_session}")
+			self.log(f"加入成功 - 用户 ID: {self.user_id}, 会话: {self.search_session}")
 			self._send_preset_messages()
 
 	def _handle_remaining_times(self, payload: dict[str, Any]) -> None:
@@ -237,7 +237,7 @@ class CodeMaoAICore(EventHandler):
 		if payload.get("code") == 1:
 			data = payload.get("data", {})
 			self._user_info["remaining_image_times"] = data.get("remaining_times")
-			self.log(f"剩余图片生成次数: {data.get('remaining_times', '未知')}")
+			self.log(f"剩余图片生成次数: {data.get('remaining_times', ' 未知 ')}")
 
 	def _handle_chat_ack(self, payload: dict[str, Any]) -> None:
 		"""处理聊天回复"""
@@ -258,15 +258,15 @@ class CodeMaoAICore(EventHandler):
 		elif content_type == "stream_output_end":
 			self.is_receiving_response = False
 			self.emit_event(self.current_response, "end")
-			# 将AI回复添加到对话历史
+			# 将 AI 回复添加到对话历史
 			if self.current_response:
 				self._conversation_history.append({"role": "assistant", "content": self.current_response})
 
 	def _send_preset_messages(self) -> None:
 		"""发送预设消息"""
 		if self.ws_manager.connected:
-			self.ws_manager.send('42["preset_chat_message",{"turn_count":5,"system_content_enum":"default"}]')
-			self.ws_manager.send('42["get_text2Img_remaining_times"]')
+			self.ws_manager.send('42 ["preset_chat_message",{"turn_count":5,"system_content_enum":"default"}]')
+			self.ws_manager.send('42 ["get_text2Img_remaining_times"]')
 
 	def connect(self) -> bool:
 		"""连接到服务器"""
@@ -296,13 +296,13 @@ class CodeMaoAICore(EventHandler):
 			"chat_type": "chat_v3",
 			"msg_channel": 0,
 		}
-		message_str = f'42["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
+		message_str = f'42 ["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
 		self.ws_manager.send(message_str)
 		self.log(f"消息已发送: {message}")
 		return True
 
 	def wait_for_response_start(self, timeout: int = CodeMaoConfig.RESPONSE_START_TIMEOUT) -> bool:
-		"""等待AI开始回复"""
+		"""等待 AI 开始回复"""
 		start_time = time.time()
 		while not self.is_receiving_response and time.time() - start_time < timeout:
 			time.sleep(0.1)
@@ -319,9 +319,9 @@ class CodeMaoAICore(EventHandler):
 		"""发送消息并等待回复完成"""
 		if not self.send_message(message=message, include_history=include_history):
 			return False
-		# 等待AI开始回复
+		# 等待 AI 开始回复
 		if not self.wait_for_response_start():
-			self.log("AI未开始回复")
+			self.log("AI 未开始回复")
 			return False
 		# 等待回复完成
 		return self.wait_for_response(timeout=response_timeout)
@@ -351,7 +351,7 @@ class CodeMaoAICore(EventHandler):
 
 # ==================== 高级接口类 ====================
 class CodeMaoAIChat:
-	"""CodeMao AI聊天客户端 - 高级接口"""
+	"""CodeMao AI 聊天客户端 - 高级接口"""
 
 	def __init__(self, token: str, *, verbose: bool = False) -> None:
 		self._core = CodeMaoAICore(token, verbose=verbose)
@@ -409,7 +409,7 @@ class CodeMaoTool:
 
 	@staticmethod
 	def stream_chat(token: str, message: str, timeout: int = 60) -> str:
-		"""直接流式打印AI回复的便捷函数"""
+		"""直接流式打印 AI 回复的便捷函数"""
 		client = CodeMaoAIChat(token=token, verbose=False)
 		full_response = []
 
@@ -462,7 +462,7 @@ class CodeMaoTool:
 		print("=" * 20)
 		try:
 			while True:
-				user_input = input("\n你: ").strip()
+				user_input = input("\n 你:").strip()
 				if not user_input:
 					continue
 				if user_input.lower() in {"/quit", "/exit", "退出"}:
@@ -477,13 +477,13 @@ class CodeMaoTool:
 					for i, msg in enumerate(history[-6:], 1):
 						role = "你" if msg["role"] == "user" else "AI"
 						content_preview = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]
-						print(f"  {i}. {role}: {content_preview}")
+						print(f"{i}. {role}: {content_preview}")
 					continue
-				print("AI: ", end="", flush=True)
+				print("AI:", end="", flush=True)
 				if not client.send_and_wait(user_input, response_timeout=60):
-					print("\n回复超时或失败")
+					print("\n 回复超时或失败")
 		except KeyboardInterrupt:
-			print("\n\n聊天结束")
+			print("\n\n 聊天结束")
 		finally:
 			client.close()
 
@@ -500,9 +500,9 @@ class CodeMaoTool:
 			client.close()
 
 
-# ==================== 多token管理 ====================
+# ==================== 多 token 管理 ====================
 class CodeMaoAIClient:
-	"""CodeMao AI聊天客户端 - 多token管理版本"""
+	"""CodeMao AI 聊天客户端 - 多 token 管理版本"""
 
 	def __init__(self, tokens: list[str], *, verbose: bool = False) -> None:
 		self.tokens = tokens
@@ -511,17 +511,17 @@ class CodeMaoAIClient:
 		self._clients: dict[str, CodeMaoAIChat] = {}
 
 	def _get_current_token(self) -> str:
-		"""获取当前token"""
+		"""获取当前 token"""
 		return self.tokens[self.current_token_index]
 
 	def _switch_to_next_token(self) -> bool:
-		"""切换到下一个token"""
+		"""切换到下一个 token"""
 		if len(self.tokens) <= 1:
 			return False
 		old_index = self.current_token_index
 		self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
 		if self.verbose:
-			print(f"Token切换: 从索引 {old_index} 切换到 {self.current_token_index}")
+			print(f"Token 切换: 从索引 {old_index} 切换到 {self.current_token_index}")
 		return True
 
 	def _get_or_create_client(self, token: str) -> CodeMaoAIChat:
@@ -531,24 +531,24 @@ class CodeMaoAIClient:
 		return self._clients[token]
 
 	def _check_token_quota(self, client: CodeMaoAIChat) -> bool:
-		"""检查token配额"""
+		"""检查 token 配额"""
 		try:
 			user_info = client.get_user_info()
 			chat_count = user_info.get("chat_count", 0)
 			if self.verbose:
-				print(f"当前token剩余对话次数: {chat_count}")
-			return chat_count >= 2  # 剩余次数大于等于2次认为充足  # noqa: TRY300
+				print(f"当前 token 剩余对话次数: {chat_count}")
+			return chat_count >= 2  # 剩余次数大于等于 2 次认为充足  # noqa: TRY300
 		except Exception as e:
 			if self.verbose:
 				print(f"检查配额失败: {e}")
-			return True  # 如果检查失败,继续使用当前token
+			return True  # 如果检查失败, 继续使用当前 token
 
 	def stream_chat_with_prompt(self, message: str, prompt: str = "", timeout: int = 60) -> Iterator[str]:
 		max_retries = len(self.tokens)
 		for retry in range(max_retries):
 			current_token = self._get_current_token()
 			if self.verbose:
-				print(f"尝试使用token索引 {self.current_token_index} (尝试 {retry + 1}/{max_retries})")
+				print(f"尝试使用 token 索引 {self.current_token_index} (尝试 {retry + 1}/{max_retries})")
 			client = self._get_or_create_client(current_token)
 			try:
 				if not client.connect():
@@ -560,7 +560,7 @@ class CodeMaoAIClient:
 				# 检查配额
 				if not self._check_token_quota(client):
 					if self.verbose:
-						print(f"Token {self.current_token_index} 配额不足,尝试切换")
+						print(f"Token {self.current_token_index} 配额不足, 尝试切换")
 					self._switch_to_next_token()
 					continue
 				# 发送提示词
@@ -584,7 +584,7 @@ class CodeMaoAIClient:
 				return
 			finally:
 				client.close()
-		yield f"错误: 所有token都尝试失败,共尝试了 {max_retries} 次"
+		yield f"错误: 所有 token 都尝试失败, 共尝试了 {max_retries} 次"
 
 	def _stream_user_message(self, client: CodeMaoAIChat, message: str, timeout: int) -> Iterator[str]:
 		full_response = []
@@ -605,7 +605,7 @@ class CodeMaoAIClient:
 			yield "错误: 发送消息失败"
 			return
 		if not client.wait_for_response_start(timeout=10):
-			yield "错误: AI未开始回复"
+			yield "错误: AI 未开始回复"
 			return
 		# 流式返回内容
 		start_time = time.time()
@@ -626,7 +626,7 @@ class CodeMaoAIClient:
 	def print_stream_response(self, message: str, prompt: str = "", timeout: int = 60) -> str:
 		"""打印流式回复的便捷方法"""
 		full_response = []
-		print("AI: ", end="", flush=True)
+		print("AI:", end="", flush=True)
 		for chunk in self.stream_chat_with_prompt(message, prompt, timeout):
 			print(chunk, end="", flush=True)
 			full_response.append(chunk)
@@ -634,7 +634,7 @@ class CodeMaoAIClient:
 		return "".join(full_response)
 
 	def batch_check_quotas(self) -> dict[str, Any]:
-		"""批量检查所有token的配额"""
+		"""批量检查所有 token 的配额"""
 		quotas = {}
 		for i, token in enumerate(self.tokens):
 			try:
