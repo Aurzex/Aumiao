@@ -37,16 +37,16 @@ class ColorConfig:
 	"""优化的颜色配置管理"""
 
 	_COLOR_MAP: ClassVar[dict[str, str]] = {
-		"COMMENT": "\033 [38;5;245m",
-		"ERROR": "\033 [38;5;203m",
-		"MENU_ITEM": "\033 [38;5;183m",
-		"MENU_TITLE": "\033 [38;5;80m",
-		"PROMPT": "\033 [38;5;75m",
-		"RESET": "\033 [0m",
-		"STATUS": "\033 [38;5;228m",
-		"SUCCESS": "\033 [38;5;114m",
-		"INFO": "\033 [38;5;39m",
-		"WARNING": "\033 [38;5;214m",
+		"COMMENT": "\033[38;5;245m",
+		"ERROR": "\033[38;5;203m",
+		"MENU_ITEM": "\033[38;5;183m",
+		"MENU_TITLE": "\033[38;5;80m",
+		"PROMPT": "\033[38;5;75m",
+		"RESET": "\033[0m",
+		"STATUS": "\033[38;5;228m",
+		"SUCCESS": "\033[38;5;114m",
+		"INFO": "\033[38;5;39m",
+		"WARNING": "\033[38;5;214m",
 	}
 	_SEPARATOR: ClassVar[str] = f"{_COLOR_MAP['PROMPT']}══════════════════════════════════════════════════════════{_COLOR_MAP['RESET']}"
 
