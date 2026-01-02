@@ -27,7 +27,7 @@ class Obtain(ClassUnion):
 	) -> list[dict]:
 		"""获取社区新回复
 		Args:
-			limit: 获取数量限制 (0表示获取全部新回复)
+			limit: 获取数量限制 (0 表示获取全部新回复)
 			type_item: 消息类型
 		Returns:
 			结构化回复数据列表
@@ -89,21 +89,21 @@ class Obtain(ClassUnion):
 	) -> list[dict] | list[str]:
 		"""获取结构化评论数据
 		Args:
-			com_id: 目标主体ID (作品/帖子/工作室ID)
-			source: 数据来源 work=作品 post=帖子 shop=工作室
+			com_id: 目标主体 ID (作品 / 帖子 / 工作室 ID)
+			source: 数据来源 work = 作品 post = 帖子 shop = 工作室
 			method: 返回格式
-				user_id -> 用户ID列表
-				comment_id -> 评论ID列表
+				user_id -> 用户 ID 列表
+				comment_id -> 评论 ID 列表
 				comments -> 结构化评论数据
 			max_limit: 最大获取数量
 		Returns:
-			根据method参数返回对应格式的数据
+			根据 method 参数返回对应格式的数据
 		"""
 		if source not in self._source_map:
 			msg = f"无效来源: {source}"
 			raise ValueError(msg)
 		method_func, id_key, user_field = self._source_map[source]
-		comments = method_func(**{id_key: com_id, "limit": max_limit})  # pyright: ignore[reportArgumentType]
+		comments = method_func(**{id_key: com_id, "limit": max_limit})  # pyright: ignore [reportArgumentType]
 		reply_cache = {}
 
 		def extract_reply_user(reply: dict) -> int:
@@ -187,7 +187,7 @@ class Obtain(ClassUnion):
 			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
 			comments.extend(work_comments)
 		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
-		filtered_comments = cast("list[dict]", filtered_comments)
+		filtered_comments = cast("list [dict]", filtered_comments)
 		user_comments_map = {}
 		for comment in filtered_comments:
 			user_id = comment.get("user_id")
@@ -211,10 +211,10 @@ class Obtain(ClassUnion):
 	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[Any]: ...
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
 		"""
-		获取教育账号信息,可选择返回生成器或列表
+		获取教育账号信息, 可选择返回生成器或列表
 		:param limit: 要获取的账号数量限制
-		:param return_method: 返回方式,"generator"返回生成器,"list"返回列表
-		:return: 账号生成器或列表,每个元素为(username, password)元组
+		:param return_method: 返回方式,"generator" 返回生成器,"list" 返回列表
+		:return: 账号生成器或列表, 每个元素为 (username, password) 元组
 		"""
 		try:
 			# 获取学生列表

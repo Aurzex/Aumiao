@@ -19,14 +19,14 @@ def singleton(cls):  # noqa: ANN001, ANN201
 
 
 def retry(retries: int = 3, delay: float = 1) -> Callable:
-	# 如果重试次数小于1或者延迟时间小于等于0,则抛出ValueError异常
+	# 如果重试次数小于 1 或者延迟时间小于等于 0, 则抛出 ValueError 异常
 	if retries < 1 or delay <= 0:
 		msg = "Are you high, mate?"
 		raise ValueError(msg)
 	# 定义装饰器函数
 
 	def decorator(func: Callable) -> Callable:
-		# 使用wraps装饰器,保留原函数的元信息
+		# 使用 wraps 装饰器, 保留原函数的元信息
 		@wraps(func)
 		def wrapper(*args: ..., **kwargs: ...) -> ...:
 			# 循环重试
@@ -35,15 +35,15 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 					# 调用原函数
 					return func(*args, **kwargs)
 				except Exception as e:
-					# 如果重试次数达到上限,则抛出异常
+					# 如果重试次数达到上限, 则抛出异常
 					if i == retries:
 						print(f"Error: {e!r}.")
 						print(f'"{func.__name__}()" failed after {retries} retries.')
 						break
-					# 否则,打印错误信息并等待一段时间后重试
+					# 否则, 打印错误信息并等待一段时间后重试
 					print(f"Error: {e!r} -> Retrying...")
 					sleep(delay)
-			# 如果重试次数达到上限,则抛出Error异常
+			# 如果重试次数达到上限, 则抛出 Error 异常
 			raise ValueError
 
 		return wrapper
@@ -64,13 +64,13 @@ def skip_on_error(func):  # noqa: ANN001, ANN201
 
 
 def generator(chunk_size: int = 1000) -> Callable:
-	# 定义一个装饰器函数,用于将一个函数的返回值按指定大小分割成多个块
+	# 定义一个装饰器函数, 用于将一个函数的返回值按指定大小分割成多个块
 	def decorator(func: Callable) -> Callable:
-		# 定义一个包装函数,用于调用被装饰的函数,并将返回值按指定大小分割成多个块
+		# 定义一个包装函数, 用于调用被装饰的函数, 并将返回值按指定大小分割成多个块
 		def wrapper(*args, **kwargs) -> Generator:  # noqa: ANN002, ANN003
-			# 调用被装饰的函数,并将返回值赋给result
+			# 调用被装饰的函数, 并将返回值赋给 result
 			result = func(*args, **kwargs)
-			# 遍历result,将result按指定大小分割成多个块,并逐个返回
+			# 遍历 result, 将 result 按指定大小分割成多个块, 并逐个返回
 			for i in range(0, len(result), chunk_size):
 				yield result[i : i + chunk_size]
 
@@ -80,14 +80,14 @@ def generator(chunk_size: int = 1000) -> Callable:
 
 
 def lazy_property(func: Callable) -> ...:
-	# 定义一个属性名,用于存储函数的返回值
+	# 定义一个属性名, 用于存储函数的返回值
 	attr_name = "_lazy_" + func.__name__
-	# 定义一个装饰器,用于将函数转换为属性
+	# 定义一个装饰器, 用于将函数转换为属性
 
 	@property
 	@wraps(func)
 	def wrapper(self) -> object:  # noqa: ANN001
-		# 如果属性不存在,则调用函数并将返回值存储为属性
+		# 如果属性不存在, 则调用函数并将返回值存储为属性
 		if not hasattr(self, attr_name):
 			setattr(self, attr_name, func(self))
 		# 返回属性值
@@ -104,7 +104,6 @@ def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool 
 	def decorator(func: Callable) -> ...:
 		# 使用 lru_cache 缓存结果
 		cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
-
 		# 为每个函数创建独立的计数器
 		call_counts = defaultdict(int)
 		func_registry[func] = (cached_func, call_counts)
@@ -114,31 +113,26 @@ def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool 
 			# 使用更健壮的键生成方式
 			key = (
 				args,
-				frozenset(kwargs.items()),  # 使用frozenset避免顺序依赖
+				frozenset(kwargs.items()),  # 使用 frozenset 避免顺序依赖
 			)
-
 			# 获取当前计数
 			current_count = call_counts[key] + 1
 			call_counts[key] = current_count
-
 			# 检查是否需要重置
 			if current_count > max_calls:
-				# 只清除当前键的计数,而不是整个缓存
+				# 只清除当前键的计数, 而不是整个缓存
 				call_counts[key] = 1
-
 				# 清除特定键的缓存
 				if hasattr(cached_func, "__wrapped__"):
-					# 创建新的缓存函数实例,模拟清除特定缓存
+					# 创建新的缓存函数实例, 模拟清除特定缓存
 					new_cached_func = lru_cache(maxsize=maxsize, typed=typed)(cached_func.__wrapped__)
 					func_registry[func] = (new_cached_func, call_counts)
 					return new_cached_func(*args, **kwargs)
-
 			return cached_func(*args, **kwargs)
 
 		# 添加缓存访问方法
-		wrapper.cache_info = cached_func.cache_info  # pyright: ignore[reportAttributeAccessIssue]
-		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore[reportAttributeAccessIssue]
-
+		wrapper.cache_info = cached_func.cache_info  # pyright: ignore [reportAttributeAccessIssue]
+		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore [reportAttributeAccessIssue]
 		return wrapper
 
 	return decorator

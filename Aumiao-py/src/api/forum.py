@@ -13,17 +13,17 @@ class ForumDataFetcher:
 		self._client = acquire.CodeMaoClient()
 
 	# 获取多个帖子信息
-	# 相较于fetch_single_post_details,这个api在帖子删除后依然可以获取到帖子信息
+	# 相较于 fetch_single_post_details, 这个 api 在帖子删除后依然可以获取到帖子信息
 	def fetch_posts_details(self, post_ids: int | list[int]) -> dict:
-		# 判断传入的ids类型
+		# 判断传入的 ids 类型
 		if isinstance(post_ids, int):
-			# 如果是单个id,则直接传入
+			# 如果是单个 id, 则直接传入
 			params = {"ids": post_ids}
 		elif isinstance(post_ids, list):
 			if len(post_ids) >= 20:
-				msg = "数据长度需小于20"
+				msg = "数据长度需小于 20"
 				raise TypeError(msg)
-			# 如果是多个id,则将id列表转换为字符串
+			# 如果是多个 id, 则将 id 列表转换为字符串
 			params = {"ids": ",".join(map(str, post_ids))}
 		# 发送请求获取帖子信息
 		response = self._client.send_request(endpoint="/web/forums/posts/all", method="GET", params=params)
@@ -35,7 +35,7 @@ class ForumDataFetcher:
 		response = self._client.send_request(endpoint=f"/web/forums/posts/{post_id}/details", method="GET")
 		return response.json()
 
-	# 回帖会单独分配一个独立于被回复帖子的id
+	# 回帖会单独分配一个独立于被回复帖子的 id
 	# 获取帖子回帖
 	def fetch_post_replies_gen(self, post_id: int, sort: str = "-created_at", limit: int | None = 15) -> Generator[dict]:
 		# 设置请求参数
@@ -92,7 +92,7 @@ class ForumDataFetcher:
 		response = self._client.send_request(endpoint=f"/web/forums/boards/{board_id}", method="GET")
 		return response.json()
 
-	# 获取社区所有热门帖子ID
+	# 获取社区所有热门帖子 ID
 	def fetch_hot_posts_ids(self) -> dict:
 		response = self._client.send_request(endpoint="/web/forums/posts/hots/all", method="GET")
 		return response.json()
@@ -135,11 +135,11 @@ class ForumDataFetcher:
 			config={"amount_key": "limit", "offset_key": "page"},
 		)
 
-	# 获取热门帖子(7天内)
+	# 获取热门帖子 (7 天内)
 	def fetch_7day_hot_posts_gen(self, board_id: int = -1, limit: int | None = 15) -> Generator[dict]:
 		# 设置请求参数
 		params = {"page": 1, "limit": 10}
-		# 构建endpoint
+		# 构建 endpoint
 		endpoint = "/web/forums/boards/posts/7dayHot" if board_id == -1 else f"/web/forums/boards/posts/7dayHot?board_id={board_id}"
 		return self._client.fetch_paginated_data(
 			endpoint=endpoint,
@@ -166,7 +166,7 @@ class ForumDataFetcher:
 @singleton
 class ForumActionHandler:
 	def __init__(self) -> None:
-		# 初始化acquire对象,用于发送请求
+		# 初始化 acquire 对象, 用于发送请求
 		self._client = acquire.CodeMaoClient()
 
 	# 对某个帖子回帖
@@ -202,7 +202,7 @@ class ForumActionHandler:
 		item_id: int,
 		item_type: Literal["REPLY", "COMMENT"],
 	) -> bool:
-		# 每个回帖都有唯一id
+		# 每个回帖都有唯一 id
 		method = "PUT" if action == "like" else "DELETE"
 		params = {"source": item_type.upper()}
 		response = self._client.send_request(
@@ -243,7 +243,7 @@ class ForumActionHandler:
 		*,
 		return_data: bool = False,
 	) -> dict | bool:
-		# get_report_reasons()仅返回1-8的reason_id,其中description与reason_id一一对应 0为自定义举报理由
+		# get_report_reasons() 仅返回 1-8 的 reason_id, 其中 description 与 reason_id 一一对应 0 为自定义举报理由
 		data = {
 			"reason_id": reason_id,
 			"description": description,
@@ -267,7 +267,7 @@ class ForumActionHandler:
 		*,
 		return_data: bool = False,
 	) -> dict | bool:
-		# description与reason_id并不对应,可以自定义描述
+		# description 与 reason_id 并不对应, 可以自定义描述
 		data = {
 			"reason_id": reason_id,
 			"description": description,
@@ -312,7 +312,7 @@ class ForumActionHandler:
 		*,
 		return_data: bool = False,
 	) -> dict | bool:
-		# board_id类型可从get_post_categories()获取
+		# board_id 类型可从 get_post_categories() 获取
 		data = {"title": title, "content": content}
 		if target_type == "board":
 			if board_id is None:

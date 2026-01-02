@@ -14,17 +14,17 @@ class CodeMaoFile:
 		try:
 			with Path.open(path):
 				return True
-		# 如果打开文件失败,打印错误信息并返回False
+		# 如果打开文件失败, 打印错误信息并返回 False
 		except OSError as err:
 			print(err)
 			return False
 
 	@staticmethod
 	def validate_json(json_string: str | bytes) -> str | Literal[False]:
-		# 尝试解析JSON字符串
+		# 尝试解析 JSON 字符串
 		try:
 			return json.loads(json_string)
-		# 如果解析失败,打印错误信息并返回False
+		# 如果解析失败, 打印错误信息并返回 False
 		except ValueError as err:
 			print(err)
 			return False
@@ -41,7 +41,7 @@ class CodeMaoFile:
 				return json.loads(data) if data else {}
 			if _type == "txt":
 				return data
-			# 如果文件类型不支持,抛出异常
+			# 如果文件类型不支持, 抛出异常
 			msg = "不支持的读取方法"
 			raise ValueError(msg)
 

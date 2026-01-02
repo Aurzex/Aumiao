@@ -13,19 +13,19 @@ class CartoonDataFetcher:
 
 	# 获取全部漫画
 	def fetch_all_cartoons(self) -> dict:
-		# 发送GET请求获取全部漫画
+		# 发送 GET 请求获取全部漫画
 		response = self._client.send_request(endpoint="/api/comic/list/all", method="GET")
 		return response.json()
 
 	# 获取漫画信息
 	def fetch_cartoon_info(self, comic_id: int) -> dict:
-		# 发送GET请求获取漫画信息
+		# 发送 GET 请求获取漫画信息
 		response = self._client.send_request(endpoint=f"/api/comic/{comic_id}", method="GET")
 		return response.json()
 
-	# 获取漫画某个章节信息(每个章节会分配一个唯一id)
+	# 获取漫画某个章节信息 (每个章节会分配一个唯一 id)
 	def fetch_cartoon_chapter(self, chapter_id: int) -> dict:
-		# 发送GET请求获取漫画某个章节信息
+		# 发送 GET 请求获取漫画某个章节信息
 		response = self._client.send_request(endpoint=f"/api/comic/page/list/{chapter_id}", method="GET")
 		return response.json()
 
@@ -39,7 +39,7 @@ class NovelDataFetcher:
 
 	# 获取小说分类列表
 	def fetch_novel_categories(self) -> dict:
-		# 发送GET请求获取小说分类列表
+		# 发送 GET 请求获取小说分类列表
 		response = self._client.send_request(endpoint="/api/fanfic/type", method="GET")
 		return response.json()
 
@@ -58,11 +58,11 @@ class NovelDataFetcher:
 		page: int = 1,
 		limit: int = 20,
 	) -> dict:
-		# sort_id: 0:默认排序 1:最多点击 2:最多收藏 3:最近更新
-		# category_id: 0:不限 1:魔法 2:科幻 3:游戏 4:推理 5:治愈 6:冒险 7:日常 8:校园 9:格斗 10:古风 11:恐怖
-		# status: 0:全部 1:连载中 2:已完结
-		# list_type: all:全部 recommend:推荐
-		# 经测试recommend返回数据不受params影响 recommend
+		# sort_id: 0: 默认排序 1: 最多点击 2: 最多收藏 3: 最近更新
+		# category_id: 0: 不限 1: 魔法 2: 科幻 3: 游戏 4: 推理 5: 治愈 6: 冒险 7: 日常 8: 校园 9: 格斗 10: 古风 11: 恐怖
+		# status: 0: 全部 1: 连载中 2: 已完结
+		# list_type: all: 全部 recommend: 推荐
+		# 经测试 recommend 返回数据不受 params 影响 recommend
 		params = {
 			"sort_id": sort_id,
 			"type_id": category_id,
@@ -70,7 +70,7 @@ class NovelDataFetcher:
 			"page": page,
 			"limit": limit,
 		}
-		# params中的type_id与fanfic_type_id可互换
+		# params 中的 type_id 与 fanfic_type_id 可互换
 		response = self._client.send_request(endpoint=f"/api/fanfic/list/{list_type}", method="GET", params=params)
 		return response.json()
 
@@ -93,7 +93,7 @@ class NovelDataFetcher:
 	def fetch_chapter_details(self, chapter_id: int) -> dict:
 		response = self._client.send_request(
 			# endpoint=f"/web/fanfic/section/{chapter_id}",
-			# 猫门!这是一个更新的api
+			# 猫门! 这是一个更新的 api
 			endpoint=f"/api/fanfic/section/{chapter_id}",
 			method="GET",
 		)
@@ -101,7 +101,7 @@ class NovelDataFetcher:
 
 	# 获取小说评论
 	def fetch_novel_comments(self, novel_id: int, page: int = 0, limit: int = 10) -> dict:
-		# page从0开始
+		# page 从 0 开始
 		params = {"page": page, "limit": limit}
 		response = self._client.send_request(
 			endpoint=f"/api/fanfic/comments/list/{novel_id}",
@@ -112,7 +112,7 @@ class NovelDataFetcher:
 
 	# 获取搜索小说结果
 	def search_novels(self, keyword: str, page: int = 0, limit: int = 10) -> dict:
-		# page从0开始
+		# page 从 0 开始
 		params = {"searchContent": keyword, "page": page, "limit": limit}
 		response = self._client.send_request(
 			endpoint="/api/fanfic/list/search",
@@ -143,10 +143,10 @@ class NovelDataFetcher:
 @singleton
 class NovelActionHandler:
 	def __init__(self) -> None:
-		# 初始化CodeMaoClient对象
+		# 初始化 CodeMaoClient 对象
 		self._client = acquire.CodeMaoClient()
 
-	# 收藏/取消收藏小说
+	# 收藏 / 取消收藏小说
 	def execute_toggle_novel_favorite(self, novel_id: int, *, favorite: bool = True) -> dict:
 		method = "POST" if favorite else "DELETE"
 		response = self._client.send_request(
@@ -164,18 +164,18 @@ class NovelActionHandler:
 				"content": content,
 			},
 		)
-		# 如果return_data为True,则返回response的json数据,否则返回response的状态码
+		# 如果 return_data 为 True, 则返回 response 的 json 数据, 否则返回 response 的状态码
 		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
-	# 点赞/取消点赞小说评论
+	# 点赞 / 取消点赞小说评论
 	def execute_toggle_comment_like(self, comment_id: int, *, like: bool = True, return_data: bool = False) -> bool | dict:
-		# 发送请求,点赞赞或取消点赞小说评论
+		# 发送请求, 点赞赞或取消点赞小说评论
 		method = "POST" if like else "DELETE"
 		response = self._client.send_request(
 			endpoint=f"/api/fanfic/comments/praise/{comment_id}",
 			method=method,
 		)
-		# 如果return_data为True,则返回response的json数据,否则返回response的状态码
+		# 如果 return_data 为 True, 则返回 response 的 json 数据, 否则返回 response 的状态码
 		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 删除小说评论
@@ -184,7 +184,7 @@ class NovelActionHandler:
 			endpoint=f"/api/fanfic/comments/{comment_id}",
 			method="DELETE",
 		)
-		# 如果return_data为True,则返回response的json数据,否则返回返回response的状态码
+		# 如果 return_data 为 True, 则返回 response 的 json 数据, 否则返回返回 response 的状态码
 		return response.json() if return_data else response.status_code == HTTPStatus.OK.value
 
 	# 更新章节
@@ -281,12 +281,12 @@ class BookDataFetcher:
 
 	# 按星级获取图鉴
 	def fetch_books_by_star(self, star: Literal[1, 2, 3, 4, 5, 6]) -> dict:
-		# 1:一星 2:二星 3:三星 4:四星 5:五星 6:六星
+		# 1: 一星 2: 二星 3: 三星 4: 四星 5: 五星 6: 六星
 		return self._get_books_by_params({"star": star})
 
 	# 按属性获取图鉴
 	def fetch_books_by_attribute(self, attribute_id: Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) -> dict:
-		# 2:普通 3:草 4:地 5:电 6:虫 7:水 8:火 9:机械 10:飞行 11:超能 12:神圣
+		# 2: 普通 3: 草 4: 地 5: 电 6: 虫 7: 水 8: 火 9: 机械 10: 飞行 11: 超能 12: 神圣
 		return self._get_books_by_params({"faction_id": attribute_id})
 
 	# 通用获取图鉴方法
@@ -312,7 +312,7 @@ class BookActionHandler:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 
-	# 点赞/取消点赞图鉴
+	# 点赞 / 取消点赞图鉴
 	def execute_toggle_book_like(self, book_id: int, *, like: bool, return_data: bool = False) -> bool | dict:
 		method = "POST" if like else "DELETE"
 		response = self._client.send_request(

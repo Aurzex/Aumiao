@@ -12,7 +12,7 @@ class OverseaDataClient:
 		self._client = acquire.CodeMaoClient()
 
 	def fetch_tiger_accounts(self) -> dict:
-		"""获取Tiger账号信息"""
+		"""获取 Tiger 账号信息"""
 		response = self._client.send_request(endpoint="https://oversea-api.code.game/tiger/accounts", method="GET")
 		return response.json()
 
@@ -35,10 +35,10 @@ class UserActionHandler:
 		Args:
 			email: 用户邮箱
 			password: 账号密码
-			pid: 产品ID,默认"LHnQoPMr"
-			language: 语言,目前仅支持"en"
+			pid: 产品 ID, 默认 "LHnQoPMr"
+			language: 语言, 目前仅支持 "en"
 		Returns:
-			注册成功返回True,否则返回False
+			注册成功返回 True, 否则返回 False
 		"""
 		payload = {"email": email, "language": language, "password": password, "pid": pid}
 		response = self._client.send_request(endpoint="https://oversea-api.code.game/tiger/accounts/register/email", method="POST", payload=payload)
@@ -48,11 +48,11 @@ class UserActionHandler:
 		"""
 		使用账号密码登录
 		Args:
-			identity: 身份标识(邮箱或用户名)
+			identity: 身份标识 (邮箱或用户名)
 			password: 账号密码
-			pid: 产品ID,默认"LHnQoPMr"
+			pid: 产品 ID, 默认 "LHnQoPMr"
 		Returns:
-			登录成功返回True,否则返回False
+			登录成功返回 True, 否则返回 False
 		"""
 		payload = {"identity": identity, "password": password, "pid": pid}
 		response = self._client.send_request(endpoint="https://oversea-api.code.game/tiger/accounts/login", method="POST", payload=payload)

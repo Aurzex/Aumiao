@@ -37,23 +37,23 @@ class ColorConfig:
 	"""优化的颜色配置管理"""
 
 	_COLOR_MAP: ClassVar[dict[str, str]] = {
-		"COMMENT": "\033[38;5;245m",
-		"ERROR": "\033[38;5;203m",
-		"MENU_ITEM": "\033[38;5;183m",
-		"MENU_TITLE": "\033[38;5;80m",
-		"PROMPT": "\033[38;5;75m",
-		"RESET": "\033[0m",
-		"STATUS": "\033[38;5;228m",
-		"SUCCESS": "\033[38;5;114m",
-		"INFO": "\033[38;5;39m",
-		"WARNING": "\033[38;5;214m",
+		"COMMENT": "\033 [38;5;245m",
+		"ERROR": "\033 [38;5;203m",
+		"MENU_ITEM": "\033 [38;5;183m",
+		"MENU_TITLE": "\033 [38;5;80m",
+		"PROMPT": "\033 [38;5;75m",
+		"RESET": "\033 [0m",
+		"STATUS": "\033 [38;5;228m",
+		"SUCCESS": "\033 [38;5;114m",
+		"INFO": "\033 [38;5;39m",
+		"WARNING": "\033 [38;5;214m",
 	}
 	_SEPARATOR: ClassVar[str] = f"{_COLOR_MAP['PROMPT']}══════════════════════════════════════════════════════════{_COLOR_MAP['RESET']}"
 
 	@classmethod
 	@lru_cache(maxsize=64)
 	def get_color(cls, color_name: str) -> str:
-		"""获取颜色代码,使用缓存提高性能"""
+		"""获取颜色代码, 使用缓存提高性能"""
 		return cls._COLOR_MAP.get(color_name, cls._COLOR_MAP["RESET"])
 
 	@classmethod
@@ -231,8 +231,8 @@ class DataConverter:
 
 	@staticmethod
 	def convert_cookie(cookie: dict[str, str]) -> str:
-		"""将字典格式cookie转换为字符串"""
-		return "; ".join(f"{k}={v}" for k, v in cookie.items())
+		"""将字典格式 cookie 转换为字符串"""
+		return ";".join(f"{k}={v}" for k, v in cookie.items())
 
 	@staticmethod
 	def to_serializable(data: object) -> dict[str, object]:
@@ -243,17 +243,17 @@ class DataConverter:
 			return asdict(data)
 		if hasattr(data, "__dict__"):
 			return vars(data)
-		msg = f"不支持的类型: {type(data).__name__}。支持类型: dict, 数据类实例,或包含__dict__属性的对象"
+		msg = f"不支持的类型: {type(data).__name__}。支持类型: dict, 数据类实例, 或包含__dict__属性的对象"
 		raise TypeError(msg)
 
 	@staticmethod
 	def bbcode_to_html(bbcode: str) -> str:
 		"""
-		将BBCode转换为HTML的简化版本
+		将 BBCode 转换为 HTML 的简化版本
 		Args:
-			bbcode: BBCode字符串
+			bbcode: BBCode 字符串
 		Returns:
-			HTML字符串
+			HTML 字符串
 		"""
 		if not bbcode or not bbcode.strip():
 			return ""
@@ -310,9 +310,9 @@ class DataConverter:
 			r'<img src="\1" alt="image" style="max-width:100%;height:auto;">',
 			result,
 		)
-		# 转义HTML
+		# 转义 HTML
 		result = html.escape(result)
-		# 还原HTML标签(避免被转义)
+		# 还原 HTML 标签 (避免被转义)
 		tag_replacements = {
 			"&lt;strong&gt;": "<strong>",
 			"&lt;/strong&gt;": "</strong>",
@@ -336,7 +336,7 @@ class DataConverter:
 			"&lt;a href=&quot;": '<a href="',
 			"&lt;/a&gt;": "</a>",
 			"&lt;img src=&quot;": '<img src="',
-			"&quot; alt=&quot;image&quot; style=&quot;max-width:100%;height:auto;&quot;&gt;": '" alt="image" style="max-width:100%;height:auto;">',
+			"&quot; alt=&quot;image&quot; style=&quot;max-width:100%;height:auto;&quot;&gt;": '"alt="image"style="max-width:100%;height:auto;">',
 		}
 		for old, new in tag_replacements.items():
 			result = result.replace(old, new)
@@ -344,7 +344,7 @@ class DataConverter:
 		lines = result.split("\n")
 		lines = [line.strip() for line in lines if line.strip()]
 		if lines:
-			# 检查是否已经有HTML块级元素
+			# 检查是否已经有 HTML 块级元素
 			has_block_elements = any(any(tag in line for tag in ["<div", "<img", "<a href", "<code>", "<pre>"]) for line in lines)
 			result = "\n".join(lines) if has_block_elements else "\n".join(f"<p>{line}</p>" for line in lines)
 		return result
@@ -359,14 +359,14 @@ class DataConverter:
 		unescape_entities: bool = True,
 		keep_line_breaks: bool = True,
 	) -> str:
-		"""将HTML转换为可配置的纯文本"""
+		"""将 HTML 转换为可配置的纯文本"""
 
 		def replace_img(match: re.Match) -> str:
 			src = next((g for g in match.groups()[1:] if g), "")
 			return img_format.format(src=unescape(src)) if src else img_format.format(src="")
 
-		# 处理段落和div块
-		blocks = re.findall(r"<(?:div|p)\b[^>]*>(.*?)</(?:div|p)>", html_content, flags=re.DOTALL | re.IGNORECASE)
+		# 处理段落和 div 块
+		blocks = re.findall(r"<(?:div|p)\b [^>]*>(.*?)</(?:div|p)>", html_content, flags=re.DOTALL | re.IGNORECASE)
 		if not blocks:
 			blocks = [html_content]
 		processed = []
@@ -374,18 +374,18 @@ class DataConverter:
 			# 图片处理
 			if replace_images:
 				block = re.sub(  # noqa: PLW2901
-					r'<img\b[^>]*?src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))[^>]*>',
+					r'<img\b [^>]*?src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))[^>]*>',
 					replace_img,
 					block,
 					flags=re.IGNORECASE,
 				)
-			# 移除span标签但保留内容
-			block = re.sub(r"<span[^>]*>|</span>", "", block)  # noqa: PLW2901
-			# 转换HTML实体
+			# 移除 span 标签但保留内容
+			block = re.sub(r"<span [^>]*>|</span>", "", block)  # noqa: PLW2901
+			# 转换 HTML 实体
 			if unescape_entities:
 				block = unescape(block)  # noqa: PLW2901
 				block = block.replace("&nbsp;", " ")  # noqa: PLW2901
-			# 移除其他HTML标签但保留内容
+			# 移除其他 HTML 标签但保留内容
 			text = re.sub(r"<[^>]+>", "", block)
 			# 处理换行
 			if not keep_line_breaks:
@@ -394,7 +394,7 @@ class DataConverter:
 		# 构建结果
 		result = "\n\n".join(processed)
 		if merge_empty_lines:
-			result = re.sub(r"\n{3,}", "\n\n", result)
+			result = re.sub(r"\n {3,}", "\n\n", result)
 		return result.strip()
 
 	@staticmethod
@@ -737,12 +737,12 @@ class EduDataGenerator:
 		class_names = []
 		for _ in range(num_classes):
 			grade = random.randint(grade_range[0], grade_range[1])
-			grade_str = f"{number_to_chinese(grade)}年级"
+			grade_str = f"{number_to_chinese(grade)} 年级"
 			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < LETTER_PROBABILITY else str(random.randint(1, 20))
 			specialty = ""
 			if add_specialty and random.random() < SPECIALTY_PROBABILITY:
 				specialty = random.choice(cls._SPECIALTIES)
-			class_name = f"{grade_str}{class_num}{specialty}班"
+			class_name = f"{grade_str}{class_num}{specialty} 班"
 			class_names.append(class_name)
 		return class_names
 
@@ -788,7 +788,7 @@ class Crypto:
 
 	@staticmethod
 	def sha256(data: str | bytes) -> str:
-		"""计算SHA256哈希"""
+		"""计算 SHA256 哈希"""
 		if isinstance(data, str):
 			data = data.encode()
 		return hashlib.sha256(data).hexdigest()
@@ -800,38 +800,38 @@ class Crypto:
 
 	@staticmethod
 	def base64_to_bytes(base64_str: str) -> bytes:
-		"""Base64解码"""
+		"""Base64 解码"""
 		try:
 			return base64.b64decode(base64_str)
 		except Exception as e:
-			msg = f"Base64解码错误: {e}"
+			msg = f"Base64 解码错误: {e}"
 			raise ValueError(msg) from e
 
 	def generate_aes_key(self) -> bytes:
-		"""生成AES密钥"""
+		"""生成 AES 密钥"""
 		digest = hashes.Hash(hashes.SHA256())
 		digest.update(self.default_salt)
 		return digest.finalize()
 
 	@staticmethod
 	def decrypt_aes_gcm(encrypted_data: bytes, key: bytes, iv: bytes) -> bytes:
-		"""AES-GCM解密"""
+		"""AES-GCM 解密"""
 		try:
 			aesgcm = AESGCM(key)
 			return aesgcm.decrypt(iv, encrypted_data, None)
 		except Exception as e:
-			msg = f"AES解密错误: {e}"
+			msg = f"AES 解密错误: {e}"
 			raise ValueError(msg) from e
 
 	def decrypt_bcmkn_data(self, encrypted_content: str) -> dict[str, Any]:
-		"""解密BCMKN数据"""
+		"""解密 BCMKN 数据"""
 		# 字符串反转
 		reversed_data = self.reverse_string(encrypted_content)
-		# Base64解码
+		# Base64 解码
 		decoded_data = self.base64_to_bytes(reversed_data)
-		# 分离IV和密文
+		# 分离 IV 和密文
 		if len(decoded_data) < MIN_DATA_LENGTH:
-			msg = "数据太短,无法分离IV和密文"
+			msg = "数据太短, 无法分离 IV 和密文"
 			raise ValueError(msg)
 		iv = decoded_data[:AES_IV_LENGTH]
 		ciphertext = decoded_data[AES_IV_LENGTH:]
@@ -842,7 +842,7 @@ class Crypto:
 
 	@staticmethod
 	def find_valid_json_end(text: str) -> int:
-		"""找到有效的JSON结束位置"""
+		"""找到有效的 JSON 结束位置"""
 		stack: list[str] = []
 		in_string = False
 		escape = False
@@ -880,7 +880,7 @@ class Crypto:
 		return len(text)
 
 	def clean_and_repair_json(self, raw_bytes: bytes) -> dict[str, Any]:
-		"""清理和修复JSON数据"""
+		"""清理和修复 JSON 数据"""
 		text_content = raw_bytes.decode("utf-8", errors="ignore")
 		valid_end = self.find_valid_json_end(text_content)
 		if valid_end < len(text_content):
@@ -892,12 +892,12 @@ class Crypto:
 			try:
 				return json.loads(repaired_content)
 			except json.JSONDecodeError as decode_error:
-				msg = "JSON解析失败,数据可能已损坏"
+				msg = "JSON 解析失败, 数据可能已损坏"
 				raise ValueError(msg) from decode_error
 
 	@staticmethod
 	def repair_json(text: str) -> str:
-		"""尝试修复JSON数据"""
+		"""尝试修复 JSON 数据"""
 		text = text.rstrip()
 		while text and text[-1] in ", \t\n\r":
 			text = text[:-1]
@@ -921,12 +921,12 @@ class Encrypt:
 	def encrypt(self, data: int | str | list[int | str]) -> str:
 		"""加密数据"""
 		if isinstance(data, int):
-			str_data = f"i{data}"
+			str_data = f"i {data}"
 		elif isinstance(data, str):
-			str_data = f"s{data}"
+			str_data = f"s {data}"
 		elif isinstance(data, list):
-			list_str = ",".join(f"i{item}" if isinstance(item, int) else f"s{item}" for item in data)
-			str_data = f"l{list_str}"
+			list_str = ",".join(f"i {item}" if isinstance(item, int) else f"s {item}" for item in data)
+			str_data = f"l {list_str}"
 		else:
 			msg = f"不支持的类型: {type(data)}"
 			raise TypeError(msg)
@@ -1018,8 +1018,8 @@ class Printer:
 	"""优化后的打印器类"""
 
 	def __init__(self) -> None:
-		self._input_prefix = "↳ "
-		self._input_suffix = ": "
+		self._input_prefix = "↳"
+		self._input_suffix = ":"
 		self._header_width = 60
 
 	@staticmethod
@@ -1041,7 +1041,7 @@ class Printer:
 		"""打印装饰头部"""
 		separator = ColorConfig.get_separator()
 		formatted_text = text.center(self._header_width)
-		print(f"\n{separator}")
+		print(f"\n {separator}")
 		print(self.color_text(formatted_text, "MENU_TITLE"))
 		print(f"{separator}\n")
 
@@ -1082,7 +1082,7 @@ class Printer:
 			try:
 				value_str = self.prompt_input(prompt).strip()
 				if not value_str:
-					self.print_message("输入不能为空,请重新输入", "WARNING")
+					self.print_message("输入不能为空, 请重新输入", "WARNING")
 					attempts += 1
 					continue
 				# 字符串类型的智能处理
@@ -1111,17 +1111,17 @@ class Printer:
 					continue
 			except ValueError as e:
 				type_name = cast_type.__name__
-				self.print_message(f"格式错误: 请输入{type_name}类型的值 ({e})", "ERROR")
+				self.print_message(f"格式错误: 请输入 {type_name} 类型的值 ({e})", "ERROR")
 				attempts += 1
 			except KeyboardInterrupt:
-				self.print_message("\n操作已取消", "INFO")
+				self.print_message("\n 操作已取消", "INFO")
 				raise
 			except Exception as e:
 				self.print_message(f"发生意外错误: {e!s}", "ERROR")
 				attempts += 1
 			else:
 				return value
-		msg = "输入尝试次数过多,程序退出"
+		msg = "输入尝试次数过多, 程序退出"
 		raise ValueError(msg)
 
 
@@ -1222,7 +1222,7 @@ class DisplayRenderer:
 			return ""
 		operation_display = ""
 		for shortcut in operations:
-			operation_display += f"{shortcut}{local_index} "
+			operation_display += f"{shortcut}{local_index}"
 		return operation_display.strip()
 
 	def _batch_format_values(self, item: Any, field_info: dict[str, Any]) -> dict[str, str]:
@@ -1246,7 +1246,7 @@ class DisplayRenderer:
 
 	@staticmethod
 	def _format_display_value(value: str, max_length: int = 18) -> str:
-		"""格式化显示值,处理长文本"""
+		"""格式化显示值, 处理长文本"""
 		if len(value) > max_length:
 			return value[: max_length - 3] + "..."
 		return value
@@ -1270,11 +1270,11 @@ class InputProcessor:
 		"""获取用户选择"""
 		valid_choices = self._build_valid_choices(current_page, total_pages, nav_config, current_page_item_count, operation_shortcuts)
 		options = self._build_options_display(current_page, total_pages, nav_config, custom_operations, operation_shortcuts)
-		self.printer.print_message(" | ".join(options), "INFO")
+		self.printer.print_message("|".join(options), "INFO")
 		try:
 			return self.printer.get_valid_input(prompt="请选择", valid_options=valid_choices, cast_type=str)
 		except (EOFError, KeyboardInterrupt):
-			self.printer.print_message("\n操作已取消", "INFO")
+			self.printer.print_message("\n 操作已取消", "INFO")
 			return nav_config["quit"]
 
 	@staticmethod
@@ -1311,13 +1311,13 @@ class InputProcessor:
 		options = []
 		# 导航选项
 		if current_page < total_pages:
-			options.append(f"{nav_config['next_page']}:下一页")
+			options.append(f"{nav_config['next_page']}: 下一页")
 		if current_page > 1:
-			options.append(f"{nav_config['previous_page']}:上一页")
-		options.append(f"{nav_config['quit']}:退出")
+			options.append(f"{nav_config['previous_page']}: 上一页")
+		options.append(f"{nav_config['quit']}: 退出")
 		# 操作选项
 		if custom_operations and operation_shortcuts:
-			op_descriptions = [f"{shortcut}数字:{op_name}" for shortcut, op_name in operation_shortcuts.items()]
+			op_descriptions = [f"{shortcut} 数字:{op_name}" for shortcut, op_name in operation_shortcuts.items()]
 			options.extend(op_descriptions)
 		return options
 
@@ -1440,7 +1440,7 @@ class GenericDataViewer:
 	) -> None:
 		"""执行操作"""
 		shortcut = choice[0]
-		item_num = int(choice[1:]) - 1  # 转换为0-based索引
+		item_num = int(choice[1:]) - 1  # 转换为 0-based 索引
 		if 0 <= item_num < len(current_page_items):
 			selected_item = current_page_items[item_num]
 			op_name = operation_shortcuts[shortcut]
@@ -1509,7 +1509,7 @@ class GenericDataViewer:
 			raise ValueError(msg)
 
 	def _validate_id_field(self, data_class: type[T], id_field: str) -> None:
-		"""验证ID字段"""
+		"""验证 ID 字段"""
 		try:
 			if is_dataclass(data_class):
 				field_names = [field.name for field in fields(data_class)]
@@ -1518,7 +1518,7 @@ class GenericDataViewer:
 			else:
 				self.printer.print_message("警告: 提供的类不是 dataclass", "WARNING")
 		except (TypeError, AttributeError):
-			self.printer.print_message(f"警告: 无法验证字段 '{id_field}',请确保是有效的 dataclass", "WARNING")
+			self.printer.print_message(f"警告: 无法验证字段 '{id_field}', 请确保是有效的 dataclass", "WARNING")
 
 	def _precompute_field_info(
 		self,
@@ -1558,7 +1558,7 @@ class GenericDataViewer:
 			return {}
 		shortcuts = {}
 		operations = list(custom_operations.keys())
-		# 使用可用的字母作为操作快捷键(避免与导航键冲突)
+		# 使用可用的字母作为操作快捷键 (避免与导航键冲突)
 		available_letters = [chr(i) for i in range(ord("a"), ord("z") + 1) if chr(i) not in existing_shortcuts]
 		for i, op_name in enumerate(operations):
 			shortcut = available_letters[i] if i < len(available_letters) else str(i - len(available_letters))

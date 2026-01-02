@@ -43,29 +43,29 @@ class AuthManager:
 		"""
 		整合登录方法
 		参数:
-			identity: 用户身份标识(手机号/邮箱/用户名)
+			identity: 用户身份标识 (手机号 / 邮箱 / 用户名)
 			password: 用户密码
-			token: 用户token
-			cookies: 用户cookies字符串
-			pid: 请求的PID,默认为"65edCTyg"
+			token: 用户 token
+			cookies: 用户 cookies 字符串
+			pid: 请求的 PID, 默认为 "65edCTyg"
 			status: 账号状态类型
-			role: 用户角色(user-普通用户, admin-管理员)
-			prefer_method: 优先使用的登录方式,auto为自动选择
-			注意:当role为admin时,prefer_method只能为"auto"、"token"或"password"
+			role: 用户角色 (user - 普通用户, admin - 管理员)
+			prefer_method: 优先使用的登录方式,auto 为自动选择
+			注意: 当 role 为 admin 时,prefer_method 只能为 "auto"、"token" 或 "password"
 		返回:
 			登录结果信息
 		"""
 		if role == "admin":
-			# 转换prefer_method类型为admin可接受的类型
+			# 转换 prefer_method 类型为 admin 可接受的类型
 			admin_prefer_method: Literal["auto", "token", "password"]
-			admin_prefer_method = cast("Literal['auto', 'token', 'password']", prefer_method) if prefer_method in {"auto", "token", "password"} else "auto"
+			admin_prefer_method = cast("Literal ['auto', 'token', 'password']", prefer_method) if prefer_method in {"auto", "token", "password"} else "auto"
 			return self._admin_login(identity, password, token, admin_prefer_method)
-		# 为用户登录转换prefer_method类型
+		# 为用户登录转换 prefer_method 类型
 		user_prefer_method: Literal["auto", "simple_password", "secure_password", "token", "cookies"]
 		if prefer_method in {"auto", "simple_password", "secure_password", "token", "cookies"}:
-			user_prefer_method = cast("Literal['auto', 'simple_password', 'secure_password', 'token', 'cookies']", prefer_method)
+			user_prefer_method = cast("Literal ['auto', 'simple_password', 'secure_password', 'token', 'cookies']", prefer_method)
 		else:
-			# 如果传入的是"password",转换为默认的"secure_password"
+			# 如果传入的是 "password", 转换为默认的 "secure_password"
 			user_prefer_method = "secure_password"
 		return self._user_login(identity, password, token, cookies, pid, status, user_prefer_method)
 
@@ -87,7 +87,7 @@ class AuthManager:
 			return self._execute_user_login(prefer_method, identity, password, token, cookies, pid, status)
 		except Exception as e:
 			print(f"用户登录失败: {e}")
-			# 如果首选方式失败,尝试备用方式
+			# 如果首选方式失败, 尝试备用方式
 			if prefer_method != "simple_password" and identity and password:
 				print("尝试使用简单密码登录作为备用方案...")
 				return self._authenticate_with_simple_password(identity, password, pid, status)
@@ -157,11 +157,11 @@ class AuthManager:
 		raise ValueError(msg)
 
 	def _login_with_token(self, token: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
-		"""使用现有token直接登录"""
+		"""使用现有 token 直接登录"""
 		if not token:
-			msg = "Token不能为空"
+			msg = "Token 不能为空"
 			raise ValueError(msg)
-		# 验证token有效性并获取完整认证信息
+		# 验证 token 有效性并获取完整认证信息
 		auth_details = self.fetch_auth_details(token)
 		self._client.switch_identity(token=token, identity=status)
 		return {
@@ -169,19 +169,19 @@ class AuthManager:
 			"method": "token",
 			"token": token,
 			"auth_details": auth_details,
-			"message": "Token登录成功",
+			"message": "Token 登录成功",
 		}
 
 	def _login_with_cookies(self, cookies: str, status: Literal["judgement", "average", "edu"]) -> dict[str, Any]:
-		"""使用cookies登录"""
+		"""使用 cookies 登录"""
 		if not cookies:
-			msg = "Cookies不能为空"
+			msg = "Cookies 不能为空"
 			raise ValueError(msg)
 		result = self._authenticate_with_cookies(cookies, status)
 		if result is False:
-			msg = "Cookie登录失败"
+			msg = "Cookie 登录失败"
 			raise ValueError(msg)
-		return {"success": True, "method": "cookies", "message": "Cookie登录成功"}
+		return {"success": True, "method": "cookies", "message": "Cookie 登录成功"}
 
 	def _authenticate_with_simple_password(
 		self,
@@ -241,11 +241,11 @@ class AuthManager:
 		cookies: str,
 		status: Literal["judgement", "average", "edu"] = "average",
 	) -> bool | None:
-		"""cookie登录实现"""
+		"""cookie 登录实现"""
 		try:
-			cookie_dict = dict([item.split("=", 1) for item in cookies.split("; ")])
+			cookie_dict = dict([item.split("=", 1) for item in cookies.split(";")])
 		except (KeyError, ValueError) as err:
-			print(f"Cookie格式错误: {err}")
+			print(f"Cookie 格式错误: {err}")
 			return False
 		self._client.send_request(
 			endpoint=self.setting.PARAMETER.cookie_check_url,
@@ -257,15 +257,15 @@ class AuthManager:
 		return None
 
 	def _handle_admin_token_login(self, token: str | None) -> dict[str, Any]:
-		"""处理管理员Token登录"""
+		"""处理管理员 Token 登录"""
 		if not token:
-			token = input("请输入 Authorization Token: ")
+			token = input("请输入 Authorization Token:")
 		self._client.switch_identity(token=token, identity="judgement")
 		return {
 			"success": True,
 			"method": "admin_token",
 			"token": token,
-			"message": "管理员Token登录成功",
+			"message": "管理员 Token 登录成功",
 		}
 
 	def _handle_admin_password_login(
@@ -276,7 +276,7 @@ class AuthManager:
 		"""
 		处理管理员账密登录
 		验证码原理:
-			1. 验证码根据"时间戳"和"序列位置"确定性算法生成
+			1. 验证码根据 "时间戳" 和 "序列位置" 确定性算法生成
 			2. 每个时间戳对应一个虚拟的验证码序列
 			3. 每个验证码成功验证后立即失效
 			4. 对同一时间戳的连续请求按顺序生成不同验证码
@@ -285,19 +285,19 @@ class AuthManager:
 
 		def input_account() -> tuple[str, str]:
 			"""获取用户名和密码"""
-			username_input = username or input("请输入用户名: ")
-			password_input = password or input("请输入密码: ")
+			username_input = username or input("请输入用户名:")
+			password_input = password or input("请输入密码:")
 			return username_input, password_input
 
 		def input_captcha(timestamp: int) -> tuple[str, Any]:
-			"""获取验证码和Cookie"""
+			"""获取验证码和 Cookie"""
 			print("正在获取验证码...")
 			cookies = self.fetch_admin_captcha(timestamp=timestamp)
-			captcha = input("请输入验证码: ")
+			captcha = input("请输入验证码:")
 			return captcha, cookies
 
 		# 登录循环
-		timestamp = self.tool.TimeUtils().current_timestamp(13)  # 13位时间戳
+		timestamp = self.tool.TimeUtils().current_timestamp(13)  # 13 位时间戳
 		username_input, password_input = input_account()
 		while True:
 			captcha, _ = input_captcha(timestamp=timestamp)
@@ -319,8 +319,8 @@ class AuthManager:
 				}
 			# 登录失败处理
 			if "error_code" in response:
-				print(f"登录失败: {response.get('error_msg', '未知错误')}")
-				# 密码错误/参数无效:重新输入账号
+				print(f"登录失败: {response.get('error_msg', ' 未知错误 ')}")
+				# 密码错误 / 参数无效: 重新输入账号
 				if response["error_code"] in {"Admin-Password-Error@Community-Admin", "Param - Invalid @ Common"}:
 					username_input, password_input = input_account()
 				# 重新获取验证码和时间戳
@@ -352,7 +352,7 @@ class AuthManager:
 			)
 			print(f"验证码已保存至: {self._captcha_img_path}")
 		else:
-			print(f"获取验证码失败,错误代码: {response.status_code}")
+			print(f"获取验证码失败, 错误代码: {response.status_code}")
 		return response.cookies
 
 	def fetch_auth_details(self, token: str) -> dict[str, Any]:
@@ -394,7 +394,7 @@ class AuthManager:
 		return response.json()
 
 	def configure_authentication_token(self, token: str, identity: str = "judgement") -> None:
-		"""配置认证Token"""
+		"""配置认证 Token"""
 		self._client.switch_identity(token=token, identity=identity)
 
 	def restore_admin_account(self) -> None:
@@ -475,7 +475,7 @@ class Authenticator:
 
 	@staticmethod
 	def _generate_client_id(length: int = 8) -> str:
-		"""生成客户端ID"""
+		"""生成客户端 ID"""
 		chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 		return "".join(chars[randint(0, 35)] for _ in range(length))
 

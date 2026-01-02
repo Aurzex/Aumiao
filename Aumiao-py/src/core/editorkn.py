@@ -30,7 +30,7 @@ class TypeChecker:
 		if color_str.startswith("#"):
 			hex_part = color_str[1:]
 			return len(hex_part) in {3, 4, 6, 8} and all(c in "0123456789ABCDEFabcdef" for c in hex_part)
-		if color_str.startswith("rgba("):
+		if color_str.startswith("rgba ("):
 			match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
@@ -45,7 +45,7 @@ class TypeChecker:
 					)
 				except (ValueError, TypeError):
 					return False
-		if color_str.startswith("rgb("):
+		if color_str.startswith("rgb ("):
 			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
@@ -82,7 +82,7 @@ class TypeChecker:
 
 	@staticmethod
 	def is_valid_uuid(value: str) -> bool:
-		"""检查是否为有效UUID"""
+		"""检查是否为有效 UUID"""
 		try:
 			uuid.UUID(value)
 		except (ValueError, TypeError, AttributeError):
@@ -92,7 +92,7 @@ class TypeChecker:
 
 	@staticmethod
 	def is_valid_xml_string(xml_str: str) -> bool:
-		"""检查是否为有效XML字符串"""
+		"""检查是否为有效 XML 字符串"""
 		try:
 			ET.fromstring(xml_str)
 		except ET.ParseError:
@@ -102,7 +102,7 @@ class TypeChecker:
 
 
 class JSONConverter:
-	"""JSON转换工具(类型安全)"""
+	"""JSON 转换工具 (类型安全)"""
 
 	@staticmethod
 	def ensure_dict(obj: Any, default: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -162,7 +162,7 @@ class JSONConverter:
 
 	@staticmethod
 	def ensure_uuid(obj: Any, default: str = "") -> str:
-		"""确保对象是有效UUID"""
+		"""确保对象是有效 UUID"""
 		if isinstance(obj, str) and TypeChecker.is_valid_uuid(obj):
 			return obj
 		return default or str(uuid.uuid4())
@@ -195,7 +195,7 @@ class ConstraintManager:
 			try:
 				num_value = float(value)
 				if num_value < constraint["min"]:
-					return False, f"值不能小于{constraint['min']}"
+					return False, f"值不能小于 {constraint['min']}"
 			except (ValueError, TypeError):
 				if not constraint.get("allow_text"):
 					return False, "请输入数字"
@@ -203,7 +203,7 @@ class ConstraintManager:
 			try:
 				num_value = float(value)
 				if num_value > constraint["max"]:
-					return False, f"值不能大于{constraint['max']}"
+					return False, f"值不能大于 {constraint['max']}"
 			except (ValueError, TypeError):
 				if not constraint.get("allow_text"):
 					return False, "请输入数字"
@@ -213,7 +213,7 @@ class ConstraintManager:
 				if constraint["step"] > 0:
 					remainder = (num_value - (constraint.get("min", 0))) % constraint["step"]
 					if remainder > 0.0001:  # 浮点数精度容差
-						return False, f"值必须是{constraint['step']}的倍数"
+						return False, f"值必须是 {constraint['step']} 的倍数"
 			except (ValueError, TypeError):
 				if not constraint.get("allow_text"):
 					return False, "请输入数字"
@@ -232,21 +232,21 @@ class ConstraintManager:
 
 
 class XMLParser:
-	"""XML解析器 - 根据文档实现完整的XML解析逻辑"""
+	"""XML 解析器 - 根据文档实现完整的 XML 解析逻辑"""
 
 	@staticmethod
 	def parse_xml(xml_string: str) -> dict[str, Any]:
-		"""解析XML字符串为积木对象"""
+		"""解析 XML 字符串为积木对象"""
 		try:
 			root = ET.fromstring(xml_string)
 		except ET.ParseError as e:
-			msg = f"XML解析错误: {e}"
+			msg = f"XML 解析错误: {e}"
 			raise ValueError(msg)  # noqa: B904
 		return XMLParser._parse_element(root)
 
 	@staticmethod
 	def _parse_element(element: ET.Element) -> dict[str, Any]:  # noqa: PLR0915
-		"""解析XML元素"""
+		"""解析 XML 元素"""
 		# 解析属性
 		result: dict[str, Any] = dict(element.attrib.items())
 		# 设置积木类型
@@ -273,7 +273,7 @@ class XMLParser:
 		mutation_elem = element.find("mutation")
 		if mutation_elem is not None:
 			result["mutation"] = ET.tostring(mutation_elem, encoding="unicode")
-			# 特殊处理PROCEDURE积木
+			# 特殊处理 PROCEDURE 积木
 			if result.get("type", "").startswith("procedures"):
 				XMLParser._parse_procedure_mutation(mutation_elem, result)
 		# 解析输入项和语句
@@ -298,7 +298,7 @@ class XMLParser:
 						inputs[name] = block_data
 					else:
 						statements[name] = block_data
-				# 如果是语句但没有内容,添加空语句
+				# 如果是语句但没有内容, 添加空语句
 				if child.tag == "statement" and name not in statements:
 					statements[name] = {"type": "input_statement"}
 		if inputs:
@@ -307,7 +307,7 @@ class XMLParser:
 			result["statements"] = statements
 		if shadows:
 			result["shadows"] = shadows
-		# 解析next
+		# 解析 next
 		next_elem = element.find("next")
 		if next_elem is not None:
 			block_elem = next_elem.find("block")
@@ -317,7 +317,7 @@ class XMLParser:
 
 	@staticmethod
 	def _parse_procedure_mutation(mutation_elem: ET.Element, result: dict[str, Any]) -> None:
-		"""解析PROCEDURE积木的mutation"""
+		"""解析 PROCEDURE 积木的 mutation"""
 		# 解析参数
 		args = []
 		for arg_elem in mutation_elem.findall("arg"):
@@ -330,7 +330,7 @@ class XMLParser:
 			param_shadows.append(shadow_info)
 		result["args"] = args
 		result["param_shadows"] = param_shadows
-		# 如果是函数调用,保存关联信息
+		# 如果是函数调用, 保存关联信息
 		if "def_id" in mutation_elem.attrib:
 			result["def_id"] = mutation_elem.get("def_id")
 		if "name" in mutation_elem.attrib:
@@ -338,7 +338,7 @@ class XMLParser:
 
 	@staticmethod
 	def to_xml(block_data: dict[str, Any]) -> str:
-		"""将积木数据转换为XML字符串"""
+		"""将积木数据转换为 XML 字符串"""
 		root_tag = "shadow" if block_data.get("is_shadow") else "block"
 		root = ET.Element(root_tag)
 		# 添加属性
@@ -355,7 +355,7 @@ class XMLParser:
 			constraints = block_data.get("field_constraints", {}).get(field_name)
 			if constraints:
 				field_elem.set("constraints", constraints)
-		# 添加mutation
+		# 添加 mutation
 		mutation = block_data.get("mutation")
 		if mutation and TypeChecker.is_valid_xml_string(mutation):
 			try:
@@ -385,12 +385,12 @@ class XMLParser:
 				try:
 					shadow_elem = ET.fromstring(shadow_xml)
 					shadow_elem.set("name", shadow_name)
-					# 找到对应的value或statement元素
+					# 找到对应的 value 或 statement 元素
 					for elem in root.findall(f".//*[@name='{shadow_name}']"):
 						elem.append(shadow_elem)
 				except ET.ParseError:
 					pass
-		# 添加next
+		# 添加 next
 		next_data = block_data.get("next")
 		if next_data and isinstance(next_data, dict):
 			next_elem = ET.SubElement(root, "next")
@@ -400,7 +400,7 @@ class XMLParser:
 
 	@staticmethod
 	def _dict_to_element(data: dict[str, Any]) -> ET.Element:
-		"""将字典转换为XML元素"""
+		"""将字典转换为 XML 元素"""
 		element = ET.Element("block")
 		if "type" in data:
 			element.set("type", data["type"])
@@ -425,7 +425,7 @@ class XMLParser:
 
 
 # ============================================================================
-# Repository模式实现 - 增强版
+# Repository 模式实现 - 增强版
 # ============================================================================
 class BlockRepository:
 	"""增强版积木仓库"""
@@ -484,7 +484,7 @@ class BlockRepository:
 		return True
 
 	def get_by_id(self, block_id: str) -> Block | None:
-		"""根据ID获取积木"""
+		"""根据 ID 获取积木"""
 		return self._blocks_by_id.get(block_id)
 
 	def get_by_type(self, block_type: str) -> list[Block]:
@@ -492,7 +492,7 @@ class BlockRepository:
 		return self._blocks_by_type.get(block_type, []).copy()
 
 	def get_by_parent(self, parent_id: str) -> list[Block]:
-		"""根据父级ID获取积木"""
+		"""根据父级 ID 获取积木"""
 		return self._blocks_by_parent.get(parent_id, []).copy()
 
 	def get_by_category(self, category: BlockCategory) -> list[Block]:
@@ -535,15 +535,15 @@ class BlockRepository:
 			block = self.get_by_id(current_id)
 			if block:
 				result.append(block)
-				# 查找通过inputs连接的积木
+				# 查找通过 inputs 连接的积木
 				for input_data in block.inputs.values():
 					if isinstance(input_data, dict) and "id" in input_data:
 						queue.append(input_data["id"])
-				# 查找通过statements连接的积木
+				# 查找通过 statements 连接的积木
 				for stmt_data in block.statements.values():
 					if isinstance(stmt_data, dict) and "id" in stmt_data:
 						queue.append(stmt_data["id"])
-				# 查找通过next连接的积木
+				# 查找通过 next 连接的积木
 				if block.next and isinstance(block.next, dict) and "id" in block.next:
 					queue.append(block.next["id"])
 		return result
@@ -576,7 +576,7 @@ class BlockRepository:
 
 
 # ============================================================================
-# Builder模式实现 - 增强版
+# Builder 模式实现 - 增强版
 # ============================================================================
 class BlockBuilder:
 	"""增强版积木构建器"""
@@ -586,7 +586,7 @@ class BlockBuilder:
 		self._config = BLOCK_CONFIG.get(BlockType(block_type), {})
 
 	def with_id(self, block_id: str) -> BlockBuilder:
-		"""设置积木ID"""
+		"""设置积木 ID"""
 		self._block.id = JSONConverter.ensure_uuid(block_id)
 		return self
 
@@ -623,7 +623,7 @@ class BlockBuilder:
 		return self
 
 	def with_input_builder(self, name: str, builder: BlockBuilder) -> BlockBuilder:
-		"""使用Builder添加输入"""
+		"""使用 Builder 添加输入"""
 		block = builder.build()
 		self._block.inputs[name] = block.to_dict()
 		return self
@@ -636,7 +636,7 @@ class BlockBuilder:
 			if isinstance(shadow_value, ShadowXML):
 				shadow_xml = shadow_value.xml_string
 			else:
-				# 创建简单的影子积木XML
+				# 创建简单的影子积木 XML
 				shadow_root = ET.Element("shadow")
 				shadow_root.set("type", shadow_type)
 				if shadow_type == "math_number":
@@ -658,12 +658,12 @@ class BlockBuilder:
 		return self
 
 	def with_parent(self, parent_id: str) -> BlockBuilder:
-		"""设置父级ID"""
+		"""设置父级 ID"""
 		self._block.parent_id = parent_id
 		return self
 
 	def with_mutation(self, mutation: str) -> BlockBuilder:
-		"""设置mutation"""
+		"""设置 mutation"""
 		self._block.mutation = mutation
 		return self
 
@@ -773,7 +773,7 @@ class BlockBuilder:
 	def create_if_block(cls, condition: Block, then_block: Block, else_block: Block | None = None, **kwargs: Any) -> Block:
 		"""创建条件判断积木"""
 		builder = cls(BlockType.CONTROLS_IF_ELSE.value)
-		# 直接使用Block对象,而不是尝试转换为BlockBuilder
+		# 直接使用 Block 对象, 而不是尝试转换为 BlockBuilder
 		if isinstance(condition, Block):
 			builder.with_input("IF0", condition.type, condition.fields.get("TEXT", ""))
 		if isinstance(then_block, Block):
@@ -799,12 +799,12 @@ class BlockBuilder:
 		if isinstance(left_value, (int, float, str)):
 			builder.with_input("A", BlockType.MATH_NUMBER.value, str(left_value))
 		elif isinstance(left_value, Block):
-			# 将Block对象转换为BlockBuilder
+			# 将 Block 对象转换为 BlockBuilder
 			builder.with_input_builder("A", cls.from_block(left_value))
 		if isinstance(right_value, (int, float, str)):
 			builder.with_input("B", BlockType.MATH_NUMBER.value, str(right_value))
 		elif isinstance(right_value, Block):
-			# 将Block对象转换为BlockBuilder
+			# 将 Block 对象转换为 BlockBuilder
 			builder.with_input_builder("B", cls.from_block(right_value))
 		for key, value in kwargs.items():
 			if key == "location":
@@ -842,7 +842,7 @@ class BlockBuilder:
 
 	@classmethod
 	def from_block(cls, block: Block) -> BlockBuilder:
-		"""从现有积木创建Builder"""
+		"""从现有积木创建 Builder"""
 		builder = cls(block.type)
 		builder._block = block
 		return builder
@@ -852,13 +852,13 @@ class BlockBuilder:
 		"""创建函数定义积木"""
 		builder = cls(BlockType.PROCEDURES_DEFNORETURN.value)
 		builder.with_field("NAME", name)
-		# 创建mutation XML
+		# 创建 mutation XML
 		mutation_root = ET.Element("mutation")
 		mutation_root.set("xmlns", "http://www.w3.org/1999/xhtml")
 		for i, param in enumerate(params):
 			arg_elem = ET.SubElement(mutation_root, "arg")
-			arg_elem.set("id", f"param{i}")
-			arg_elem.set("name", param.get("name", f"参数{i + 1}"))
+			arg_elem.set("id", f"param {i}")
+			arg_elem.set("name", param.get("name", f"参数 {i + 1}"))
 			arg_elem.set("type", param.get("type", "Number"))
 		mutation_xml = ET.tostring(mutation_root, encoding="unicode")
 		builder.with_mutation(mutation_xml)
@@ -869,7 +869,7 @@ class BlockBuilder:
 		"""创建函数调用积木"""
 		builder = cls(BlockType.PROCEDURES_CALLNORETURN.value)
 		builder.with_field("NAME", name)
-		# 创建mutation XML
+		# 创建 mutation XML
 		mutation_root = ET.Element("mutation")
 		mutation_root.set("name", name)
 		mutation_root.set("def_id", def_id)
@@ -887,7 +887,7 @@ class BlockBuilder:
 # ============================================================================
 @dataclass
 class Color:
-	"""颜色类(增强版)"""
+	"""颜色类 (增强版)"""
 
 	r: int = 0
 	g: int = 0
@@ -933,7 +933,7 @@ class Color:
 				self.b = int(hex_str[4:6], 16)
 				self.a = int(hex_str[6:8], 16) / 255.0
 				return True
-		elif color_str.startswith("rgba("):
+		elif color_str.startswith("rgba ("):
 			match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
@@ -945,7 +945,7 @@ class Color:
 					return False
 				else:
 					return True
-		elif color_str.startswith("rgb("):
+		elif color_str.startswith("rgb ("):
 			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
@@ -964,13 +964,13 @@ class Color:
 		if formats == ColorFormat.COLOR_STRING:
 			return self.to_hex()
 		if formats == ColorFormat.RGBA:
-			return f"rgba({self.r},{self.g},{self.b},{self.a})"
+			return f"rgba ({self.r},{self.g},{self.b},{self.a})"
 		if formats == ColorFormat.COLOR_PALETTE:
 			return f"#{self.r:02x}{self.g:02x}{self.b:02x}"
-		return f"rgba({self.r},{self.g},{self.b},{self.a})"
+		return f"rgba ({self.r},{self.g},{self.b},{self.a})"
 
 	def to_hex(self, *, include_alpha: bool = False) -> str:
-		"""转换为HEX格式"""
+		"""转换为 HEX 格式"""
 		if include_alpha:
 			alpha = int(self.a * 255)
 			return f"#{self.r:02x}{self.g:02x}{self.b:02x}{alpha:02x}"
@@ -1002,12 +1002,12 @@ class Color:
 		return color
 
 	def __repr__(self) -> str:
-		return f"Color(r={self.r}, g={self.g}, b={self.b}, a={self.a})"
+		return f"Color (r={self.r}, g={self.g}, b={self.b}, a={self.a})"
 
 
 @dataclass
 class ConnectionJson:
-	"""连接JSON结构"""
+	"""连接 JSON 结构"""
 
 	type: str
 	input_type: str | None = None
@@ -1034,7 +1034,7 @@ class ConnectionJson:
 
 @dataclass
 class CommentJson:
-	"""注释JSON结构"""
+	"""注释 JSON 结构"""
 
 	id: str
 	text: str = ""
@@ -1084,11 +1084,11 @@ class CommentJson:
 
 
 # ============================================================================
-# 影子积木XML解析器
+# 影子积木 XML 解析器
 # ============================================================================
 @dataclass
 class ShadowXML:
-	"""影子积木XML解析器"""
+	"""影子积木 XML 解析器"""
 
 	xml_string: str
 	type: str = ""
@@ -1101,7 +1101,7 @@ class ShadowXML:
 
 	@classmethod
 	def from_xml(cls, xml_str: str) -> ShadowXML:
-		"""从XML字符串创建影子积木"""
+		"""从 XML 字符串创建影子积木"""
 		if not xml_str or not xml_str.strip():
 			return cls("", "", "", True, False, {})  # noqa: FBT003
 		try:
@@ -1219,11 +1219,11 @@ class ShadowManager:
 
 
 # ============================================================================
-# KN积木块系统(匹配实际JSON结构)
+# KN 积木块系统 (匹配实际 JSON 结构)
 # ============================================================================
 @dataclass
 class Block:
-	"""KN积木结构 - 匹配实际JSON数据结构"""
+	"""KN 积木结构 - 匹配实际 JSON 数据结构"""
 
 	# 基础标识属性
 	id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -1243,19 +1243,19 @@ class Block:
 	# 功能属性
 	is_output: bool = False
 	mutation: str = ""
-	shadows: dict[str, str] = field(default_factory=dict)  # XML字符串
+	shadows: dict[str, str] = field(default_factory=dict)  # XML 字符串
 	fields: dict[str, Any] = field(default_factory=dict)
 	field_constraints: dict[str, Any] = field(default_factory=dict)
 	field_extra_attr: dict[str, Any] = field(default_factory=dict)
 	# 连接关系
 	inputs: dict[str, dict] = field(default_factory=dict)
 	next: dict | None = None
-	# 内部字段(不输出到JSON)
+	# 内部字段 (不输出到 JSON)
 	statements: dict[str, dict] = field(default_factory=dict)
 	shield: bool = False
 	shadow_manager: ShadowManager | None = field(default_factory=lambda: None)
 	_parsed_shadows: dict[str, ShadowXML] = field(default_factory=dict)
-	# PROCEDURE特定字段
+	# PROCEDURE 特定字段
 	def_id: str | None = None
 	procedure_name: str | None = None
 	args: list[dict[str, Any]] = field(default_factory=list)
@@ -1272,7 +1272,7 @@ class Block:
 				self.field_extra_attr["color"] = config["color"]
 			if "style" in config and "style" not in self.field_extra_attr:
 				self.field_extra_attr["style"] = config["style"]
-		# 如果是影子积木,设置不可删除
+		# 如果是影子积木, 设置不可删除
 		if self.is_shadow:
 			self.deletable = False
 
@@ -1301,26 +1301,26 @@ class Block:
 		return blocks
 
 	def find_block(self, block_id: str) -> Block | None:
-		"""查找指定ID的块"""
+		"""查找指定 ID 的块"""
 		for block in self.get_all_blocks():
 			if block.id == block_id:
 				return block
 		return None
 
-	# 修复 to_xml 方法,确保它调用 XMLParser.to_xml
+	# 修复 to_xml 方法, 确保它调用 XMLParser.to_xml
 	def to_xml(self) -> str:
-		"""转换为XML字符串"""
+		"""转换为 XML 字符串"""
 		return XMLParser.to_xml(self.to_dict())
 
-	# 修复 from_xml 方法,确保它调用 XMLParser.parse_xml
+	# 修复 from_xml 方法, 确保它调用 XMLParser.parse_xml
 	@classmethod
 	def from_xml(cls, xml_str: str) -> Block:
-		"""从XML字符串创建积木块"""
+		"""从 XML 字符串创建积木块"""
 		try:
 			block_data = XMLParser.parse_xml(xml_str)
 			return cls.from_dict(block_data)
 		except Exception as e:
-			msg = f"XML解析错误: {e}"
+			msg = f"XML 解析错误: {e}"
 			raise ValueError(msg)  # noqa: B904
 
 	# 在 to_dict 方法中添加 shield 字段
@@ -1356,7 +1356,7 @@ class Block:
 			result["next"] = self.next
 		if self.statements:
 			result["statements"] = self.statements.copy()
-		# PROCEDURE特定字段
+		# PROCEDURE 特定字段
 		if self.def_id is not None:
 			result["def_id"] = self.def_id
 		if self.procedure_name is not None:
@@ -1372,7 +1372,7 @@ class Block:
 	def from_dict(cls, data: dict[str, Any]) -> Block:
 		"""从字典创建块"""
 		block_type = JSONConverter.ensure_str(data.get("type"))
-		# 检查是否为PROCEDURE类积木
+		# 检查是否为 PROCEDURE 类积木
 		if block_type.startswith("procedures_"):
 			return cls._create_procedure_block(data, block_type)
 		# 创建普通积木
@@ -1405,7 +1405,7 @@ class Block:
 		statements_data = data.get("statements", {})
 		if isinstance(statements_data, dict):
 			block.statements.update(statements_data)
-		# 处理next
+		# 处理 next
 		next_data = data.get("next")
 		if isinstance(next_data, dict):
 			block.next = next_data
@@ -1413,13 +1413,13 @@ class Block:
 
 	@classmethod
 	def _create_procedure_block(cls, data: dict[str, Any], block_type: str) -> Block:
-		"""创建PROCEDURE类积木"""
+		"""创建 PROCEDURE 类积木"""
 		block = cls.from_dict(data)  # 先创建基础积木
-		# 解析mutation中的参数信息
+		# 解析 mutation 中的参数信息
 		mutation = data.get("mutation", "")
 		if mutation:
 			block.parse_procedure_mutation(mutation)
-		# 设置PROCEDURE特定字段
+		# 设置 PROCEDURE 特定字段
 		if "def_id" in data:
 			block.def_id = data["def_id"]
 		if "procedure_name" in data:
@@ -1450,7 +1450,7 @@ class Block:
 		return block
 
 	def parse_procedure_mutation(self, mutation_xml: str) -> None:
-		"""解析PROCEDURE积木的mutation"""
+		"""解析 PROCEDURE 积木的 mutation"""
 		if not mutation_xml:
 			return
 		try:
@@ -1465,7 +1465,7 @@ class Block:
 			for shadow_elem in root.findall("procedures_2_parameter_shadow"):
 				shadow_info = {"name": shadow_elem.get("name", ""), "value": shadow_elem.get("value", "")}
 				self.param_shadows.append(shadow_info)
-			# 如果是函数调用,保存关联信息
+			# 如果是函数调用, 保存关联信息
 			def_id = root.get("def_id")
 			if def_id:
 				self.def_id = def_id
@@ -1479,27 +1479,27 @@ class Block:
 		"""为函数定义生成参数输入项"""
 		if not self.args:
 			return
-		# 清空现有输入项(除了STACK)
+		# 清空现有输入项 (除了 STACK)
 		new_inputs = {}
 		if "STACK" in self.inputs:
 			new_inputs["STACK"] = self.inputs["STACK"]
 		# 为每个参数生成输入项
 		for i, arg in enumerate(self.args):
-			input_name = f"PARAMS{i}"
-			new_inputs[input_name] = {"type": "input_value", "check": [arg.get("type", "String")], "name": arg.get("name", f"参数{i + 1}")}
+			input_name = f"PARAMS {i}"
+			new_inputs[input_name] = {"type": "input_value", "check": [arg.get("type", "String")], "name": arg.get("name", f"参数 {i + 1}")}
 		self.inputs = new_inputs
 
 	def generate_arg_inputs(self) -> None:
 		"""为函数调用生成参数输入项"""
 		if not self.args:
 			return
-		# 清空现有输入项(除了NAME)
+		# 清空现有输入项 (除了 NAME)
 		new_inputs = {}
 		if "NAME" in self.inputs:
 			new_inputs["NAME"] = self.inputs["NAME"]
 		# 为每个参数生成输入项
 		for i, arg in enumerate(self.args):
-			input_name = f"ARG{i}"
+			input_name = f"ARG {i}"
 			arg_type = arg.get("type", "String")
 			# 创建输入项配置
 			input_config: dict = {"type": "input_value", "check": [arg_type]}
@@ -1521,7 +1521,7 @@ class Block:
 		self.inputs = new_inputs
 
 	def parse_shadows(self) -> dict[str, ShadowXML]:
-		"""解析影子积木XML"""
+		"""解析影子积木 XML"""
 		if not self._parsed_shadows:
 			self._parsed_shadows = {}
 			for key, xml_str in self.shadows.items():
@@ -1570,11 +1570,11 @@ class Block:
 
 
 # ============================================================================
-# 自定义函数/过程类
+# 自定义函数 / 过程类
 # ============================================================================
 @dataclass
 class Procedure:
-	"""自定义函数/过程类"""
+	"""自定义函数 / 过程类"""
 
 	id: str
 	name: str
@@ -1634,7 +1634,7 @@ class Procedure:
 # ============================================================================
 @dataclass
 class ShadowBlock:
-	"""影子积木(完整版)"""
+	"""影子积木 (完整版)"""
 
 	id: str = field(default_factory=lambda: str(uuid.uuid4()))
 	type: str = ""
@@ -1754,10 +1754,10 @@ class ShadowBlock:
 
 
 # ============================================================================
-# KN项目解析器(恢复旧版功能)
+# KN 项目解析器 (恢复旧版功能)
 # ============================================================================
 class KNProjectParser:
-	"""KN项目解析器"""
+	"""KN 项目解析器"""
 
 	@staticmethod
 	def parse_nested_structure(data: dict, all_blocks_flat: dict[str, dict], parent_id: str | None = None) -> None:
@@ -1768,26 +1768,26 @@ class KNProjectParser:
 		# 保存原始数据
 		if block_id not in all_blocks_flat:
 			all_blocks_flat[block_id] = data
-		# 设置parent_id
+		# 设置 parent_id
 		data["parent_id"] = parent_id
-		# 递归处理inputs
+		# 递归处理 inputs
 		inputs = data.get("inputs", {})
 		for input_data in inputs.values():
 			if isinstance(input_data, dict):
 				KNProjectParser.parse_nested_structure(input_data, all_blocks_flat, block_id)
-		# 递归处理statements
+		# 递归处理 statements
 		statements = data.get("statements", {})
 		for stmt_data in statements.values():
 			if isinstance(stmt_data, dict):
 				KNProjectParser.parse_nested_structure(stmt_data, all_blocks_flat, block_id)
-		# 递归处理next
+		# 递归处理 next
 		next_data = data.get("next")
 		if isinstance(next_data, dict):
 			KNProjectParser.parse_nested_structure(next_data, all_blocks_flat, block_id)
 
 	@staticmethod
 	def build_blocks_from_flat(all_blocks_flat: dict[str, dict]) -> dict[str, Block]:
-		"""从平面数据构建Block对象"""
+		"""从平面数据构建 Block 对象"""
 		blocks = {}
 		for block_id, block_data in all_blocks_flat.items():
 			blocks[block_id] = Block.from_dict(block_data)
@@ -1795,7 +1795,7 @@ class KNProjectParser:
 
 	@staticmethod
 	def parse_project_structure(data: dict) -> dict[str, Any]:
-		"""解析项目结构,提取所有积木"""
+		"""解析项目结构, 提取所有积木"""
 		all_blocks_flat: dict[str, dict] = {}
 		# 解析场景积木
 		scenes_data = JSONConverter.ensure_dict(data.get("scenes", {}))
@@ -1821,7 +1821,7 @@ class KNProjectParser:
 # ============================================================================
 @dataclass
 class Actor:
-	"""角色(增强版)"""
+	"""角色 (增强版)"""
 
 	id: str
 	name: str
@@ -1905,7 +1905,7 @@ class Actor:
 
 @dataclass
 class Scene:
-	"""场景(增强版)"""
+	"""场景 (增强版)"""
 
 	id: str
 	name: str
@@ -2057,10 +2057,10 @@ class WorkspaceData:
 
 
 # ============================================================================
-# KN项目主类 - 完整版
+# KN 项目主类 - 完整版
 # ============================================================================
 class KNProject:
-	"""KN项目(完整重构版)"""
+	"""KN 项目 (完整重构版)"""
 
 	def __init__(self, project_name: str = "未命名项目") -> None:
 		self.project_name: str = project_name
@@ -2090,7 +2090,7 @@ class KNProject:
 
 	@classmethod
 	def load_from_dict(cls, data: dict[str, Any]) -> KNProject:
-		"""从JSON字典加载项目 - 完整版"""
+		"""从 JSON 字典加载项目 - 完整版"""
 		project = cls(JSONConverter.ensure_str(data.get("projectName", "未命名项目")))
 		# 基础信息
 		project.version = JSONConverter.ensure_str(data.get("version", DEFAULT_PROJECT_CONFIG["version"]))
@@ -2188,20 +2188,20 @@ class KNProject:
 		procedures_dict = JSONConverter.ensure_dict(procedures_data.get("proceduresDict", {}))
 		for proc_id, proc_data in procedures_dict.items():
 			if isinstance(proc_data, dict):
-				# 尝试创建 Procedure 对象,如果数据有效
+				# 尝试创建 Procedure 对象, 如果数据有效
 				try:
 					if "name" in proc_data and "params" in proc_data:
 						# 创建 Procedure 对象
 						procedure = Procedure.from_dict(proc_data)
 						project.procedures[proc_id] = procedure
 					else:
-						# 如果数据不符合 Procedure 结构,则存储为字典
+						# 如果数据不符合 Procedure 结构, 则存储为字典
 						project.procedures[proc_id] = proc_data
 				except Exception:
-					# 如果创建失败,存储为原始字典
+					# 如果创建失败, 存储为原始字典
 					project.procedures[proc_id] = proc_data
 			else:
-				# 如果数据类型不是字典,直接存储
+				# 如果数据类型不是字典, 直接存储
 				project.procedures[proc_id] = proc_data
 		return project
 
@@ -2238,7 +2238,7 @@ class KNProject:
 		print(f"项目已保存: {filepath}")
 
 	def to_dict(self) -> dict[str, Any]:
-		"""转换为完整项目JSON"""
+		"""转换为完整项目 JSON"""
 		project_dict: dict[str, Any] = {
 			"projectName": self.project_name,
 			"version": self.version,
@@ -2268,9 +2268,9 @@ class KNProject:
 
 	@classmethod
 	def from_xml(cls, xml_str: str) -> KNProject:
-		"""从XML创建项目"""
+		"""从 XML 创建项目"""
 		root = ET.fromstring(xml_str)
-		project_name = root.get("name", "XML项目")
+		project_name = root.get("name", "XML 项目")
 		project = cls(project_name)
 		project.version = root.get("version", "0.20.0")
 		project.tool_type = root.get("toolType", "KN")
@@ -2316,7 +2316,7 @@ class KNProject:
 		return project
 
 	def to_xml(self) -> str:
-		"""将整个项目转换为XML格式"""
+		"""将整个项目转换为 XML 格式"""
 		root = ET.Element("project")
 		root.set("name", self.project_name)
 		root.set("version", self.version)
@@ -2513,23 +2513,23 @@ class KNProject:
 		print(f"总积木数: {analysis['total_blocks']}")
 		print(f"影子积木数: {analysis['shadow_blocks']}")
 		print("=" * 60)
-		# 显示块类型统计(前10种)
+		# 显示块类型统计 (前 10 种)
 		if analysis["block_type_counts"]:
-			print("\n积木类型统计(前10种):")
+			print("\n 积木类型统计 (前 10 种):")
 			sorted_types = sorted(
 				analysis["block_type_counts"].items(),
 				key=operator.itemgetter(1),
 				reverse=True,
 			)[:10]
 			for block_type, count in sorted_types:
-				print(f"  {block_type}: {count}")
+				print(f"{block_type}: {count}")
 
 
 # ============================================================================
-# Python操作接口类(优化版)
+# Python 操作接口类 (优化版)
 # ============================================================================
 class KNEditor:
-	"""KN项目编辑器(Python操作接口) - 优化版"""
+	"""KN 项目编辑器 (Python 操作接口) - 优化版"""
 
 	def __init__(self, project: KNProject | None = None) -> None:
 		self.project = project or KNProject()
@@ -2545,7 +2545,7 @@ class KNEditor:
 
 	@property
 	def current_entity_id(self) -> str | None:
-		"""当前实体ID"""
+		"""当前实体 ID"""
 		return self._current_entity[1] if self._current_entity else None
 
 	def _record_state(self) -> None:
@@ -2565,10 +2565,10 @@ class KNEditor:
 		self._record_state()
 
 	def import_from_xml_file(self, filepath: str | Path) -> None:
-		"""从XML文件导入项目"""
+		"""从 XML 文件导入项目"""
 		xml_content = Path(filepath).read_text(encoding="utf-8")
 		self.project = KNProject.from_xml(xml_content)
-		print(f"已从XML导入项目: {self.project.project_name}")
+		print(f"已从 XML 导入项目: {self.project.project_name}")
 		self._record_state()
 
 	def save_project(self, filepath: str | Path | None = None) -> None:
@@ -2636,7 +2636,7 @@ class KNEditor:
 			self.project.__dict__.update(KNProject.load_from_dict(initial_state).__dict__)
 			raise
 		finally:
-			# 成功完成,记录状态
+			# 成功完成, 记录状态
 			self._record_state()
 
 	def add_block(self, block_type: str, **kwargs: Any) -> Block | None:
@@ -2688,10 +2688,10 @@ class KNEditor:
 		return block
 
 	def export_to_xml_file(self, filepath: str | Path) -> None:
-		"""导出项目为XML文件"""
+		"""导出项目为 XML 文件"""
 		xml_content = self.project.to_xml()
 		Path(filepath).write_text(xml_content, encoding="utf-8")
-		print(f"项目已导出为XML: {filepath}")
+		print(f"项目已导出为 XML: {filepath}")
 
 	def export(self, filepath: str | Path, formats: str = "json", indent: int = 2) -> None:
 		"""导出项目为多种格式"""
@@ -2699,7 +2699,7 @@ class KNEditor:
 			data = self.project.to_dict()
 			with Path(filepath).open("w", encoding="utf-8") as f:
 				json.dump(data, f, ensure_ascii=False, indent=indent)
-			print(f"项目已导出为JSON: {filepath}")
+			print(f"项目已导出为 JSON: {filepath}")
 		elif formats.lower() == "xml":
 			self.export_to_xml_file(filepath)
 		else:
@@ -2756,7 +2756,7 @@ class KNEditor:
 		return repository.get_all()
 
 	def find_block(self, block_id: str) -> Block | None:
-		"""查找指定ID的积木"""
+		"""查找指定 ID 的积木"""
 		return self.project.find_block(block_id)
 
 	def validate_project(self) -> dict[str, list[str]]:

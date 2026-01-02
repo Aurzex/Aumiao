@@ -177,18 +177,18 @@ DEFAULT_SETTING_DATA = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0",
 		},
 		"MEMBER": "Aurzex, MoonLeaaaf, Nomen, MiTao, DontLoveBy",
-		"SLOGAN": "欢迎使用Aumiao-PY! "
-		"你说的对,但是《Aumiao》是一款由Aumiao开发团队开发的编程猫自动化工具,于2023年5月2日发布 "
-		"工具以编程猫宇宙为舞台,玩家可以扮演扮演毛毡用户,在这个社区毛线坍缩并邂逅各种不同的乐子人 "
-		"在领悟了《猫站圣经》后,打败强敌扫厕所,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相",
+		"SLOGAN": "欢迎使用 Aumiao-PY!"
+		"你说的对, 但是《Aumiao》是一款由 Aumiao 开发团队开发的编程猫自动化工具, 于 2023 年 5 月 2 日发布"
+		"工具以编程猫宇宙为舞台, 玩家可以扮演扮演毛毡用户, 在这个社区毛线坍缩并邂逅各种不同的乐子人"
+		"在领悟了《猫站圣经》后, 打败强敌扫厕所, 在维护编程猫核邪铀删的局面的同时, 逐步揭开编程猫社区的真相",
 		"TEAM": "Aumiao Team",
 		"VERSION": "2.5.0",
 	},
 }
 # data.json 的默认配置
 DEFAULT_DATA_DATA = {
-	"ACCOUNT_DATA": {"author_level": 1, "create_time": 1800000000, "description": "", "id": "1742185446", "identity": "********", "nickname": "猫猫捏", "password": "******"},
-	"INFO": {"e_mail": "zybqw@qq.com", "nickname": "喵鱼a", "qq_number": "3611198191"},
+	"ACCOUNT_DATA": {"author_level": 1, "create_time": 1800000000, "description": "", "id": "1742185446", "identity": "********", "nickname": " 猫猫捏 ", "password": "******"},
+	"INFO": {"e_mail": "zybqw@qq.com", "nickname": "喵鱼 a", "qq_number": "3611198191"},
 	"USER_DATA": {
 		"ads": [
 			"codemao.cn/work",
@@ -233,7 +233,7 @@ DEFAULT_DATA_DATA = {
 			{"只因": ["不许你黑我家鸽鸽!😡", "想要绿尸函了食不食?", "香精煎鱼食不食?"]},
 		],
 		"black_room": ["2233", "114514", "1919810"],
-		"comments": ["666", "不错不错", "前排:P", "加油!:O", "沙发*/ω\\*", "针不戳:D"],
+		"comments": ["666", "不错不错", "前排:P", "加油!:O", "沙发 */ω\\*", "针不戳:D"],
 		"emojis": [
 			"星能猫_好吃",
 			"星能猫_耶",
@@ -258,11 +258,11 @@ DEFAULT_DATA_DATA = {
 			"魔术喵_魔术",
 		],
 		"replies": [
-			"{nickname}很忙oh,机器人来凑热闹(*^^*)",
-			"{nickname}的自动回复来喽",
-			"嗨嗨嗨!这事{nickname}の自动回复鸭!",
-			"对不起,{nickname}它又搞忘了时间,一定是在忙呢",
-			"这是{nickname}的自动回复,不知道你在说啥(",
+			"{nickname} 很忙 oh, 机器人来凑热闹 (*^^*)",
+			"{nickname} 的自动回复来喽",
+			"嗨嗨嗨! 这事 {nickname} の自动回复鸭!",
+			"对不起,{nickname} 它又搞忘了时间, 一定是在忙呢",
+			"这是 {nickname} 的自动回复, 不知道你在说啥 (",
 		],
 	},
 }
@@ -276,7 +276,7 @@ class DataClassConverter:
 
 	@staticmethod
 	def validate_literal(value: object, field_type: type) -> object:
-		"""验证Literal类型字段值"""
+		"""验证 Literal 类型字段值"""
 		if get_origin(field_type) is Literal:
 			valid_values = get_args(field_type)
 			if value not in valid_values:
@@ -298,7 +298,7 @@ class DataClassConverter:
 			value = data[field_name]
 			origin_type = get_origin(field_type)
 			type_args = get_args(field_type)
-			# 处理Literal类型
+			# 处理 Literal 类型
 			if get_origin(field_type) is Literal:
 				kwargs[field_name] = cls.validate_literal(value, field_type)
 				continue
@@ -326,7 +326,7 @@ class DataClassConverter:
 		if isinstance(item_type, type) and is_dataclass(item_type):
 			return [cls.dict_to_dataclass(item_type, item) for item in value]
 		if get_origin(item_type) is Literal:
-			# 特殊处理列表中的Literal类型
+			# 特殊处理列表中的 Literal 类型
 			valid_values = get_args(item_type)
 			return [item if item in valid_values else (valid_values[0] if valid_values else None) for item in value]
 		try:
@@ -364,15 +364,15 @@ class DataClassConverter:
 # 增强型文件操作
 # --------------------------
 class JsonFileHandler:
-	"""JSON文件处理器"""
+	"""JSON 文件处理器"""
 
 	@staticmethod
 	def load_json_file(path: Path, data_class: type[T], *, create_if_missing: bool = True) -> T:
-		"""从JSON文件加载数据到数据类,如果文件不存在则创建"""
+		"""从 JSON 文件加载数据到数据类, 如果文件不存在则创建"""
 		try:
 			if not path.exists():
 				if create_if_missing:
-					print(f"文件 {path.name} 不存在,使用默认值创建...")
+					print(f"文件 {path.name} 不存在, 使用默认值创建...")
 					# 根据路径选择默认数据
 					default_data = {}
 					if path == PathConfig.SETTING_FILE_PATH:
@@ -386,7 +386,7 @@ class JsonFileHandler:
 				return data_class()
 			with path.open(encoding="utf-8") as f:
 				data = json.load(f)
-			# 预处理Literal类型字段
+			# 预处理 Literal 类型字段
 			field_types = get_type_hints(data_class)
 			for field_name, field_type in field_types.items():
 				if field_name in data and get_origin(field_type) is Literal:
@@ -404,7 +404,7 @@ class JsonFileHandler:
 
 	@staticmethod
 	def save_json_file(path: Path, data: object) -> None:
-		"""将数据类实例保存到JSON文件"""
+		"""将数据类实例保存到 JSON 文件"""
 		if not is_dataclass(data) or isinstance(data, type):
 			msg = "Only dataclass instances can be saved"
 			raise ValueError(msg)
@@ -412,7 +412,7 @@ class JsonFileHandler:
 		try:
 			serialized = asdict(data)
 			with temp_file.open("w", encoding="utf-8") as f:
-				json.dump(serialized, f, ensure_ascii=False, indent=4, separators=(",", ": "))
+				json.dump(serialized, f, ensure_ascii=False, indent=4, separators=(",", ":"))
 			temp_file.replace(path)
 			print(f"文件 {path.name} 已保存")
 		except Exception as e:
@@ -425,7 +425,7 @@ class JsonFileHandler:
 # 初始化函数
 # --------------------------
 def initialize_config_files() -> None:
-	"""初始化所有配置文件,如果不存在则用默认值创建"""
+	"""初始化所有配置文件, 如果不存在则用默认值创建"""
 	print("正在初始化配置文件...")
 	for file_path, data_class in PathConfig.get_config_files():
 		if not file_path.exists():
@@ -455,7 +455,7 @@ class BaseManager[T]:
 
 	@property
 	def data(self) -> T:
-		"""获取数据实例(懒加载)"""
+		"""获取数据实例 (懒加载)"""
 		if self._data is None:
 			self._data = JsonFileHandler.load_json_file(self._file_path, self._data_class)
 		return self._data

@@ -9,12 +9,12 @@ from src.utils.decorator import singleton
 @singleton
 class DataFetcher:
 	def __init__(self) -> None:
-		# 初始化acquire对象
+		# 初始化 acquire 对象
 		self._client = acquire.CodeMaoClient()
 
 	# 获取随机昵称
 	def fetch_random_nickname(self) -> str:
-		# 发送GET请求,获取随机昵称
+		# 发送 GET 请求, 获取随机昵称
 		response = self._client.send_request(
 			method="GET",
 			endpoint="/api/user/random/nickname",
@@ -24,7 +24,7 @@ class DataFetcher:
 
 	# 获取新消息数量
 	def fetch_message_count(self, method: Literal["web", "nemo"]) -> dict:
-		# 根据方法选择不同的url
+		# 根据方法选择不同的 url
 		if method == "web":
 			url = "/web/message-record/count"
 		elif method == "nemo":
@@ -32,7 +32,7 @@ class DataFetcher:
 		else:
 			msg = "不支持的方法"
 			raise ValueError(msg)
-		# 发送GET请求,获取新消息数量
+		# 发送 GET 请求, 获取新消息数量
 		record = self._client.send_request(
 			endpoint=url,
 			method="GET",
@@ -49,7 +49,7 @@ class DataFetcher:
 	) -> dict:
 		# 构造参数
 		params = {"query_type": types, "limit": limit, "offset": offset}
-		# 获取前*个回复
+		# 获取前 * 个回复
 		response = self._client.send_request(
 			endpoint="/web/message-record",
 			method="GET",
@@ -73,7 +73,7 @@ class DataFetcher:
 			data_key="items",
 		)
 
-	# 获取nemo消息
+	# 获取 nemo 消息
 	def fetch_nemo_messages(self, types: Literal["fork", "like"]) -> dict:
 		extra_url = 1 if types == "like" else 3
 		url = f"/nemo/v2/user/message/{extra_url}"
@@ -85,14 +85,14 @@ class DataFetcher:
 		response = self._client.send_request(endpoint="https://update.codemao.cn/updatev2/appsdk", method="GET")
 		return response.json()
 
-	# 获取kitten4更新
+	# 获取 kitten4 更新
 	def fetch_kitten4_update(self) -> dict:
 		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"TIME": time_stamp}
 		response = self._client.send_request(endpoint="https://kn-cdn.codemao.cn/kitten4/application/kitten4_update_info.json", method="GET", params=params)
 		return response.json()
 
-	# 获取kitten更新
+	# 获取 kitten 更新
 	def fetch_kitten_update(self) -> dict:
 		time_stamp = self.fetch_current_timestamp_10()["data"]
 		params = {"timeStamp": time_stamp}
@@ -127,15 +127,15 @@ class DataFetcher:
 		self,
 		types: (Literal["FLOAT_BANNER", "OFFICIAL", "CODE_TV", "WOKE_SHOP", "MATERIAL_NORMAL"] | None) = None,
 	) -> dict:
-		# 所有:不设置type,首页:OFFICIAL, 工作室页:WORK_SHOP
-		# 素材页:MATERIAL_NORMAL, 右下角浮动区域:FLOAT_BANNER, 编程TV:CODE_TV
+		# 所有: 不设置 type, 首页:OFFICIAL, 工作室页:WORK_SHOP
+		# 素材页:MATERIAL_NORMAL, 右下角浮动区域:FLOAT_BANNER, 编程 TV:CODE_TV
 		params = {"type": types}
 		response = self._client.send_request(endpoint="/web/banners/all", method="GET", params=params)
 		return response.json()
 
 	# 获取推荐头图
 	def fetch_nemo_banners(self, types: Literal[1, 2, 3]) -> dict:
-		# 1:点个猫推荐页 2:点个猫主题页 3:点个猫课程页
+		# 1: 点个猫推荐页 2: 点个猫主题页 3: 点个猫课程页
 		params = {"banner_type": types}
 		response = self._client.send_request(endpoint="/nemo/v2/home/banners", method="GET", params=params)
 		return response.json()
@@ -146,7 +146,7 @@ class DataFetcher:
 		response = self._client.send_request(endpoint="/web/reports/reasons/all", method="GET")
 		return response.json()
 
-	# 获取nemo配置
+	# 获取 nemo 配置
 	# TODO@Aurzex: 待完善
 	def _fetch_nemo_config(self) -> str:
 		response = self._client.send_request(endpoint="https://nemo.codemao.cn/config", method="GET")
@@ -164,7 +164,7 @@ class DataFetcher:
 
 	# 获取编程猫首页作品
 	def fetch_recommended_works(self, types: Literal[1, 2]) -> dict:
-		# 1为点猫精选,2为新作喵喵看
+		# 1 为点猫精选,2 为新作喵喵看
 		params = {"type": types}
 		response = self._client.send_request(
 			endpoint="/creation-tools/v1/pc/home/recommend-work",
@@ -173,18 +173,18 @@ class DataFetcher:
 		)
 		return response.json()
 
-	# 获取nemo端新作喵喵看作品
+	# 获取 nemo 端新作喵喵看作品
 	def fetch_new_recommend_works(self, limit: int = 15, offset: int = 0) -> dict:
 		params = {"limit": limit, "offset": offset}
 		response = self._client.send_request(endpoint="/nemo/v3/new-recommend/more/list", method="GET", params=params)
 		return response.json()
 
-	# 获取编程猫nemo作品推荐
+	# 获取编程猫 nemo 作品推荐
 	def fetch_recommended_works_nemo(self) -> dict:
 		response = self._client.send_request(endpoint="/nemo/v2/system/recommended/pool", method="GET")
 		return response.json()
 
-	# 获取编程猫首页推荐channel
+	# 获取编程猫首页推荐 channel
 	def fetch_work_channels(self, types: Literal["KITTEN", "NEMO"]) -> dict:
 		params = {"type": types}
 		response = self._client.send_request(
@@ -194,7 +194,7 @@ class DataFetcher:
 		)
 		return response.json()
 
-	# 获取指定channel
+	# 获取指定 channel
 	def fetch_channel_works(self, channel_id: int, types: Literal["KITTEN", "NEMO"], limit: int = 5, page: int = 1) -> dict:
 		params = {"type": types, "page": page, "limit": limit}
 		response = self._client.send_request(
@@ -214,12 +214,12 @@ class DataFetcher:
 		response = self._client.send_request(endpoint="https://backend.box3.fun/diversion/codemao/post", method="GET")
 		return response.json()
 
-	# 获取KN课程
+	# 获取 KN 课程
 	def fetch_kn_courses(self) -> dict:
 		response = self._client.send_request(endpoint="/creation-tools/v1/home/especially/course", method="GET")
 		return response.json()
 
-	# 获取KN公开课
+	# 获取 KN 公开课
 	def fetch_public_courses_gen(self, limit: int | None = 10) -> Generator[dict]:
 		params = {"limit": 10, "offset": 0}
 		return self._client.fetch_paginated_data(
@@ -227,12 +227,12 @@ class DataFetcher:
 			params=params,
 			limit=limit,
 			total_key="total_course",
-			# total_key也可设置为"course_page.total",
+			# total_key 也可设置为 "course_page.total",
 			data_key="course_page.items",
 		)
 
-	# 获取KN模板作品
-	# subject_id为一时返回基础指南,为2时返回进阶指南
+	# 获取 KN 模板作品
+	# subject_id 为一时返回基础指南, 为 2 时返回进阶指南
 	def fetch_sample_works(self, subject_id: Literal[1, 2]) -> dict:
 		params = {"subject_id": subject_id}
 		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/sample/list", params=params, method="GET")
@@ -244,7 +244,7 @@ class DataFetcher:
 		response = self._client.send_request(endpoint=f"/web/config/tab/on-off/status?config_type={types}", method="GET")
 		return response.json()
 
-	# 获取kitten编辑页面精选活动
+	# 获取 kitten 编辑页面精选活动
 	def fetch_kitten_activities(self) -> dict:
 		response = self._client.send_request(
 			endpoint="https://api-creation.codemao.cn/kitten/activity/choiceness/list",
@@ -252,7 +252,7 @@ class DataFetcher:
 		)
 		return response.json()
 
-	# 获取nemo端教程合集
+	# 获取 nemo 端教程合集
 	def fetch_course_packages_gen(self, platform: int = 1, limit: int | None = 50) -> Generator[dict]:
 		params = {"limit": 50, "offset": 0, "platform": platform}
 		return self._client.fetch_paginated_data(
@@ -261,9 +261,9 @@ class DataFetcher:
 			limit=limit,
 		)
 
-	# 获取nemo教程
+	# 获取 nemo 教程
 	def fetch_course_details_gen(self, course_package_id: int, limit: int | None = 50) -> Generator[dict]:
-		# course_package_id由fetch_course_packages_gen中获取
+		# course_package_id 由 fetch_course_packages_gen 中获取
 		params = {
 			"course_package_id": course_package_id,
 			"limit": 50,
@@ -274,7 +274,7 @@ class DataFetcher:
 			params=params,
 			data_key="course_page.items",
 			limit=limit,
-			# 参数中total_key也可用total_course
+			# 参数中 total_key 也可用 total_course
 		)
 
 	# 获取教学计划
@@ -339,7 +339,7 @@ class DataFetcher:
 @singleton
 class UserAction:
 	def __init__(self) -> None:
-		# 初始化CodeMaoClient对象
+		# 初始化 CodeMaoClient 对象
 		self._client = acquire.CodeMaoClient()
 
 	# 签订友好协议

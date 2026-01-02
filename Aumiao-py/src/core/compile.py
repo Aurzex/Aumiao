@@ -55,34 +55,34 @@ class InternalImplementations:
 	"""内部实现模块"""
 
 	class BCMKNDecryptor:
-		"""BCMKN文件解密器 - 用于NEKO类型作品"""
+		"""BCMKN 文件解密器 - 用于 NEKO 类型作品"""
 
 		def __init__(self) -> None:
 			self.crypto = Crypto(Configuration.CRYPTO_SALT)
 
 		def decrypt_data(self, encrypted_content: str) -> dict[str, Any]:
-			"""解密BCMKN数据"""
-			# 步骤1: 字符串反转
+			"""解密 BCMKN 数据"""
+			# 步骤 1: 字符串反转
 			reversed_data = self.crypto.reverse_string(encrypted_content)
-			# 步骤2: Base64解码
+			# 步骤 2: Base64 解码
 			decoded_data = self.crypto.base64_to_bytes(reversed_data)
-			# 步骤3: 分离IV和密文 (IV为前12字节)
+			# 步骤 3: 分离 IV 和密文 (IV 为前 12 字节)
 			MIN_DATA_LENGTH = 13  # noqa: N806
 			if len(decoded_data) < MIN_DATA_LENGTH:
-				msg = "数据太短,无法分离IV和密文"
+				msg = "数据太短, 无法分离 IV 和密文"
 				raise ValueError(msg)
 			iv = decoded_data[:12]
 			ciphertext = decoded_data[12:]
-			# 步骤4: 生成AES密钥
+			# 步骤 4: 生成 AES 密钥
 			key = self.crypto.generate_aes_key()
-			# 步骤5: AES-GCM解密
+			# 步骤 5: AES-GCM 解密
 			decrypted_bytes = self.crypto.decrypt_aes_gcm(ciphertext, key, iv)
-			# 清理和修复JSON数据
+			# 清理和修复 JSON 数据
 			return self._clean_and_repair_json(decrypted_bytes)
 
 		@staticmethod
 		def _find_valid_json_end(text: str) -> int:
-			"""找到有效的JSON结束位置"""
+			"""找到有效的 JSON 结束位置"""
 			stack: list[str] = []
 			in_string = False
 			escape = False
@@ -119,27 +119,27 @@ class InternalImplementations:
 			return len(text)
 
 		def _clean_and_repair_json(self, raw_bytes: bytes) -> dict[str, Any]:
-			"""清理和修复JSON数据"""
+			"""清理和修复 JSON 数据"""
 			text_content = raw_bytes.decode("utf-8", errors="ignore")
-			# 查找有效的JSON结束位置
+			# 查找有效的 JSON 结束位置
 			valid_end = self._find_valid_json_end(text_content)
 			if valid_end < len(text_content):
 				text_content = text_content[:valid_end]
-			# 尝试解析JSON
+			# 尝试解析 JSON
 			try:
 				return json.loads(text_content)
 			except json.JSONDecodeError:
-				# 尝试修复常见的JSON问题
+				# 尝试修复常见的 JSON 问题
 				repaired_content = self._repair_json(text_content)
 				try:
 					return json.loads(repaired_content)
 				except json.JSONDecodeError as decode_error:
-					error_msg = "JSON解析失败,数据可能已损坏"
+					error_msg = "JSON 解析失败, 数据可能已损坏"
 					raise ValueError(error_msg) from decode_error
 
 		@staticmethod
 		def _repair_json(text: str) -> str:
-			"""尝试修复JSON数据"""
+			"""尝试修复 JSON 数据"""
 			# 移除末尾的逗号
 			text = text.rstrip()
 			while text and text[-1] in ", \t\n\r":
@@ -180,12 +180,12 @@ class InternalImplementations:
 
 		@property
 		def is_nemo(self) -> bool:
-			"""是否为Nemo作品"""
+			"""是否为 Nemo 作品"""
 			return self.type == "NEMO"
 
 		@property
 		def is_neko(self) -> bool:
-			"""是否为NEKO作品"""
+			"""是否为 NEKO 作品"""
 			return self.type == "NEKO"
 
 	class FileHelper:
@@ -208,7 +208,7 @@ class InternalImplementations:
 
 		@staticmethod
 		def write_json(path: str | Path, data: Any) -> None:
-			"""写入JSON文件"""
+			"""写入 JSON 文件"""
 			with Path(path).open("w", encoding="utf-8") as f:
 				json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -250,7 +250,7 @@ class InternalImplementations:
 
 		@staticmethod
 		def generate_id(length: int = 20) -> str:
-			"""生成随机ID"""
+			"""生成随机 ID"""
 			chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			return "".join(random.choice(chars) for _ in range(length))
 
@@ -288,12 +288,12 @@ class InternalImplementations:
 			raise NotImplementedError
 
 	class NekoDecompiler(BaseDecompiler):
-		"""NEKO作品反编译器"""
+		"""NEKO 作品反编译器"""
 
 		def decompile(self) -> dict[str, Any]:
-			"""反编译NEKO作品"""
-			print(f"🔓 开始解密NEKO作品: {self.work_info.id}")
-			# 获取作品详情以获取加密文件URL
+			"""反编译 NEKO 作品"""
+			print(f"🔓 开始解密 NEKO 作品: {self.work_info.id}")
+			# 获取作品详情以获取加密文件 URL
 			detail_url = f"{Configuration.CREATION_BASE_URL}/neko/community/player/published-work-detail/{self.work_info.id}"
 			device_auth_dict = auth.Authenticator().generate_x_device_auth()
 			device_auth_json = json.dumps(device_auth_dict)
@@ -301,14 +301,14 @@ class InternalImplementations:
 			try:
 				detail_data = self.client.send_request(endpoint=detail_url, method="GET", headers=headers).json()
 				encrypted_url = detail_data["source_urls"][0]
-				print(f"📥 获取加密文件URL: {encrypted_url}")
+				print(f"📥 获取加密文件 URL: {encrypted_url}")
 			except Exception as e:
 				error_msg = "获取作品详情失败"
 				raise ValueError(error_msg) from e
 			# 下载加密文件
 			try:
 				encrypted_content = self.client.send_request(endpoint=encrypted_url, method="GET").text
-				print(f"📊 下载加密数据完成,长度: {len(encrypted_content)} 字符")
+				print(f"📊 下载加密数据完成, 长度: {len(encrypted_content)} 字符")
 			except Exception as e:
 				error_msg = "下载加密文件失败"
 				raise ValueError(error_msg) from e
@@ -316,10 +316,10 @@ class InternalImplementations:
 			decryptor = InternalImplementations.BCMKNDecryptor()
 			try:
 				decrypted_data = decryptor.decrypt_data(encrypted_content)
-				print("✅ NEKO作品解密成功!")
+				print("✅ NEKO 作品解密成功!")
 				print("食用教程:")
-				print("首先确保你有ROOT权限或者MT管理器")
-				print("将反编译的文件复制到NEMO客户端数据目录")
+				print("首先确保你有 ROOT 权限或者 MT 管理器")
+				print("将反编译的文件复制到 NEMO 客户端数据目录")
 				print("一般为 /data/data/com.codemao.nemo/files/nemo_users_db")
 				print("重启客户端, 打开并保存一次")
 			except Exception as e:
@@ -329,10 +329,10 @@ class InternalImplementations:
 				return decrypted_data
 
 	class NemoDecompiler(BaseDecompiler):
-		"""Nemo作品反编译器"""
+		"""Nemo 作品反编译器"""
 
 		def decompile(self) -> str:
-			"""反编译Nemo作品为文件夹结构"""
+			"""反编译 Nemo 作品为文件夹结构"""
 			work_id = self.work_info.id
 			work_dir = Path(f"nemo_work_{work_id}")
 			InternalImplementations.FileHelper.ensure_dir(work_dir)
@@ -437,14 +437,14 @@ class InternalImplementations:
 						print(f"资源下载失败 {image_url}: {e}")
 
 	class KittenDecompiler(BaseDecompiler):
-		"""Kitten作品反编译器"""
+		"""Kitten 作品反编译器"""
 
 		def __init__(self, work_info: "InternalImplementations.WorkInfo", client: Any) -> None:
 			super().__init__(work_info, client)
 			self.functions: dict[str, Any] = {}
 
 		def decompile(self) -> dict[str, Any]:
-			"""反编译Kitten作品"""
+			"""反编译 Kitten 作品"""
 			compiled_data = self._fetch_compiled_data()
 			work = compiled_data.copy()
 			self._decompile_actors(work)
@@ -482,7 +482,7 @@ class InternalImplementations:
 				return theatre["actors"][actor_id]
 			if actor_id in theatre["scenes"]:
 				return theatre["scenes"][actor_id]
-			print(f"警告: 角色ID {actor_id} 在actors和scenes中均未找到,使用空角色信息")
+			print(f"警告: 角色 ID {actor_id} 在 actors 和 scenes 中均未找到, 使用空角色信息")
 			return {
 				"direction": 90,
 				"draggable": False,
@@ -639,7 +639,7 @@ class InternalImplementations:
 					for i, condition in enumerate(self.compiled["conditions"]):
 						condition_block = self.actor.process_block(condition)
 						condition_block["parent_id"] = self.block["id"]
-						input_name = f"IF{i}"
+						input_name = f"IF {i}"
 						if condition_block["type"] != "logic_empty":
 							self.connection[condition_block["id"]] = {
 								"type": "input",
@@ -696,9 +696,9 @@ class InternalImplementations:
 					self.shadows["ELSE_TEXT"] = ""
 				return block
 
-			def _get_child_input_name(self, index: int) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+			def _get_child_input_name(self, index: int) -> str:  # pyright: ignore [reportIncompatibleMethodOverride]
 				conditions_count = len(self.compiled["conditions"])
-				return f"DO{index}" if index < conditions_count else "ELSE"
+				return f"DO {index}" if index < conditions_count else "ELSE"
 
 		class TextJoinProcessor(BlockProcessor):
 			"""文本连接积木处理器"""
@@ -720,7 +720,7 @@ class InternalImplementations:
 				self.fields["NAME"] = self.compiled["procedure_name"]
 				mutation = ET.Element("mutation")
 				for i, (param_name, _) in enumerate(self.compiled["params"].items()):
-					input_name = f"PARAMS{i}"
+					input_name = f"PARAMS {i}"
 					arg = ET.SubElement(mutation, "arg")
 					arg.set("name", input_name)
 					shadow = self.actor.decompiler.shadow_builder.create("math_number")
@@ -767,23 +767,23 @@ class InternalImplementations:
 				for i, (param_name, param_value) in enumerate(self.compiled["params"].items()):
 					param_block = self.actor.process_block(param_value)
 					shadow = self.actor.decompiler.shadow_builder.create("default_value", param_block["id"])
-					self.shadows[f"ARG{i}"] = shadow
+					self.shadows[f"ARG {i}"] = shadow
 					param_elem = ET.SubElement(mutation, "procedures_2_parameter_shadow")
 					param_elem.set("name", param_name)
 					param_elem.set("value", "0")
 					self.connection[param_block["id"]] = {
 						"type": "input",
 						"input_type": "value",
-						"input_name": f"ARG{i}",
+						"input_name": f"ARG {i}",
 					}
 				self.block["mutation"] = ET.tostring(mutation, encoding="unicode")
 				return self.block
 
 	class CocoDecompiler(BaseDecompiler):
-		"""CoCo作品反编译器"""
+		"""CoCo 作品反编译器"""
 
 		def decompile(self) -> dict[str, Any]:
-			"""反编译CoCo作品"""
+			"""反编译 CoCo 作品"""
 			compiled_data = self._fetch_compiled_data()
 			work = compiled_data.copy()
 			self._reorganize_data(work)
@@ -862,7 +862,7 @@ class InternalImplementations:
 					variable_lists["globalArrayList"].append(
 						{
 							"id": var_id,
-							"name": f"列表{counters['list']}",
+							"name": f"列表 {counters['list']}",
 							"defaultValue": value,
 							"value": value,
 						},
@@ -872,7 +872,7 @@ class InternalImplementations:
 					variable_lists["globalObjectList"].append(
 						{
 							"id": var_id,
-							"name": f"字典{counters['dict']}",
+							"name": f"字典 {counters['dict']}",
 							"defaultValue": value,
 							"value": value,
 						},
@@ -882,7 +882,7 @@ class InternalImplementations:
 					variable_lists["globalVariableList"].append(
 						{
 							"id": var_id,
-							"name": f"变量{counters['var']}",
+							"name": f"变量 {counters['var']}",
 							"defaultValue": value,
 							"value": value,
 						},
@@ -918,7 +918,7 @@ class CodemaoDecompiler:
 		"""
 		初始化反编译器
 		Args:
-			client_config: 客户端配置,如为None则使用默认配置
+			client_config: 客户端配置, 如为 None 则使用默认配置
 		"""
 		self.client = Configuration.CLIENT_FACTORY.create_codemao_client()
 		self._decompiler_map = {
@@ -934,8 +934,8 @@ class CodemaoDecompiler:
 		"""
 		反编译作品
 		Args:
-			work_id: 作品ID
-			output_dir: 输出目录,如为None则使用默认目录
+			work_id: 作品 ID
+			output_dir: 输出目录, 如为 None 则使用默认目录
 		Returns:
 			保存的文件路径
 		"""
@@ -964,7 +964,7 @@ class CodemaoDecompiler:
 		if work_info.is_nemo:
 			if isinstance(result, str):
 				return result
-			msg = "Nemo作品应该返回字符串路径"
+			msg = "Nemo 作品应该返回字符串路径"
 			raise TypeError(msg)
 		file_name = InternalImplementations.FileHelper.safe_filename(
 			work_info.name,
@@ -975,7 +975,7 @@ class CodemaoDecompiler:
 		if isinstance(result, dict):
 			InternalImplementations.FileHelper.write_json(file_path, result)
 		else:
-			msg = "非Nemo作品应该返回字典"
+			msg = "非 Nemo 作品应该返回字典"
 			raise TypeError(msg)
 		return str(file_path)
 
@@ -983,10 +983,10 @@ class CodemaoDecompiler:
 # 向后兼容的函数
 def decompile_work(work_id: int, output_dir: Path | None = None) -> str:
 	"""
-	反编译作品(向后兼容的函数)
+	反编译作品 (向后兼容的函数)
 	Args:
-		work_id: 作品ID
-		output_dir: 输出目录,如为None则使用默认目录
+		work_id: 作品 ID
+		output_dir: 输出目录, 如为 None 则使用默认目录
 	Returns:
 		保存的文件路径
 	"""
