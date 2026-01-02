@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import json
 import random
 import re
@@ -246,6 +247,109 @@ class DataConverter:
 		raise TypeError(msg)
 
 	@staticmethod
+	def bbcode_to_html(bbcode: str) -> str:
+		"""
+		将BBCode转换为HTML的简化版本
+		Args:
+			bbcode: BBCode字符串
+		Returns:
+			HTML字符串
+		"""
+		if not bbcode or not bbcode.strip():
+			return ""
+		result = bbcode.strip()
+		# 基础标签替换
+		replacements = {
+			r"\[b\](.*?)\[/b\]": r"<strong>\1</strong>",
+			r"\[i\](.*?)\[/i\]": r"<em>\1</em>",
+			r"\[u\](.*?)\[/u\]": r"<u>\1</u>",
+			r"\[s\](.*?)\[/s\]": r"<strike>\1</strike>",
+			r"\[br\]": "<br>",
+			r"\[hr\]": "<hr>",
+			r"\[code\](.*?)\[/code\]": r"<code>\1</code>",
+			r"\[left\](.*?)\[/left\]": r'<div style="text-align:left;">\1</div>',
+			r"\[center\](.*?)\[/center\]": r'<div style="text-align:center;">\1</div>',
+			r"\[right\](.*?)\[/right\]": r'<div style="text-align:right;">\1</div>',
+		}
+		# 执行替换
+		for pattern, replacement in replacements.items():
+			result = re.sub(pattern, replacement, result, flags=re.DOTALL)
+		# 带参数的标签
+		# 字体大小
+		result = re.sub(
+			r"\[font_size=(\d+)\](.*?)\[/font_size\]",
+			r'<span style="font-size:\1px;">\2</span>',
+			result,
+			flags=re.DOTALL,
+		)
+		# 颜色
+
+		def _expand_color(match: re.Match) -> str:
+			color = match.group(1)
+			content = match.group(2)
+			if len(color) == 3:
+				color = color[0] * 2 + color[1] * 2 + color[2] * 2
+			return f'<span style="color:#{color};">{content}</span>'
+
+		result = re.sub(
+			r"\[color=#?([0-9a-fA-F]{3,6})\](.*?)\[/color\]",
+			_expand_color,
+			result,
+			flags=re.DOTALL,
+		)
+		# 链接
+		result = re.sub(
+			r"\[url=(.+?)\](.+?)\[/url\]",
+			r'<a href="\1" target="_blank">\2</a>',
+			result,
+			flags=re.DOTALL,
+		)
+		# 图片
+		result = re.sub(
+			r"\[image=(.+?)\]",
+			r'<img src="\1" alt="image" style="max-width:100%;height:auto;">',
+			result,
+		)
+		# 转义HTML
+		result = html.escape(result)
+		# 还原HTML标签(避免被转义)
+		tag_replacements = {
+			"&lt;strong&gt;": "<strong>",
+			"&lt;/strong&gt;": "</strong>",
+			"&lt;em&gt;": "<em>",
+			"&lt;/em&gt;": "</em>",
+			"&lt;u&gt;": "<u>",
+			"&lt;/u&gt;": "</u>",
+			"&lt;strike&gt;": "<strike>",
+			"&lt;/strike&gt;": "</strike>",
+			"&lt;br&gt;": "<br>",
+			"&lt;hr&gt;": "<hr>",
+			"&lt;code&gt;": "<code>",
+			"&lt;/code&gt;": "</code>",
+			"&lt;div style=&quot;text-align:left;&quot;&gt;": '<div style="text-align:left;">',
+			"&lt;/div&gt;": "</div>",
+			"&lt;div style=&quot;text-align:center;&quot;&gt;": '<div style="text-align:center;">',
+			"&lt;div style=&quot;text-align:right;&quot;&gt;": '<div style="text-align:right;">',
+			"&lt;span style=&quot;font-size:": '<span style="font-size:',
+			"&lt;/span&gt;": "</span>",
+			"&lt;span style=&quot;color:#": '<span style="color:#',
+			"&lt;a href=&quot;": '<a href="',
+			"&lt;/a&gt;": "</a>",
+			"&lt;img src=&quot;": '<img src="',
+			"&quot; alt=&quot;image&quot; style=&quot;max-width:100%;height:auto;&quot;&gt;": '" alt="image" style="max-width:100%;height:auto;">',
+		}
+		for old, new in tag_replacements.items():
+			result = result.replace(old, new)
+		# 添加段落
+		lines = result.split("\n")
+		lines = [line.strip() for line in lines if line.strip()]
+		if lines:
+			# 检查是否已经有HTML块级元素
+			has_block_elements = any(any(tag in line for tag in ["<div", "<img", "<a href", "<code>", "<pre>"]) for line in lines)
+			result = "\n".join(lines) if has_block_elements else "\n".join(f"<p>{line}</p>" for line in lines)
+		return result
+
+	@staticmethod
 	def html_to_text(
 		html_content: str,
 		*,
@@ -322,7 +426,6 @@ class StringProcessor:
 				try:
 					main_id = int(parts[0])
 					sub_id = int(parts[1]) if len(parts) > 1 else None
-
 				except ValueError:
 					continue
 				else:
@@ -1006,7 +1109,6 @@ class Printer:
 					self.print_message(validation_error, "ERROR")
 					attempts += 1
 					continue
-
 			except ValueError as e:
 				type_name = cast_type.__name__
 				self.print_message(f"格式错误: 请输入{type_name}类型的值 ({e})", "ERROR")
