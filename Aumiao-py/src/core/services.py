@@ -611,8 +611,44 @@ class MillenniumEntanglement(ClassUnion):
 			teacher_card_number=generator.generate_teacher_certificate_number(),
 		)
 
-	def manage_edu_accounts(self, action_type: Literal["create", "delete", "token"], limit: int | None = 100) -> None:
+	def manage_edu_accounts(self, action_type: Literal["create", "delete", "token", "password"], limit: int | None = 100) -> None:
 		"""批量管理教育账号"""
+		total = self._edu_obtain.fetch_class_students_total()
+		print(f"可支配学生账号数 {total['total']}")
+
+		def _manage_account_credentials(
+			cred_type: Literal["token", "password"],
+			limit: int | None,
+		) -> list[str]:
+			"""生成账号凭证(token 或密码)"""
+			accounts = Obtain().switch_edu_account(limit=limit, return_method="list")
+			credential_list = []
+			for identity, pass_key in accounts:
+				if cred_type == "token":
+					# 生成 token 逻辑
+					response = self._auth.login(
+						identity=identity,
+						password=pass_key,
+						status="edu",
+						prefer_method="simple_password",
+					)
+					credential = response["data"]["auth"]["token"]
+					file_path = data.PathConfig.TOKEN_FILE_PATH
+					file_method = "w"  # 如果是覆盖写入
+				else:  # cred_type == "password"
+					# 生成密码逻辑 - 这里根据实际情况调整
+					credential = pass_key  # 或者生成新密码
+					file_path = data.PathConfig.PASSWORD_FILE_PATH
+					file_method = "a"  # 追加模式
+				credential_list.append(credential)
+				# 写入文件
+				content = f"{credential}\n" if cred_type == "token" else f"{identity}:{credential}\n"
+				self._file.file_write(
+					path=file_path,
+					content=content,
+					method=file_method,
+				)
+			return credential_list
 
 		def _create_students(student_limit: int) -> None:
 			"""创建学生账号"""
@@ -636,24 +672,13 @@ class MillenniumEntanglement(ClassUnion):
 			for student in students:
 				self._edu_motion.delete_student_from_class(stu_id=student["id"])
 
-		def _create_token(token_limit: int | None) -> list[str]:
-			"""生成账号 token"""
-			accounts = Obtain().switch_edu_account(limit=token_limit, return_method="list")
-			token_list = []
-			for identity, pass_key in accounts:
-				response = self._auth.login(identity=identity, password=pass_key, status="edu", prefer_method="simple_password")
-				token = response["auth"]["token"]
-				token_list.append(token)
-				self._file.file_write(path=data.PathConfig.TOKEN_FILE_PATH, content=f"{token}\n", method="a")
-			return token_list
-
 		if action_type == "delete":
 			_delete_students(limit)
 		elif action_type == "create":
 			actual_limit = limit or 100
 			_create_students(actual_limit)
-		elif action_type == "token":
-			_create_token(token_limit=limit)
+		elif action_type in {"token", "password"}:
+			_manage_account_credentials(cred_type=action_type, limit=limit)
 
 	def batch_report_work(self, work_id: int) -> None:
 		"""批量举报作品"""

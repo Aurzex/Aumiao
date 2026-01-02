@@ -223,9 +223,9 @@ class Obtain(ClassUnion):
 				print("没有可用的教育账号")
 				return iter([]) if return_method == "generator" else []
 			# 定义处理函数
+			self._client.switch_identity(token=self._client.token.average, identity="average")
 
 			def process_student(student: dict) -> tuple[Any, Any]:
-				self._client.switch_identity(token=self._client.token.average, identity="average")
 				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
 
 			# 根据返回方式处理
