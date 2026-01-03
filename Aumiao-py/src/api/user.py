@@ -203,6 +203,18 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/creation-tools/v1/works/list/user", params=params, method="GET")
 		return response.json()
 
+	def fetch_user_certificate(self, user_id: str) -> dict:
+		"""
+		获取用户证书信息
+		Args:
+			user_id: 用户 ID
+		Returns:
+			用户证书信息字典
+		"""
+		params = {"user_id": user_id}
+		response = self._client.send_request(endpoint="https://api-wechatsbp-codemaster.codemao.cn/user/info/certificate", method="GET", params=params)
+		return response.json()
+
 	def fetch_published_nemo_works_gen(self, method: Literal["published"], limit: int | None = 15) -> Generator[dict]:
 		"""
 		获取用户已发布 Nemo 作品生成器
