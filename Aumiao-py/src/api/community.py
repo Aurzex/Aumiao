@@ -382,3 +382,12 @@ class UserAction:
 			method="DELETE",
 		)
 		return response.status_code == acquire.HTTPStatus.NO_CONTENT.value
+
+	# 获取广播消息
+	def fetch_broadcast_messages_gen(self, limit: int | None = 10, read_status: Literal["READ", "UNREAD"] = "UNREAD") -> Generator[dict]:
+		params = {"limit": 1, "offset": 0, "read_status": read_status, "sort": "-created_at"}
+		return self._client.fetch_paginated_data(
+			endpoint="/web/message-record/broadcast",
+			params=params,
+			limit=limit,
+		)
