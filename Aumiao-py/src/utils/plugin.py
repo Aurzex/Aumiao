@@ -77,7 +77,7 @@ class CodeModificationManager:
 			modified_source = self._apply_all_modifications(module_name, source)
 			if modified_source != source:
 				# 编译并执行修改后的代码
-				code = compile(modified_source, module.__file__, "exec")  # pyright: ignore [reportArgumentType]
+				code = compile(modified_source, module.__file__, "exec")  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-argument-type]
 				exec(code, module.__dict__)  # noqa: S102
 			# 应用函数重写
 			self._apply_function_rewrites(module_name, module)

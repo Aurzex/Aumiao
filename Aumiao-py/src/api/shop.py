@@ -28,10 +28,7 @@ class WorkshopDataFetcher:
 		limit: int = 14,
 		works_limit: int = 4,
 		offset: int = 0,
-		sort: list[Literal["-latest_joined_at", "-created_at"]] = [
-			"-created_at",
-			"-latest_joined_at",
-		],
+		sort: list[str] = ["-created_at", "-latest_joined_at"],
 	) -> dict:
 		if isinstance(sort, list):
 			sort_str = ",".join(sort)

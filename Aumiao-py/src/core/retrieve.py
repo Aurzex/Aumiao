@@ -9,7 +9,7 @@ from src.utils import decorator
 
 
 @decorator.singleton
-class Obtain(ClassUnion):
+class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 		self._source_map = {

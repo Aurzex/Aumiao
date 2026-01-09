@@ -12,9 +12,9 @@ _is_compiling: bool = any("nuitka" in arg.lower() for arg in argv) or hasattr(sy
 # 类型检查时显式导入 (仅供 IDE 识别)
 if TYPE_CHECKING or _is_compiling:
 	# 显式导入所有子模块以确保类型系统识别
-	from .api import auth, coco, community, edu, forum, library, pickduck, shop, user, whale, work
-	from .core import client
-	from .utils import acquire, data, decorator, plugin, tool
+	from .api import auth, coco, community, edu, forum, library, pickduck, shop, user, whale, work  # ty:ignore[unresolved-import]
+	from .core import client  # ty:ignore[unresolved-import]
+	from .utils import acquire, data, decorator, plugin, tool  # ty:ignore[unresolved-import]
 # 模块路径映射 (使用 Final 类型提示)
 _MODULE_PATHS: Final[dict[str, str]] = {
 	"auth": ".api.auth",

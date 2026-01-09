@@ -38,7 +38,7 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 					# 如果重试次数达到上限, 则抛出异常
 					if i == retries:
 						print(f"Error: {e!r}.")
-						print(f'"{func.__name__}()" failed after {retries} retries.')
+						print(f'"{func.__name__}()" failed after {retries} retries.')  # ty:ignore[unresolved-attribute]
 						break
 					# 否则, 打印错误信息并等待一段时间后重试
 					print(f"Error: {e!r} -> Retrying...")
@@ -81,7 +81,7 @@ def generator(chunk_size: int = 1000) -> Callable:
 
 def lazy_property(func: Callable) -> ...:
 	# 定义一个属性名, 用于存储函数的返回值
-	attr_name = "_lazy_" + func.__name__
+	attr_name = "_lazy_" + func.__name__  # ty:ignore[unresolved-attribute]
 	# 定义一个装饰器, 用于将函数转换为属性
 
 	@property
@@ -131,8 +131,8 @@ def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool 
 			return cached_func(*args, **kwargs)
 
 		# 添加缓存访问方法
-		wrapper.cache_info = cached_func.cache_info  # pyright: ignore [reportAttributeAccessIssue]
-		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore [reportAttributeAccessIssue]
+		wrapper.cache_info = cached_func.cache_info  # pyright: ignore [reportAttributeAccessIssue]  # ty:ignore[unresolved-attribute]
+		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore [reportAttributeAccessIssue]  # ty:ignore[unresolved-attribute]
 		return wrapper
 
 	return decorator

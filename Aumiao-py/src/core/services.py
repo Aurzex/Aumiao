@@ -17,7 +17,7 @@ from src.utils.acquire import HTTPStatus
 
 
 @decorator.singleton
-class FileUploader(ClassUnion):
+class FileUploader(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 		self.uploader = FileProcessor()
@@ -52,7 +52,7 @@ class FileUploader(ClassUnion):
 		return None
 
 
-class WorkParser(ClassUnion):
+class WorkParser(ClassUnion):  # ty:ignore[unsupported-base]
 	"""作品解析处理器"""
 
 	def __init__(self) -> None:
@@ -291,16 +291,16 @@ class WorkParser(ClassUnion):
 
 
 @decorator.singleton
-class Motion(ClassUnion):
+class Motion(ClassUnion):  # ty:ignore[unsupported-base]
 	SOURCE_CONFIG: ClassVar = {
 		"work": SourceConfigSimple(
-			get_items=lambda self=None: self._user_obtain.fetch_user_works_web_gen(self._data.ACCOUNT_DATA.id, limit=None),
+			get_items=lambda self=None: self._user_obtain.fetch_user_works_web_gen(self._data.ACCOUNT_DATA.id, limit=None),  # ty:ignore[possibly-missing-attribute]
 			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "work", "comments"),
 			delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
 			title_key="work_name",
 		),
 		"post": SourceConfigSimple(
-			get_items=lambda self=None: self._forum_obtain.fetch_my_posts_gen("created", limit=None),
+			get_items=lambda self=None: self._forum_obtain.fetch_my_posts_gen("created", limit=None),  # ty:ignore[possibly-missing-attribute]
 			get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "post", "comments"),
 			delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
 			title_key="title",
@@ -398,7 +398,7 @@ class Motion(ClassUnion):
 			responses = {}
 			for msg_type in config["message_types"]:
 				config["endpoint"] = cast("str", config["endpoint"])
-				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]
+				endpoint = config["endpoint"].format(type=msg_type) if "{" in config["endpoint"] else config["endpoint"]  # ty:ignore[possibly-missing-attribute]
 				request_params = params.copy()
 				if method == "web":
 					request_params["query_type"] = msg_type
@@ -570,7 +570,7 @@ class Motion(ClassUnion):
 
 
 @decorator.singleton
-class MillenniumEntanglement(ClassUnion):
+class MillenniumEntanglement(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 
@@ -749,7 +749,7 @@ class MillenniumEntanglement(ClassUnion):
 
 
 @decorator.singleton
-class Report(ClassUnion):
+class Report(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 		self.report = ReportAuthManager()

@@ -325,7 +325,7 @@ class DataClassConverter:
 		if not isinstance(value, list):
 			return []
 		if isinstance(item_type, type) and is_dataclass(item_type):
-			return [cls.dict_to_dataclass(item_type, item) for item in value]
+			return [cls.dict_to_dataclass(item_type, item) for item in value]  # ty:ignore[invalid-argument-type]
 		if get_origin(item_type) is Literal:
 			# 特殊处理列表中的 Literal 类型
 			valid_values = get_args(item_type)
@@ -342,7 +342,7 @@ class DataClassConverter:
 		if not isinstance(value, dict):
 			return {}
 		if isinstance(val_type, type) and is_dataclass(val_type):
-			return {key_type(k): cls.dict_to_dataclass(val_type, v) for k, v in value.items()}
+			return {key_type(k): cls.dict_to_dataclass(val_type, v) for k, v in value.items()}  # ty:ignore[invalid-argument-type]
 		try:
 			return {key_type(k): val_type(v) for k, v in value.items()}
 		except (TypeError, ValueError):

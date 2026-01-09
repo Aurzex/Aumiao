@@ -871,8 +871,8 @@ class InteractiveEditor:
 			entity_type=EntityType.ACTOR,
 			data=new_actor,
 		)
-		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore [reportArgumentType]
-		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore [reportArgumentType]
+		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-assignment]
+		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-assignment]
 		print(f"演员 {name} 添加成功")
 
 	def add_variable(self) -> None:

@@ -4,7 +4,7 @@ from collections import namedtuple
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict
 
 from src.api import auth, community, edu, forum, library, shop, user, whale, work
 from src.utils import acquire, data, decorator, file, tool
@@ -810,7 +810,6 @@ class SourceConfig:
 		"""初始化后处理"""
 		if self.available_actions is None:
 			self.available_actions = []
-		self.available_actions = cast("list [ActionConfig]", self.available_actions)
 
 
 # ==============================
@@ -864,7 +863,7 @@ ClassUnion = Union().__class__
 
 
 @decorator.singleton
-class Index(ClassUnion):
+class Index(ClassUnion):  # ty:ignore[unsupported-base]
 	"""首页展示类"""
 
 	# 颜色配置
@@ -912,7 +911,7 @@ class Index(ClassUnion):
 
 
 @decorator.singleton
-class Tool(ClassUnion):
+class Tool(ClassUnion):  # ty:ignore[unsupported-base]
 	"""工具类"""
 
 	def __init__(self) -> None:

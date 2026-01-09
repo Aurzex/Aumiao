@@ -110,7 +110,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 		except ValueError as ve:
 			print(printer.color_text(f"输入错误: {ve}", "ERROR"))
 		except Exception as e:
-			logger.exception("%s 执行失败", func.__name__)
+			logger.exception("%s 执行失败", func.__name__)  # ty:ignore[unresolved-attribute]
 			print(printer.color_text(f"操作失败: {e}", "ERROR"))
 
 	return wrapper

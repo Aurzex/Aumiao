@@ -238,7 +238,7 @@ class DataConverter:
 	def to_serializable(data: object) -> dict[str, object]:
 		"""转换为可序列化字典"""
 		if isinstance(data, dict):
-			return data.copy()
+			return data.copy()  # ty:ignore[invalid-return-type]
 		if is_dataclass_instance(data):
 			return asdict(data)
 		if hasattr(data, "__dict__"):
@@ -1072,7 +1072,7 @@ class Printer:
 		self,
 		prompt: str,
 		valid_options: set[T] | range | None = None,
-		cast_type: Callable[[str], T] = str,
+		cast_type: Callable[[str], T] = str,  # ty:ignore[invalid-parameter-default]
 		validator: Callable[[T], bool] | None = None,
 		max_attempts: int = 10,
 	) -> T:
@@ -1110,7 +1110,7 @@ class Printer:
 					attempts += 1
 					continue
 			except ValueError as e:
-				type_name = cast_type.__name__
+				type_name = cast_type.__name__  # ty:ignore[unresolved-attribute]
 				self.print_message(f"格式错误: 请输入 {type_name} 类型的值 ({e})", "ERROR")
 				attempts += 1
 			except KeyboardInterrupt:
