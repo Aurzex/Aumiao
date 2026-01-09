@@ -2,7 +2,7 @@ import sys  # noqa: I001
 
 from gui import MainWindow
 
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication  # ty:ignore[unresolved-import]
 
 
 def main() -> None:

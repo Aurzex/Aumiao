@@ -129,7 +129,7 @@ class CloudVariable(CloudDataItem):
 
 	def get(self) -> CloudValueType:
 		"""获取变量值"""
-		return self.value
+		return cast("CloudValueType", self.value)  # 添加类型转换
 
 	def set(self, value: CloudValueType) -> bool:
 		"""设置变量值"""
@@ -147,8 +147,8 @@ class CloudVariable(CloudDataItem):
 			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
 		# 类型转换, 因为我们知道回调是 ChangeCallbackType
-		old_val = cast("CloudValueType", old_value)
-		new_val = cast("CloudValueType", new_value)
+		old_val = "CloudValueType", old_value
+		new_val = "CloudValueType", new_value
 		# 调用所有回调
 		for callback in self._change_callbacks[:]:
 			try:
@@ -222,8 +222,8 @@ class CloudList(CloudDataItem):
 			print(f"警告: 云列表值类型不匹配, 期望 list, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
 		# 类型转换
-		old_list = cast("CloudListValueType", old_value)
-		new_list = cast("CloudListValueType", new_value)
+		old_list = "CloudListValueType", old_value
+		new_list = "CloudListValueType", new_value
 		# 调用父类的回调 (如果有)
 		for callback in self._change_callbacks[:]:
 			try:
@@ -251,7 +251,9 @@ class CloudList(CloudDataItem):
 
 	def get(self, index: int) -> CloudValueType | None:
 		"""获取指定位置的元素"""
-		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
+		if self.value and isinstance(self.value, list):
+			return len(self.value)
+		if self.value and isinstance(self.value, list) and ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			return self.value[index]
 		return None
 
@@ -259,39 +261,43 @@ class CloudList(CloudDataItem):
 		"""向列表末尾添加元素"""
 		if not isinstance(item, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
-		self.value.append(item)
-		self._emit_operation("push", item, len(self.value) - 1)
-		return True
+		if isinstance(self.value, list):
+			self.value.append(item)
+			self._emit_operation("push", item, len(self.value) - 1)
+			return True
+		return False
 
 	def pop(self) -> CloudValueType | None:
 		"""移除并返回列表最后一个元素"""
-		if self.value:
+		if isinstance(self.value, list) and self.value:
 			item = self.value.pop()
 			self._emit_operation("pop", item, len(self.value))
-			return item
+			return cast("CloudValueType", item)
 		return None
 
 	def unshift(self, item: CloudValueType) -> bool:
 		"""向列表开头添加元素"""
 		if not isinstance(item, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
-		self.value.insert(ValidationConfig.FIRST_ELEMENT_INDEX, item)
-		self._emit_operation("unshift", item, ValidationConfig.FIRST_ELEMENT_INDEX)
-		return True
+		if isinstance(self.value, list):
+			self.value.insert(ValidationConfig.FIRST_ELEMENT_INDEX, item)
+			self._emit_operation("unshift", item, ValidationConfig.FIRST_ELEMENT_INDEX)
+			return True
+		return False
 
 	def shift(self) -> CloudValueType | None:
 		"""移除并返回列表第一个元素"""
-		if self.value:
+		if isinstance(self.value, list) and self.value:
 			item = self.value.pop(ValidationConfig.FIRST_ELEMENT_INDEX)
 			self._emit_operation("shift", item, ValidationConfig.FIRST_ELEMENT_INDEX)
-			return item
+			return cast("CloudValueType", item)
 		return None
 
 	def insert(self, index: int, item: CloudValueType) -> bool:
 		"""在指定位置插入元素"""
 		if not isinstance(item, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
-		if ValidationConfig.MIN_LIST_INDEX <= index <= len(self.value):
+		if isinstance(self.value, list) and ValidationConfig.MIN_LIST_INDEX <= index <= len(self.value):
 			self.value.insert(index, item)
 			self._emit_operation("insert", item, index)
 			return True
@@ -299,17 +305,17 @@ class CloudList(CloudDataItem):
 
 	def remove(self, index: int) -> CloudValueType | None:
 		"""移除指定位置的元素"""
-		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
+		if isinstance(self.value, list) and ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			item = self.value.pop(index)
 			self._emit_operation("remove", item, index)
-			return item
+			return cast("CloudValueType", item)
 		return None
 
 	def replace(self, index: int, item: CloudValueType) -> bool:
 		"""替换指定位置的元素"""
 		if not isinstance(item, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
-		if ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
+		if isinstance(self.value, list) and ValidationConfig.MIN_LIST_INDEX <= index < len(self.value):
 			old_item = self.value[index]
 			self.value[index] = item
 			self._emit_operation("replace", old_item, item, index)
@@ -320,7 +326,7 @@ class CloudList(CloudDataItem):
 		"""替换列表最后一个元素"""
 		if not isinstance(item, (int, str)):
 			raise TypeError(ErrorMessages.INVALID_LIST_ITEM_TYPE)
-		if self.value:
+		if isinstance(self.value, list) and self.value:
 			old_item = self.value[ValidationConfig.LAST_ELEMENT_INDEX]
 			self.value[ValidationConfig.LAST_ELEMENT_INDEX] = item
 			self._emit_operation("replace_last", old_item, item)
@@ -329,49 +335,65 @@ class CloudList(CloudDataItem):
 
 	def clear(self) -> bool:
 		"""清空列表所有元素"""
-		old_value = self.value.copy()
-		self.value.clear()
-		self._emit_operation("clear", old_value)
-		return True
+		if isinstance(self.value, list):
+			old_value = self.value.copy()
+			self.value.clear()
+			self._emit_operation("clear", old_value)
+			return True
+		return False
 
 	def length(self) -> int:
 		"""获取列表长度"""
-		return len(self.value)
+		if isinstance(self.value, list):
+			return len(self.value)
+		return 0
 
 	def index_of(self, item: CloudValueType) -> int:
 		"""查找元素第一次出现的索引"""
 		try:
-			return self.value.index(item)
+			if isinstance(self.value, list):
+				return self.value.index(item)
 		except ValueError:
 			return -1
+		return -1
 
 	def last_index_of(self, item: CloudValueType) -> int:
 		"""查找元素最后一次出现的索引"""
 		try:
-			return len(self.value) - 1 - self.value[::-1].index(item)
+			if isinstance(self.value, list) and self.value:
+				return len(self.value) - 1 - self.value[::-1].index(item)
 		except ValueError:
 			return -1
+		return -1
 
 	def includes(self, item: CloudValueType) -> bool:
 		"""检查列表是否包含指定元素"""
-		return item in self.value
+		if isinstance(self.value, list):
+			return item in self.value
+		return False
 
 	def join(self, separator: str = ",") -> str:
 		"""将列表元素连接为字符串"""
-		return separator.join(str(item) for item in self.value)
+		if isinstance(self.value, list):
+			return separator.join(str(item) for item in self.value)
+		return ""
 
 	def copy(self) -> list[CloudValueType]:
 		"""返回列表的浅拷贝"""
-		return self.value.copy()
+		if isinstance(self.value, list):
+			return self.value.copy()
+		return []
 
 	def copy_from(self, source_list: list[CloudValueType]) -> bool:
 		"""从源列表复制数据"""
 		if source_list and not isinstance(source_list[0], (int, str)):
 			return False
-		old_value = self.value.copy()
-		self.value = source_list.copy()
-		self.emit_change(old_value, self.value, "local")
-		return True
+		if isinstance(self.value, list):
+			old_value = self.value.copy()
+			self.value = source_list.copy()
+			self.emit_change(old_value, self.value, "local")
+			return True
+		return False
 
 
 class CloudConnection:
@@ -651,7 +673,7 @@ class CloudConnection:
 			}
 			handler = message_handlers.get(message_type)
 			if handler:
-				handler(data)
+				handler(data)  # ty:ignore[invalid-argument-type]
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {DisplayHelper.truncate_value(data)}")
 		except Exception as error:
@@ -664,7 +686,7 @@ class CloudConnection:
 		print("✓ 连接加入成功, 请求所有数据...")
 		self.send_message(SendMessageType.GET_ALL_DATA, {})
 
-	def _handle_receive_all_data(self, data: list[dict[str, Any]] | object) -> None:
+	def _handle_receive_all_data(self, data: list[dict[str, Any]]) -> None:
 		"""处理接收完整数据消息"""
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
 		if isinstance(data, str):
@@ -673,12 +695,16 @@ class CloudConnection:
 			except json.JSONDecodeError as e:
 				print(f"数据解析失败: {e}")
 				return
-		if not isinstance(data, list):
+		if isinstance(data, list):
+			for item in data:
+				if isinstance(item, dict):
+					self._create_data_item(cast("dict", item))
+				else:
+					print(f"警告: 数据项不是字典类型: {type(item)}")
+		else:
 			print(f"数据格式错误, 期望列表, 得到: {type(data)}")
 			print(f"原始数据: {DisplayHelper.truncate_value(data)}")
 			return
-		for item in data:
-			self._create_data_item(item)
 		self.data_ready = True
 		print(f"✓ 数据准备完成! 私有变量: {len(self.private_variables)}, 公有变量: {len(self.public_variables)}, 列表: {len(self.lists)}")
 		self._emit_event("data_ready")
@@ -708,7 +734,7 @@ class CloudConnection:
 						value = int(value) if isinstance(value, (float, bool)) else str(value)
 					except Exception:
 						value = str(value)
-				self._create_private_variable(str(cloud_variable_id), str(name), cast("CloudValueType", value))
+				self._create_private_variable(str(cloud_variable_id), str(name), value)
 			elif data_type == DataType.PUBLIC_VARIABLE.value:
 				# 公有变量: 需要 CloudValueType (int | str)
 				if not isinstance(value, (int, str)):
@@ -718,7 +744,7 @@ class CloudConnection:
 						value = int(value) if isinstance(value, (float, bool)) else str(value)
 					except Exception:
 						value = str(value)
-				self._create_public_variable(str(cloud_variable_id), str(name), cast("CloudValueType", value))
+				self._create_public_variable(str(cloud_variable_id), str(name), value)
 			elif data_type == DataType.LIST.value:
 				# 列表类型: 需要 CloudListValueType (list [CloudValueType])
 				if not isinstance(value, list):
@@ -766,11 +792,15 @@ class CloudConnection:
 			self.lists[name] = cloud_list
 			self.lists[cloud_variable_id] = cloud_list
 
-	def _handle_update_private_variable(self, data: dict[str, Any] | object) -> None:
+	def _handle_update_private_variable(self, data: dict[str, Any]) -> None:
 		"""处理更新私有变量消息"""
 		if isinstance(data, dict) and "cvid" in data and "value" in data:
-			cloud_variable_id = data["cvid"]
+			data = cast("dict", data)
+			cloud_variable_id = str(data["cvid"])
 			new_value = data["value"]
+			if not isinstance(new_value, (int, str)):
+				print(f"警告: 私有变量值类型错误: {type(new_value)}")
+				return
 			for variable in self.private_variables.values():
 				if variable.cloud_variable_id == cloud_variable_id:
 					old_value = variable.value
@@ -778,28 +808,43 @@ class CloudConnection:
 					variable.emit_change(old_value, new_value, "cloud")
 					break
 
-	def _handle_receive_ranking_list(self, data: dict[str, Any] | object) -> None:
+	def _handle_receive_ranking_list(self, data: dict[str, Any]) -> None:
 		"""处理接收排行榜列表消息"""
 		with self._pending_requests_lock:
 			if not self._pending_ranking_requests:
 				print(ErrorMessages.NO_PENDING_REQUESTS)
 				return
 			variable = self._pending_ranking_requests.pop(0)
-		if not isinstance(data, dict) or "items" not in data or not isinstance(data["items"], list):
+		if not isinstance(data, dict):
 			print(f"{ErrorMessages.INVALID_RANKING_DATA}: {DisplayHelper.truncate_value(data)}")
 			return
-		ranking_data = [
-			{
-				"value": item["value"],
-				"user": {
-					"id": int(item["identifier"]),
-					"nickname": item["nickname"],
-					"avatar_url": item["avatar_url"],
-				},
-			}
-			for item in data["items"]
-			if isinstance(item, dict) and all(key in item for key in ["value", "nickname", "avatar_url", "identifier"])
-		]
+		ranking_data: list[dict[str, Any]] = []
+		# 安全地获取 items
+		items = data.get("items")
+		if not isinstance(items, list):
+			print(f"警告: items 不是列表类型: {type(items)}")
+			return
+		for item in items:
+			if isinstance(item, dict):
+				try:
+					# 安全地获取各个字段
+					value = item.get("value")
+					identifier = item.get("identifier")
+					nickname = item.get("nickname")
+					avatar_url = item.get("avatar_url")
+					if all([value is not None, identifier is not None, nickname is not None, avatar_url is not None]):
+						ranking_data.append(
+							{
+								"value": value,
+								"user": {
+									"id": int(str(identifier)),
+									"nickname": str(nickname),
+									"avatar_url": str(avatar_url),
+								},
+							},
+						)
+				except (ValueError, TypeError) as e:
+					print(f"排行榜数据解析错误: {e}")
 		variable.emit_ranking(ranking_data)
 		self._emit_event("ranking_received", variable, ranking_data)
 
@@ -810,6 +855,7 @@ class CloudConnection:
 		if isinstance(data, list):
 			for item in data:
 				if isinstance(item, dict) and "cvid" in item and "value" in item:
+					item = cast("dict", item)
 					cloud_variable_id = item["cvid"]
 					new_value = item["value"]
 					for variable in self.public_variables.values():
@@ -819,7 +865,7 @@ class CloudConnection:
 							variable.emit_change(old_value, new_value, "cloud")
 							break
 
-	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]] | object) -> None:
+	def _handle_update_list(self, data: dict[str, list[dict[str, Any]]]) -> None:
 		"""处理更新列表消息"""
 		if not isinstance(data, dict):
 			return
@@ -872,7 +918,7 @@ class CloudConnection:
 			index = nth - 1
 			cloud_list.replace(index, value)
 
-	def _handle_update_online_users(self, data: dict[str, Any] | object) -> None:
+	def _handle_update_online_users(self, data: dict[str, Any]) -> None:
 		"""处理更新在线用户数消息"""
 		if isinstance(data, dict) and "total" in data and isinstance(data["total"], int):
 			old_count = self.online_users

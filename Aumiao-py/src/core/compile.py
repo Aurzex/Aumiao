@@ -696,7 +696,7 @@ class InternalImplementations:
 					self.shadows["ELSE_TEXT"] = ""
 				return block
 
-			def _get_child_input_name(self, index: int) -> str:  # pyright: ignore [reportIncompatibleMethodOverride]
+			def _get_child_input_name(self, index: int) -> str:  # pyright: ignore [reportIncompatibleMethodOverride]  # ty:ignore[invalid-method-override]
 				conditions_count = len(self.compiled["conditions"])
 				return f"DO {index}" if index < conditions_count else "ELSE"
 

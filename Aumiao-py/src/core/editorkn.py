@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from html import unescape
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from src.core.base import BLOCK_CONFIG, DEFAULT_PROJECT_CONFIG, BlockCategory, BlockType, ColorFormat, ConnectionType, ShadowCategory, ShadowType
 
@@ -2409,6 +2409,7 @@ class KNProject:
 		"""按名称获取过程"""
 		for proc in self.procedures.values():
 			if isinstance(proc, dict):
+				proc = cast("dict", proc)
 				if proc.get("name") == name:
 					return proc
 			elif isinstance(proc, Procedure) and proc.name == name:

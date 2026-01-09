@@ -458,7 +458,7 @@ class ReportTypeRegistry:
 	def get_available_actions(self, report_type: str) -> list[ActionConfig]:
 		"""获取指定举报类型的可用操作"""
 		config = self.get_config(report_type)
-		return [action for action in config.available_actions if action.enabled]  # pyright: ignore [reportOptionalIterable]
+		return [action for action in config.available_actions if action.enabled]  # pyright: ignore [reportOptionalIterable]  # ty:ignore[not-iterable]
 
 	def get_action_prompt(self, report_type: str) -> str:
 		"""生成操作提示字符串"""
@@ -477,7 +477,7 @@ class ReportTypeRegistry:
 
 
 @decorator.singleton
-class ReportFetcher(ClassUnion):
+class ReportFetcher(ClassUnion):  # ty:ignore[unsupported-base]
 	"""举报信息获取器 - 支持分块获取和类型扩展"""
 
 	def __init__(self) -> None:
@@ -599,7 +599,7 @@ class ReportFetcher(ClassUnion):
 			# 创建举报记录
 			record = ReportRecord(
 				item=item_ndd,
-				report_type=report_type,  # pyright: ignore [reportArgumentType]
+				report_type=report_type,  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-argument-type]
 				item_id=str(item_ndd[config.item_id_field]),
 				content=item_ndd[config.content_field],
 				processed=False,
@@ -630,7 +630,7 @@ class ReportFetcher(ClassUnion):
 
 
 @decorator.singleton
-class BatchActionManager(ClassUnion):
+class BatchActionManager(ClassUnion):  # ty:ignore[unsupported-base]
 	"""批量动作管理器 - 负责管理批量处理动作和状态"""
 
 	def __init__(self) -> None:
@@ -660,7 +660,7 @@ class BatchActionManager(ClassUnion):
 
 
 @decorator.singleton
-class ReportProcessor(ClassUnion):
+class ReportProcessor(ClassUnion):  # ty:ignore[unsupported-base]
 	"""举报处理器 - 主处理逻辑"""
 
 	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
@@ -893,7 +893,7 @@ class ReportProcessor(ClassUnion):
 					adjusted_source_type = self.SOURCE_TYPE_MAP[report_type]
 					self._check_violation(
 						source_id=item_ndd[config.source_id_field],
-						source_type=adjusted_source_type,  # pyright: ignore [reportArgumentType]
+						source_type=adjusted_source_type,  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-argument-type]
 						board_name=item_ndd.get("board_name", "UNKNOWN"),
 						user_id=user_id_str,
 					)
@@ -1192,7 +1192,7 @@ class ReportProcessor(ClassUnion):
 
 
 @decorator.singleton
-class ReportAuthManager(ClassUnion):
+class ReportAuthManager(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		self.student_accounts = []
 		self.student_tokens = []
@@ -1272,7 +1272,7 @@ class FileUploaderProtocol(Protocol):
 	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
 
 
-class FileProcessor(ClassUnion):
+class FileProcessor(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 
