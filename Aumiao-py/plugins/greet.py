@@ -25,7 +25,7 @@ class Plugin(BasePlugin):
 	def PLUGIN_DEFAULT_CONFIG(self) -> dict[str, Any]:
 		return {"default_greeting": "Hello", "use_uppercase": False, "max_repeat_count": 3}
 
-	def __init__(self):
+	def __init__(self) -> None:
 		super().__init__()
 		self.config = {}
 
@@ -62,10 +62,7 @@ class Plugin(BasePlugin):
 			names.append(name2)
 		if name3:
 			names.append(name3)
-		results = []
-		for name in names:
-			results.append(self.greet(name))
-		return results
+		return [self.greet(name) for name in names]
 
 	def repeat_greeting(self, name: str = "World", count: int = 1) -> list[str]:
 		"""重复问候指定次数
@@ -75,7 +72,4 @@ class Plugin(BasePlugin):
 		"""
 		max_count = self.config.get("max_repeat_count", 3)
 		actual_count = min(count, max_count)
-		results = []
-		for _ in range(actual_count):
-			results.append(self.greet(name))
-		return results
+		return [self.greet(name) for _ in range(actual_count)]
