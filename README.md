@@ -1,3 +1,5 @@
+![看板娘](./Aumiao-py/resource//images/看板娘.webp)
+
 # Aumiao
 
 [![Moe Counter](https://count.getloli.com/@aurzex?name=aurzex&theme=capoo-1&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)](https://count.getloli.com/)
