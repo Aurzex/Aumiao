@@ -5,6 +5,8 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.13+](https://img.shields.io/badge/Python-3.13+-green.svg)](https://www.python.org/downloads/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
+[![PyPI Version](https://img.shields.io/pypi/v/aumiao.svg)](https://pypi.org/project/aumiao/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/aumiao.svg)](https://pypi.org/project/aumiao/)
 
 一个为编程猫社区开发的 API 收集项目和工具集合，旨在赋能脚本开发并提升社区管理效率。
 
@@ -54,14 +56,26 @@ A powerful API collection project and toolset for CodeMao community development,
 
 - Python 3.13 或更高版本 | Python 3.13 or higher
 
-### 安装步骤 | Installation Steps
+### 安装方式 | Installation Methods
+
+#### 通过 PyPI 安装（推荐）| Via PyPI (Recommended)
+
+```bash
+# 安装最新版本
+pip install aumiao
+
+# 或安装特定版本
+pip install aumiao==1.0.0
+```
+
+#### 从源代码安装 | From Source
 
 ```bash
 # 克隆项目 | Clone the repository
 git clone https://github.com/aurzex/Aumiao.git
 cd Aumiao/Aumiao-py
 
-# 使用uv包管理器（推荐）| Using uv package manager (recommended)
+# 使用 uv 包管理器（推荐）| Using uv package manager (recommended)
 pip install uv
 uv sync
 
@@ -78,7 +92,7 @@ pip install -r requirements.txt
 
 ### 二进制版本 | Binary Versions
 
-从[Release 页面](https://github.com/aurzex/Aumiao/releases)下载预编译版本，无需配置即可直接运行。  
+从 [Release 页面](https://github.com/aurzex/Aumiao/releases) 下载预编译版本，无需配置即可直接运行。  
 Download precompiled versions from the [Release page](https://github.com/aurzex/Aumiao/releases), ready to run without configuration.
 
 ## 贡献指南 | Contribution Guidelines
@@ -86,7 +100,7 @@ Download precompiled versions from the [Release page](https://github.com/aurzex/
 我们欢迎所有形式的贡献。请遵循以下流程： | We welcome all forms of contributions. Please follow the process below:
 
 1. **Fork 仓库**：点击右上角的 Fork 按钮 | **Fork Repository**: Click the Fork button in the upper right corner
-2. **创建分支**：基于`main`分支创建功能分支 | **Create Branch**: Create a feature branch based on the `main` branch
+2. **创建分支**：基于 `main` 分支创建功能分支 | **Create Branch**: Create a feature branch based on the `main` branch
 3. **开发功能**：在分支上实现您的改进 | **Develop Feature**: Implement your improvements on the branch
 4. **提交测试**：确保代码通过现有测试 | **Run Tests**: Ensure code passes existing tests
 5. **发起 PR**：向主仓库提交 Pull Request | **Submit PR**: Submit a Pull Request to the main repository
@@ -155,7 +169,7 @@ Download precompiled versions from the [Release page](https://github.com/aurzex/
 
 ## 许可证 | License
 
-本项目采用 AGPL-3.0 开源协议。详细条款请参阅[LICENSE](LICENSE)文件。  
+本项目采用 AGPL-3.0 开源协议。详细条款请参阅 [LICENSE](LICENSE) 文件。  
 This project is licensed under the AGPL-3.0 license. See the [LICENSE](LICENSE) file for details.
 
 ---

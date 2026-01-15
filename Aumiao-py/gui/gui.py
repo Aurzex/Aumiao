@@ -1,14 +1,14 @@
 # ruff: noqa: {code}
 import sys  # noqa: I001
 import ctypes
-import numpy as np
+import numpy as np  # ty:ignore[unresolved-import]
 
-from PyQt5.QtWidgets import *  # noqa: F403
-from PyQt5.QtGui import *  # noqa: F403
+from PyQt5.QtWidgets import *  # noqa: F403  # ty:ignore[unresolved-import]
+from PyQt5.QtGui import *  # noqa: F403  # ty:ignore[unresolved-import]
 from PyQt5.QtCore import *  # noqa: F403
 from src import *  # noqa: F403
 
-from scipy.ndimage import convolve
+from scipy.ndimage import convolve  # ty:ignore[unresolved-import]
 
 # 高斯核(5x5)
 gaussian_kernel = np.array(

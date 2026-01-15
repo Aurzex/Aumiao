@@ -7,14 +7,14 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
-from src import auth, user
-from src.api.auth import AuthManager
-from src.core.base import Index
-from src.core.compile import decompile_work
-from src.core.deepser import CodeMaoTool
-from src.core.process import FileProcessor
-from src.core.services import FileUploader, MillenniumEntanglement, Motion, Report
-from src.utils import data, plugin, tool
+from aumiao import auth, user
+from aumiao.api.auth import AuthManager
+from aumiao.core.base import Index
+from aumiao.core.compile import decompile_work
+from aumiao.core.deepser import CodeMaoTool
+from aumiao.core.process import FileProcessor
+from aumiao.core.services import FileUploader, MillenniumEntanglement, Motion, Report
+from aumiao.utils import data, plugin, tool
 
 # 常量定义
 T = TypeVar("T")

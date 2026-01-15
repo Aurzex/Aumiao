@@ -9,13 +9,13 @@ on:
     branches: [main]  # 只在 main 分支触发自动发版
     paths:
       - ".github/workflows/build.yml"
-      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
   pull_request:
     branches: [main]  # PR 到 main 时只构建验证
     paths:
       - ".github/workflows/build.yml"
-      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
     types: [closed]  # 只在 PR 合并时触发
   workflow_dispatch:  # 手动触发
@@ -552,7 +552,7 @@ jobs:
           $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
           if (Test-Path $issPath) {
               Write-Host "使用 Inno Setup 编译安装程序"
-              Write-Host "ISS 文件版本: 2.5.0 (硬编码)"
+              Write-Host "ISS 文件版本: 2.6.0 (硬编码)"
               Write-Host "构建版本: $fullVersion"
               Write-Host "图标文件路径: $iconPath"
               Write-Host "图标文件存在: $(Test-Path $iconPath)"
@@ -577,7 +577,7 @@ jobs:
                       $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
                       Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
                       Write-Host "安装程序构建成功: $newInstallerName"
-                      Write-Host "注意: ISS 文件中版本号为硬编码 2.5.0，安装程序文件名为 $fullVersion"
+                      Write-Host "注意: ISS 文件中版本号为硬编码 2.6.0，安装程序文件名为 $fullVersion"
                   } else {
                       Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
                       Write-Host "Output 目录内容:"
