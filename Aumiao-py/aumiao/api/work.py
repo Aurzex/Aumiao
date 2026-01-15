@@ -262,6 +262,21 @@ class WorkManager:
 		)
 		return response.status_code == HTTPStatus.OK.value
 
+	def execute_fork_work(self, work_id: int) -> bool:
+		"""
+		再创作作品
+		Args:
+			work_id: 作品 ID
+		Returns:
+			再创作是否成功
+		"""
+		response = self._client.send_request(
+			endpoint=f"/nemo/v2/works/{work_id}/fork",
+			method="POST",
+			payload={},
+		)
+		return response.status_code == HTTPStatus.OK.value
+
 	def execute_share_work(self, work_id: int) -> bool:
 		"""
 		分享作品
@@ -564,6 +579,18 @@ class WorkManager:
 			endpoint=f"/tiger/work/works/{work_id}/rename",
 			method="PATCH",
 			params={"is_check_name": is_check_name, "name": name, "work_type": work_type},
+		)
+		return response.status_code == HTTPStatus.OK.value
+
+	def recover_kn_trash(self, work_id: int) -> bool:
+		"""
+		恢复 KN 作品回收站作品
+		Returns:
+			操作是否成功
+		"""
+		response = self._client.send_request(
+			endpoint=f"https://api-creation.codemao.cn/neko/works/{work_id}/recover",
+			method="PATCH",
 		)
 		return response.status_code == HTTPStatus.OK.value
 
@@ -1255,6 +1282,22 @@ class WorkDataFetcher:
 		}
 		response = self._client.send_request(
 			endpoint="/nemo/v2/work/name/search",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	def fetch_work_by_miao_code(self, token: str) -> dict:
+		"""
+		根据喵口令获取作品数据
+		Args:
+			token: 喵口令
+		Returns:
+			作品数据字典
+		"""
+		params = {"token": token}
+		response = self._client.send_request(
+			endpoint="/tiger/nemo/miao-codes",
 			method="GET",
 			params=params,
 		)

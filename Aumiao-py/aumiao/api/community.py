@@ -232,7 +232,7 @@ class DataFetcher:
 		)
 
 	# 获取 KN 模板作品
-	# subject_id 为一时返回基础指南, 为 2 时返回进阶指南
+	# subject_id 为 1 时返回基础指南, 为 2 时返回进阶指南
 	def fetch_sample_works(self, subject_id: Literal[1, 2]) -> dict:
 		params = {"subject_id": subject_id}
 		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/sample/list", params=params, method="GET")
