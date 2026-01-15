@@ -1,25 +1,208 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "Aumiao"
-version = "2.5.0"
+name = "aumiao"
+version = "2.6.0"
+description = "赋能编程猫社区脚本开发 - https://aumiao.aurzex.top"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = { text = "GNU General Public License v3.0 or later" }
 authors = [
     { name = "Aumiao Team", email = "aumiao@aurzex.top" },
-    { name = "DontLoveBy", email = "laya200900@outlook.com" },
     { name = "Aurzex" },
+    { name = "DontLoveBy", email = "laya200900@outlook.com" },
+    { name = "MiTao" },
     { name = "MoonLeaaaf" },
     { name = "Nomen" },
-    { name = "MiTao" }
 ]
-description = "Aumiao 是一款针对于编程猫社区的爬虫(划掉)你说的对,但是《Aumiao》是一款由 Aumiao 开发团队开发的编程猫自动化工具 于 2023 年 5 月 2 日发布,工具以编程猫宇宙为舞台,玩家可以扮演毛毡用户在这个答辩 💩 社区毛线 🧶 坍缩并邂逅各种不同的乐子人 😋。在领悟了《猫站圣经》后,打败强敌扫厕所 😡,在维护编程猫核邪铀删的局面的同时,逐步揭开编程猫社区的真相官方网站:https://aumiao.aurzex.top 联系我们: Aumiao@aurzex.top"
-readme = "README.md"
-requires-python = ">=3.13"
+maintainers = [{ name = "Aumiao Team", email = "aumiao@aurzex.top" }]
+keywords = ["script", "codemao", "aumiao", "development", "automation", "bcm"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "cryptography>=46.0.3",
     "httpx>=0.28.1",
     "websocket-client>=1.9.0",
 ]
 
-[project.scripts]
-aumiao = "main:main"
+[project.optional-dependencies]
+dev = ["nuitka>=2.0.0", "pytest>=9.0.0", "black>=25.0.0", "ruff>=0.4.0"]
 
-[dependency-groups]
-dev = ["nuitka>=2.0.0"]
+[project.urls]
+Homepage = "https://aumiao.aurzex.top"
+Documentation = "https://docs.aumiao.aurzex.top"
+Repository = "https://github.com/aurzex/aumiao"
+Issues = "https://github.com/aurzex/aumiao/issues"
+Changelog = "https://github.com/aurzex/aumiao/releases"
+"Bug Tracker" = "https://github.com/aurzex/aumiao/issues"
+
+[project.scripts]
+aumiao = "aumiao.main:main"
+
+[project.entry-points."aumiao.plugins"]
+
+# 为未来插件系统预留
+# example-plugin = "aumiao.plugins.example:ExamplePlugin"
+[tool.hatch.version]
+path = "aumiao/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aumiao"]
+
+# Ruff 配置
+[tool.ruff]
+exclude = ["**/gui.py"]
+extend-exclude = ["test"]
+indent-width = 4
+line-length = 180
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "A", # 内置异常
+    "AIR", # 自动导入重构
+    "ANN", # 类型注解
+    "ARG", # 参数检查
+    "ASYNC", # 异步相关
+    "B", # 代码错误
+    "BLE", # 盲捕获异常
+    "C", # 代码复杂度
+    "C4", # 代码复杂度扩展
+    "C90", # McCabe 复杂度
+    "COM", # 逗号相关
+    "CPY", # 类型检查器
+    "DJ", # Django 相关
+    "DOC", # 文档字符串
+    "DTZ", # 日期时间时区
+    "E", # 错误
+    "EM", # 异常消息
+    "ERA", # 无意义操作
+    "EXE", # 可执行文件检查
+    "F", # 格式相关
+    "FA", # 未来注解
+    "FAST", # 快速API检查
+    "FBT", # 布尔陷阱
+    "FIX", # 自动修复
+    "FLY", # Flynt (f-string 转换)
+    "FURB", # 代码重构
+    "G", # Gutenberg (Tornado)
+    "I", # import 排序
+    "ICN", # import 约定
+    "INP", # Numpy 索引
+    "INT", # 类型推断
+    "ISC", # 隐式字符串连接
+    "LOG", # 日志相关
+    "N", # 命名约定
+    "NPY", # Numpy 实践
+    "PD", # Pandas 实践
+    "PERF", # 性能相关
+    "PGH", # PGH 特定规则
+    "PIE", # PIE (Python Idiosyncrasies)
+    "PL", # Pylint
+    "PT", # Pytest
+    "PTH", # 路径处理
+    "PYI", # .pyi 文件检查
+    "Q", # 引号相关
+    "R", # 重构
+    "RET", # 返回语句
+    "RSE", # 提升异常
+    "RUF", # Ruff 特定规则
+    "S", # 安全
+    "SIM", # 简化
+    "SLF", # self 参数检查
+    "SLOT", # __slots__
+    "T10", # T10 (TensorFlow)
+    "T20", # T20 (TensorFlow)
+    "TC", # 类型检查
+    "TD", # 待办事项
+    "TID", # 整理导入
+    "TRY", # try 语句
+    "UP", # 升级规则
+    "W", # 警告
+    "YTT", # Yield 类型检查
+
+]
+ignore = [
+    "ANN401", # 动态类型注解
+    "B006", # 可变默认参数
+    "BLE001", # 盲捕获异常
+    "C901", # 函数过于复杂
+    "CPY001", # 类型检查器
+    "DOC201", # 文档字符串格式
+    "DOC501", # 文档字符串返回类型
+    "E731", # lambda 赋值
+    "ERA001", # 无意义比较
+    "FIX002", # 自动修复相关
+    "PLR0913", # 过多参数
+    "PLR2004", # 魔术值比较
+    "S311", # 伪随机数生成
+    "S314", # 非加密随机数
+    "S405", # XML 解析
+    "T201", # print 调试
+    "TD002", # TODO 无作者
+    "TD003", # TODO 无日期
+    "W191", # 制表符缩进
+    "RUF067", # Ruff 特定规则
+
+]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+preview = true
+
+[tool.ruff.lint.pylint]
+max-branches = 30
+max-locals = 20
+max-nested-blocks = 15
+max-positional-args = 20
+max-public-methods = 50
+max-returns = 10
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+indent-style = "tab"
+line-ending = "auto"
+quote-style = "double"
+
+# Black 配置（保持与 Ruff 格式一致）
+[tool.black]
+line-length = 180
+target-version = ['py312', 'py313', 'py314']
+skip-string-normalization = true # 因为 Ruff 使用双引号
+
+# MyPy 配置
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["aumiao.gui.*", "test.*"]
+ignore_errors = true
+
+# 包包含配置
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aumiao*"]
+exclude = ["test*", "tests*", "docs*", "examples*"]

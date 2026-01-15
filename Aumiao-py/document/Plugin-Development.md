@@ -18,7 +18,7 @@
 ```python
 from collections.abc import Callable
 from typing import Any
-from src.utils.plugin import BasePlugin
+from aumiao.utils.plugin import BasePlugin
 
 class Plugin(BasePlugin):
     @property
@@ -190,7 +190,7 @@ plugins/
 ```python
 from collections.abc import Callable
 from typing import Any
-from src.utils.plugin import BasePlugin
+from aumiao.utils.plugin import BasePlugin
 
 class Plugin(BasePlugin):
     @property
@@ -203,7 +203,7 @@ class Plugin(BasePlugin):
 
     @property
     def PLUGIN_VERSION(self) -> str:
-        return "2.5.0"
+        return "2.6.0"
 
     @property
     def PLUGIN_CONFIG_SCHEMA(self) -> dict[str, Any]:
@@ -251,7 +251,7 @@ class Plugin(BasePlugin):
     def _backup_functions(self):
         """备份所有要修改的函数"""
         try:
-            import src.community as community
+            import aumiao.community as community
             if hasattr(community, 'authenticate_with_token'):
                 self.original_functions['authenticate_with_token'] = community.authenticate_with_token
         except Exception as e:
@@ -260,7 +260,7 @@ class Plugin(BasePlugin):
     def _restore_functions(self):
         """恢复所有修改的函数"""
         try:
-            import src.community as community
+            import aumiao.community as community
             for func_name, original_func in self.original_functions.items():
                 if hasattr(community, func_name):
                     setattr(community, func_name, original_func)
@@ -270,13 +270,13 @@ class Plugin(BasePlugin):
     def apply_code_modifications(self) -> str:
         """应用代码修改 - 使用最可靠的方法"""
         try:
-            import src.community as community
+            import aumiao.community as community
 
             # 方法1: 直接替换(最可靠)
             community.authenticate_with_token = self.new_authenticate_function
 
             # 方法2: 使用系统的重写功能
-            self.rewrite_function("src.community", "authenticate_with_token", self.new_authenticate_function)
+            self.rewrite_function("aumiao.community", "authenticate_with_token", self.new_authenticate_function)
 
             return "代码修改成功应用"
         except Exception as e:
@@ -293,7 +293,7 @@ class Plugin(BasePlugin):
     def test_modification(self) -> str:
         """测试修改是否生效"""
         try:
-            import src.community as community
+            import aumiao.community as community
             # 模拟调用
             result = community.authenticate_with_token("test_token")
             return f"测试成功，函数已修改"
@@ -366,8 +366,8 @@ def debug_module_status(self):
     modules = [m for m in sys.modules if 'community' in m]
     print(f"已加载的相关模块: {modules}")
 
-    if 'src.community' in sys.modules:
-        module = sys.modules['src.community']
+    if 'aumiao.community' in sys.modules:
+        module = sys.modules['aumiao.community']
         print(f"模块函数: {[f for f in dir(module) if not f.startswith('_')]}")
 ```
 

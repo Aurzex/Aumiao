@@ -1,26 +1,178 @@
-近日,我们痛心地发现,编程猫社区内出现了大量由自动化脚本发布的评论。这些行为不仅严重干扰了普通用户的正常交流,更在社区中滋生了对自动化工具的普遍反感与抵触情绪,这与我们创造工具的初衷完全相悖。
+# Aumiao
 
-2022 年,社区成员“伴雪纷飞”在论坛分享了一套用于自动点赞、评论的 Python 代码。我们(Aumiao 团队)当时出于技术探索精神,对其功能进行了优化与增补,初衷是希望为开发者提供一个研究学习与便捷测试的工具。
+[![Moe Counter](https://count.getloli.com/@aurzex?name=aurzex&theme=capoo-1&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)](https://count.getloli.com/)
 
-然而,事与愿违。我们看到这段代码及其衍生程序在各大论坛、博客被肆意传播,甚至被用于恶意刷取互动数据。此刻,我们内心五味杂陈。技术的传播一旦失控,其带来的负面影响远超我们的想象。
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.13+](https://img.shields.io/badge/Python-3.13+-green.svg)](https://www.python.org/downloads/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
+[![PyPI Version](https://img.shields.io/pypi/v/aumiao.svg)](https://pypi.org/project/aumiao/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/aumiao.svg)](https://pypi.org/project/aumiao/)
 
-我们的郑重呼吁
-在此,我们向整个开发者社区及所有用户发出郑重呼吁:
+一个为编程猫社区开发的 API 收集项目和工具集合，旨在赋能脚本开发并提升社区管理效率。
 
-致开发者: 请勿随意传播或出售您手中的相关源码与程序。我们应当成为社区环境的守护者,而非破坏者。技术的价值在于造福,而非滥用。
+A powerful API collection project and toolset for CodeMao community development, empowering script development and enhancing community management efficiency.
 
-致使用者: 请立即停止对自动化工具的滥用行为。编程猫社区是一个供广大创作者学习、交流与成长的平台,任何破坏社区氛围的行为都是对他人劳动成果的不尊重。
+## 主要功能 | Main Features
 
-我们坚信,技术的使用必须是有益且负责任的。既然我们共同选择在这个社区扎根,就有责任携手保护并促进我们所珍视的这片学习交流空间的和谐与发展。
-让我们回归技术的本心,用代码创造美好,而非困扰。
+### 社区管理 | Community Management
+
+- **评论管理**：支持关键词过滤、黑名单批量清理作品和帖子评论  
+  **Comment Management**: Keyword filtering, batch cleanup of work and post comments via blacklist
+- **智能回复**：基于关键词的自动化回复系统  
+  **Auto Reply**: Keyword-based automated reply system
+- **消息处理**：一键清空邮箱红点、批量邮件处理  
+  **Message Processing**: Clear inbox notifications with one click, batch email processing
+
+### 内容审核 | Content Moderation
+
+- **批量举报**：支持批量提交和审核举报  
+  **Batch Reporting**: Batch submission and review of reports
+- **违规检测**：自动识别广告内容、黑名单用户和重复发布  
+  **Violation Detection**: Automatically identify ads, blacklisted users, and duplicate posts
+- **实时监控**：动态监测社区违规行为  
+  **Real-time Monitoring**: Dynamically monitor community violations
+
+### 开发工具 | Development Tools
+
+- **多格式反编译**：支持 KITTEN N、KITTEN、NEMO、COCO 等作品格式  
+  **Multi-format Decompilation**: Support for KITTEN N, KITTEN, NEMO, COCO and other work formats
+- **AI 助手集成**：KN AI 对话接口和智能交互功能  
+  **AI Assistant Integration**: KN AI dialogue interface and intelligent interaction features
+- **跨平台上传**：多平台文件上传支持，便捷资源管理  
+  **Cross-platform Upload**: Multi-platform file upload support for convenient resource management
+
+### 实用工具 | Utility Tools
+
+- **喵口令生成器**：快速生成作品分享口令  
+  **Miao Code Generator**: Quickly generate work sharing codes
+- **小说下载器**：批量下载编程猫社区小说  
+  **Novel Downloader**: Batch download CodeMao community novels
+- **插件系统**：支持第三方插件扩展功能  
+  **Plugin System**: Support for third-party plugin extensions
+
+## 快速开始 | Quick Start
+
+### 环境要求 | Requirements
+
+- Python 3.13 或更高版本 | Python 3.13 or higher
+
+### 安装方式 | Installation Methods
+
+#### 通过 PyPI 安装（推荐）| Via PyPI (Recommended)
+
+```bash
+# 安装最新版本
+pip install aumiao
+
+# 或安装特定版本
+pip install aumiao==1.0.0
+```
+
+#### 从源代码安装 | From Source
+
+```bash
+# 克隆项目 | Clone the repository
+git clone https://github.com/aurzex/Aumiao.git
+cd Aumiao/Aumiao-py
+
+# 使用 uv 包管理器（推荐）| Using uv package manager (recommended)
+pip install uv
+uv sync
+
+# 或使用传统方式 | Or using traditional method
+pip install -r requirements.txt
+```
+
+### 配置文件 | Configuration Files
+
+项目使用以下配置文件： | The project uses the following configuration files:
+
+- `data.json` - 用户认证和数据配置文件 | User authentication and data configuration
+- `setting.json` - 程序运行设置和选项 | Program runtime settings and options
+
+### 二进制版本 | Binary Versions
+
+从 [Release 页面](https://github.com/aurzex/Aumiao/releases) 下载预编译版本，无需配置即可直接运行。  
+Download precompiled versions from the [Release page](https://github.com/aurzex/Aumiao/releases), ready to run without configuration.
+
+## 贡献指南 | Contribution Guidelines
+
+我们欢迎所有形式的贡献。请遵循以下流程： | We welcome all forms of contributions. Please follow the process below:
+
+1. **Fork 仓库**：点击右上角的 Fork 按钮 | **Fork Repository**: Click the Fork button in the upper right corner
+2. **创建分支**：基于 `main` 分支创建功能分支 | **Create Branch**: Create a feature branch based on the `main` branch
+3. **开发功能**：在分支上实现您的改进 | **Develop Feature**: Implement your improvements on the branch
+4. **提交测试**：确保代码通过现有测试 | **Run Tests**: Ensure code passes existing tests
+5. **发起 PR**：向主仓库提交 Pull Request | **Submit PR**: Submit a Pull Request to the main repository
+
+请确保： | Please ensure:
+
+- 代码风格与现有代码保持一致 | Code style is consistent with existing code
+- 添加必要的文档和注释 | Add necessary documentation and comments
+- 更新相关的测试用例 | Update relevant test cases
+
+[![Star History Chart](https://api.star-history.com/svg?repos=aurzex/Aumiao&type=Date)](https://star-history.com/#aurzex/Aumiao&Date)
+
+## 相关项目 | Related Projects
+
+### API 与文档 | API & Documentation
+
+- [codemao-api](https://github.com/lambdark/codemao-api) - 编程猫社区官方 API 文档 | Official CodeMao community API documentation
+- [CoCo-Source-Code-Plan](https://github.com/glacier-studio/CoCo-Source-Code-Plan) - CoCo 编辑器源代码还原计划 | CoCo editor source code restoration project
+
+### 开发工具 | Development Tools
+
+- [Kitten-4-Decompiler](https://github.com/S-LIGHTNING/Kitten-4-Decompiler) - Kitten4 作品反编译器 | Kitten4 work decompiler
+- [Kitten-Cloud-Function](https://github.com/S-LIGHTNING/Kitten-Cloud-Function) - 云变量客户端工具 | Cloud variable client tool
+- [JsToKn](https://github.com/PiicatXstate/JsToKn) - JavaScript 转 KittenN 积木工具 | JavaScript to KittenN block tool
+- [CodemaoNemoMultiDecompiler](https://github.com/MoonBcmTools/CodemaoNemoMultiDecompiler) - Nemo 作品源代码还原 | Nemo work source code restoration
+- [CodemaoNemoOneKeyBuildShareCode](https://github.com/MoonBcmTools/CodemaoNemoOneKeyBuildShareCode) - 一键生成 Nemo 作品分享口令 | One-click Nemo work share code generation
+- [coco-packager](https://github.com/cocotais-lab/coco-packager) - CoCo 作品打包工具 | CoCo work packaging tool
+- [widget-template](https://github.com/liulyxandy-codemao/widget-template) - CoCo 自定义控件模板 | CoCo custom widget template
+
+### 社区增强与优化 | Community Enhancement & Optimization
+
+- [Better-Codemao](https://github.com/LuYingYiLong/Better-Codemao) - 编程猫社区增强脚本 | CodeMao community enhancement script
+- [codemaoOptimization](https://github.com/sf-yuzifu/codemaoOptimization) - 社区使用问题优化 | Community usage optimization
+- [pickcat](https://github.com/sf-yuzifu/pickcat) - 编程猫社区重新设计与功能扩展 | CodeMao community redesign and feature extension
+
+### 实用工具 | Utility Tools
+
+- [CodemaoEDUTools](https://github.com/Wangs-official/CodemaoEDUTools) - 学生账号管理工具 | Student account management tool
+- [Codemao-Storage](https://github.com/ornwind/Codemao-Storage) - 编程猫 CDN 文件上传工具 | CodeMao CDN file upload tool
+- [bcm_convertor](https://github.com/sf-yuzifu/bcm_convertor) - 作品转桌面应用工具 | Work to desktop application converter
+- [codemaonoveldownloader](https://github.com/rumunius/codemaonoveldownloader) - 小说下载爬虫 | Novel download crawler
+- [CodemaoDrive](https://github.com/CrackerCat/CodemaoDrive) - 编程猫云盘，支持任意文件上传与下载 | CodeMao cloud drive supporting any file upload/download
+- [PostCodemao](https://github.com/stonehfzs/PostCodemao) - 编程猫的时光邮箱/明信片生成 DEMO | CodeMao time email/postcard generation demo
+- [Codemao-Studio-Ranking](https://github.com/Hatmic/Codemao-Studio-Ranking) - 编程猫工作室评论数排行榜 | CodeMao studio comment ranking
+- [codemao-diger-rebuild](https://github.com/Rov-Waff/codemao-diger-rebuild) - 编程猫社区挖坟工具 | CodeMao community necromancy tool
+
+### 数据采集与分析 | Data Collection & Analysis
+
+- [CodemaoSpider](https://github.com/wbteve/CodemaoSpider) - 作品素材采集工具 | Work material collection tool
+- [-Codemao-](https://github.com/Liu-YuC/-Codemao-) - 评论数据爬取与分析 | Comment data crawling and analysis
+
+### CoCo 生态 | CoCo Ecosystem
+
+- [CoCo-Community](https://github.com/zitzhen/CoCo-Community) - CoCo 第三方社区 | CoCo third-party community
+
+## 联系我们 | Contact Us
+
+- **官方网站**：[https://aumiao.aurzex.top](https://aumiao.aurzex.top)  
+  **Official Website**: [https://aumiao.aurzex.top](https://aumiao.aurzex.top)
+- **问题反馈**：[GitHub Issues](https://github.com/aurzex/Aumiao/issues)  
+  **Issue Reporting**: [GitHub Issues](https://github.com/aurzex/Aumiao/issues)
+- **联系邮箱**：Aumiao@aurzex.top  
+  **Contact Email**: Aumiao@aurzex.top
+- **开发团队**：Aurzex, DontLoveby, Moonleeeaf, Nomen  
+  **Development Team**: Aurzex, DontLoveby, Moonleeeaf, Nomen
+
+## 许可证 | License
+
+本项目采用 AGPL-3.0 开源协议。详细条款请参阅 [LICENSE](LICENSE) 文件。  
+This project is licensed under the AGPL-3.0 license. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-Aumiao Team
-MAOYU
-2024 年 8 月 7 日
-
-附:技术使用说明(优化版)
-为方便开发者进行合规的技术研究,现将部分 API 使用规范说明如下:
-API 版本说明: 编程猫 API 中的 v2 等字样代表接口版本号。通常,高版本接口兼容低版本功能,但建议优先使用指定版本。
-分页请求说明: 若函数使用 fetch_all_data 方法,则该方法的 limit 参数主要用于控制请求速度(值越大,请求速度通常越快,建议取值范围为 [5, 100]),而 offset 与 page 参数则用于设定数据请求的起始位置(默认从 0 开始)。
+感谢使用 Aumiao。如果本项目对您有帮助，请考虑在 GitHub 上为我们点亮星标。  
+Thank you for using Aumiao. If this project helps you, please consider giving it a star on GitHub.

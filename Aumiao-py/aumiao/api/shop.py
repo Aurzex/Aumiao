@@ -1,0 +1,285 @@
+from collections.abc import Generator
+from typing import Literal
+
+from aumiao.utils import acquire
+from aumiao.utils.acquire import HTTPStatus
+from aumiao.utils.decorator import singleton
+
+
+@singleton
+class WorkshopDataFetcher:
+	def __init__(self) -> None:
+		self._client = acquire.CodeMaoClient()
+
+	# 获取工作室简介 (简易, 需登录工作室成员账号)
+	def fetch_workshop_info(self) -> dict:
+		response = self._client.send_request(endpoint="/web/work_shops/simple", method="GET")
+		return response.json()
+
+	# 获取工作室详情
+	def fetch_workshop_details(self, workshop_id: str) -> dict:
+		response = self._client.send_request(endpoint=f"/web/shops/{workshop_id}", method="GET")
+		return response.json()
+
+	# 获取工作室列表
+	def fetch_workshops(
+		self,
+		level: int = 4,
+		limit: int = 14,
+		works_limit: int = 4,
+		offset: int = 0,
+		sort: list[str] = ["-created_at", "-latest_joined_at"],
+	) -> dict:
+		if isinstance(sort, list):
+			sort_str = ",".join(sort)
+		params = {
+			"level": level,
+			"works_limit": works_limit,
+			"limit": limit,
+			"offset": offset,
+			"sort": sort_str,
+		}
+		response = self._client.send_request(
+			endpoint="/web/work-shops/search",
+			params=params,
+			method="GET",
+		)
+		return response.json()
+
+	# 获取工作室成员
+	def fetch_workshop_members_gen(self, workshop_id: int, limit: int | None = 40) -> Generator[dict]:
+		params = {"limit": 40, "offset": 0}
+		return self._client.fetch_paginated_data(
+			endpoint=f"/web/shops/{workshop_id}/users",
+			params=params,
+			total_key="total",
+			limit=limit,
+		)
+
+	# 获取工作室详情列表, 包括成员和作品
+	def fetch_workshop_details_list(
+		self,
+		levels: list[int] | int = [1, 2, 3, 4],
+		max_number: int = 4,
+		works_limit: int = 4,
+		sort: list[str] | str = ["-ordinal,-updated_at"],
+	) -> dict:
+		levels_str: str = ""
+		sort_str: str = ""
+		if isinstance(levels, list):
+			levels_str = ",".join(map(str, levels))
+		if isinstance(sort, list):
+			sort_str = ",".join(sort)
+		params = {
+			"levels": levels_str,
+			"max_number": max_number,
+			"works_limit": works_limit,
+			"sort": sort_str,
+		}
+		response = self._client.send_request(endpoint="/web/shops", method="GET", params=params)
+		return response.json()
+
+	# 获取工作室讨论
+	def fetch_workshop_discussions_gen(
+		self,
+		shop_id: int,
+		source: Literal["WORK_SHOP"] = "WORK_SHOP",
+		sort: Literal["-created_at"] = "-created_at",
+		limit: int | None = 15,
+	) -> Generator[dict]:
+		params = {"source": source, "sort": sort, "limit": 20, "offset": 0}
+		return self._client.fetch_paginated_data(endpoint=f"/web/discussions/{shop_id}/comments", params=params, limit=limit)
+
+	# 获取工作室投稿作品
+	def fetch_workshop_works_gen(self, workshop_id: int, user_id: int, sort: str = "-created_at,-id", limit: int | None = 20) -> Generator[dict]:
+		params = {"limit": 20, "offset": 0, "sort": sort, "user_id": user_id, "work_subject_id": workshop_id}
+		return self._client.fetch_paginated_data(endpoint=f"/web/works/subjects/{workshop_id}/works", params=params, limit=limit)
+
+	# 获取与工作室关系
+	def fetch_workshop_relation(self, relation_id: int) -> dict:
+		params = {"id": relation_id}
+		response = self._client.send_request(endpoint="/web/work_shops/users/relation", method="GET", params=params)
+		return response.json()
+
+	# 获取工作室讨论区的帖子
+	def fetch_workshop_posts_gen(self, label_id: int, limit: int | None = 20) -> Generator[dict]:
+		params = {"limit": 20, "offset": 0}
+		return self._client.fetch_paginated_data(endpoint=f"/web/works/subjects/labels/{label_id}/posts", params=params, limit=limit)
+
+	# 获取工作室待审核成员
+	def fetch_workshop_unaudited_member(self, workshop_id: int, limit: int = 40, offset: int = 0) -> dict:
+		params = {"limit": limit, "offset": offset, "id": workshop_id}
+		response = self._client.send_request(endpoint="https://api.codemao.cn/web/work_shops/users/unaudited/list", method="GET", params=params)
+		return response.json()
+
+
+@singleton
+class WorkshopActionHandler:
+	def __init__(self) -> None:
+		# 初始化 acquire 对象
+		self._client = acquire.CodeMaoClient()
+
+	# 更新工作室简介
+	def update_workshop_details(self, description: str, workshop_id: str, name: str, preview_url: str) -> bool:
+		# 发送请求, 更新工作室简介
+		response = self._client.send_request(
+			endpoint="/web/work_shops/update",
+			method="POST",
+			payload={
+				"description": description,
+				"id": workshop_id,
+				"name": name,
+				"preview_url": preview_url,
+			},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 创建工作室
+	def create_workshop(self, name: str, description: str, preview_url: str) -> dict:
+		# 发送请求, 创建工作室
+		response = self._client.send_request(
+			endpoint="/web/work_shops/create",
+			method="POST",
+			payload={
+				"name": name,
+				"description": description,
+				"preview_url": preview_url,
+			},
+		)
+		# 返回请求的 json 数据
+		return response.json()
+
+	# 解散工作室
+	def delete_workshop(self, workshop_id: int) -> bool:
+		# 发送请求, 解散工作室
+		response = self._client.send_request(
+			endpoint="/web/work_shops/dissolve",
+			method="POST",
+			payload={"id": workshop_id},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 在指定工作室投稿作品
+	def create_work_contribution(self, workshop_id: int, work_id: int) -> bool:
+		# 发送请求, 在指定工作室投稿作品
+		response = self._client.send_request(
+			endpoint="/web/work_shops/works/contribute",
+			method="POST",
+			payload={"id": workshop_id, "work_id": work_id},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 在指定工作室删除作品
+	def delete_workshop_work(self, workshop_id: int, work_id: int) -> bool:
+		# 发送请求, 在指定工作室删除作品
+		response = self._client.send_request(
+			endpoint="/web/work_shops/works/remove",
+			method="POST",
+			payload={"id": workshop_id, "work_id": work_id},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 申请加入工作室
+	def execute_apply_to_join(self, workshop_id: int, qq: str | None = None) -> bool:
+		# 发送请求申请加入工作室
+		response = self._client.send_request(
+			endpoint="/web/work_shops/users/apply/join",
+			method="POST",
+			payload={"id": workshop_id, "qq": qq},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 审核已经申请加入工作室的用户
+	def execute_review_join_application(self, workshop_id: int, status: Literal["UNACCEPTED", "ACCEPTED"], user_id: int) -> bool:
+		# 发送请求, 审核已经申请加入工作室的用户
+		response = self._client.send_request(
+			endpoint="/web/work_shops/users/audit",
+			method="POST",
+			payload={"id": workshop_id, "status": status, "user_id": user_id},
+		)
+		# 返回请求状态码是否为 HTTPStatus.OK.value
+		return response.status_code == HTTPStatus.OK.value
+
+	# 举报讨论区下的评论
+	def execute_report_comment(
+		self,
+		comment_id: int,
+		reason_content: str,
+		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
+		reporter_id: int,
+		comment_source: Literal["WORK_SHOP"] = "WORK_SHOP",
+		comment_parent_id: int = 0,
+		description: str = "",
+	) -> bool:
+		response = self._client.send_request(
+			endpoint="/web/reports/comments",
+			method="POST",
+			payload={
+				"comment_id": comment_id,
+				"comment_parent_id": comment_parent_id,
+				"description": description,
+				"reason_content": reason_content,
+				"reason_id": str(reason_id),
+				"reporter_id": reporter_id,
+				"comment_source": comment_source,
+			},
+		)
+		return response.status_code == HTTPStatus.CREATED.value
+
+	# 回复评论
+	def create_comment_reply(
+		self,
+		workshop_id: int,
+		comment_id: int,
+		content: str,
+		source: Literal["WORK_SHOP"] = "WORK_SHOP",
+		parent_id: int = 0,
+		*,
+		return_data: bool = False,
+	) -> dict | bool:
+		response = self._client.send_request(
+			endpoint=f"/web/discussions/{workshop_id}/comments/{comment_id}/reply",
+			method="POST",
+			payload={
+				"parent_id": parent_id,
+				"content": content,
+				"source": source,
+			},
+		)
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
+
+	# 删除回复
+	def delete_reply(self, comment_id: int, source: Literal["WORK_SHOP"] = "WORK_SHOP") -> bool:
+		response = self._client.send_request(
+			endpoint=f"/web/discussions/replies/{comment_id}",
+			method="DELETE",
+			params={"source": source},
+		)
+		return response.status_code == HTTPStatus.NO_CONTENT.value
+
+	# 评论
+	def create_comment(self, workshop_id: int, content: str, rich_content: str, source: Literal["WORK_SHOP"] = "WORK_SHOP", *, return_data: bool = False) -> dict | bool:
+		response = self._client.send_request(
+			endpoint=f"/web/discussions/{workshop_id}/comment",
+			method="POST",
+			payload={
+				"content": content,
+				"rich_content": rich_content,
+				"source": source,
+			},
+		)
+		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
+
+	# 删除评论
+	def delete_comment(self, comment_id: int, source: Literal["WORK_SHOP"] = "WORK_SHOP") -> bool:
+		response = self._client.send_request(
+			endpoint=f"/web/discussions/comments/{comment_id}",
+			method="DELETE",
+			params={"source": source},
+		)
+		return response.status_code == HTTPStatus.NO_CONTENT.value
