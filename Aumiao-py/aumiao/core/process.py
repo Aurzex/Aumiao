@@ -31,7 +31,7 @@ class ProcessingContext:
 	admin_id: int
 	report_type: str
 	# 配置信息
-	config: SourceConfig = field(default_factory=SourceConfig)
+	config: "SourceConfig" = field(default_factory=SourceConfig)  # 使用工厂函数  # ty:ignore[no-matching-overload]
 	# 处理状态
 	processed: bool = False
 	action: str | None = None
@@ -94,7 +94,7 @@ class OfficialCheckProcessor(BaseProcessor):
 			context.user_id = user_id
 			# 检查是否为官方账号
 			if user_id in self.OFFICIAL_IDS:
-				context.messages.append("这是一条官方发布的内容,自动通过")
+				context.messages.append("这是一条官方发布的内容, 自动通过")
 				context.action = "P"
 				context.processed = True
 				# 应用动作到记录
@@ -117,8 +117,8 @@ class OfficialCheckProcessor(BaseProcessor):
 						handle_method(report_id=record["item"]["id"], resolution=status_map["P"], admin_id=context.admin_id)
 					context.messages.append("已自动通过官方内容")
 				except AttributeError:
-					# 如果找不到 _whale_motion,记录警告
-					context.messages.append("警告:无法执行官方内容自动通过操作")
+					# 如果找不到 _whale_motion, 记录警告
+					context.messages.append("警告: 无法执行官方内容自动通过操作")
 
 
 class DetailDisplayProcessor(BaseProcessor):
@@ -268,10 +268,10 @@ class ActionSelectionProcessor(BaseProcessor):
 		# 尝试转换为整数
 		source_id_int = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id_int:
-			self.printer.print_message("无效的来源 ID,无法检查违规", "ERROR")
+			self.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
 			return
 		# 调整来源类型
-		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # ty:ignore[invalid-assignment]
+		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # ty:ignore [invalid-assignment]
 		ReportProcessor().check_violation(
 			source_id=source_id_int,
 			source_type=adjusted_source_type,
@@ -310,7 +310,7 @@ class ActionSelectionProcessor(BaseProcessor):
 			action_name = action_config.name if action_config else action
 			self.printer.print_message(f"已应用操作: {action_name}", "SUCCESS")
 		except AttributeError:
-			self.printer.print_message("警告:无法执行处理动作", "ERROR")
+			self.printer.print_message("警告: 无法执行处理动作", "ERROR")
 
 
 class ProcessingPipeline:
@@ -338,7 +338,7 @@ class ProcessingPipeline:
 	@classmethod
 	def create_default_pipeline(cls, printer: Any, fetcher: Any) -> "ProcessingPipeline":
 		"""创建默认处理管道"""
-		# 创建处理器(注意顺序很重要)
+		# 创建处理器 (注意顺序很重要)
 		action_processor = ActionSelectionProcessor(printer, fetcher)
 		detail_processor = DetailDisplayProcessor(printer, action_processor)
 		official_processor = OfficialCheckProcessor(detail_processor)
@@ -925,6 +925,12 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 	def _fetch_type_chunked(report_type: str, config: SourceConfig, status: str) -> Generator[list[ReportRecord]]:
 		chunk: list[ReportRecord] = []
 		for item in config.fetch_generator(status):
+			# 如果状态是 TOBEDONE, 确保只获取未处理的
+			if status == "TOBEDONE":
+				# 检查是否为已处理状态
+				item_status = item.get("status", "")
+				if item_status and item_status != "TOBEDONE":
+					continue
 			item_ndd = data.NestedDefaultDict(item)
 			# 创建举报记录
 			record = ReportRecord(
@@ -943,20 +949,6 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		# 返回剩余记录
 		if chunk:
 			yield chunk
-
-	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
-		"""获取所有举报类型的总数"""
-		report_configs = [
-			("comment", lambda: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
-			("post", lambda: self._whale_obtain.fetch_post_reports_total(status=status)),
-			("discussion", lambda: self._whale_obtain.fetch_discussion_reports_total(status=status)),
-			("work", lambda: self._whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
-		]
-		total_reports = 0
-		for _report_type, total_func in report_configs:
-			total_info = total_func()
-			total_reports += total_info.get("total", 0)
-		return total_reports
 
 
 @decorator.singleton
