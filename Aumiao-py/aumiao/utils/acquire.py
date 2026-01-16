@@ -26,13 +26,29 @@ if TYPE_CHECKING:
 # ==================== 配置类 ====================
 @dataclass
 class ClientConfig:
-	"""客户端配置"""
+	"""客户端配置 - 重构版本"""
 
-	base_url: str = "https://api.codemao.cn"
+	# 基础 API 配置
+	api_base_urls: dict[str, str] = field(
+		default_factory=lambda: {
+			"default": "https://api.codemao.cn",
+			"creation": "https://api-creation.codemao.cn",
+			"whale": "https://api-whale.codemao.cn",
+			"edu": "https://eduzone.codemao.cn",
+		},
+	)
+	# 默认使用的 API 前缀
+	default_base_url_key: str = "default"
+	# 请求配置
 	timeout: float = 30.0
 	max_retries: int = 3
 	retry_delay: float = 1.0
 	log_requests: bool = True
+
+	def get_base_url(self, key: str | None = None) -> str:
+		"""获取指定 key 的基础 URL"""
+		key = key or self.default_base_url_key
+		return self.api_base_urls.get(key, self.api_base_urls[self.default_base_url_key])
 
 
 class HTTPStatus(Enum):
@@ -65,7 +81,12 @@ class IHTTPClient(ABC):
 	"""HTTP 客户端接口"""
 
 	@abstractmethod
-	def send_request(self, method: str, endpoint: str) -> Response:
+	def send_request(
+		self,
+		method: str,
+		endpoint: str,
+		base_url_key: str | None = None,
+	) -> Response:
 		"""发送 HTTP 请求"""
 
 	@abstractmethod
@@ -84,6 +105,7 @@ class IHTTPClient(ABC):
 		data_key: str = "items",
 		pagination_method: Literal["offset", "page"] = "offset",
 		config: PaginationConfig | None = None,
+		base_url_key: str | None = None,
 	) -> Generator[dict[str, Any]]:
 		"""获取分页数据"""
 
@@ -97,6 +119,7 @@ class IHTTPClient(ABC):
 		total_key: str = "total",
 		data_key: str = "items",
 		config: PaginationConfig | None = None,
+		base_url_key: str | None = None,
 	) -> dict[Literal["total", "total_pages"], int]:
 		"""获取分页总数"""
 
@@ -234,7 +257,7 @@ class BaseHTTPClient:
 
 	def send_request(
 		self,
-		method: str,
+		method: Literal["GET", "POST", "DELETE", "PUT", "PATCH"],
 		endpoint: str,
 		params: dict[str, Any] | None = None,
 		data: dict[str, Any] | None = None,
@@ -246,16 +269,31 @@ class BaseHTTPClient:
 		timeout: float | None = None,
 		*,
 		log: bool = True,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> Response:
-		"""统一的 HTTP 请求方法"""
-		url = endpoint if endpoint.startswith("http") else f"{self.config.base_url}{endpoint}"
+		"""统一的 HTTP 请求方法 - 添加 base_url_key 参数"""
+		# 构建完整的 URL
+		if endpoint.startswith("http"):
+			url = endpoint
+		else:
+			base_url = self.config.get_base_url(base_url_key)
+			url = f"{base_url}{endpoint}"
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
 		log_enabled = bool(self.config.log_requests and log)
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
-				response = self._execute_request(method=method, url=url, params=params, data=data, payload=payload, files=files, headers=request_headers, timeout=timeout)
+				response = self._execute_request(
+					method=method,
+					url=url,
+					params=params,
+					data=data,
+					payload=payload,
+					files=files,
+					headers=request_headers,
+					timeout=timeout,
+				)
 				if log_enabled:
 					self._log_request(response)
 				response.raise_for_status()
@@ -368,6 +406,7 @@ class BaseHTTPClient:
 		config: PaginationConfig | None = None,
 		*,
 		include_first_page: bool = False,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> tuple[int, int, list[dict[str, Any]], dict[str, Any]]:
 		"""获取分页信息 - 优化版"""
 		# 合并配置
@@ -376,7 +415,13 @@ class BaseHTTPClient:
 		amount_key = config_.get("amount_key", "")
 		request_params = self._prepare_pagination_params(params=params, amount_key=amount_key, include_first_page=include_first_page)
 		# 发送请求
-		response = self.send_request(fetch_method, endpoint, params=request_params, payload=payload)
+		response = self.send_request(
+			fetch_method,
+			endpoint,
+			params=request_params,
+			payload=payload,
+			base_url_key=base_url_key,
+		)
 		if response.status_code != HTTPStatus.OK.value:
 			return 0, 0, [], {}
 		response_data = response.json()
@@ -440,9 +485,16 @@ class BaseHTTPClient:
 		params: dict[str, Any],
 		payload: dict[str, Any] | None,
 		data_key: str,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> list[dict[str, Any]]:
 		"""获取单个页面的数据"""
-		response = self.send_request(method, endpoint, params=params, payload=payload)
+		response = self.send_request(
+			method,
+			endpoint,
+			params=params,
+			payload=payload,
+			base_url_key=base_url_key,
+		)
 		if response.status_code != HTTPStatus.OK.value:
 			return []
 		page_data_raw = self._get_nested_value(response.json(), data_key)
@@ -462,13 +514,14 @@ class BaseHTTPClient:
 		remaining_to_fetch: int,
 		current_count: int,
 		limit: int | None,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> Generator[dict[str, Any]]:
 		total_pages = (remaining_to_fetch + items_per_page - 1) // items_per_page
 		yielded_count = current_count
 		offset_key = config.get("offset_key", "")
 		for page_idx in range(1, total_pages + 1):
 			page_params = self._build_page_params(base_params, offset_key, page_idx, items_per_page, first_page_size, pagination_method)
-			page_data = self._fetch_single_page(endpoint, method, page_params, payload, data_key)
+			page_data = self._fetch_single_page(endpoint, method, page_params, payload, data_key, base_url_key)
 			if not page_data:
 				continue
 			for item in page_data:
@@ -488,6 +541,7 @@ class BaseHTTPClient:
 		data_key: str = "items",
 		pagination_method: Literal["offset", "page"] = "offset",
 		config: PaginationConfig | None = None,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> Generator[dict[str, Any]]:
 		# 获取分页信息
 		total_items, items_per_page, first_page, _ = self._get_pagination_info(
@@ -499,6 +553,7 @@ class BaseHTTPClient:
 			data_key=data_key,
 			config=config,
 			include_first_page=True,
+			base_url_key=base_url_key,
 		)
 		config_ = self._merge_pagination_config(config)
 		base_params = params.copy()
@@ -527,6 +582,7 @@ class BaseHTTPClient:
 			remaining_to_fetch=remaining_to_fetch,
 			current_count=yielded_count,
 			limit=limit,
+			base_url_key=base_url_key,
 		)
 
 	@staticmethod
@@ -545,9 +601,20 @@ class BaseHTTPClient:
 		total_key: str = "total",
 		data_key: str = "items",
 		config: PaginationConfig | None = None,
+		base_url_key: Literal["default", "creation", "edu", "whale"] | None = None,
 	) -> dict[Literal["total", "total_pages"], int]:
 		"""获取分页总数 - 优化版"""
-		total_items, items_per_page, _, _ = self._get_pagination_info(endpoint, params, payload, fetch_method, total_key, data_key, config, include_first_page=False)
+		total_items, items_per_page, _, _ = self._get_pagination_info(
+			endpoint,
+			params,
+			payload,
+			fetch_method,
+			total_key,
+			data_key,
+			config,
+			include_first_page=False,
+			base_url_key=base_url_key,
+		)
 		total_pages = self._calculate_total_pages(total_items, items_per_page)
 		return {"total": total_items, "total_pages": total_pages}
 
@@ -809,7 +876,11 @@ class FileUploader(IFileUploader):
 			"fileSign": "p1",
 			"cdnName": "qiniu",
 		}
-		response = self.client.send_request("GET", "https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading", params=params)
+		response = self.client.send_request(
+			"GET",
+			"https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
+			params=params,
+		)
 		data = response.json()
 		return {
 			"token": data["tokens"][0]["token"],
@@ -821,7 +892,11 @@ class FileUploader(IFileUploader):
 	def _get_codegame_token(self, prefix: str, file_path: Path) -> dict[str, Any]:
 		"""获取 CodeGame 上传 token"""
 		params = {"prefix": prefix, "bucket": "static", "type": file_path.suffix}
-		response = self.client.send_request("GET", "https://oversea-api.code.game/tiger/kitten/cdn/token/1", params=params)
+		response = self.client.send_request(
+			"GET",
+			"https://oversea-api.code.game/tiger/kitten/cdn/token/1",
+			params=params,
+		)
 		data = response.json()
 		return {
 			"token": data["data"][0]["token"],
