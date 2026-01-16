@@ -42,6 +42,7 @@ RankingReceivedCallbackType = Callable[["PrivateCloudVariable", list[dict[str, A
 # ==============================
 class DisplayHelper:
 	"""显示辅助类 - 使用外部导入的 DisplayConfig"""
+
 	@staticmethod
 	def truncate_value(value: Any, max_length: int = DisplayConfig.MAX_DISPLAY_LENGTH) -> str:
 		"""截断过长的值用于显示"""
@@ -64,6 +65,7 @@ class DisplayHelper:
 
 class WorkInfo:
 	"""作品信息容器"""
+
 	def __init__(self, data: dict[str, Any]) -> None:
 		self.id = data["id"]
 		self.name = data.get("work_name", data.get("name", "未知作品"))
@@ -79,6 +81,7 @@ class WorkInfo:
 # ==============================
 class CloudDataItem:
 	"""云数据项基类"""
+
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudValueType | CloudListValueType) -> None:
 		self.connection = connection
 		self.cloud_variable_id = cloud_variable_id
@@ -104,8 +107,9 @@ class CloudDataItem:
 				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
 
-class CloudVariable (CloudDataItem):
+class CloudVariable(CloudDataItem):
 	"""云变量基类"""
+
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		# 调用父类初始化, 父类会创建_change_callbacks 列表
 		super().__init__(connection, cloud_variable_id, name, value)
@@ -150,8 +154,9 @@ class CloudVariable (CloudDataItem):
 				print(f"{ErrorMessages.CLOUD_VARIABLE_CALLBACK}: {error}")
 
 
-class PrivateCloudVariable (CloudVariable):
+class PrivateCloudVariable(CloudVariable):
 	"""私有云变量类"""
+
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudValueType) -> None:
 		super().__init__(connection, cloud_variable_id, name, value)
 		self._ranking_callbacks: list[RankingCallbackType] = []
@@ -183,12 +188,13 @@ class PrivateCloudVariable (CloudVariable):
 		self.connection.send_message(SendMessageType.GET_PRIVATE_VARIABLE_RANKING_LIST, request_data)
 
 
-class PublicCloudVariable (CloudVariable):
+class PublicCloudVariable(CloudVariable):
 	"""公有云变量类"""
 
 
-class CloudList (CloudDataItem):
+class CloudList(CloudDataItem):
 	"""云列表类"""
+
 	def __init__(self, connection: "CloudConnection", cloud_variable_id: str, name: str, value: CloudListValueType) -> None:
 		super().__init__(connection, cloud_variable_id, name, value or [])
 		# 注意: 我们不需要在 CloudList 中重新定义_change_callbacks
@@ -211,13 +217,10 @@ class CloudList (CloudDataItem):
 		if not isinstance(old_value, list) or not isinstance(new_value, list):
 			print(f"警告: 云列表值类型不匹配, 期望 list, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
-		# 类型转换
-		old_list = "CloudListValueType", old_value
-		new_list = "CloudListValueType", new_value
 		# 调用父类的回调 (如果有)
 		for callback in self._change_callbacks[:]:
 			try:
-				callback(old_list, new_list, source)
+				callback(old_value, new_value, source)
 			except Exception as error:
 				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
@@ -386,6 +389,7 @@ class CloudList (CloudDataItem):
 
 class CloudConnection:
 	"""云连接核心类 - 使用外部导入的配置"""
+
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self._ping_thread: threading.Thread | None = None
 		self.authenticator = Authenticator(authorization_token)
@@ -634,6 +638,7 @@ class CloudConnection:
 					except Exception as error:
 						print(f"{ErrorMessages.PING_SEND}: {error}")
 						break
+
 		self._ping_thread = threading.Thread(target=ping_task, daemon=True)
 		self._ping_thread.start()
 
@@ -1040,6 +1045,7 @@ class CloudConnection:
 						)
 				except Exception as error:
 					print(f"{ErrorMessages.WEB_SOCKET_RUN}: {error}")
+
 			self._websocket_thread = threading.Thread(target=run_websocket, daemon=True)
 			self._websocket_thread.start()
 		except Exception as error:
@@ -1299,6 +1305,7 @@ class CloudConnection:
 # ==============================
 class CloudManager:
 	"""云数据管理器 - 高级 API"""
+
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self.connection = CloudConnection(work_id, editor, authorization_token)
 
@@ -1325,8 +1332,9 @@ class CloudManager:
 		}
 
 
-class CloudCommandLineInterface (cmd.Cmd):
+class CloudCommandLineInterface(cmd.Cmd):
 	"""云数据交互式命令行界面"""
+
 	def __init__(self, cloud_manager: CloudManager) -> None:
 		super().__init__()
 		self.manager = cloud_manager
@@ -1404,7 +1412,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 			print(f"云列表: {len(available['lists'])} 个")
 
 	def do_available(self, arg: str) -> None:
-		""" 显示所有可用变量和列表
+		"""显示所有可用变量和列表
 		用法: available [详细]"""
 		if not self.connection.data_ready:
 			print("数据尚未就绪, 请等待连接完成")
@@ -1449,7 +1457,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 			print("无云列表")
 
 	def do_list(self, arg: str) -> None:
-		""" 列出所有数据
+		"""列出所有数据
 		用法: list [type]
 		type: private (私有变量) /public (公有变量) /lists (列表) /all (全部)"""
 		args = shlex.split(arg)
@@ -1487,7 +1495,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 				print("无云列表")
 
 	def do_get(self, arg: str) -> None:
-		""" 获取特定变量的值
+		"""获取特定变量的值
 		用法: get < 变量名 >"""
 		if not arg:
 			print("错误: 请指定变量名")
@@ -1512,7 +1520,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 		print("使用 'available' 命令查看所有可用变量")
 
 	def do_set_private(self, arg: str) -> None:
-		""" 设置私有变量的值
+		"""设置私有变量的值
 		用法: set_private < 变量名 > < 值 >"""
 		args = shlex.split(arg)
 		if len(args) < ValidationConfig.MIN_SET_ARGS:
@@ -1529,7 +1537,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 			print("使用 'available' 查看可用私有变量")
 
 	def do_set_public(self, arg: str) -> None:
-		""" 设置公有变量的值
+		"""设置公有变量的值
 		用法: set_public < 变量名 > < 值 >"""
 		args = shlex.split(arg)
 		if len(args) < ValidationConfig.MIN_SET_ARGS:
@@ -1556,7 +1564,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 		return value
 
 	def do_list_ops(self, arg: str) -> None:
-		""" 云列表操作
+		"""云列表操作
 		用法:
 			list_ops push < 列表名 > < 值 >      # 追加元素
 			list_ops pop < 列表名 >            # 弹出最后一个元素
@@ -1722,7 +1730,7 @@ class CloudCommandLineInterface (cmd.Cmd):
 		""")
 
 	def do_ranking(self, arg: str) -> None:
-		""" 获取私有变量的排行榜
+		"""获取私有变量的排行榜
 		用法: ranking < 变量名 > [数量] [排序]
 		数量: 默认 10, 最大 31
 		排序: 1 (升序) 或 -1 (降序, 默认)"""
