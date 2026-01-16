@@ -11,10 +11,10 @@ SelectMethod = Literal["POST", "DELETE"]
 
 @singleton
 class BaseWorkManager:
-	"""基础作品管理类,包含通用操作方法"""
+	"""基础作品管理类, 包含通用操作方法"""
 
 	def __init__(self) -> None:
-		"""初始化作品管理类,创建 CodeMaoClient 实例"""
+		"""初始化作品管理类, 创建 CodeMaoClient 实例"""
 		self._client = acquire.CodeMaoClient()
 
 	def execute_toggle_follow(self, user_id: int, method: SelectMethod = "POST") -> bool:
@@ -318,8 +318,10 @@ class BaseWorkManager:
 
 
 @singleton
-class KittenWorkManager(BaseWorkManager):
-	"""Kitten 作品管理类"""
+class KittenWorkManager:
+	def __init__(self) -> None:
+		"""初始化作品数据获取类"""
+		self._client = acquire.CodeMaoClient()
 
 	def create_kitten_work(
 		self,
@@ -435,8 +437,10 @@ class KittenWorkManager(BaseWorkManager):
 
 
 @singleton
-class NekoWorkManager(BaseWorkManager):
-	"""Neko (KittenN) 作品管理类"""
+class NekoWorkManager:
+	def __init__(self) -> None:
+		"""初始化作品数据获取类"""
+		self._client = acquire.CodeMaoClient()
 
 	def create_kn_work(
 		self,
@@ -1305,7 +1309,7 @@ class WorkDataFetcher:
 
 @singleton
 class NekoAIServices:
-	"""Neko AI 服务类,包含 AI 相关功能"""
+	"""Neko AI 服务类, 包含 AI 相关功能"""
 
 	def __init__(self) -> None:
 		"""初始化 Neko AI 服务类"""
@@ -1361,7 +1365,7 @@ class NekoAIServices:
 
 @singleton
 class NekoPlatformServices:
-	"""Neko 平台服务类,包含社区、素材、排行榜、包管理等功能"""
+	"""Neko 平台服务类, 包含社区、素材、排行榜、包管理等功能"""
 
 	def __init__(self) -> None:
 		"""初始化 Neko 平台服务类"""
