@@ -1,5 +1,3 @@
-import weakref
-from collections import defaultdict
 from collections.abc import Callable, Generator
 from functools import lru_cache, wraps
 from time import sleep
@@ -38,7 +36,7 @@ def retry(retries: int = 3, delay: float = 1) -> Callable:
 					# 如果重试次数达到上限, 则抛出异常
 					if i == retries:
 						print(f"Error: {e!r}.")
-						print(f'"{func.__name__}()" failed after {retries} retries.')  # ty:ignore[unresolved-attribute]
+						print(f'"{func.__name__}()" failed after {retries} retries.')  # ty:ignore [unresolved-attribute]
 						break
 					# 否则, 打印错误信息并等待一段时间后重试
 					print(f"Error: {e!r} -> Retrying...")
@@ -81,7 +79,7 @@ def generator(chunk_size: int = 1000) -> Callable:
 
 def lazy_property(func: Callable) -> ...:
 	# 定义一个属性名, 用于存储函数的返回值
-	attr_name = "_lazy_" + func.__name__  # ty:ignore[unresolved-attribute]
+	attr_name = "_lazy_" + func.__name__  # ty:ignore [unresolved-attribute]
 	# 定义一个装饰器, 用于将函数转换为属性
 
 	@property
@@ -98,41 +96,36 @@ def lazy_property(func: Callable) -> ...:
 
 
 def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool = False) -> Callable:
-	# 使用弱引用字典避免内存泄漏
-	func_registry = weakref.WeakKeyDictionary()
-
 	def decorator(func: Callable) -> ...:
 		# 使用 lru_cache 缓存结果
 		cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
-		# 为每个函数创建独立的计数器
-		call_counts = defaultdict(int)
-		func_registry[func] = (cached_func, call_counts)
+		# 使用字典记录调用次数,键为参数元组
+		call_counts = {}
 
 		@wraps(func)
-		def wrapper(*args: ..., **kwargs: ...) -> Callable:
-			# 使用更健壮的键生成方式
+		def wrapper(*args: ..., **kwargs: ...) -> ...:
+			# 生成缓存键
+			# 注意:functools.lru_cache 内部使用的方式更复杂
+			# 我们简化处理,只基于 args 和排序后的 kwargs
 			key = (
 				args,
-				frozenset(kwargs.items()),  # 使用 frozenset 避免顺序依赖
+				tuple(sorted(kwargs.items())) if kwargs else (),
 			)
 			# 获取当前计数
-			current_count = call_counts[key] + 1
+			current_count = call_counts.get(key, 0) + 1
 			call_counts[key] = current_count
 			# 检查是否需要重置
 			if current_count > max_calls:
-				# 只清除当前键的计数, 而不是整个缓存
+				# 重置该键的计数
 				call_counts[key] = 1
-				# 清除特定键的缓存
-				if hasattr(cached_func, "__wrapped__"):
-					# 创建新的缓存函数实例, 模拟清除特定缓存
-					new_cached_func = lru_cache(maxsize=maxsize, typed=typed)(cached_func.__wrapped__)
-					func_registry[func] = (new_cached_func, call_counts)
-					return new_cached_func(*args, **kwargs)
+				# 清除整个缓存(简化处理)
+				cached_func.cache_clear()
+			# 调用缓存函数
 			return cached_func(*args, **kwargs)
 
 		# 添加缓存访问方法
-		wrapper.cache_info = cached_func.cache_info  # pyright: ignore [reportAttributeAccessIssue]  # ty:ignore[unresolved-attribute]
-		wrapper.cache_clear = cached_func.cache_clear  # pyright: ignore [reportAttributeAccessIssue]  # ty:ignore[unresolved-attribute]
+		wrapper.cache_info = cached_func.cache_info  # ty:ignore[unresolved-attribute]
+		wrapper.cache_clear = cached_func.cache_clear  # ty:ignore[unresolved-attribute]
 		return wrapper
 
 	return decorator
