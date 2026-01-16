@@ -23,7 +23,7 @@ __all__: list[str] = [  # noqa: PLE0604
 	"process",
 	"retrieve",
 	"services",
-]  # type: ignore  # noqa: PGH003
+]
 # 模块缓存 (使用弱引用字典可考虑 WeakValueDictionary)
 _LOADED_MODULES: dict[str, ModuleType] = {}
 
