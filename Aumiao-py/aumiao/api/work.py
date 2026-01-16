@@ -316,18 +316,6 @@ class BaseWorkManager:
 		)
 		return response.status_code == HTTPStatus.OK.value
 
-	def recover_kn_trash(self, work_id: int) -> bool:
-		"""
-		恢复 KN 作品回收站作品
-		Returns:
-			操作是否成功
-		"""
-		response = self._client.send_request(
-			endpoint=f"https://api-creation.codemao.cn/neko/works/{work_id}/recover",
-			method="PATCH",
-		)
-		return response.status_code == HTTPStatus.OK.value
-
 
 @singleton
 class KittenWorkManager(BaseWorkManager):
@@ -1323,82 +1311,13 @@ class NekoAIServices:
 		"""初始化 Neko AI 服务类"""
 		self._client = acquire.CodeMaoClient()
 
-	def fetch_tts_generate(self, content: str, biz_type: int = 9) -> dict:
-		"""
-		生成 TTS 语音
-		Args:
-			content: 要转换的文本内容
-			biz_type: 业务类型,默认为 9
-		Returns:
-			TTS 生成结果
-		"""
-		data = {"bizType": biz_type, "content": content}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/ai/tts/generate", method="POST", payload=data)
-		return response.json()
-
-	def fetch_tts_status(self, task_id: str) -> dict:
-		"""
-		查询 TTS 任务状态
-		Args:
-			task_id: 任务 ID
-		Returns:
-			任务状态信息
-		"""
-		response = self._client.send_request(endpoint=f"/ai/tts/status?taskId={task_id}", method="GET")
-		return response.json()
-
-	def fetch_text2img_generate(self, data: dict) -> dict:
-		"""
-		文生图生成
-		Args:
-			data: 生成参数
-		Returns:
-			生成任务结果
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cncommon/api/neko/text2img", method="POST", payload=data)
-		return response.json()
-
-	def fetch_text2img_status(self, task_id: str) -> dict:
-		"""
-		查询文生图任务状态
-		Args:
-			task_id: 任务 ID
-		Returns:
-			任务状态信息
-		"""
-		params = {"task_id": task_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/status", method="GET", params=params)
-		return response.json()
-
-	def fetch_text2img_usage_left(self) -> dict:
-		"""
-		获取文生图剩余使用次数
-		Returns:
-			使用次数信息
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/usage-left", method="GET")
-		return response.json()
-
-	def fetch_text2img_history_list(self, limit: int = 10, offset: int = 0) -> dict:
-		"""
-		获取文生图历史记录列表
-		Args:
-			limit: 每页数量
-			offset: 偏移量
-		Returns:
-			历史记录列表
-		"""
-		params = {"limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/history-img/list", method="GET", params=params)
-		return response.json()
-
 	def fetch_text2img_prompt(self) -> dict:
 		"""
 		获取文生图提示词
 		Returns:
 			提示词信息
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/text2img/prompt", method="GET")
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/text2img/prompt", method="GET")
 		return response.json()
 
 	def fetch_ai_painting_templates(self, template_type: str) -> dict:
@@ -1409,7 +1328,7 @@ class NekoAIServices:
 		Returns:
 			模板列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ai-painting/templates?type={template_type}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/ai-painting/templates?type={template_type}", method="GET")
 		return response.json()
 
 	def match_ai_painting(self, data: dict) -> dict:
@@ -1420,7 +1339,7 @@ class NekoAIServices:
 		Returns:
 			匹配结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ai-painting/match", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/ai-painting/match", method="POST", payload=data)
 		return response.json()
 
 	def add_to_inspiration_pool(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str) -> dict:
@@ -1436,134 +1355,17 @@ class NekoAIServices:
 			添加结果
 		"""
 		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/inspiration-pool", method="POST", payload=data)
-		return response.json()
-
-	def save_text2img_history(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str, source_img: str | None = None) -> dict:
-		"""
-		保存文生图历史记录
-		Args:
-			img_url: 图片 URL
-			prompt: 提示词
-			style: 风格
-			img_type: 图片类型
-			generation_type: 生成类型
-			source_img: 源图片 (可选)
-		Returns:
-			保存结果
-		"""
-		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
-		if source_img:
-			data["source_img"] = source_img
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//common/api/neko/text2img/history-img", method="POST", payload=data)
-		return response.json()
-
-	def delete_text2img_task(self, task_id: str) -> dict:
-		"""
-		删除文生图任务
-		Args:
-			task_id: 任务 ID
-		Returns:
-			删除结果
-		"""
-		params = {"task_id": task_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/task", method="DELETE", params=params)
-		return response.json()
-
-	def delete_text2img_history(self, img_id: str) -> dict:
-		"""
-		删除文生图历史记录
-		Args:
-			img_id: 图片 ID
-		Returns:
-			删除结果
-		"""
-		params = {"img_id": img_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/history-img", method="DELETE", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/inspiration-pool", method="POST", payload=data)
 		return response.json()
 
 
-@singleton  # noqa: PLR0904
+@singleton
 class NekoPlatformServices:
-	"""Neko 平台服务类,包含云变量、社区、素材、排行榜、包管理等功能"""
+	"""Neko 平台服务类,包含社区、素材、排行榜、包管理等功能"""
 
 	def __init__(self) -> None:
 		"""初始化 Neko 平台服务类"""
 		self._client = acquire.CodeMaoClient()
-
-	# 云变量相关 API
-	def fetch_cloud_variables(self, work_id: int) -> dict:
-		"""
-		获取作品的云变量列表
-		Args:
-			work_id: 作品 ID
-		Returns:
-			云变量列表
-		"""
-		response = self._client.send_request(endpoint=f"/neko/cv/list/variables/{work_id}", method="GET")
-		return response.json()
-
-	def add_cloud_variable(self, work_id: int, name: str, var_type: int = 1) -> dict:
-		"""
-		添加云变量
-		Args:
-			work_id: 作品 ID
-			name: 变量名称
-			var_type: 变量类型,默认为 1
-		Returns:
-			添加结果
-		"""
-		data = {"type": var_type, "work_id": work_id, "name": name}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/cv/add/variables", method="POST", payload=data)
-		return response.json()
-
-	def delete_cloud_variable(self, work_id: int, cvid: str) -> dict:
-		"""
-		删除云变量
-		Args:
-			work_id: 作品 ID
-			cvid: 云变量 ID
-		Returns:
-			删除结果
-		"""
-		data = {"cvid": cvid, "work_id": work_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/cv/delete/variables", method="DELETE", payload=data)
-		return response.json()
-
-	def sync_cloud_variable(self, work_id: int, data: dict) -> dict:
-		"""
-		同步云变量数据
-		Args:
-			work_id: 作品 ID
-			data: 要同步的数据
-		Returns:
-			同步结果
-		"""
-		response = self._client.send_request(endpoint=f"/neko/cv/sync/{work_id}", method="POST", payload=data)
-		return response.json()
-
-	# 作品相关 API
-	def fetch_work_detail(self, work_id: int) -> dict:
-		"""
-		获取作品详情
-		Args:
-			work_id: 作品 ID
-		Returns:
-			作品详情信息
-		"""
-		response = self._client.send_request(endpoint=f"/neko/works/{work_id}", method="GET")
-		return response.json()
-
-	def fetch_work_archive(self, work_id: int) -> dict:
-		"""
-		获取作品存档
-		Args:
-			work_id: 作品 ID
-		Returns:
-			作品存档数据
-		"""
-		response = self._client.send_request(endpoint=f"/neko/works/archive/{work_id}", method="GET")
-		return response.json()
 
 	def save_teacher_work(self, data: dict) -> dict:
 		"""
@@ -1573,7 +1375,7 @@ class NekoPlatformServices:
 		Returns:
 			保存结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/works/teacher", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/teacher", method="POST", payload=data)
 		return response.json()
 
 	def copy_work(self, work_id: int) -> dict:
@@ -1585,7 +1387,7 @@ class NekoPlatformServices:
 			复制结果
 		"""
 		data = {"work_id": work_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/works/copy", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/copy", method="POST", payload=data)
 		return response.json()
 
 	def fetch_work_status(self, work_id: int) -> dict:
@@ -1596,7 +1398,7 @@ class NekoPlatformServices:
 		Returns:
 			作品状态信息
 		"""
-		response = self._client.send_request(endpoint=f"/neko/works/status/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/works/status/{work_id}", method="GET")
 		return response.json()
 
 	# 社区相关 API
@@ -1608,41 +1410,7 @@ class NekoPlatformServices:
 		Returns:
 			已发布作品详情
 		"""
-		response = self._client.send_request(endpoint=f"/neko/community/player/published-work-detail/{work_id}", method="GET")
-		return response.json()
-
-	def publish_work_to_community(self, work_id: int, data: dict) -> dict:
-		"""
-		发布作品到社区
-		Args:
-			work_id: 作品 ID
-			data: 发布参数
-		Returns:
-			发布结果
-		"""
-		response = self._client.send_request(endpoint=f"/neko/community/work/publish/{work_id}", method="POST", payload=data)
-		return response.json()
-
-	def fetch_community_work_detail(self, work_id: int) -> dict:
-		"""
-		获取社区作品详情
-		Args:
-			work_id: 作品 ID
-		Returns:
-			社区作品详情
-		"""
-		response = self._client.send_request(endpoint=f"/neko/community/work/detail/{work_id}", method="GET")
-		return response.json()
-
-	def fetch_user_achievement(self, user_id: int) -> dict:
-		"""
-		获取用户成就
-		Args:
-			user_id: 用户 ID
-		Returns:
-			用户成就信息
-		"""
-		response = self._client.send_request(endpoint=f"neko/community/user/achievement/{user_id}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/community/player/published-work-detail/{work_id}", method="GET")
 		return response.json()
 
 	# 素材相关 API
@@ -1654,7 +1422,7 @@ class NekoPlatformServices:
 		Returns:
 			分类列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/material/categories?type={material_type}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/material/categories?type={material_type}", method="GET")
 		return response.json()
 
 	def fetch_material_list(self, second_id: str, limit: int = 20, offset: int = 0) -> dict:
@@ -1668,7 +1436,7 @@ class NekoPlatformServices:
 			素材列表
 		"""
 		params = {"second_id": second_id, "limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/material/list", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/material/list", method="GET", params=params)
 		return response.json()
 
 	# 排行榜相关 API
@@ -1681,7 +1449,7 @@ class NekoPlatformServices:
 		Returns:
 			排行榜记录列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/record/list?id={ranking_id}&work_id={work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/ranking-list/record/list?id={ranking_id}&work_id={work_id}", method="GET")
 		return response.json()
 
 	def add_ranking_record(self, data: dict) -> dict:
@@ -1692,7 +1460,7 @@ class NekoPlatformServices:
 		Returns:
 			添加结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ranking-list/record", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/ranking-list/record", method="POST", payload=data)
 		return response.json()
 
 	def create_ranking_list(self, data: dict) -> dict:
@@ -1703,7 +1471,7 @@ class NekoPlatformServices:
 		Returns:
 			创建结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ranking-list", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/ranking-list", method="POST", payload=data)
 		return response.json()
 
 	def delete_ranking_list(self, ranking_id: str, work_id: str) -> dict:
@@ -1716,7 +1484,7 @@ class NekoPlatformServices:
 			删除结果
 		"""
 		params = {"id": ranking_id, "work_id": work_id}
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/{ranking_id}", method="DELETE", params=params)
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/ranking-list/{ranking_id}", method="DELETE", params=params)
 		return response.json()
 
 	# 包管理相关 API
@@ -1731,7 +1499,7 @@ class NekoPlatformServices:
 			包列表
 		"""
 		params = {"type": package_type, "limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/package/list", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/package/list", method="GET", params=params)
 		return response.json()
 
 	def create_package(self, data: dict) -> dict:
@@ -1742,7 +1510,7 @@ class NekoPlatformServices:
 		Returns:
 			创建结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/package", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/package", method="POST", payload=data)
 		return response.json()
 
 	def update_package(self, package_id: str, name: str, description: str) -> dict:
@@ -1756,7 +1524,7 @@ class NekoPlatformServices:
 			更新结果
 		"""
 		data = {"name": name, "description": description}
-		response = self._client.send_request(endpoint=f"/neko/package/{package_id}", method="PUT", payload=data)
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/package/{package_id}", method="PUT", payload=data)
 		return response.json()
 
 	def delete_package(self, package_id: str) -> dict:
@@ -1767,7 +1535,7 @@ class NekoPlatformServices:
 		Returns:
 			删除结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/package/{package_id}", method="DELETE")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/package/{package_id}", method="DELETE")
 		return response.json()
 
 	# 课程相关 API
@@ -1779,7 +1547,7 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/course/user/progress", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/course/user/progress", method="POST", payload=data)
 		return response.json()
 
 	def submit_course_work(self, data: dict) -> dict:
@@ -1790,17 +1558,7 @@ class NekoPlatformServices:
 		Returns:
 			提交结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/course/user/course-work", method="POST", payload=data)
-		return response.json()
-
-	# 其他工具 API
-	def fetch_current_time(self) -> dict:
-		"""
-		获取服务器当前时间
-		Returns:
-			服务器时间信息
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//coconut/clouddb/currentTime", method="GET")
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/course/user/course-work", method="POST", payload=data)
 		return response.json()
 
 	def translate_kitten_work(self, data: dict) -> dict:
@@ -1811,7 +1569,7 @@ class NekoPlatformServices:
 		Returns:
 			翻译结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//kitten/work/translate", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/kitten/work/translate", method="POST", payload=data)
 		return response.json()
 
 	# 图像分类相关 API
@@ -1825,7 +1583,7 @@ class NekoPlatformServices:
 			分类列表
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/image-classify/list", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/image-classify/list", method="GET", params=params)
 		return response.json()
 
 	def submit_image_classify(self, data: dict) -> dict:
@@ -1836,7 +1594,7 @@ class NekoPlatformServices:
 		Returns:
 			分类结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/image-classify", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/image-classify", method="POST", payload=data)
 		return response.json()
 
 	def update_image_classify(self, classify_id: str, data: dict) -> dict:
@@ -1848,7 +1606,7 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/image-classify/{classify_id}", method="PUT", payload=data)
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/image-classify/{classify_id}", method="PUT", payload=data)
 		return response.json()
 
 	def delete_image_classify(self, classify_id: str) -> dict:
@@ -1859,63 +1617,7 @@ class NekoPlatformServices:
 		Returns:
 			删除结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/image-classify/{classify_id}", method="DELETE")
-		return response.json()
-
-	# 打包相关 API
-	def submit_pack_task(self, data: dict) -> dict:
-		"""
-		提交打包任务
-		Args:
-			data: 打包参数
-		Returns:
-			任务提交结果
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/web/pack", method="POST", payload=data)
-		return response.json()
-
-	def stop_pack_task(self, task_id: str) -> dict:
-		"""
-		停止打包任务
-		Args:
-			task_id: 任务 ID
-		Returns:
-			停止结果
-		"""
-		response = self._client.send_request(endpoint=f"/neko/web/pack/stop?task_id={task_id}", method="PUT")
-		return response.json()
-
-	def fetch_pack_limit(self) -> dict:
-		"""
-		获取打包限制
-		Returns:
-			打包限制信息
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/web/pack/limit", method="GET")
-		return response.json()
-
-	def fetch_pack_status(self, params: dict) -> dict:
-		"""
-		获取打包状态
-		Args:
-			params: 状态查询参数
-		Returns:
-			打包状态信息
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/web/pack/status", method="GET", params=params)
-		return response.json()
-
-	def fetch_pack_result(self, task_id: str, work_id: str) -> dict:
-		"""
-		获取打包结果
-		Args:
-			task_id: 任务 ID
-			work_id: 作品 ID
-		Returns:
-			打包结果
-		"""
-		params = {"task_id": task_id, "work_id": work_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/web/pack", method="GET", params=params)
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/image-classify/{classify_id}", method="DELETE")
 		return response.json()
 
 	# 教学计划相关 API
@@ -1927,7 +1629,7 @@ class NekoPlatformServices:
 		Returns:
 			保存结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/teaching-plan/save/team/work", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/save/team/work", method="POST", payload=data)
 		return response.json()
 
 	def fetch_teaching_plan_logs(self, work_id: str, offset: int = 0, limit: int = 20) -> dict:
@@ -1941,7 +1643,7 @@ class NekoPlatformServices:
 			操作日志列表
 		"""
 		params = {"work_id": work_id, "offset": offset, "limit": limit}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/teaching-plan/list/opr/log", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/opr/log", method="GET", params=params)
 		return response.json()
 
 	def add_teaching_plan_log(self, data: dict) -> dict:
@@ -1952,7 +1654,7 @@ class NekoPlatformServices:
 		Returns:
 			添加结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/teaching-plan/add/opr/log", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/add/opr/log", method="POST", payload=data)
 		return response.json()
 
 	def fetch_work_editing_status(self, work_id: str) -> dict:
@@ -1963,7 +1665,7 @@ class NekoPlatformServices:
 		Returns:
 			编辑状态信息
 		"""
-		response = self._client.send_request(endpoint=f"/neko/teaching-plan/work/editing-status/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/teaching-plan/work/editing-status/{work_id}", method="GET")
 		return response.json()
 
 	def set_work_editing_status(self, data: dict) -> dict:
@@ -1974,7 +1676,7 @@ class NekoPlatformServices:
 		Returns:
 			设置结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/teaching-plan/set/work/editing-status", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/set/work/editing-status", method="POST", payload=data)
 		return response.json()
 
 	# 作品相关补充 API
@@ -1986,7 +1688,7 @@ class NekoPlatformServices:
 		Returns:
 			保存结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/works/save-teacher-course-invite-url", method="POST", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/save-teacher-course-invite-url", method="POST", payload=data)
 		return response.json()
 
 	def fetch_player_work_detail(self, work_id: int) -> dict:
@@ -1997,7 +1699,7 @@ class NekoPlatformServices:
 		Returns:
 			作品详情
 		"""
-		response = self._client.send_request(endpoint=f"/neko/works/player/work-detail/{work_id}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/works/player/work-detail/{work_id}", method="GET")
 		return response.json()
 
 	def fetch_work_by_course_code(self, course_code: str) -> dict:
@@ -2009,7 +1711,7 @@ class NekoPlatformServices:
 			作品信息
 		"""
 		params = {"course_code": course_code}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/works/get-player-by-course-code", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/get-player-by-course-code", method="GET", params=params)
 		return response.json()
 
 	def troubleshoot_work_pics(self, work_id: int) -> dict:
@@ -2020,7 +1722,7 @@ class NekoPlatformServices:
 		Returns:
 			排查结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/works/pic-troubleshoot/{work_id}", method="PUT")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/works/pic-troubleshoot/{work_id}", method="PUT")
 		return response.json()
 
 	# 社区相关补充 API
@@ -2032,29 +1734,7 @@ class NekoPlatformServices:
 		Returns:
 			操作状态
 		"""
-		response = self._client.send_request(endpoint=f"neko/community/check-user-opr-work-status/{work_id}", method="GET")
-		return response.json()
-
-	def fork_work(self, work_id: int) -> dict:
-		"""
-		fork 作品
-		Args:
-			work_id: 作品 ID
-		Returns:
-			fork 结果
-		"""
-		response = self._client.send_request(endpoint=f"nemo/v2/works/{work_id}/fork", method="POST")
-		return response.json()
-
-	def follow_user(self, user_id: int) -> dict:
-		"""
-		关注用户
-		Args:
-			user_id: 用户 ID
-		Returns:
-			关注结果
-		"""
-		response = self._client.send_request(endpoint=f"nemo/v2/user/{user_id}/follow", method="POST")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/community/check-user-opr-work-status/{work_id}", method="GET")
 		return response.json()
 
 	# 示例相关 API
@@ -2066,7 +1746,7 @@ class NekoPlatformServices:
 		Returns:
 			示例详情
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/sample/detail", method="GET", params=params)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/sample/detail", method="GET", params=params)
 		return response.json()
 
 	def fetch_sample_list(self, subject_id: str) -> dict:
@@ -2077,28 +1757,7 @@ class NekoPlatformServices:
 		Returns:
 			示例列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/sample/list?subject_id={subject_id}", method="GET")
-		return response.json()
-
-	# 权限相关 API
-	def fetch_user_detail(self) -> dict:
-		"""
-		获取用户详情
-		Returns:
-			用户详情信息
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/users/detail", method="GET")
-		return response.json()
-
-	def check_permit(self, permit_type: str) -> dict:
-		"""
-		检查权限
-		Args:
-			permit_type: 权限类型
-		Returns:
-			权限检查结果
-		"""
-		response = self._client.send_request(endpoint=f"common/neko/check-permit?type={permit_type}", method="GET")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/sample/list?subject_id={subject_id}", method="GET")
 		return response.json()
 
 	# 排行榜补充 API
@@ -2110,7 +1769,7 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ranking-list/fullUpdate", method="PUT", payload=data)
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/ranking-list/fullUpdate", method="PUT", payload=data)
 		return response.json()
 
 	def clear_ranking_list(self, ranking_id: str) -> dict:
@@ -2121,5 +1780,5 @@ class NekoPlatformServices:
 		Returns:
 			清空结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/clear?id={ranking_id}", method="PUT")
+		response = self._client.send_request(endpoint=f"https://api-creation.codemao.cn/neko/ranking-list/clear?id={ranking_id}", method="PUT")
 		return response.json()
