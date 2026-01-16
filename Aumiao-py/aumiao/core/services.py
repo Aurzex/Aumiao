@@ -148,7 +148,7 @@ class WorkParser(ClassUnion):  # ty:ignore[unsupported-base]
 		print(f"\n 处理完成, 共处理 {len(processed_ids)} 条通知")
 		return True
 
-	def _handle_work_parsing_request(  # noqa: PLR0915
+	def _handle_work_parsing_request(
 		self,
 		comment_text: str,
 		sender_id: int,
@@ -792,7 +792,7 @@ class KnEditor:
 	def __init__(self) -> None:
 		self.editor = KNEditor()
 
-	def handle_menu_selection(self, choice: str) -> bool:  # noqa: PLR0915
+	def handle_menu_selection(self, choice: str) -> bool:
 		"""处理菜单选择"""
 		if choice == "1":
 			project_name = input("请输入项目名称:").strip()
