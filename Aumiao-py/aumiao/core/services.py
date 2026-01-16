@@ -482,7 +482,7 @@ class Motion(ClassUnion):  # ty:ignore[unsupported-base]
 
 	def generate_miao_code(self, work_id: int) -> None:
 		try:
-			work_info_url = f"https://api.codemao.cn/creation-tools/v1/works/{work_id}/source/public"
+			work_info_url = f"/creation-tools/v1/works/{work_id}/source/public"
 			work_info = self._client.send_request(endpoint=work_info_url, method="GET").json()  # 统一客户端调用
 			bcm_url = work_info["work_urls"][0]
 			payload = {
@@ -495,7 +495,7 @@ class Motion(ClassUnion):  # ty:ignore[unsupported-base]
 				"work_id": work_id,
 				"work_url": bcm_url,
 			}
-			response = self._client.send_request(endpoint="https://api.codemao.cn/nemo/v2/miao-codes/bcm", method="POST", payload=payload)  # 统一客户端调用
+			response = self._client.send_request(endpoint="/nemo/v2/miao-codes/bcm", method="POST", payload=payload)  # 统一客户端调用
 			# Process the response
 			if response:
 				result = response.json()
