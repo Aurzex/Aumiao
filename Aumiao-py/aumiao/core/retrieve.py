@@ -1,11 +1,102 @@
 import operator
 from collections.abc import Callable, Generator, Iterator
+from dataclasses import dataclass
+from enum import Enum
+from functools import wraps
 from random import randint
 from time import sleep
 from typing import Any, Literal, cast, overload
 
 from aumiao.core.base import ClassUnion
 from aumiao.utils import decorator
+
+
+class QuerySource(Enum):
+	"""查询来源枚举"""
+
+	WORK = "work"
+	POST = "post"
+	SHOP = "shop"
+
+
+class QueryMethod(Enum):
+	"""查询方法枚举"""
+
+	USER_ID = "user_id"
+	COMMENT_ID = "comment_id"
+	COMMENTS = "comments"
+
+
+@dataclass
+class QueryParams:
+	"""查询参数封装类"""
+
+	source: QuerySource
+	id: int
+	method: QueryMethod = QueryMethod.USER_ID
+	limit: int | None = 500
+	type_item: str = "COMMENT_REPLY"
+
+
+class QueryBuilder:
+	"""查询构建器"""
+
+	def __init__(self, obtain_instance: "Obtain") -> None:
+		self.obtain = obtain_instance
+		self.params = QueryParams(source=QuerySource.WORK, id=0, method=QueryMethod.USER_ID, limit=500)
+
+	def from_source(self, source: Literal["work", "post", "shop"]) -> "QueryBuilder":
+		"""设置查询来源"""
+		self.params.source = QuerySource(source)
+		return self
+
+	def with_id(self, com_id: int) -> "QueryBuilder":
+		"""设置查询 ID"""
+		self.params.id = com_id
+		return self
+
+	def using_method(self, method: str) -> "QueryBuilder":
+		"""设置查询方法"""
+		self.params.method = QueryMethod(method)
+		return self
+
+	def with_limit(self, limit: int | None) -> "QueryBuilder":
+		"""设置查询限制"""
+		self.params.limit = limit
+		return self
+
+	def execute(self) -> Any:
+		"""执行查询"""
+		return self.obtain.execute_query(self.params)
+
+
+class QueryManager:
+	"""查询管理器"""
+
+	def __init__(self, obtain_instance: "Obtain") -> None:
+		self.obtain = obtain_instance
+
+	def create_builder(self) -> QueryBuilder:
+		"""创建查询构建器"""
+		return QueryBuilder(self.obtain)
+
+
+def query_method(method_name: str) -> ...:
+	"""查询方法装饰器,用于简化 API 调用"""
+
+	def decorator_func(func: ...) -> ...:
+		@wraps(func)
+		def wrapper(self: ..., *args: ..., **kwargs: ...) -> ...:
+			builder = self.query_manager.create_builder()
+			# 根据方法名和参数自动构建查询
+			if method_name == "comments_detail":
+				com_id, source, method, max_limit = args
+				return builder.from_source(source).with_id(com_id).using_method(method).with_limit(max_limit).execute()
+			return func(self, *args, **kwargs)
+
+		return wrapper
+
+	return decorator_func
 
 
 @decorator.singleton
@@ -19,19 +110,14 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		}
 		self._math_utils = self._tool.MathUtils()
 		self._data_processor = self._tool.DataProcessor()
+		self.query_manager = QueryManager(self)
 
 	def get_new_replies(
 		self,
 		limit: int = 0,
 		type_item: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"] = "COMMENT_REPLY",
 	) -> list[dict]:
-		"""获取社区新回复
-		Args:
-			limit: 获取数量限制 (0 表示获取全部新回复)
-			type_item: 消息类型
-		Returns:
-			结构化回复数据列表
-		"""
+		"""获取社区新回复"""
 		try:
 			message_data = self._community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
@@ -63,6 +149,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 				break
 		return replies
 
+	# 保持原有重载接口
 	@overload
 	def get_comments_detail(
 		self,
@@ -80,6 +167,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		max_limit: int | None = 500,
 	) -> list[dict]: ...
 	@decorator.lru_cache_with_reset(max_calls=3)
+	@query_method("comments_detail")
 	def get_comments_detail(
 		self,
 		com_id: int,
@@ -87,33 +175,26 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		method: str = "user_id",
 		max_limit: int | None = 500,
 	) -> list[dict] | list[str]:
-		"""获取结构化评论数据
-		Args:
-			com_id: 目标主体 ID (作品 / 帖子 / 工作室 ID)
-			source: 数据来源 work = 作品 post = 帖子 shop = 工作室
-			method: 返回格式
-				user_id -> 用户 ID 列表
-				comment_id -> 评论 ID 列表
-				comments -> 结构化评论数据
-			max_limit: 最大获取数量
-		Returns:
-			根据 method 参数返回对应格式的数据
-		"""
-		if source not in self._source_map:
-			msg = f"无效来源: {source}"
+		"""获取结构化评论数据(兼容原有接口)"""
+		return self.execute_query(QueryParams(source=QuerySource(source), id=com_id, method=QueryMethod(method), limit=max_limit))
+
+	def execute_query(self, params: QueryParams) -> Any:
+		"""执行查询的核心逻辑"""
+		source_value = params.source.value
+		if source_value not in self._source_map:
+			msg = f"无效来源: {source_value}"
 			raise ValueError(msg)
-		method_func, id_key, user_field = self._source_map[source]
-		comments = method_func(**{id_key: com_id, "limit": max_limit})  # pyright: ignore [reportArgumentType]
+		method_func, id_key, user_field = self._source_map[source_value]
+		comments = method_func(**{id_key: params.id, "limit": params.limit})
 		reply_cache = {}
 
 		def extract_reply_user(reply: dict) -> int:
 			return reply[user_field]["id"]
 
 		def generate_replies(comment: dict) -> Generator:
-			if source == "post":
-				# 缓存未命中时请求数据
+			if source_value == "post":
 				if comment["id"] not in reply_cache:
-					reply_cache[comment["id"]] = list(self._forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))  # 生成器后缀优化
+					reply_cache[comment["id"]] = list(self._forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
 				yield from reply_cache[comment["id"]]
 			else:
 				yield from comment.get("replies", {}).get("items", [])
@@ -154,15 +235,21 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 			]
 
 		method_handlers = {
-			"user_id": process_user_id,
-			"comment_id": process_comment_id,
-			"comments": process_detailed,
+			QueryMethod.USER_ID: process_user_id,
+			QueryMethod.COMMENT_ID: process_comment_id,
+			QueryMethod.COMMENTS: process_detailed,
 		}
-		if method not in method_handlers:
-			msg = f"无效方法: {method}"
+		if params.method not in method_handlers:
+			msg = f"无效方法: {params.method}"
 			raise ValueError(msg)
-		return method_handlers[method]()
+		return method_handlers[params.method]()
 
+	# 新增:使用查询构建器的 API
+	def query(self) -> QueryBuilder:
+		"""创建查询构建器"""
+		return QueryBuilder(self)
+
+	# 保持其他方法不变
 	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
 		per_source_limit = limit // 2
 		data_sources = [
@@ -181,10 +268,11 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 				yield {target: item.get(source_field) for target, source_field in mapping.items()}
 
 	def collect_work_comments(self, limit: int) -> list[dict]:
-		works = Obtain().integrate_work_data(limit=limit)
+		# 使用查询构建器重写
+		works = self.integrate_work_data(limit=limit)
 		comments = []
 		for single_work in works:
-			work_comments = Obtain().get_comments_detail(com_id=single_work["work_id"], source="work", method="comments", max_limit=20)
+			work_comments = self.query().from_source("work").with_id(single_work["work_id"]).using_method("comments").with_limit(20).execute()
 			comments.extend(work_comments)
 		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
 		filtered_comments = cast("list [dict]", filtered_comments)
@@ -200,7 +288,6 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 				user_comments_map[user_id_str] = {"user_id": user_id_str, "nickname": nickname, "comments": [], "comment_count": 0}
 			user_comments_map[user_id_str]["comments"].append(content)
 			user_comments_map[user_id_str]["comment_count"] += 1
-		# 转换为列表并按评论数从大到小排序
 		result = list(user_comments_map.values())
 		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
 		return result
@@ -210,29 +297,21 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	@overload
 	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[Any]: ...
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
-		"""
-		获取教育账号信息, 可选择返回生成器或列表
-		:param limit: 要获取的账号数量限制
-		:param return_method: 返回方式,"generator" 返回生成器,"list" 返回列表
-		:return: 账号生成器或列表, 每个元素为 (username, password) 元组
-		"""
+		"""获取教育账号信息"""
 		try:
-			# 获取学生列表
 			students = list(self._edu_obtain.fetch_class_students_gen(limit=limit))
 			if not students:
 				print("没有可用的教育账号")
 				return iter([]) if return_method == "generator" else []
-			# 定义处理函数
 			self._client.switch_identity(token=self._client.token.average, identity="average")
 
 			def process_student(student: dict) -> tuple[Any, Any]:
 				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
 
-			# 根据返回方式处理
 			if return_method == "generator":
 
 				def account_generator() -> Generator[tuple[Any, Any], Any]:
-					students_copy = students.copy()  # 避免修改原列表
+					students_copy = students.copy()
 					while students_copy:
 						student = students_copy.pop(randint(0, len(students_copy) - 1))
 						yield process_student(student)
@@ -240,7 +319,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 				return account_generator()
 			if return_method == "list":
 				result = []
-				students_copy = students.copy()  # 避免修改原列表
+				students_copy = students.copy()
 				while students_copy:
 					student = students_copy.pop(randint(0, len(students_copy) - 1))
 					result.append(process_student(student))
@@ -252,11 +331,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 			return iter([]) if return_method == "generator" else []
 
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
-		"""
-		处理教育账号的切换、登录和执行操作
-		:param limit: 要处理的账号数量限制
-		:param action: 登录成功后执行的回调函数
-		"""
+		"""处理教育账号的切换、登录和执行操作"""
 		try:
 			self._client.switch_identity(token=self._client.token.average, identity="average")
 			accounts = self.switch_edu_account(limit=limit, return_method="list")
