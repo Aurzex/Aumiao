@@ -11,7 +11,7 @@ from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from aumiao.api import auth
-from aumiao.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, ReportRecord, SourceConfig, data, decorator
+from aumiao.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, InfrastructureCoordinator, ReportRecord, SourceConfig, data, decorator
 from aumiao.core.retrieve import Obtain
 from aumiao.utils import acquire
 from aumiao.utils.tool import DataConverter, DataProcessor, GenericDataViewer, StringProcessor, TimeUtils
@@ -295,10 +295,8 @@ class ActionSelectionProcessor(BaseProcessor):
 		status_map = self.fetcher.registry.get_status_mapping()
 		# 执行处理动作
 		try:
-			# 使用 ReportProcessor 中的方法
-			if hasattr(self, "_whale_motion"):
-				handle_method = getattr(self._whale_motion, config.handle_method)
-				handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=context.admin_id)
+			handle_method = getattr(InfrastructureCoordinator()._whale_motion, config.handle_method)  # noqa: SLF001
+			handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=context.admin_id)
 			# 更新记录状态
 			record["processed"] = True
 			record["action"] = action
@@ -950,6 +948,20 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		if chunk:
 			yield chunk
 
+	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
+		"""获取所有举报类型的总数"""
+		report_configs = [
+			("comment", lambda: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
+			("post", lambda: self._whale_obtain.fetch_post_reports_total(status=status)),
+			("discussion", lambda: self._whale_obtain.fetch_discussion_reports_total(status=status)),
+			("work", lambda: self._whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
+		]
+		total_reports = 0
+		for _report_type, total_func in report_configs:
+			total_info = total_func()
+			total_reports += total_info.get("total", 0)
+		return total_reports
+
 
 @decorator.singleton
 class BatchActionManager(ClassUnion):  # ty:ignore [unsupported-base]
@@ -1158,7 +1170,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self,
 		record: ReportRecord,
 		action: str,
-		_admin_id: int,
+		admin_id: int,
 	) -> None:
 		"""应用简单动作 (不经过完整管道)"""
 		_config = self.fetcher.registry.get_config(record["report_type"])
@@ -1166,14 +1178,9 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		if not self.fetcher.registry.is_action_available(record["report_type"], action):
 			return
 		# 执行处理动作
-		_status_map = self.fetcher.registry.get_status_mapping()
-		# 这里需要实际执行动作
-		# handle_method = getattr (self._whale_motion, config.handle_method)
-		# handle_method (
-		#     report_id=record ["item"]["id"],
-		#     resolution=status_map [action],
-		#     admin_id=admin_id
-		# )
+		status_map = self.fetcher.registry.get_status_mapping()
+		handle_method = getattr(InfrastructureCoordinator()._whale_motion, record["item"]["id"])  # noqa: SLF001
+		handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=admin_id)
 		record["processed"] = True
 		record["action"] = action
 
@@ -1190,14 +1197,13 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self._printer.print_message(f"一键通过完成, 共通过 {total_processed} 条待处理举报", "SUCCESS")
 		return total_processed
 
-	def _pass_chunk_reports(self, chunk: list[ReportRecord], _admin_id: int) -> int:
+	def _pass_chunk_reports(self, chunk: list[ReportRecord], admin_id: int) -> int:
 		"""通过单个数据块中的所有举报"""
 		processed_count = 0
 		for record in chunk:
 			if not record["processed"]:
 				try:
-					# 这里应该执行实际的动作
-					# self._apply_action (record, "P", admin_id)
+					self._apply_action(record, "P", admin_id)
 					record["processed"] = True
 					record["action"] = "P"
 					processed_count += 1
