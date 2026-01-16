@@ -843,7 +843,7 @@ class Union:
 		self._user_motion = user.UserManager()
 		self._user_obtain = user.UserDataFetcher()
 		# 作品模块
-		self._work_motion = work.WorkManager()
+		self._work_motion = work.BaseWorkManager()
 		self._work_obtain = work.WorkDataFetcher()
 		# 举报模块
 		self._whale_motion = whale.ReportHandler()

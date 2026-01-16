@@ -11,10 +11,10 @@ SelectMethod = Literal["POST", "DELETE"]
 
 @singleton
 class BaseWorkManager:
-	"""基础作品管理类,包含通用方法"""
+	"""基础作品管理类,包含通用操作方法"""
 
 	def __init__(self) -> None:
-		"""初始化作品管理类, 创建 CodeMaoClient 实例"""
+		"""初始化作品管理类,创建 CodeMaoClient 实例"""
 		self._client = acquire.CodeMaoClient()
 
 	def execute_toggle_follow(self, user_id: int, method: SelectMethod = "POST") -> bool:
@@ -22,7 +22,7 @@ class BaseWorkManager:
 		关注或取消关注用户
 		Args:
 			user_id: 用户 ID
-			method: HTTP 方法 (POST = 关注,DELETE = 取消关注)
+			method: HTTP 方法 (POST = 关注, DELETE = 取消关注)
 		Returns:
 			操作是否成功
 		"""
@@ -38,7 +38,7 @@ class BaseWorkManager:
 		收藏或取消收藏作品
 		Args:
 			work_id: 作品 ID
-			method: HTTP 方法 (POST = 收藏,DELETE = 取消收藏)
+			method: HTTP 方法 (POST = 收藏, DELETE = 取消收藏)
 		Returns:
 			操作是否成功
 		"""
@@ -54,7 +54,7 @@ class BaseWorkManager:
 		点赞或取消点赞作品
 		Args:
 			work_id: 作品 ID
-			method: HTTP 方法 (POST = 点赞,DELETE = 取消点赞)
+			method: HTTP 方法 (POST = 点赞, DELETE = 取消点赞)
 		Returns:
 			操作是否成功
 		"""
@@ -186,7 +186,7 @@ class BaseWorkManager:
 		"""
 		置顶或取消置顶评论
 		Args:
-			method: HTTP 方法 (PUT = 置顶,DELETE = 取消置顶)
+			method: HTTP 方法 (PUT = 置顶, DELETE = 取消置顶)
 			work_id: 作品 ID
 			comment_id: 评论 ID
 			return_data: 是否返回完整响应数据
@@ -202,7 +202,7 @@ class BaseWorkManager:
 		Args:
 			work_id: 作品 ID
 			comment_id: 评论 ID
-			method: HTTP 方法 (POST = 点赞,DELETE = 取消点赞)
+			method: HTTP 方法 (POST = 点赞, DELETE = 取消点赞)
 		Returns:
 			操作是否成功
 		"""
@@ -351,7 +351,7 @@ class KittenWorkManager(BaseWorkManager):
 			work_url: 作品 URL
 			preview: 预览图 URL
 			version: 作品版本
-			orientation: 作品方向 (1 = 横屏,2 = 竖屏)
+			orientation: 作品方向 (1 = 横屏, 2 = 竖屏)
 			sample_id: 样本 ID (可选)
 			work_source_label: 作品来源标签
 			save_type: 保存类型
@@ -402,8 +402,8 @@ class KittenWorkManager(BaseWorkManager):
 			cover_url: 封面 URL
 			bcmc_url: BCMC URL
 			work_url: 作品 URL
-			fork_enable: 是否允许分叉 (0 = 不允许,1 = 允许)
-			if_default_cover: 封面类型 (1 = 默认,2 = 自定义)
+			fork_enable: 是否允许分叉 (0 = 不允许, 1 = 允许)
+			if_default_cover: 封面类型 (1 = 默认, 2 = 自定义)
 			version: 作品版本
 			cover_type: 封面类型 (可选)
 			user_labels: 用户标签列表 (可选)
@@ -520,8 +520,8 @@ class NekoWorkManager(BaseWorkManager):
 			preview_url: 预览 URL
 			description: 作品描述
 			operation: 操作说明
-			fork_enable: 分叉权限 (0 = 不允许,1 = 允许,2 = 仅粉丝允许)
-			if_default_cover: 封面类型 (1 = 默认,2 = 自定义)
+			fork_enable: 分叉权限 (0 = 不允许, 1 = 允许, 2 = 仅粉丝允许)
+			if_default_cover: 封面类型 (1 = 默认, 2 = 自定义)
 			bcmc_url: BCMC URL
 			work_url: 作品 URL
 			bcm_version: BCM 版本
@@ -553,7 +553,7 @@ class NekoWorkManager(BaseWorkManager):
 		删除未发布的 KN 作品草稿
 		Args:
 			work_id: 作品 ID
-			force: 强制删除模式 (1 = 网页端,2 = 手机端)
+			force: 强制删除模式 (1 = 网页端, 2 = 手机端)
 		Returns:
 			删除是否成功
 		"""
@@ -604,9 +604,10 @@ class NekoWorkManager(BaseWorkManager):
 		return response.status_code == HTTPStatus.OK.value
 
 
-# 保持原有的 WorkDataFetcher 类不变
 @singleton
 class WorkDataFetcher:
+	"""作品数据获取类"""
+
 	def __init__(self) -> None:
 		"""初始化作品数据获取类"""
 		self._client = acquire.CodeMaoClient()
@@ -946,7 +947,7 @@ class WorkDataFetcher:
 		获取或删除协作邀请码
 		Args:
 			work_id: 作品 ID
-			method: HTTP 方法 (GET = 获取,DELETE = 删除)
+			method: HTTP 方法 (GET = 获取, DELETE = 删除)
 		Returns:
 			协作信息字典
 		"""
@@ -1199,7 +1200,7 @@ class WorkDataFetcher:
 		"""
 		获取积木或角色资源包
 		Args:
-			types: 资源类型 (block = 积木,character = 角色)
+			types: 资源类型 (block = 积木, character = 角色)
 			limit: 获取数量 (可选)
 			offset: 偏移量 (可选)
 		Returns:
@@ -1314,15 +1315,14 @@ class WorkDataFetcher:
 		return response.json()
 
 
-# 保持原有的 NekoAPI 类不变
-class NekoAPI:  # noqa: PLR0904
-	"""Neko 平台 API 客户端"""
+@singleton
+class NekoAIServices:
+	"""Neko AI 服务类,包含 AI 相关功能"""
 
 	def __init__(self) -> None:
-		"""初始化作品数据获取类"""
+		"""初始化 Neko AI 服务类"""
 		self._client = acquire.CodeMaoClient()
 
-	# AI 相关 API
 	def fetch_tts_generate(self, content: str, biz_type: int = 9) -> dict:
 		"""
 		生成 TTS 语音
@@ -1400,6 +1400,96 @@ class NekoAPI:  # noqa: PLR0904
 		"""
 		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/text2img/prompt", method="GET")
 		return response.json()
+
+	def fetch_ai_painting_templates(self, template_type: str) -> dict:
+		"""
+		获取 AI 绘画模板
+		Args:
+			template_type: 模板类型
+		Returns:
+			模板列表
+		"""
+		response = self._client.send_request(endpoint=f"/neko/ai-painting/templates?type={template_type}", method="GET")
+		return response.json()
+
+	def match_ai_painting(self, data: dict) -> dict:
+		"""
+		AI 绘画匹配
+		Args:
+			data: 匹配参数
+		Returns:
+			匹配结果
+		"""
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ai-painting/match", method="POST", payload=data)
+		return response.json()
+
+	def add_to_inspiration_pool(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str) -> dict:
+		"""
+		添加到灵感池
+		Args:
+			img_url: 图片 URL
+			prompt: 提示词
+			style: 风格
+			img_type: 图片类型
+			generation_type: 生成类型
+		Returns:
+			添加结果
+		"""
+		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/inspiration-pool", method="POST", payload=data)
+		return response.json()
+
+	def save_text2img_history(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str, source_img: str | None = None) -> dict:
+		"""
+		保存文生图历史记录
+		Args:
+			img_url: 图片 URL
+			prompt: 提示词
+			style: 风格
+			img_type: 图片类型
+			generation_type: 生成类型
+			source_img: 源图片 (可选)
+		Returns:
+			保存结果
+		"""
+		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
+		if source_img:
+			data["source_img"] = source_img
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//common/api/neko/text2img/history-img", method="POST", payload=data)
+		return response.json()
+
+	def delete_text2img_task(self, task_id: str) -> dict:
+		"""
+		删除文生图任务
+		Args:
+			task_id: 任务 ID
+		Returns:
+			删除结果
+		"""
+		params = {"task_id": task_id}
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/task", method="DELETE", params=params)
+		return response.json()
+
+	def delete_text2img_history(self, img_id: str) -> dict:
+		"""
+		删除文生图历史记录
+		Args:
+			img_id: 图片 ID
+		Returns:
+			删除结果
+		"""
+		params = {"img_id": img_id}
+		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/history-img", method="DELETE", params=params)
+		return response.json()
+
+
+@singleton  # noqa: PLR0904
+class NekoPlatformServices:
+	"""Neko 平台服务类,包含云变量、社区、素材、排行榜、包管理等功能"""
+
+	def __init__(self) -> None:
+		"""初始化 Neko 平台服务类"""
+		self._client = acquire.CodeMaoClient()
 
 	# 云变量相关 API
 	def fetch_cloud_variables(self, work_id: int) -> dict:
@@ -1724,64 +1814,6 @@ class NekoAPI:  # noqa: PLR0904
 		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//kitten/work/translate", method="POST", payload=data)
 		return response.json()
 
-	# AI 绘画相关 API
-	def fetch_ai_painting_templates(self, template_type: str) -> dict:
-		"""
-		获取 AI 绘画模板
-		Args:
-			template_type: 模板类型
-		Returns:
-			模板列表
-		"""
-		response = self._client.send_request(endpoint=f"/neko/ai-painting/templates?type={template_type}", method="GET")
-		return response.json()
-
-	def match_ai_painting(self, data: dict) -> dict:
-		"""
-		AI 绘画匹配
-		Args:
-			data: 匹配参数
-		Returns:
-			匹配结果
-		"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/ai-painting/match", method="POST", payload=data)
-		return response.json()
-
-	def add_to_inspiration_pool(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str) -> dict:
-		"""
-		添加到灵感池
-		Args:
-			img_url: 图片 URL
-			prompt: 提示词
-			style: 风格
-			img_type: 图片类型
-			generation_type: 生成类型
-		Returns:
-			添加结果
-		"""
-		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//neko/inspiration-pool", method="POST", payload=data)
-		return response.json()
-
-	def save_text2img_history(self, img_url: str, prompt: str, style: str, img_type: str, generation_type: str, source_img: str | None = None) -> dict:
-		"""
-		保存文生图历史记录
-		Args:
-			img_url: 图片 URL
-			prompt: 提示词
-			style: 风格
-			img_type: 图片类型
-			generation_type: 生成类型
-			source_img: 源图片(可选)
-		Returns:
-			保存结果
-		"""
-		data = {"img_url": img_url, "prompt": prompt, "style": style, "img_type": img_type, "generation_type": generation_type}
-		if source_img:
-			data["source_img"] = source_img
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn//common/api/neko/text2img/history-img", method="POST", payload=data)
-		return response.json()
-
 	# 图像分类相关 API
 	def fetch_image_classify_list(self, limit: int = 20, offset: int = 0) -> dict:
 		"""
@@ -1889,7 +1921,7 @@ class NekoAPI:  # noqa: PLR0904
 	# 教学计划相关 API
 	def save_team_work(self, data: dict) -> dict:
 		"""
-		保存团队作品(教学计划)
+		保存团队作品 (教学计划)
 		Args:
 			data: 作品数据
 		Returns:
@@ -2072,7 +2104,7 @@ class NekoAPI:  # noqa: PLR0904
 	# 排行榜补充 API
 	def update_ranking_list(self, data: dict) -> dict:
 		"""
-		更新排行榜(全量更新)
+		更新排行榜 (全量更新)
 		Args:
 			data: 排行榜数据
 		Returns:
@@ -2090,29 +2122,4 @@ class NekoAPI:  # noqa: PLR0904
 			清空结果
 		"""
 		response = self._client.send_request(endpoint=f"/neko/ranking-list/clear?id={ranking_id}", method="PUT")
-		return response.json()
-
-	# 杂项 API
-	def delete_text2img_task(self, task_id: str) -> dict:
-		"""
-		删除文生图任务
-		Args:
-			task_id: 任务 ID
-		Returns:
-			删除结果
-		"""
-		params = {"task_id": task_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/task", method="DELETE", params=params)
-		return response.json()
-
-	def delete_text2img_history(self, img_id: str) -> dict:
-		"""
-		删除文生图历史记录
-		Args:
-			img_id: 图片 ID
-		Returns:
-			删除结果
-		"""
-		params = {"img_id": img_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/common/api/neko/text2img/history-img", method="DELETE", params=params)
 		return response.json()
