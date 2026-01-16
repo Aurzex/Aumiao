@@ -1,0 +1,2643 @@
+{
+  "all_apis": [
+    {
+      "call_start": 40122,
+      "endpoint": "/neko/material/categories?type=",
+      "full_call": "h.tI.get(\"/neko/material/categories?type=\".concat(t))",
+      "function_name": "I",
+      "function_params": "",
+      "instance": "h.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 40557,
+      "endpoint": "/neko/material/list",
+      "full_call": "h.tI.get(\"/neko/material/list\",{params:{second_id:t,limit:n,offset:i}})",
+      "function_name": "v",
+      "function_params": "",
+      "instance": "h.tI",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "second_id",
+          "type": "query",
+          "value": "t"
+        },
+        {
+          "name": "limit",
+          "type": "query",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 133776,
+      "endpoint": "/ai/tts/status?taskId=",
+      "full_call": "c.coneAiRequest.get(\"/ai/tts/status?taskId=\".concat(t))",
+      "function_name": "E",
+      "function_params": "",
+      "instance": "c.coneAiRequest",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 135038,
+      "endpoint": "/ai/tts/generate",
+      "full_call": "c.coneAiRequest.post(\"/ai/tts/generate\",{bizType:9,content:r})",
+      "function_name": "C",
+      "function_params": "",
+      "instance": "c.coneAiRequest",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "bizType",
+          "type": "body",
+          "value": "9"
+        },
+        {
+          "name": "content",
+          "type": "body",
+          "value": "r"
+        }
+      ]
+    },
+    {
+      "call_start": 148454,
+      "endpoint": "/public-api/ocr/status",
+      "full_call": "H.tI.get(\"/public-api/ocr/status\",{params:{task_id:e}})",
+      "function_name": "W",
+      "function_params": "e",
+      "instance": "H.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 148565,
+      "endpoint": "/public-api/ocr/task",
+      "full_call": "H.tI.delete(\"/public-api/ocr/task\",{params:{task_id:e}})",
+      "function_name": "V",
+      "function_params": "e",
+      "instance": "H.tI",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 150146,
+      "endpoint": "/public-api/ocr",
+      "full_call": "H.tI.post(\"/public-api/ocr\",{img_url:l},{headers:{\"request-origin\":\"NEKO\"}})",
+      "function_name": "e",
+      "function_params": "t,n",
+      "instance": "H.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "img_url",
+          "type": "body",
+          "value": "l"
+        },
+        {
+          "name": "headers",
+          "type": "body",
+          "value": "{\"request-origin\":\"NEKO\""
+        }
+      ]
+    },
+    {
+      "call_start": 154348,
+      "endpoint": "/public-api/baidu-openapi/face_detect",
+      "full_call": "H.tI.post(\"/public-api/baidu-openapi/face_detect\",{image_url:t,face_field:\"age,emotion,face_shape,gender\",max_face_num:1,face_type:\"LIVE\"},{cancelToken:n})",
+      "function_name": "se",
+      "function_params": "",
+      "instance": "H.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "image_url",
+          "type": "body",
+          "value": "t"
+        },
+        {
+          "name": "face_field",
+          "type": "body",
+          "value": "\"age"
+        },
+        {
+          "name": "max_face_num",
+          "type": "body",
+          "value": "1"
+        },
+        {
+          "name": "face_type",
+          "type": "body",
+          "value": "\"LIVE\""
+        },
+        {
+          "name": "cancelToken",
+          "type": "body",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 154781,
+      "endpoint": "/public-api/baidu-openapi/image_classify",
+      "full_call": "H.tI.post(\"/public-api/baidu-openapi/image_classify\",{image_url:t},{cancelToken:n})",
+      "function_name": "ue",
+      "function_params": "",
+      "instance": "H.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "image_url",
+          "type": "body",
+          "value": "t"
+        },
+        {
+          "name": "cancelToken",
+          "type": "body",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 232322,
+      "endpoint": "common/users/detail",
+      "full_call": "a.creationRequest.get(\"common/users/detail\")",
+      "function_name": "c",
+      "function_params": "",
+      "instance": "a.creationRequest",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 232746,
+      "endpoint": "common/neko/check-permit?type=",
+      "full_call": "a.aiRequest.get(\"common/neko/check-permit?type=\".concat(t))",
+      "function_name": "l",
+      "function_params": "",
+      "instance": "a.aiRequest",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 241376,
+      "endpoint": "/tiger/kitten/wechat/user",
+      "full_call": "A.$p.get(\"/tiger/kitten/wechat/user\")",
+      "function_name": "f",
+      "function_params": "",
+      "instance": "A.$p",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 242047,
+      "endpoint": "/tiger/v3/web/accounts/oauth/wechat",
+      "full_call": "A.$p.post(\"/tiger/v3/web/accounts/oauth/wechat\",{code:t,pid:u.ZP.pid,appid:u.ZP.wxAppid})",
+      "function_name": "v",
+      "function_params": "",
+      "instance": "A.$p",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "code",
+          "type": "body",
+          "value": "t"
+        },
+        {
+          "name": "pid",
+          "type": "body",
+          "value": "u.ZP.pid"
+        },
+        {
+          "name": "appid",
+          "type": "body",
+          "value": "u.ZP.wxAppid"
+        }
+      ]
+    },
+    {
+      "call_start": 244155,
+      "endpoint": "code",
+      "full_call": "t.get(\"code\")",
+      "function_name": "C",
+      "function_params": "",
+      "instance": "t",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 244488,
+      "endpoint": "wechat_login_attempted",
+      "full_call": "t.delete(\"wechat_login_attempted\")",
+      "function_name": "C",
+      "function_params": "",
+      "instance": "t",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 282121,
+      "endpoint": "/neko/image-classify/list",
+      "full_call": "i.tI.get(\"/neko/image-classify/list\",{params:{limit:a,offset:n}})",
+      "function_name": "o",
+      "function_params": "e",
+      "instance": "i.tI",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "limit",
+          "type": "query",
+          "value": "a"
+        }
+      ]
+    },
+    {
+      "call_start": 282210,
+      "endpoint": "/neko/image-classify",
+      "full_call": "i.tI.post(\"/neko/image-classify\",e,{cancelToken:t})",
+      "function_name": "s",
+      "function_params": "e,t",
+      "instance": "i.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "cancelToken",
+          "type": "body",
+          "value": "t"
+        }
+      ]
+    },
+    {
+      "call_start": 282309,
+      "endpoint": "/neko/image-classify/",
+      "full_call": "i.tI.put(\"/neko/image-classify/\".concat(t),n)",
+      "function_name": "c",
+      "function_params": "e",
+      "instance": "i.tI",
+      "method": "put",
+      "parameters": []
+    },
+    {
+      "call_start": 282376,
+      "endpoint": "/neko/image-classify/",
+      "full_call": "i.tI.delete(\"/neko/image-classify/\".concat(e))",
+      "function_name": "u",
+      "function_params": "e",
+      "instance": "i.tI",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 282925,
+      "endpoint": "/neko/ai-painting/templates?type=",
+      "full_call": "o.tI.get(\"/neko/ai-painting/templates?type=\".concat(t))",
+      "function_name": "u",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 283354,
+      "endpoint": "/neko/ai-painting/match",
+      "full_call": "o.tI.post(\"/neko/ai-painting/match\",(0,r.Z)({},t))",
+      "function_name": "d",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 283911,
+      "endpoint": "token",
+      "full_call": ".searchParams.get(\"token\")",
+      "function_name": "62676",
+      "function_params": "e,t,n",
+      "instance": ".searchParams",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 287474,
+      "endpoint": "/neko/package",
+      "full_call": "o.tI.post(\"/neko/package\",(0,i.Z)({},t),{cancelToken:n})",
+      "function_name": "c",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "cancelToken",
+          "type": "body",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 287798,
+      "endpoint": "/neko/package/",
+      "full_call": "o.tI.delete(\"/neko/package/\".concat(t))",
+      "function_name": "l",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 288195,
+      "endpoint": "/neko/package/list",
+      "full_call": "o.tI.get(\"/neko/package/list\",{params:{type:t,limit:n,offset:i}})",
+      "function_name": "p",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "query",
+          "value": "t"
+        },
+        {
+          "name": "limit",
+          "type": "query",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 288529,
+      "endpoint": "/neko/package/",
+      "full_call": "o.tI.put(\"/neko/package/\".concat(t.id),{name:t.name,description:t.description})",
+      "function_name": "M",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "put",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "body",
+          "value": "t.name"
+        },
+        {
+          "name": "description",
+          "type": "body",
+          "value": "t.description"
+        }
+      ]
+    },
+    {
+      "call_start": 289924,
+      "endpoint": "/neko/cv/list/variables/",
+      "full_call": "l.uK.get(\"/neko/cv/list/variables/\".concat(t))",
+      "function_name": "p",
+      "function_params": "",
+      "instance": "l.uK",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 290338,
+      "endpoint": "/neko/cv/add/variables",
+      "full_call": "l.uK.post(\"/neko/cv/add/variables\",{type:1,work_id:t,name:n})",
+      "function_name": "M",
+      "function_params": "",
+      "instance": "l.uK",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "body",
+          "value": "1"
+        },
+        {
+          "name": "work_id",
+          "type": "body",
+          "value": "t"
+        },
+        {
+          "name": "name",
+          "type": "body",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 291181,
+      "endpoint": "/neko/cv/delete/variables",
+      "full_call": "l.uK.delete(\"/neko/cv/delete/variables\",{data:{cvid:n,work_id:t}})",
+      "function_name": "_",
+      "function_params": "",
+      "instance": "l.uK",
+      "method": "delete",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "body",
+          "value": "{cvid:n"
+        },
+        {
+          "name": "work_id",
+          "type": "body",
+          "value": "t"
+        }
+      ]
+    },
+    {
+      "call_start": 291806,
+      "endpoint": "/neko/cv/sync/",
+      "full_call": "l.uK.post(\"/neko/cv/sync/\".concat(t),r)",
+      "function_name": "h",
+      "function_params": "",
+      "instance": "l.uK",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 293536,
+      "endpoint": "/neko/web/pack",
+      "full_call": "s.FV.post(\"/neko/web/pack\",e)",
+      "function_name": "u",
+      "function_params": "e",
+      "instance": "s.FV",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 293587,
+      "endpoint": "/neko/web/pack/stop?task_id=",
+      "full_call": "s.FV.put(\"/neko/web/pack/stop?task_id=\".concat(e.task_id))",
+      "function_name": "l",
+      "function_params": "e",
+      "instance": "s.FV",
+      "method": "put",
+      "parameters": []
+    },
+    {
+      "call_start": 293666,
+      "endpoint": "/neko/web/pack/limit",
+      "full_call": "s.FV.get(\"/neko/web/pack/limit\")",
+      "function_name": "d",
+      "function_params": "",
+      "instance": "s.FV",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 293720,
+      "endpoint": "/neko/web/pack/status",
+      "full_call": "s.FV.get(\"/neko/web/pack/status\",{params:e})",
+      "function_name": "p",
+      "function_params": "e",
+      "instance": "s.FV",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 294074,
+      "endpoint": "/neko/web/pack",
+      "full_call": "s.FV.get(\"/neko/web/pack\",{params:{task_id:n,work_id:t}})",
+      "function_name": "M",
+      "function_params": "",
+      "instance": "s.FV",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "task_id",
+          "type": "query",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 298139,
+      "endpoint": "/public-api/wood/matting",
+      "full_call": "_.tI.post(\"/public-api/wood/matting\",{img_url:e,is_ai_image:t},{headers:{\"request-origin\":\"NEKO\"}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "img_url",
+          "type": "body",
+          "value": "e"
+        },
+        {
+          "name": "is_ai_image",
+          "type": "body",
+          "value": "t"
+        },
+        {
+          "name": "headers",
+          "type": "body",
+          "value": "{\"request-origin\":\"NEKO\""
+        }
+      ]
+    },
+    {
+      "call_start": 298324,
+      "endpoint": "/public-api/wood/matting/status",
+      "full_call": "_.tI.get(\"/public-api/wood/matting/status\",{params:{task_id:e}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 298469,
+      "endpoint": "/public-api/wood/matting",
+      "full_call": "_.tI.delete(\"/public-api/wood/matting\",{params:{task_id:e}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.tI",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 302089,
+      "endpoint": "common/api/neko/text2img",
+      "full_call": "_.AQ.post(\"common/api/neko/text2img\",t,r)",
+      "function_name": "e",
+      "function_params": "t",
+      "instance": "_.AQ",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 302706,
+      "endpoint": "common/api/neko/text2img/status",
+      "full_call": "_.AQ.get(\"common/api/neko/text2img/status\",{params:{task_id:e}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.AQ",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 302852,
+      "endpoint": "common/api/neko/text2img/task",
+      "full_call": "_.AQ.delete(\"common/api/neko/text2img/task\",{params:{task_id:e}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.AQ",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 303006,
+      "endpoint": "common/api/neko/text2img/usage-left",
+      "full_call": "_.AQ.get(\"common/api/neko/text2img/usage-left\")",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.AQ",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 303147,
+      "endpoint": "common/api/neko/text2img/history-img/list",
+      "full_call": "_.AQ.get(\"common/api/neko/text2img/history-img/list\",{params:{limit:e,offset:t}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.AQ",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "limit",
+          "type": "query",
+          "value": "e"
+        }
+      ]
+    },
+    {
+      "call_start": 303322,
+      "endpoint": "common/api/neko/text2img/history-img",
+      "full_call": "_.AQ.delete(\"common/api/neko/text2img/history-img\",{params:{img_id:e}})",
+      "function_name": "81065",
+      "function_params": "e,t,n",
+      "instance": "_.AQ",
+      "method": "delete",
+      "parameters": []
+    },
+    {
+      "call_start": 303844,
+      "endpoint": "/neko/text2img/prompt",
+      "full_call": "_.tI.get(\"/neko/text2img/prompt\")",
+      "function_name": "e",
+      "function_params": "",
+      "instance": "_.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 304731,
+      "endpoint": "/neko/inspiration-pool",
+      "full_call": "_.tI.post(\"/neko/inspiration-pool\",{img_url:a,prompt:s,style:o,img_type:r,generation_type:n})",
+      "function_name": "e",
+      "function_params": "t",
+      "instance": "_.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "img_url",
+          "type": "body",
+          "value": "a"
+        },
+        {
+          "name": "prompt",
+          "type": "body",
+          "value": "s"
+        },
+        {
+          "name": "style",
+          "type": "body",
+          "value": "o"
+        },
+        {
+          "name": "img_type",
+          "type": "body",
+          "value": "r"
+        },
+        {
+          "name": "generation_type",
+          "type": "body",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 305216,
+      "endpoint": "/common/api/neko/text2img/history-img",
+      "full_call": "_.AQ.post(\"/common/api/neko/text2img/history-img\",{img_url:a,prompt:c,style:o,img_type:r,generation_type:n,source_img:s})",
+      "function_name": "e",
+      "function_params": "t",
+      "instance": "_.AQ",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "img_url",
+          "type": "body",
+          "value": "a"
+        },
+        {
+          "name": "prompt",
+          "type": "body",
+          "value": "c"
+        },
+        {
+          "name": "style",
+          "type": "body",
+          "value": "o"
+        },
+        {
+          "name": "img_type",
+          "type": "body",
+          "value": "r"
+        },
+        {
+          "name": "generation_type",
+          "type": "body",
+          "value": "n"
+        },
+        {
+          "name": "source_img",
+          "type": "body",
+          "value": "s"
+        }
+      ]
+    },
+    {
+      "call_start": 321269,
+      "endpoint": "/neko/ranking-list/record/list?id=",
+      "full_call": "p.tI.get(\"/neko/ranking-list/record/list?id=\".concat(t,\"&work_id=\").concat(n))",
+      "function_name": "A",
+      "function_params": "",
+      "instance": "p.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 321836,
+      "endpoint": "/neko/ranking-list/record",
+      "full_call": "p.tI.post(\"/neko/ranking-list/record\",(0,i.Z)({},n))",
+      "function_name": "m",
+      "function_params": "",
+      "instance": "p.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 322168,
+      "endpoint": "/neko/ranking-list",
+      "full_call": "p.tI.post(\"/neko/ranking-list\",(0,i.Z)({},t))",
+      "function_name": "f",
+      "function_params": "",
+      "instance": "p.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 323008,
+      "endpoint": "/neko/ranking-list/fullUpdate",
+      "full_call": "p.tI.put(\"/neko/ranking-list/fullUpdate\",(0,i.Z)({},t))",
+      "function_name": "N",
+      "function_params": "",
+      "instance": "p.tI",
+      "method": "put",
+      "parameters": []
+    },
+    {
+      "call_start": 323154,
+      "endpoint": "/neko/ranking-list/",
+      "full_call": "p.tI.delete(\"/neko/ranking-list/\".concat(e),{params:{id:e,work_id:t}})",
+      "function_name": "v",
+      "function_params": "e,t",
+      "instance": "p.tI",
+      "method": "delete",
+      "parameters": [
+        {
+          "name": "id",
+          "type": "query",
+          "value": "e"
+        }
+      ]
+    },
+    {
+      "call_start": 323425,
+      "endpoint": "/neko/ranking-list/clear?id=",
+      "full_call": "p.tI.put(\"/neko/ranking-list/clear?id=\".concat(t))",
+      "function_name": "T",
+      "function_params": "",
+      "instance": "p.tI",
+      "method": "put",
+      "parameters": []
+    },
+    {
+      "call_start": 325653,
+      "endpoint": "/tiger/v3/web/accounts/profile",
+      "full_call": "r.DM.get(\"/tiger/v3/web/accounts/profile\")",
+      "function_name": "i",
+      "function_params": "",
+      "instance": "r.DM",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 325811,
+      "endpoint": "/tiger/v3/web/accounts/logout",
+      "full_call": "r.DM.post(\"/tiger/v3/web/accounts/logout\")",
+      "function_name": "a",
+      "function_params": "",
+      "instance": "r.DM",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 325921,
+      "endpoint": "/tiger/v3/web/accounts/oauth/nct",
+      "full_call": "r.DM.post(\"/tiger/v3/web/accounts/oauth/nct\",{agreementIds:[-1],code:e,pid:\"account\"})",
+      "function_name": "o",
+      "function_params": "e",
+      "instance": "r.DM",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "agreementIds",
+          "type": "body",
+          "value": "[-1]"
+        },
+        {
+          "name": "code",
+          "type": "body",
+          "value": "e"
+        },
+        {
+          "name": "pid",
+          "type": "body",
+          "value": "\"account\""
+        }
+      ]
+    },
+    {
+      "call_start": 326577,
+      "endpoint": "/public-api/baidu-openapi/tts/asr",
+      "full_call": "o.tI.post(\"/public-api/baidu-openapi/tts/asr\",l)",
+      "function_name": "c",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 326980,
+      "endpoint": "/public-api/yunwei/audio/transcoding",
+      "full_call": "o.tI.post(\"/public-api/yunwei/audio/transcoding\",{speech:t})",
+      "function_name": "l",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "speech",
+          "type": "body",
+          "value": "t"
+        }
+      ]
+    },
+    {
+      "call_start": 328444,
+      "endpoint": "/neko/works/",
+      "full_call": "g.tI.get(\"/neko/works/\".concat(t))",
+      "function_name": "A",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 328567,
+      "endpoint": "/neko/works/archive/",
+      "full_call": "g.tI.get(\"/neko/works/archive/\".concat(e))",
+      "function_name": "_",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 329415,
+      "endpoint": "/neko/works/teacher",
+      "full_call": "g.tI.post(\"/neko/works/teacher\",(0,i.Z)((0,i.Z)((0,i.Z)((0,i.Z)({bcm_version:s.oF,save_type:1},(0,l.Wz)()&&!e.work_id&&{work_business_from:c.B2.TANYUE}),(0,l.aU)()&&!e.work_id&&{work_business_from:c.B2.GUYU}),(0,l.F)()&&!e.work_id&&{work_business_from:c.B2.EXAM}),e))",
+      "function_name": "f",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "bcm_version",
+          "type": "body",
+          "value": "s.oF"
+        },
+        {
+          "name": "save_type",
+          "type": "body",
+          "value": "1"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.TANYUE"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.GUYU"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.EXAM"
+        }
+      ]
+    },
+    {
+      "call_start": 329704,
+      "endpoint": "/neko/teaching-plan/save/team/work",
+      "full_call": "g.tI.post(\"/neko/teaching-plan/save/team/work\",(0,i.Z)((0,i.Z)((0,i.Z)((0,i.Z)({bcm_version:s.oF,save_type:1},(0,l.Wz)()&&!e.work_id&&{work_business_from:c.B2.TANYUE}),(0,l.aU)()&&!e.work_id&&{work_business_from:c.B2.GUYU}),(0,l.F)()&&!e.work_id&&{work_business_from:c.B2.EXAM}),e))",
+      "function_name": "I",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "bcm_version",
+          "type": "body",
+          "value": "s.oF"
+        },
+        {
+          "name": "save_type",
+          "type": "body",
+          "value": "1"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.TANYUE"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.GUYU"
+        },
+        {
+          "name": "work_business_from",
+          "type": "body",
+          "value": "c.B2.EXAM"
+        }
+      ]
+    },
+    {
+      "call_start": 330904,
+      "endpoint": "/neko/works/copy",
+      "full_call": "g.tI.post(\"/neko/works/copy\",{work_id:e})",
+      "function_name": "C",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": [
+        {
+          "name": "work_id",
+          "type": "body",
+          "value": "e"
+        }
+      ]
+    },
+    {
+      "call_start": 330967,
+      "endpoint": "/neko/works/save-teacher-course-invite-url",
+      "full_call": "g.tI.post(\"/neko/works/save-teacher-course-invite-url\",(0,i.Z)({},e))",
+      "function_name": "x",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 331882,
+      "endpoint": "/neko/works/player/work-detail/",
+      "full_call": "g.tI.get(\"/neko/works/player/work-detail/\".concat(t))",
+      "function_name": "w",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 332746,
+      "endpoint": "/coconut/clouddb/currentTime",
+      "full_call": "g.tI.get(\"/coconut/clouddb/currentTime\")",
+      "function_name": "R",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 333740,
+      "endpoint": "/public-api/yunwei/check-pictures-sync",
+      "full_call": "g.tI.post(\"/public-api/yunwei/check-pictures-sync\",(0,i.Z)({},t))",
+      "function_name": "Y",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 334103,
+      "endpoint": "/public-api/yunwei/check-pictures-async",
+      "full_call": "g.tI.post(\"/public-api/yunwei/check-pictures-async\",(0,i.Z)({},t))",
+      "function_name": "Q",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 334467,
+      "endpoint": "/public-api/yunwei/get-check-pictures?submit_id=",
+      "full_call": "g.tI.get(\"/public-api/yunwei/get-check-pictures?submit_id=\".concat(t))",
+      "function_name": "H",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 334835,
+      "endpoint": "/neko/course/user/progress",
+      "full_call": "g.tI.post(\"/neko/course/user/progress\",(0,i.Z)({},t))",
+      "function_name": "V",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 335186,
+      "endpoint": "/neko/course/user/course-work",
+      "full_call": "g.tI.post(\"/neko/course/user/course-work\",(0,i.Z)({},t))",
+      "function_name": "X",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 335407,
+      "endpoint": "/neko/teaching-plan/list/opr/log",
+      "full_call": "g.tI.get(\"/neko/teaching-plan/list/opr/log\",{params:{work_id:t,offset:n,limit:r}})",
+      "function_name": "J",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": [
+        {
+          "name": "work_id",
+          "type": "query",
+          "value": "t"
+        },
+        {
+          "name": "offset",
+          "type": "query",
+          "value": "n"
+        }
+      ]
+    },
+    {
+      "call_start": 335511,
+      "endpoint": "/neko/teaching-plan/add/opr/log",
+      "full_call": "g.tI.post(\"/neko/teaching-plan/add/opr/log\",e)",
+      "function_name": "q",
+      "function_params": "e",
+      "instance": "g.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 335579,
+      "endpoint": "/neko/sample/detail",
+      "full_call": "g.tI.get(\"/neko/sample/detail\",{params:e})",
+      "function_name": "80915",
+      "function_params": "e,t,n",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 335817,
+      "endpoint": "/neko/sample/list?subject_id=",
+      "full_call": "g.tI.get(\"/neko/sample/list?subject_id=\".concat(t))",
+      "function_name": "te",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 336170,
+      "endpoint": "/neko/works/get-player-by-course-code",
+      "full_call": "g.tI.get(\"/neko/works/get-player-by-course-code\",{params:{course_code:t}})",
+      "function_name": "re",
+      "function_params": "",
+      "instance": "g.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 336998,
+      "endpoint": "/neko/community/player/published-work-detail/",
+      "full_call": "o.tI.get(\"/neko/community/player/published-work-detail/\".concat(t))",
+      "function_name": "u",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 337324,
+      "endpoint": "/neko/community/work/publish/",
+      "full_call": "o.tI.post(\"/neko/community/work/publish/\".concat(t.work_id),(0,r.Z)({},t))",
+      "function_name": "d",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 337696,
+      "endpoint": "/neko/community/work/detail/",
+      "full_call": "o.tI.get(\"/neko/community/work/detail/\".concat(t))",
+      "function_name": "g",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 338044,
+      "endpoint": "/neko/works/status/",
+      "full_call": "o.tI.get(\"/neko/works/status/\".concat(t))",
+      "function_name": "A",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 338383,
+      "endpoint": "/neko/works/pic-troubleshoot/",
+      "full_call": "o.tI.put(\"/neko/works/pic-troubleshoot/\".concat(t))",
+      "function_name": "m",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "put",
+      "parameters": []
+    },
+    {
+      "call_start": 338732,
+      "endpoint": "nemo/v2/works/",
+      "full_call": "o.DM.post(\"nemo/v2/works/\".concat(t,\"/fork\"))",
+      "function_name": "f",
+      "function_params": "",
+      "instance": "o.DM",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 339075,
+      "endpoint": "neko/community/user/achievement/",
+      "full_call": "o.tI.get(\"neko/community/user/achievement/\".concat(t))",
+      "function_name": "N",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 339427,
+      "endpoint": "nemo/v2/user/",
+      "full_call": "o.DM.post(\"nemo/v2/user/\".concat(t,\"/follow\"))",
+      "function_name": "y",
+      "function_params": "",
+      "instance": "o.DM",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 339771,
+      "endpoint": "neko/community/check-user-opr-work-status/",
+      "full_call": "o.tI.get(\"neko/community/check-user-opr-work-status/\".concat(t))",
+      "function_name": "E",
+      "function_params": "",
+      "instance": "o.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 1130138,
+      "endpoint": "keydown",
+      "full_call": "d.mx.runtime_data.document_events_handler.get(\"keydown\")",
+      "function_name": "31234",
+      "function_params": "e,t,n",
+      "instance": "d.mx.runtime_data.document_events_handler",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 1304965,
+      "endpoint": "/kitten/work/translate",
+      "full_call": "u.tI.post(\"/kitten/work/translate\",o)",
+      "function_name": "ye",
+      "function_params": "",
+      "instance": "u.tI",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 2650279,
+      "endpoint": "https://api.codemao.cn/tiger/nemo/miao-codes?token=",
+      "full_call": "r.DM.get(\"https://api.codemao.cn/tiger/nemo/miao-codes?token=\".concat(t))",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "r.DM",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 2654396,
+      "endpoint": "openCourseId",
+      "full_call": ".searchParams.get(\"openCourseId\")",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": ".searchParams",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 2655062,
+      "endpoint": "/neko/works/archive/",
+      "full_call": "o.creationRequest.get(\"/neko/works/archive/\".concat(e))",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "o.creationRequest",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 2696932,
+      "endpoint": "/neko/teaching-plan/work/editing-status/",
+      "full_call": "r.creationRequest.get(\"/neko/teaching-plan/work/editing-status/\".concat(e))",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "r.creationRequest",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 2697029,
+      "endpoint": "/neko/teaching-plan/set/work/editing-status",
+      "full_call": "r.creationRequest.post(\"/neko/teaching-plan/set/work/editing-status\",e)",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "r.creationRequest",
+      "method": "post",
+      "parameters": []
+    },
+    {
+      "call_start": 4488183,
+      "endpoint": "/neko/user/status",
+      "full_call": "BC.tI.get(\"/neko/user/status\")",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "BC.tI",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 4517465,
+      "endpoint": "content-length",
+      "full_call": "u.headers.get(\"content-length\")",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "u.headers",
+      "method": "get",
+      "parameters": []
+    },
+    {
+      "call_start": 4591414,
+      "endpoint": "content-type",
+      "full_call": "n.headers.get(\"content-type\")",
+      "function_name": "ee",
+      "function_params": "e",
+      "instance": "n.headers",
+      "method": "get",
+      "parameters": []
+    }
+  ],
+  "categories": {
+    "ai": [
+      {
+        "call_start": 133776,
+        "endpoint": "/ai/tts/status?taskId=",
+        "full_call": "c.coneAiRequest.get(\"/ai/tts/status?taskId=\".concat(t))",
+        "function_name": "E",
+        "function_params": "",
+        "instance": "c.coneAiRequest",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 135038,
+        "endpoint": "/ai/tts/generate",
+        "full_call": "c.coneAiRequest.post(\"/ai/tts/generate\",{bizType:9,content:r})",
+        "function_name": "C",
+        "function_params": "",
+        "instance": "c.coneAiRequest",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "bizType",
+            "type": "body",
+            "value": "9"
+          },
+          {
+            "name": "content",
+            "type": "body",
+            "value": "r"
+          }
+        ]
+      },
+      {
+        "call_start": 298139,
+        "endpoint": "/public-api/wood/matting",
+        "full_call": "_.tI.post(\"/public-api/wood/matting\",{img_url:e,is_ai_image:t},{headers:{\"request-origin\":\"NEKO\"}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "img_url",
+            "type": "body",
+            "value": "e"
+          },
+          {
+            "name": "is_ai_image",
+            "type": "body",
+            "value": "t"
+          },
+          {
+            "name": "headers",
+            "type": "body",
+            "value": "{\"request-origin\":\"NEKO\""
+          }
+        ]
+      },
+      {
+        "call_start": 298324,
+        "endpoint": "/public-api/wood/matting/status",
+        "full_call": "_.tI.get(\"/public-api/wood/matting/status\",{params:{task_id:e}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 298469,
+        "endpoint": "/public-api/wood/matting",
+        "full_call": "_.tI.delete(\"/public-api/wood/matting\",{params:{task_id:e}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.tI",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 302089,
+        "endpoint": "common/api/neko/text2img",
+        "full_call": "_.AQ.post(\"common/api/neko/text2img\",t,r)",
+        "function_name": "e",
+        "function_params": "t",
+        "instance": "_.AQ",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 302706,
+        "endpoint": "common/api/neko/text2img/status",
+        "full_call": "_.AQ.get(\"common/api/neko/text2img/status\",{params:{task_id:e}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.AQ",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 302852,
+        "endpoint": "common/api/neko/text2img/task",
+        "full_call": "_.AQ.delete(\"common/api/neko/text2img/task\",{params:{task_id:e}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.AQ",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 303006,
+        "endpoint": "common/api/neko/text2img/usage-left",
+        "full_call": "_.AQ.get(\"common/api/neko/text2img/usage-left\")",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.AQ",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 303147,
+        "endpoint": "common/api/neko/text2img/history-img/list",
+        "full_call": "_.AQ.get(\"common/api/neko/text2img/history-img/list\",{params:{limit:e,offset:t}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.AQ",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "limit",
+            "type": "query",
+            "value": "e"
+          }
+        ]
+      },
+      {
+        "call_start": 303322,
+        "endpoint": "common/api/neko/text2img/history-img",
+        "full_call": "_.AQ.delete(\"common/api/neko/text2img/history-img\",{params:{img_id:e}})",
+        "function_name": "81065",
+        "function_params": "e,t,n",
+        "instance": "_.AQ",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 303844,
+        "endpoint": "/neko/text2img/prompt",
+        "full_call": "_.tI.get(\"/neko/text2img/prompt\")",
+        "function_name": "e",
+        "function_params": "",
+        "instance": "_.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 305216,
+        "endpoint": "/common/api/neko/text2img/history-img",
+        "full_call": "_.AQ.post(\"/common/api/neko/text2img/history-img\",{img_url:a,prompt:c,style:o,img_type:r,generation_type:n,source_img:s})",
+        "function_name": "e",
+        "function_params": "t",
+        "instance": "_.AQ",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "img_url",
+            "type": "body",
+            "value": "a"
+          },
+          {
+            "name": "prompt",
+            "type": "body",
+            "value": "c"
+          },
+          {
+            "name": "style",
+            "type": "body",
+            "value": "o"
+          },
+          {
+            "name": "img_type",
+            "type": "body",
+            "value": "r"
+          },
+          {
+            "name": "generation_type",
+            "type": "body",
+            "value": "n"
+          },
+          {
+            "name": "source_img",
+            "type": "body",
+            "value": "s"
+          }
+        ]
+      }
+    ],
+    "cloud_variable": [
+      {
+        "call_start": 289924,
+        "endpoint": "/neko/cv/list/variables/",
+        "full_call": "l.uK.get(\"/neko/cv/list/variables/\".concat(t))",
+        "function_name": "p",
+        "function_params": "",
+        "instance": "l.uK",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 290338,
+        "endpoint": "/neko/cv/add/variables",
+        "full_call": "l.uK.post(\"/neko/cv/add/variables\",{type:1,work_id:t,name:n})",
+        "function_name": "M",
+        "function_params": "",
+        "instance": "l.uK",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "type",
+            "type": "body",
+            "value": "1"
+          },
+          {
+            "name": "work_id",
+            "type": "body",
+            "value": "t"
+          },
+          {
+            "name": "name",
+            "type": "body",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 291181,
+        "endpoint": "/neko/cv/delete/variables",
+        "full_call": "l.uK.delete(\"/neko/cv/delete/variables\",{data:{cvid:n,work_id:t}})",
+        "function_name": "_",
+        "function_params": "",
+        "instance": "l.uK",
+        "method": "delete",
+        "parameters": [
+          {
+            "name": "data",
+            "type": "body",
+            "value": "{cvid:n"
+          },
+          {
+            "name": "work_id",
+            "type": "body",
+            "value": "t"
+          }
+        ]
+      },
+      {
+        "call_start": 291806,
+        "endpoint": "/neko/cv/sync/",
+        "full_call": "l.uK.post(\"/neko/cv/sync/\".concat(t),r)",
+        "function_name": "h",
+        "function_params": "",
+        "instance": "l.uK",
+        "method": "post",
+        "parameters": []
+      }
+    ],
+    "community": [
+      {
+        "call_start": 336998,
+        "endpoint": "/neko/community/player/published-work-detail/",
+        "full_call": "o.tI.get(\"/neko/community/player/published-work-detail/\".concat(t))",
+        "function_name": "u",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 337324,
+        "endpoint": "/neko/community/work/publish/",
+        "full_call": "o.tI.post(\"/neko/community/work/publish/\".concat(t.work_id),(0,r.Z)({},t))",
+        "function_name": "d",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 337696,
+        "endpoint": "/neko/community/work/detail/",
+        "full_call": "o.tI.get(\"/neko/community/work/detail/\".concat(t))",
+        "function_name": "g",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 339075,
+        "endpoint": "neko/community/user/achievement/",
+        "full_call": "o.tI.get(\"neko/community/user/achievement/\".concat(t))",
+        "function_name": "N",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 339771,
+        "endpoint": "neko/community/check-user-opr-work-status/",
+        "full_call": "o.tI.get(\"neko/community/check-user-opr-work-status/\".concat(t))",
+        "function_name": "E",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      }
+    ],
+    "course": [
+      {
+        "call_start": 334835,
+        "endpoint": "/neko/course/user/progress",
+        "full_call": "g.tI.post(\"/neko/course/user/progress\",(0,i.Z)({},t))",
+        "function_name": "V",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 335186,
+        "endpoint": "/neko/course/user/course-work",
+        "full_call": "g.tI.post(\"/neko/course/user/course-work\",(0,i.Z)({},t))",
+        "function_name": "X",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      }
+    ],
+    "file": [],
+    "other": [
+      {
+        "call_start": 40122,
+        "endpoint": "/neko/material/categories?type=",
+        "full_call": "h.tI.get(\"/neko/material/categories?type=\".concat(t))",
+        "function_name": "I",
+        "function_params": "",
+        "instance": "h.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 40557,
+        "endpoint": "/neko/material/list",
+        "full_call": "h.tI.get(\"/neko/material/list\",{params:{second_id:t,limit:n,offset:i}})",
+        "function_name": "v",
+        "function_params": "",
+        "instance": "h.tI",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "second_id",
+            "type": "query",
+            "value": "t"
+          },
+          {
+            "name": "limit",
+            "type": "query",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 148454,
+        "endpoint": "/public-api/ocr/status",
+        "full_call": "H.tI.get(\"/public-api/ocr/status\",{params:{task_id:e}})",
+        "function_name": "W",
+        "function_params": "e",
+        "instance": "H.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 148565,
+        "endpoint": "/public-api/ocr/task",
+        "full_call": "H.tI.delete(\"/public-api/ocr/task\",{params:{task_id:e}})",
+        "function_name": "V",
+        "function_params": "e",
+        "instance": "H.tI",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 150146,
+        "endpoint": "/public-api/ocr",
+        "full_call": "H.tI.post(\"/public-api/ocr\",{img_url:l},{headers:{\"request-origin\":\"NEKO\"}})",
+        "function_name": "e",
+        "function_params": "t,n",
+        "instance": "H.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "img_url",
+            "type": "body",
+            "value": "l"
+          },
+          {
+            "name": "headers",
+            "type": "body",
+            "value": "{\"request-origin\":\"NEKO\""
+          }
+        ]
+      },
+      {
+        "call_start": 154348,
+        "endpoint": "/public-api/baidu-openapi/face_detect",
+        "full_call": "H.tI.post(\"/public-api/baidu-openapi/face_detect\",{image_url:t,face_field:\"age,emotion,face_shape,gender\",max_face_num:1,face_type:\"LIVE\"},{cancelToken:n})",
+        "function_name": "se",
+        "function_params": "",
+        "instance": "H.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "image_url",
+            "type": "body",
+            "value": "t"
+          },
+          {
+            "name": "face_field",
+            "type": "body",
+            "value": "\"age"
+          },
+          {
+            "name": "max_face_num",
+            "type": "body",
+            "value": "1"
+          },
+          {
+            "name": "face_type",
+            "type": "body",
+            "value": "\"LIVE\""
+          },
+          {
+            "name": "cancelToken",
+            "type": "body",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 154781,
+        "endpoint": "/public-api/baidu-openapi/image_classify",
+        "full_call": "H.tI.post(\"/public-api/baidu-openapi/image_classify\",{image_url:t},{cancelToken:n})",
+        "function_name": "ue",
+        "function_params": "",
+        "instance": "H.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "image_url",
+            "type": "body",
+            "value": "t"
+          },
+          {
+            "name": "cancelToken",
+            "type": "body",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 232322,
+        "endpoint": "common/users/detail",
+        "full_call": "a.creationRequest.get(\"common/users/detail\")",
+        "function_name": "c",
+        "function_params": "",
+        "instance": "a.creationRequest",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 232746,
+        "endpoint": "common/neko/check-permit?type=",
+        "full_call": "a.aiRequest.get(\"common/neko/check-permit?type=\".concat(t))",
+        "function_name": "l",
+        "function_params": "",
+        "instance": "a.aiRequest",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 241376,
+        "endpoint": "/tiger/kitten/wechat/user",
+        "full_call": "A.$p.get(\"/tiger/kitten/wechat/user\")",
+        "function_name": "f",
+        "function_params": "",
+        "instance": "A.$p",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 242047,
+        "endpoint": "/tiger/v3/web/accounts/oauth/wechat",
+        "full_call": "A.$p.post(\"/tiger/v3/web/accounts/oauth/wechat\",{code:t,pid:u.ZP.pid,appid:u.ZP.wxAppid})",
+        "function_name": "v",
+        "function_params": "",
+        "instance": "A.$p",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "code",
+            "type": "body",
+            "value": "t"
+          },
+          {
+            "name": "pid",
+            "type": "body",
+            "value": "u.ZP.pid"
+          },
+          {
+            "name": "appid",
+            "type": "body",
+            "value": "u.ZP.wxAppid"
+          }
+        ]
+      },
+      {
+        "call_start": 244155,
+        "endpoint": "code",
+        "full_call": "t.get(\"code\")",
+        "function_name": "C",
+        "function_params": "",
+        "instance": "t",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 244488,
+        "endpoint": "wechat_login_attempted",
+        "full_call": "t.delete(\"wechat_login_attempted\")",
+        "function_name": "C",
+        "function_params": "",
+        "instance": "t",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 282121,
+        "endpoint": "/neko/image-classify/list",
+        "full_call": "i.tI.get(\"/neko/image-classify/list\",{params:{limit:a,offset:n}})",
+        "function_name": "o",
+        "function_params": "e",
+        "instance": "i.tI",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "limit",
+            "type": "query",
+            "value": "a"
+          }
+        ]
+      },
+      {
+        "call_start": 282210,
+        "endpoint": "/neko/image-classify",
+        "full_call": "i.tI.post(\"/neko/image-classify\",e,{cancelToken:t})",
+        "function_name": "s",
+        "function_params": "e,t",
+        "instance": "i.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "cancelToken",
+            "type": "body",
+            "value": "t"
+          }
+        ]
+      },
+      {
+        "call_start": 282309,
+        "endpoint": "/neko/image-classify/",
+        "full_call": "i.tI.put(\"/neko/image-classify/\".concat(t),n)",
+        "function_name": "c",
+        "function_params": "e",
+        "instance": "i.tI",
+        "method": "put",
+        "parameters": []
+      },
+      {
+        "call_start": 282376,
+        "endpoint": "/neko/image-classify/",
+        "full_call": "i.tI.delete(\"/neko/image-classify/\".concat(e))",
+        "function_name": "u",
+        "function_params": "e",
+        "instance": "i.tI",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 282925,
+        "endpoint": "/neko/ai-painting/templates?type=",
+        "full_call": "o.tI.get(\"/neko/ai-painting/templates?type=\".concat(t))",
+        "function_name": "u",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 283354,
+        "endpoint": "/neko/ai-painting/match",
+        "full_call": "o.tI.post(\"/neko/ai-painting/match\",(0,r.Z)({},t))",
+        "function_name": "d",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 283911,
+        "endpoint": "token",
+        "full_call": ".searchParams.get(\"token\")",
+        "function_name": "62676",
+        "function_params": "e,t,n",
+        "instance": ".searchParams",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 293536,
+        "endpoint": "/neko/web/pack",
+        "full_call": "s.FV.post(\"/neko/web/pack\",e)",
+        "function_name": "u",
+        "function_params": "e",
+        "instance": "s.FV",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 293587,
+        "endpoint": "/neko/web/pack/stop?task_id=",
+        "full_call": "s.FV.put(\"/neko/web/pack/stop?task_id=\".concat(e.task_id))",
+        "function_name": "l",
+        "function_params": "e",
+        "instance": "s.FV",
+        "method": "put",
+        "parameters": []
+      },
+      {
+        "call_start": 293666,
+        "endpoint": "/neko/web/pack/limit",
+        "full_call": "s.FV.get(\"/neko/web/pack/limit\")",
+        "function_name": "d",
+        "function_params": "",
+        "instance": "s.FV",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 293720,
+        "endpoint": "/neko/web/pack/status",
+        "full_call": "s.FV.get(\"/neko/web/pack/status\",{params:e})",
+        "function_name": "p",
+        "function_params": "e",
+        "instance": "s.FV",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 294074,
+        "endpoint": "/neko/web/pack",
+        "full_call": "s.FV.get(\"/neko/web/pack\",{params:{task_id:n,work_id:t}})",
+        "function_name": "M",
+        "function_params": "",
+        "instance": "s.FV",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "type": "query",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 304731,
+        "endpoint": "/neko/inspiration-pool",
+        "full_call": "_.tI.post(\"/neko/inspiration-pool\",{img_url:a,prompt:s,style:o,img_type:r,generation_type:n})",
+        "function_name": "e",
+        "function_params": "t",
+        "instance": "_.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "img_url",
+            "type": "body",
+            "value": "a"
+          },
+          {
+            "name": "prompt",
+            "type": "body",
+            "value": "s"
+          },
+          {
+            "name": "style",
+            "type": "body",
+            "value": "o"
+          },
+          {
+            "name": "img_type",
+            "type": "body",
+            "value": "r"
+          },
+          {
+            "name": "generation_type",
+            "type": "body",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 325653,
+        "endpoint": "/tiger/v3/web/accounts/profile",
+        "full_call": "r.DM.get(\"/tiger/v3/web/accounts/profile\")",
+        "function_name": "i",
+        "function_params": "",
+        "instance": "r.DM",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 325811,
+        "endpoint": "/tiger/v3/web/accounts/logout",
+        "full_call": "r.DM.post(\"/tiger/v3/web/accounts/logout\")",
+        "function_name": "a",
+        "function_params": "",
+        "instance": "r.DM",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 325921,
+        "endpoint": "/tiger/v3/web/accounts/oauth/nct",
+        "full_call": "r.DM.post(\"/tiger/v3/web/accounts/oauth/nct\",{agreementIds:[-1],code:e,pid:\"account\"})",
+        "function_name": "o",
+        "function_params": "e",
+        "instance": "r.DM",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "agreementIds",
+            "type": "body",
+            "value": "[-1]"
+          },
+          {
+            "name": "code",
+            "type": "body",
+            "value": "e"
+          },
+          {
+            "name": "pid",
+            "type": "body",
+            "value": "\"account\""
+          }
+        ]
+      },
+      {
+        "call_start": 326577,
+        "endpoint": "/public-api/baidu-openapi/tts/asr",
+        "full_call": "o.tI.post(\"/public-api/baidu-openapi/tts/asr\",l)",
+        "function_name": "c",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 326980,
+        "endpoint": "/public-api/yunwei/audio/transcoding",
+        "full_call": "o.tI.post(\"/public-api/yunwei/audio/transcoding\",{speech:t})",
+        "function_name": "l",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "speech",
+            "type": "body",
+            "value": "t"
+          }
+        ]
+      },
+      {
+        "call_start": 332746,
+        "endpoint": "/coconut/clouddb/currentTime",
+        "full_call": "g.tI.get(\"/coconut/clouddb/currentTime\")",
+        "function_name": "R",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 333740,
+        "endpoint": "/public-api/yunwei/check-pictures-sync",
+        "full_call": "g.tI.post(\"/public-api/yunwei/check-pictures-sync\",(0,i.Z)({},t))",
+        "function_name": "Y",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 334103,
+        "endpoint": "/public-api/yunwei/check-pictures-async",
+        "full_call": "g.tI.post(\"/public-api/yunwei/check-pictures-async\",(0,i.Z)({},t))",
+        "function_name": "Q",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 334467,
+        "endpoint": "/public-api/yunwei/get-check-pictures?submit_id=",
+        "full_call": "g.tI.get(\"/public-api/yunwei/get-check-pictures?submit_id=\".concat(t))",
+        "function_name": "H",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 335579,
+        "endpoint": "/neko/sample/detail",
+        "full_call": "g.tI.get(\"/neko/sample/detail\",{params:e})",
+        "function_name": "80915",
+        "function_params": "e,t,n",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 335817,
+        "endpoint": "/neko/sample/list?subject_id=",
+        "full_call": "g.tI.get(\"/neko/sample/list?subject_id=\".concat(t))",
+        "function_name": "te",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 338732,
+        "endpoint": "nemo/v2/works/",
+        "full_call": "o.DM.post(\"nemo/v2/works/\".concat(t,\"/fork\"))",
+        "function_name": "f",
+        "function_params": "",
+        "instance": "o.DM",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 339427,
+        "endpoint": "nemo/v2/user/",
+        "full_call": "o.DM.post(\"nemo/v2/user/\".concat(t,\"/follow\"))",
+        "function_name": "y",
+        "function_params": "",
+        "instance": "o.DM",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 1130138,
+        "endpoint": "keydown",
+        "full_call": "d.mx.runtime_data.document_events_handler.get(\"keydown\")",
+        "function_name": "31234",
+        "function_params": "e,t,n",
+        "instance": "d.mx.runtime_data.document_events_handler",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 1304965,
+        "endpoint": "/kitten/work/translate",
+        "full_call": "u.tI.post(\"/kitten/work/translate\",o)",
+        "function_name": "ye",
+        "function_params": "",
+        "instance": "u.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 2650279,
+        "endpoint": "https://api.codemao.cn/tiger/nemo/miao-codes?token=",
+        "full_call": "r.DM.get(\"https://api.codemao.cn/tiger/nemo/miao-codes?token=\".concat(t))",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "r.DM",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 2654396,
+        "endpoint": "openCourseId",
+        "full_call": ".searchParams.get(\"openCourseId\")",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": ".searchParams",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 4488183,
+        "endpoint": "/neko/user/status",
+        "full_call": "BC.tI.get(\"/neko/user/status\")",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "BC.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 4517465,
+        "endpoint": "content-length",
+        "full_call": "u.headers.get(\"content-length\")",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "u.headers",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 4591414,
+        "endpoint": "content-type",
+        "full_call": "n.headers.get(\"content-type\")",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "n.headers",
+        "method": "get",
+        "parameters": []
+      }
+    ],
+    "package": [
+      {
+        "call_start": 287474,
+        "endpoint": "/neko/package",
+        "full_call": "o.tI.post(\"/neko/package\",(0,i.Z)({},t),{cancelToken:n})",
+        "function_name": "c",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "cancelToken",
+            "type": "body",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 287798,
+        "endpoint": "/neko/package/",
+        "full_call": "o.tI.delete(\"/neko/package/\".concat(t))",
+        "function_name": "l",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "delete",
+        "parameters": []
+      },
+      {
+        "call_start": 288195,
+        "endpoint": "/neko/package/list",
+        "full_call": "o.tI.get(\"/neko/package/list\",{params:{type:t,limit:n,offset:i}})",
+        "function_name": "p",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "type",
+            "type": "query",
+            "value": "t"
+          },
+          {
+            "name": "limit",
+            "type": "query",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 288529,
+        "endpoint": "/neko/package/",
+        "full_call": "o.tI.put(\"/neko/package/\".concat(t.id),{name:t.name,description:t.description})",
+        "function_name": "M",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "put",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "body",
+            "value": "t.name"
+          },
+          {
+            "name": "description",
+            "type": "body",
+            "value": "t.description"
+          }
+        ]
+      }
+    ],
+    "ranking": [
+      {
+        "call_start": 321269,
+        "endpoint": "/neko/ranking-list/record/list?id=",
+        "full_call": "p.tI.get(\"/neko/ranking-list/record/list?id=\".concat(t,\"&work_id=\").concat(n))",
+        "function_name": "A",
+        "function_params": "",
+        "instance": "p.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 321836,
+        "endpoint": "/neko/ranking-list/record",
+        "full_call": "p.tI.post(\"/neko/ranking-list/record\",(0,i.Z)({},n))",
+        "function_name": "m",
+        "function_params": "",
+        "instance": "p.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 322168,
+        "endpoint": "/neko/ranking-list",
+        "full_call": "p.tI.post(\"/neko/ranking-list\",(0,i.Z)({},t))",
+        "function_name": "f",
+        "function_params": "",
+        "instance": "p.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 323008,
+        "endpoint": "/neko/ranking-list/fullUpdate",
+        "full_call": "p.tI.put(\"/neko/ranking-list/fullUpdate\",(0,i.Z)({},t))",
+        "function_name": "N",
+        "function_params": "",
+        "instance": "p.tI",
+        "method": "put",
+        "parameters": []
+      },
+      {
+        "call_start": 323154,
+        "endpoint": "/neko/ranking-list/",
+        "full_call": "p.tI.delete(\"/neko/ranking-list/\".concat(e),{params:{id:e,work_id:t}})",
+        "function_name": "v",
+        "function_params": "e,t",
+        "instance": "p.tI",
+        "method": "delete",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "query",
+            "value": "e"
+          }
+        ]
+      },
+      {
+        "call_start": 323425,
+        "endpoint": "/neko/ranking-list/clear?id=",
+        "full_call": "p.tI.put(\"/neko/ranking-list/clear?id=\".concat(t))",
+        "function_name": "T",
+        "function_params": "",
+        "instance": "p.tI",
+        "method": "put",
+        "parameters": []
+      }
+    ],
+    "teaching": [
+      {
+        "call_start": 329704,
+        "endpoint": "/neko/teaching-plan/save/team/work",
+        "full_call": "g.tI.post(\"/neko/teaching-plan/save/team/work\",(0,i.Z)((0,i.Z)((0,i.Z)((0,i.Z)({bcm_version:s.oF,save_type:1},(0,l.Wz)()&&!e.work_id&&{work_business_from:c.B2.TANYUE}),(0,l.aU)()&&!e.work_id&&{work_business_from:c.B2.GUYU}),(0,l.F)()&&!e.work_id&&{work_business_from:c.B2.EXAM}),e))",
+        "function_name": "I",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "bcm_version",
+            "type": "body",
+            "value": "s.oF"
+          },
+          {
+            "name": "save_type",
+            "type": "body",
+            "value": "1"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.TANYUE"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.GUYU"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.EXAM"
+          }
+        ]
+      },
+      {
+        "call_start": 335407,
+        "endpoint": "/neko/teaching-plan/list/opr/log",
+        "full_call": "g.tI.get(\"/neko/teaching-plan/list/opr/log\",{params:{work_id:t,offset:n,limit:r}})",
+        "function_name": "J",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": [
+          {
+            "name": "work_id",
+            "type": "query",
+            "value": "t"
+          },
+          {
+            "name": "offset",
+            "type": "query",
+            "value": "n"
+          }
+        ]
+      },
+      {
+        "call_start": 335511,
+        "endpoint": "/neko/teaching-plan/add/opr/log",
+        "full_call": "g.tI.post(\"/neko/teaching-plan/add/opr/log\",e)",
+        "function_name": "q",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 2696932,
+        "endpoint": "/neko/teaching-plan/work/editing-status/",
+        "full_call": "r.creationRequest.get(\"/neko/teaching-plan/work/editing-status/\".concat(e))",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "r.creationRequest",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 2697029,
+        "endpoint": "/neko/teaching-plan/set/work/editing-status",
+        "full_call": "r.creationRequest.post(\"/neko/teaching-plan/set/work/editing-status\",e)",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "r.creationRequest",
+        "method": "post",
+        "parameters": []
+      }
+    ],
+    "works": [
+      {
+        "call_start": 328444,
+        "endpoint": "/neko/works/",
+        "full_call": "g.tI.get(\"/neko/works/\".concat(t))",
+        "function_name": "A",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 328567,
+        "endpoint": "/neko/works/archive/",
+        "full_call": "g.tI.get(\"/neko/works/archive/\".concat(e))",
+        "function_name": "_",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 329415,
+        "endpoint": "/neko/works/teacher",
+        "full_call": "g.tI.post(\"/neko/works/teacher\",(0,i.Z)((0,i.Z)((0,i.Z)((0,i.Z)({bcm_version:s.oF,save_type:1},(0,l.Wz)()&&!e.work_id&&{work_business_from:c.B2.TANYUE}),(0,l.aU)()&&!e.work_id&&{work_business_from:c.B2.GUYU}),(0,l.F)()&&!e.work_id&&{work_business_from:c.B2.EXAM}),e))",
+        "function_name": "f",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "bcm_version",
+            "type": "body",
+            "value": "s.oF"
+          },
+          {
+            "name": "save_type",
+            "type": "body",
+            "value": "1"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.TANYUE"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.GUYU"
+          },
+          {
+            "name": "work_business_from",
+            "type": "body",
+            "value": "c.B2.EXAM"
+          }
+        ]
+      },
+      {
+        "call_start": 330904,
+        "endpoint": "/neko/works/copy",
+        "full_call": "g.tI.post(\"/neko/works/copy\",{work_id:e})",
+        "function_name": "C",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": [
+          {
+            "name": "work_id",
+            "type": "body",
+            "value": "e"
+          }
+        ]
+      },
+      {
+        "call_start": 330967,
+        "endpoint": "/neko/works/save-teacher-course-invite-url",
+        "full_call": "g.tI.post(\"/neko/works/save-teacher-course-invite-url\",(0,i.Z)({},e))",
+        "function_name": "x",
+        "function_params": "e",
+        "instance": "g.tI",
+        "method": "post",
+        "parameters": []
+      },
+      {
+        "call_start": 331882,
+        "endpoint": "/neko/works/player/work-detail/",
+        "full_call": "g.tI.get(\"/neko/works/player/work-detail/\".concat(t))",
+        "function_name": "w",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 336170,
+        "endpoint": "/neko/works/get-player-by-course-code",
+        "full_call": "g.tI.get(\"/neko/works/get-player-by-course-code\",{params:{course_code:t}})",
+        "function_name": "re",
+        "function_params": "",
+        "instance": "g.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 338044,
+        "endpoint": "/neko/works/status/",
+        "full_call": "o.tI.get(\"/neko/works/status/\".concat(t))",
+        "function_name": "A",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "get",
+        "parameters": []
+      },
+      {
+        "call_start": 338383,
+        "endpoint": "/neko/works/pic-troubleshoot/",
+        "full_call": "o.tI.put(\"/neko/works/pic-troubleshoot/\".concat(t))",
+        "function_name": "m",
+        "function_params": "",
+        "instance": "o.tI",
+        "method": "put",
+        "parameters": []
+      },
+      {
+        "call_start": 2655062,
+        "endpoint": "/neko/works/archive/",
+        "full_call": "o.creationRequest.get(\"/neko/works/archive/\".concat(e))",
+        "function_name": "ee",
+        "function_params": "e",
+        "instance": "o.creationRequest",
+        "method": "get",
+        "parameters": []
+      }
+    ]
+  },
+  "summary": {
+    "by_category": {
+      "ai": 13,
+      "cloud_variable": 4,
+      "community": 5,
+      "course": 2,
+      "file": 0,
+      "other": 46,
+      "package": 4,
+      "ranking": 6,
+      "teaching": 5,
+      "works": 10
+    },
+    "http_methods": {
+      "DELETE": 9,
+      "GET": 45,
+      "POST": 35,
+      "PUT": 6
+    },
+    "instances": {
+      "_.AQ": 7,
+      "_.tI": 5,
+      ".searchParams": 2,
+      "A.$p": 2,
+      "a.aiRequest": 1,
+      "a.creationRequest": 1,
+      "BC.tI": 1,
+      "c.coneAiRequest": 2,
+      "d.mx.runtime_data.document_events_handler": 1,
+      "g.tI": 18,
+      "h.tI": 2,
+      "H.tI": 5,
+      "i.tI": 4,
+      "l.uK": 4,
+      "n.headers": 1,
+      "o.creationRequest": 1,
+      "o.DM": 2,
+      "o.tI": 15,
+      "p.tI": 6,
+      "r.creationRequest": 2,
+      "r.DM": 4,
+      "s.FV": 5,
+      "t": 2,
+      "u.headers": 1,
+      "u.tI": 1
+    },
+    "total_apis": 95
+  }
+}
