@@ -308,7 +308,7 @@ class InternalImplementations:
 			# 下载加密文件
 			try:
 				encrypted_content = self.client.send_request(endpoint=encrypted_url, method="GET").text
-				print(f"📊 下载加密数据完成, 长度: {len(encrypted_content)} 字符")
+				print(f"下载加密数据完成, 长度: {len(encrypted_content)} 字符")
 			except Exception as e:
 				error_msg = "下载加密文件失败"
 				raise ValueError(error_msg) from e
@@ -316,7 +316,7 @@ class InternalImplementations:
 			decryptor = InternalImplementations.BCMKNDecryptor()
 			try:
 				decrypted_data = decryptor.decrypt_data(encrypted_content)
-				print("✅ NEKO 作品解密成功!")
+				print("NEKO 作品解密成功!")
 				print("食用教程:")
 				print("首先确保你有 ROOT 权限或者 MT 管理器")
 				print("将反编译的文件复制到 NEMO 客户端数据目录")

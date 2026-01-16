@@ -1,14 +1,19 @@
-"""基础定义和核心 Union 类"""
+"""基础定义和核心 InfrastructureCoordinator 类"""
 
 from collections import namedtuple
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, TypeVar
 
 from aumiao.api import auth, community, edu, forum, library, shop, user, whale, work
 from aumiao.utils import acquire, data, decorator, file, tool
 
+# ==============================
+# 类型变量定义
+# ==============================
+T = TypeVar("T")
+ModuleType = TypeVar("ModuleType")
 # ==============================
 # 常量定义
 # ==============================
@@ -813,57 +818,198 @@ class SourceConfig:
 
 
 # ==============================
-# 核心 Union 类
+# 简化的基础设施协调器
 # ==============================
-@decorator.singleton
-class Union:
-	"""核心联合类 - 整合所有功能模块"""
+class InfrastructureCoordinator:
+	"""基础设施协调器 - 简化版,延迟加载,统一管理模块"""
 
 	def __init__(self) -> None:
-		# API 客户端
-		self._client = acquire.ClientFactory().create_codemao_client()
-		# 认证模块
-		self._auth = auth.AuthManager()
-		# 社区模块
-		self._community_motion = community.UserAction()
-		self._community_obtain = community.DataFetcher()
-		# 教育模块
-		self._edu_motion = edu.UserAction()
-		self._edu_obtain = edu.DataFetcher()
-		# 论坛模块
-		self._forum_motion = forum.ForumActionHandler()
-		self._forum_obtain = forum.ForumDataFetcher()
-		# 图书馆模块
-		self._novel_motion = library.NovelActionHandler()
-		self._novel_obtain = library.NovelDataFetcher()
-		# 商店模块
-		self._shop_motion = shop.WorkshopActionHandler()
-		self._shop_obtain = shop.WorkshopDataFetcher()
-		# 用户模块
-		self._user_motion = user.UserManager()
-		self._user_obtain = user.UserDataFetcher()
-		# 作品模块
-		self._work_motion = work.BaseWorkManager()
-		self._work_obtain = work.WorkDataFetcher()
-		# 举报模块
-		self._whale_motion = whale.ReportHandler()
-		self._whale_obtain = whale.ReportFetcher()
-		# 工具模块
-		self._printer = tool.Printer()
-		self._tool = tool
-		self._file = file.CodeMaoFile()
-		# 数据管理
-		self._data = data.DataManager().data
-		self._setting = data.SettingManager().data
-		self._upload_history = data.HistoryManager()
-		self.cache = data.CacheManager().data
+		# 使用字典存储模块实例,实现延迟加载
+		self._modules: dict[str, Any] = {}
+		# 立即初始化核心客户端和工具(这些是基础依赖)
+		self._client_instance = acquire.ClientFactory().create_codemao_client()
+		self._tool_module = tool
+		# 立即初始化的数据模块(这些是基础组件)
+		self._data_manager = data.DataManager()
+		self._setting_manager = data.SettingManager()
+		self._cache_manager = data.CacheManager()
+		self._history_manager = data.HistoryManager()
+		# 模块创建器字典 - 简化版,不使用复杂的工厂模式
+		self._module_creators: dict[str, Callable[[], Any]] = {
+			# API 模块
+			"auth": auth.AuthManager,
+			"community_motion": community.UserAction,
+			"community_obtain": community.DataFetcher,
+			"edu_motion": edu.UserAction,
+			"edu_obtain": edu.DataFetcher,
+			"forum_motion": forum.ForumActionHandler,
+			"forum_obtain": forum.ForumDataFetcher,
+			"novel_motion": library.NovelActionHandler,
+			"novel_obtain": library.NovelDataFetcher,
+			"shop_motion": shop.WorkshopActionHandler,
+			"shop_obtain": shop.WorkshopDataFetcher,
+			"user_motion": user.UserManager,
+			"user_obtain": user.UserDataFetcher,
+			"work_motion": work.BaseWorkManager,
+			"work_obtain": work.WorkDataFetcher,
+			"whale_motion": whale.ReportHandler,
+			"whale_obtain": whale.ReportFetcher,
+			# 工具模块
+			"printer": tool.Printer,
+			"file": file.CodeMaoFile,
+		}
+
+	def _get_module(self, name: str) -> Any:
+		"""获取模块实例,如果不存在则创建(延迟加载)"""
+		if name not in self._modules:
+			if name not in self._module_creators:
+				msg = f"模块 '{name}' 未注册"
+				raise AttributeError(msg)
+			self._modules[name] = self._module_creators[name]()
+		return self._modules[name]
+
+	def register_module(self, name: str, creator: Callable[[], Any]) -> None:
+		"""注册新模块 - 这是添加新模块的最佳方式"""
+		self._module_creators[name] = creator
+
+	def clear_module_cache(self, module_name: str | None = None) -> None:
+		"""清除模块缓存"""
+		if module_name:
+			self._modules.pop(module_name, None)
+		else:
+			self._modules.clear()
+
+	def list_available_modules(self) -> list[str]:
+		"""列出所有可用的模块"""
+		return list(self._module_creators.keys())
+
+	def list_loaded_modules(self) -> list[str]:
+		"""列出已加载的模块"""
+		return list(self._modules.keys())
+
+	# ==============================
+	# 属性访问器 - 延迟加载
+	# ==============================
+	# 核心属性(立即加载)
+	@property
+	def _client(self) -> object:
+		return self._client_instance
+
+	@property
+	def _tool(self) -> object:
+		return self._tool_module
+
+	@property
+	def _data(self) -> object:
+		return self._data_manager.data
+
+	@property
+	def _setting(self) -> object:
+		return self._setting_manager.data
+
+	@property
+	def cache(self) -> object:
+		return self._cache_manager.data
+
+	# API 模块属性(延迟加载)
+	@property
+	def _auth(self) -> auth.AuthManager:
+		return self._get_module("auth")
+
+	@property
+	def _community_motion(self) -> community.UserAction:
+		return self._get_module("community_motion")
+
+	@property
+	def _community_obtain(self) -> community.DataFetcher:
+		return self._get_module("community_obtain")
+
+	@property
+	def _edu_motion(self) -> edu.UserAction:
+		return self._get_module("edu_motion")
+
+	@property
+	def _edu_obtain(self) -> edu.DataFetcher:
+		return self._get_module("edu_obtain")
+
+	@property
+	def _forum_motion(self) -> forum.ForumActionHandler:
+		return self._get_module("forum_motion")
+
+	@property
+	def _forum_obtain(self) -> forum.ForumDataFetcher:
+		return self._get_module("forum_obtain")
+
+	@property
+	def _novel_motion(self) -> library.NovelActionHandler:
+		return self._get_module("novel_motion")
+
+	@property
+	def _novel_obtain(self) -> library.NovelDataFetcher:
+		return self._get_module("novel_obtain")
+
+	@property
+	def _shop_motion(self) -> shop.WorkshopActionHandler:
+		return self._get_module("shop_motion")
+
+	@property
+	def _shop_obtain(self) -> shop.WorkshopDataFetcher:
+		return self._get_module("shop_obtain")
+
+	@property
+	def _user_motion(self) -> user.UserManager:
+		return self._get_module("user_motion")
+
+	@property
+	def _user_obtain(self) -> user.UserDataFetcher:
+		return self._get_module("user_obtain")
+
+	@property
+	def _work_motion(self) -> work.BaseWorkManager:
+		return self._get_module("work_motion")
+
+	@property
+	def _work_obtain(self) -> work.WorkDataFetcher:
+		return self._get_module("work_obtain")
+
+	@property
+	def _whale_motion(self) -> whale.ReportHandler:
+		return self._get_module("whale_motion")
+
+	@property
+	def _whale_obtain(self) -> whale.ReportFetcher:
+		return self._get_module("whale_obtain")
+
+	# 工具模块属性(延迟加载)
+	@property
+	def _printer(self) -> tool.Printer:
+		return self._get_module("printer")
+
+	@property
+	def _file(self) -> file.CodeMaoFile:
+		return self._get_module("file")
+
+	@property
+	def _upload_history(self) -> data.HistoryManager:
+		return self._history_manager
 
 
+# ==============================
+# 单例装饰器包装(保持向后兼容)
+# ==============================
+@decorator.singleton
+class Union(InfrastructureCoordinator):
+	"""保持原有 Union 类名,继承基础设施协调器"""
+
+
+# ==============================
+# 业务逻辑类(保持原样)
+# ==============================
 ClassUnion = Union().__class__
 
 
 @decorator.singleton
-class Index(ClassUnion):  # ty:ignore[unsupported-base]
+class Index(ClassUnion):  # ty:ignore [unsupported-base]
 	"""首页展示类"""
 
 	# 颜色配置
@@ -911,7 +1057,7 @@ class Index(ClassUnion):  # ty:ignore[unsupported-base]
 
 
 @decorator.singleton
-class Tool(ClassUnion):  # ty:ignore[unsupported-base]
+class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 	"""工具类"""
 
 	def __init__(self) -> None:
