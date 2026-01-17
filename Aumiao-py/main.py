@@ -13,7 +13,7 @@ from aumiao.core.base import Index
 from aumiao.core.compile import decompile_work
 from aumiao.core.deepser import CodeMaoTool
 from aumiao.core.process import FileProcessor
-from aumiao.core.services import FileUploader, MillenniumEntanglement, Motion, Report
+from aumiao.core.services import services
 from aumiao.utils import data, plugin, tool
 
 # 常量定义
@@ -110,7 +110,7 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 		except ValueError as ve:
 			print(printer.color_text(f"输入错误: {ve}", "ERROR"))
 		except Exception as e:
-			logger.exception("%s 执行失败", func.__name__)  # ty:ignore[unresolved-attribute]
+			logger.exception("%s 执行失败", func.__name__)  # ty:ignore [unresolved-attribute]
 			print(printer.color_text(f"操作失败: {e}", "ERROR"))
 
 	return wrapper
@@ -222,8 +222,9 @@ def clear_comments(_account_data_manager: AccountDataManager) -> None:
 	action_type = get_enum_input("请输入操作类型", {"ads", "duplicates", "blacklist"})
 	source = cast("Literal ['work', 'post']", source)
 	action_type = cast("Literal ['ads', 'duplicates', 'blacklist']", action_type)
-	Motion().remove_comments_by_type(source=source, action_type=action_type)
-	print(printer.color_text(f"已成功清除 {source} 的 {action_type} 评论", "SUCCESS"))
+	services.community.clean_comments(source=source, action_type=action_type)
+	print(printer.color_text(f"已成功执行 {source} 的 {action_type} 评论", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -233,8 +234,9 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 	printer.print_header("清除红点提醒")
 	method = get_enum_input("请输入方法", {"nemo", "web"})
 	method = cast("Literal ['nemo', 'web']", method)
-	Motion().mark_notifications_as_read(method=method)
+	services.community.mark_notifications_as_read(method=method)
 	print(printer.color_text(f"已成功清除 {method} 红点提醒", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -242,8 +244,9 @@ def clear_red_point(_account_data_manager: AccountDataManager) -> None:
 def reply_work(_account_data_manager: AccountDataManager) -> None:
 	"""自动回复作品"""
 	printer.print_header("自动回复")
-	Motion().process_auto_replies()
+	services.reply.process_replies()
 	print(printer.color_text("已成功执行自动回复", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -256,8 +259,9 @@ def handle_report(_account_data_manager: AccountDataManager) -> None:
 	judgment_data = AuthManager().fetch_admin_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
-	Report().process_reports_loop(admin_id=admin_id)
+	services.report.process_reports(admin_id=admin_id)
 	print(printer.color_text("已成功处理举报", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -265,8 +269,9 @@ def handle_report(_account_data_manager: AccountDataManager) -> None:
 def check_account_status(_account_data_manager: AccountDataManager) -> None:
 	"""检查账户状态"""
 	printer.print_header("账户状态查询")
-	status = Motion().get_account_status()
+	status = services.community.get_account_status()
 	print(printer.color_text(f"当前账户状态: {status}", "STATUS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -274,18 +279,19 @@ def download_fiction(_account_data_manager: AccountDataManager) -> None:
 	"""下载小说"""
 	printer.print_header("下载小说")
 	fiction_id = get_positive_int_input("请输入小说 ID")
-	Motion().download_novel_content(fiction_id=fiction_id)
+	services.community.download_novel(novel_id=fiction_id)
 	print(printer.color_text("小说下载完成", "SUCCESS"))
+	services.clear_cache()
 
 
-@handle_errors
 @require_login
 def generate_nemo_code(_account_data_manager: AccountDataManager) -> None:
 	"""生成喵口令"""
 	printer.print_header("生成喵口令")
 	work_id = get_positive_int_input("请输入作品编号")
-	Motion().generate_miao_code(work_id=work_id)
+	services.community.generate_miao_code(work_id=work_id)
 	print(printer.color_text("生成完成", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -318,9 +324,10 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 		print(printer.color_text("文件或路径不存在", "ERROR"))
 		return
 	method = cast("Literal ['pgaot', 'codemao','codegame']", method)
-	url = FileUploader().upload_file_or_dir(method=method, file_path=file_path)
+	url = services.file_upload.upload(method=method, path=file_path)
 	print(f"保存地址: {url}")
 	print(printer.color_text("文件上传成功", "SUCCESS"))
+	services.clear_cache()
 
 
 @handle_errors
@@ -378,18 +385,19 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	sub_choice = get_enum_input("操作选择", {"1", "2", "3"})
 	if sub_choice == "1":
 		user_id = get_positive_int_input("训练师 ID")
-		MillenniumEntanglement().batch_like_content(user_id=user_id, content_type="work")
+		services.batch_operations.batch_like(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
 		mode = get_enum_input("模式", {"delete", "create", "token"})
-		mode = cast("Literal['delete', 'create', 'token', 'password']", mode)
+		mode = cast("Literal ['delete', 'create', 'token', 'password']", mode)
 		limit = get_positive_int_input("数量", max_value=200)
-		MillenniumEntanglement().manage_edu_accounts(action_type=mode, limit=limit)
+		services.batch_operations.manage_edu_accounts(action=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
 	elif sub_choice == "3":
 		real_name = printer.prompt_input("输入姓名")
-		MillenniumEntanglement().upgrade_to_teacher(real_name=real_name)
+		services.batch_operations.upgrade_to_teacher(real_name=real_name)
 		print(printer.color_text("账号提权完成", "SUCCESS"))
+		services.clear_cache()
 
 
 def exit_program(_account_data_manager: AccountDataManager) -> None:
@@ -509,6 +517,7 @@ def main() -> None:
 	Index().index()
 	account_data_manager = AccountDataManager()
 	menu_system = MenuSystem(account_data_manager)
+	run_main_loop(menu_system)
 	try:
 		run_main_loop(menu_system)
 	except KeyboardInterrupt:

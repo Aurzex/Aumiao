@@ -7,7 +7,10 @@ from enum import Enum, auto
 from typing import Any, Literal, TypedDict, TypeVar
 
 from aumiao.api import auth, community, edu, forum, library, shop, user, whale, work
-from aumiao.utils import data, decorator, file, tool
+from aumiao.api import auth as auth_ins
+from aumiao.utils import data, decorator
+from aumiao.utils import file as file_ins
+from aumiao.utils import tool as tool_ins
 from aumiao.utils.acquire import ClientFactory
 from aumiao.utils.data import CacheManager, DataManager, HistoryManager, SettingManager
 from aumiao.utils.decorator import singleton
@@ -868,7 +871,7 @@ class CoreManager:
 	def __init__(self) -> None:
 		# 立即初始化的核心组件
 		self.client = ClientFactory().create_codemao_client()
-		self.tool = tool
+		self.tool = tool_ins
 		self.data_manager = DataManager()
 		self.setting_manager = SettingManager()
 		self.cache_manager = CacheManager()
@@ -935,8 +938,8 @@ class InfrastructureCoordinator:
 			"whale_motion": whale.ReportHandler,
 			"whale_obtain": whale.ReportFetcher,
 			# 工具模块
-			"printer": tool.Printer,
-			"file": file.CodeMaoFile,
+			"printer": tool_ins.Printer,
+			"file": file_ins.CodeMaoFile,
 		}
 		for name, creator in api_modules.items():
 			self._modules.register(name, creator)
@@ -964,22 +967,22 @@ class InfrastructureCoordinator:
 	# 核心组件属性(类型明确)
 	# ==============================
 	@property
-	def _client(self) -> Any:
+	def client(self) -> Any:
 		"""核心客户端"""
 		return self._core.client
 
 	@property
-	def _tool(self) -> Any:
+	def tool(self) -> Any:
 		"""工具模块"""
 		return self._core.tool
 
 	@property
-	def _data(self) -> Any:
+	def data(self) -> Any:
 		"""数据"""
 		return self._core.data
 
 	@property
-	def _setting(self) -> Any:
+	def setting(self) -> Any:
 		"""设置"""
 		return self._core.setting
 
@@ -989,7 +992,7 @@ class InfrastructureCoordinator:
 		return self._core.cache
 
 	@property
-	def _upload_history(self) -> Any:
+	def upload_history(self) -> Any:
 		"""上传历史"""
 		return self._core.upload_history
 
@@ -997,87 +1000,87 @@ class InfrastructureCoordinator:
 	# API 模块属性(延迟加载,类型明确)
 	# ==============================
 	@property
-	def _auth(self) -> "auth.AuthManager":
+	def auth(self) -> "auth_ins.AuthManager":
 		"""认证管理模块"""
 		return self._modules.get("auth")
 
 	@property
-	def _community_motion(self) -> "community.UserAction":
+	def community_motion(self) -> "community.UserAction":
 		"""社区动作模块"""
 		return self._modules.get("community_motion")
 
 	@property
-	def _community_obtain(self) -> "community.DataFetcher":
+	def community_obtain(self) -> "community.DataFetcher":
 		"""社区数据获取模块"""
 		return self._modules.get("community_obtain")
 
 	@property
-	def _edu_motion(self) -> "edu.UserAction":
+	def edu_motion(self) -> "edu.UserAction":
 		"""教育动作模块"""
 		return self._modules.get("edu_motion")
 
 	@property
-	def _edu_obtain(self) -> "edu.DataFetcher":
+	def edu_obtain(self) -> "edu.DataFetcher":
 		"""教育数据获取模块"""
 		return self._modules.get("edu_obtain")
 
 	@property
-	def _forum_motion(self) -> "forum.ForumActionHandler":
+	def forum_motion(self) -> "forum.ForumActionHandler":
 		"""论坛动作模块"""
 		return self._modules.get("forum_motion")
 
 	@property
-	def _forum_obtain(self) -> "forum.ForumDataFetcher":
+	def forum_obtain(self) -> "forum.ForumDataFetcher":
 		"""论坛数据获取模块"""
 		return self._modules.get("forum_obtain")
 
 	@property
-	def _novel_motion(self) -> "library.NovelActionHandler":
+	def novel_motion(self) -> "library.NovelActionHandler":
 		"""小说动作模块"""
 		return self._modules.get("novel_motion")
 
 	@property
-	def _novel_obtain(self) -> "library.NovelDataFetcher":
+	def novel_obtain(self) -> "library.NovelDataFetcher":
 		"""小说数据获取模块"""
 		return self._modules.get("novel_obtain")
 
 	@property
-	def _shop_motion(self) -> "shop.WorkshopActionHandler":
+	def shop_motion(self) -> "shop.WorkshopActionHandler":
 		"""商店动作模块"""
 		return self._modules.get("shop_motion")
 
 	@property
-	def _shop_obtain(self) -> "shop.WorkshopDataFetcher":
+	def shop_obtain(self) -> "shop.WorkshopDataFetcher":
 		"""商店数据获取模块"""
 		return self._modules.get("shop_obtain")
 
 	@property
-	def _user_motion(self) -> "user.UserManager":
+	def user_motion(self) -> "user.UserManager":
 		"""用户动作模块"""
 		return self._modules.get("user_motion")
 
 	@property
-	def _user_obtain(self) -> "user.UserDataFetcher":
+	def user_obtain(self) -> "user.UserDataFetcher":
 		"""用户数据获取模块"""
 		return self._modules.get("user_obtain")
 
 	@property
-	def _work_motion(self) -> "work.BaseWorkManager":
+	def work_motion(self) -> "work.BaseWorkManager":
 		"""作品动作模块"""
 		return self._modules.get("work_motion")
 
 	@property
-	def _work_obtain(self) -> "work.WorkDataFetcher":
+	def work_obtain(self) -> "work.WorkDataFetcher":
 		"""作品数据获取模块"""
 		return self._modules.get("work_obtain")
 
 	@property
-	def _whale_motion(self) -> "whale.ReportHandler":
+	def whale_motion(self) -> "whale.ReportHandler":
 		"""鲸鱼报告动作模块"""
 		return self._modules.get("whale_motion")
 
 	@property
-	def _whale_obtain(self) -> "whale.ReportFetcher":
+	def whale_obtain(self) -> "whale.ReportFetcher":
 		"""鲸鱼报告数据获取模块"""
 		return self._modules.get("whale_obtain")
 
@@ -1085,12 +1088,12 @@ class InfrastructureCoordinator:
 	# 工具模块属性(延迟加载,类型明确)
 	# ==============================
 	@property
-	def _printer(self) -> "tool.Printer":
+	def printer(self) -> "tool_ins.Printer":
 		"""打印工具模块"""
 		return self._modules.get("printer")
 
 	@property
-	def _file(self) -> "file.CodeMaoFile":
+	def file(self) -> "file_ins.CodeMaoFile":
 		"""文件操作模块"""
 		return self._modules.get("file")
 
@@ -1115,33 +1118,33 @@ class _InfrastructureCoordinatorStub:
 	"""
 
 	# 核心组件
-	_client: Any
-	_tool: Any
-	_data: Any
-	_setting: Any
+	client: Any
+	tool: Any
+	data: Any
+	setting: Any
 	cache: Any
-	_upload_history: Any
+	upload_history: Any
 	# API 模块
-	_auth: "auth.AuthManager"
-	_community_motion: "community.UserAction"
-	_community_obtain: "community.DataFetcher"
-	_edu_motion: "edu.UserAction"
-	_edu_obtain: "edu.DataFetcher"
-	_forum_motion: "forum.ForumActionHandler"
-	_forum_obtain: "forum.ForumDataFetcher"
-	_novel_motion: "library.NovelActionHandler"
-	_novel_obtain: "library.NovelDataFetcher"
-	_shop_motion: "shop.WorkshopActionHandler"
-	_shop_obtain: "shop.WorkshopDataFetcher"
-	_user_motion: "user.UserManager"
-	_user_obtain: "user.UserDataFetcher"
-	_work_motion: "work.BaseWorkManager"
-	_work_obtain: "work.WorkDataFetcher"
-	_whale_motion: "whale.ReportHandler"
-	_whale_obtain: "whale.ReportFetcher"
+	auth: "auth.AuthManager"
+	community_motion: "community.UserAction"
+	community_obtain: "community.DataFetcher"
+	edu_motion: "edu.UserAction"
+	edu_obtain: "edu.DataFetcher"
+	forum_motion: "forum.ForumActionHandler"
+	forum_obtain: "forum.ForumDataFetcher"
+	novel_motion: "library.NovelActionHandler"
+	novel_obtain: "library.NovelDataFetcher"
+	shop_motion: "shop.WorkshopActionHandler"
+	shop_obtain: "shop.WorkshopDataFetcher"
+	user_motion: "user.UserManager"
+	user_obtain: "user.UserDataFetcher"
+	work_motion: "work.BaseWorkManager"
+	work_obtain: "work.WorkDataFetcher"
+	whale_motion: "whale.ReportHandler"
+	whale_obtain: "whale.ReportFetcher"
 	# 工具模块
-	_printer: "tool.Printer"
-	_file: "file.CodeMaoFile"
+	printer: "tool_ins.Printer"
+	file: "file_ins.CodeMaoFile"
 
 
 # ==============================
@@ -1184,13 +1187,13 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 
 	def _print_slogan(self) -> None:
 		"""打印标语"""
-		print(f"\n {self.COLOR_SLOGAN}{self._setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
-		print(f"{self.COLOR_VERSION} 版本号: {self._setting.PROGRAM.VERSION}{self.COLOR_RESET}")
+		print(f"\n {self.COLOR_SLOGAN}{self.setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
+		print(f"{self.COLOR_VERSION} 版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
 
 	def _print_lyric(self) -> None:
 		"""打印歌词"""
 		self._print_title("一言")
-		lyric: str = self._client.send_request(endpoint="https://lty.vc/lyric", method="GET").text
+		lyric: str = self.client.send_request(endpoint="https://lty.vc/lyric", method="GET").text
 		print(f"{self.COLOR_SLOGAN}{lyric}{self.COLOR_RESET}")
 
 	def _print_announcements(self) -> None:
@@ -1202,8 +1205,8 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 	def _print_user_data(self) -> None:
 		"""打印用户数据"""
 		self._print_title("数据")
-		if self._data.ACCOUNT_DATA.id:
-			Tool().message_report(user_id=self._data.ACCOUNT_DATA.id)
+		if self.data.ACCOUNT_DATA.id:
+			Tool().message_report(user_id=self.data.ACCOUNT_DATA.id)
 			print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
 
 	def index(self) -> None:
@@ -1224,8 +1227,8 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 
 	def message_report(self, user_id: str) -> None:
 		"""生成用户数据报告"""
-		response = self._user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp = self._community_obtain.fetch_current_timestamp_10()["data"]
+		response = self.user_obtain.fetch_user_honors(user_id=user_id)
+		timestamp = self.community_obtain.fetch_current_timestamp_10()["data"]
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -1238,7 +1241,7 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 		}
 		# 如果有缓存数据, 进行对比分析
 		if self._cache_manager.data:
-			self._tool.DataAnalyzer().compare_datasets(
+			self.tool.DataAnalyzer().compare_datasets(
 				before=self._cache_manager.data,
 				after=user_data,
 				metrics={
