@@ -82,16 +82,24 @@ class QueryManager:
 
 
 def query_method(method_name: str) -> ...:
-	"""查询方法装饰器,用于简化 API 调用"""
+	"""查询方法装饰器, 用于简化 API 调用"""
 
 	def decorator_func(func: ...) -> ...:
 		@wraps(func)
 		def wrapper(self: ..., *args: ..., **kwargs: ...) -> ...:
-			builder = self.query_manager.create_builder()
-			# 根据方法名和参数自动构建查询
+			if kwargs:
+				return func(self, *args, **kwargs)
 			if method_name == "comments_detail":
-				com_id, source, method, max_limit = args
-				return builder.from_source(source).with_id(com_id).using_method(method).with_limit(max_limit).execute()
+				builder = self.query_manager.create_builder()
+				arg_names = ["com_id", "source", "method", "max_limit"]
+				args_dict = {}
+				for i, arg in enumerate(args):
+					if i < len(arg_names):
+						args_dict[arg_names[i]] = arg
+				if "max_limit" not in args_dict:
+					args_dict["max_limit"] = 500
+				# 调用查询构建器
+				return builder.from_source(args_dict["source"]).with_id(args_dict["com_id"]).using_method(args_dict["method"]).with_limit(args_dict["max_limit"]).execute()
 			return func(self, *args, **kwargs)
 
 		return wrapper
@@ -100,16 +108,16 @@ def query_method(method_name: str) -> ...:
 
 
 @decorator.singleton
-class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
+class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 		self._source_map = {
-			"work": (self._work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),
-			"post": (self._forum_obtain.fetch_post_replies_gen, "post_id", "user"),
-			"shop": (self._shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
+			"work": (self.work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),
+			"post": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
+			"shop": (self.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
 		}
-		self._math_utils = self._tool.MathUtils()
-		self._data_processor = self._tool.DataProcessor()
+		self._math_utils = self.tool.MathUtils()
+		self._data_processor = self.tool.DataProcessor()
 		self.query_manager = QueryManager(self)
 
 	def get_new_replies(
@@ -119,7 +127,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	) -> list[dict]:
 		"""获取社区新回复"""
 		try:
-			message_data = self._community_obtain.fetch_message_count(method="web")
+			message_data = self.community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
@@ -132,7 +140,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		while remaining > 0:
 			current_limit = self._math_utils.clamp(remaining, 5, 200)
 			try:
-				response = self._community_obtain.fetch_replies(
+				response = self.community_obtain.fetch_replies(
 					types=type_item,
 					limit=current_limit,
 					offset=offset,
@@ -175,7 +183,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		method: str = "user_id",
 		max_limit: int | None = 500,
 	) -> list[dict] | list[str]:
-		"""获取结构化评论数据(兼容原有接口)"""
+		"""获取结构化评论数据 (兼容原有接口)"""
 		return self.execute_query(QueryParams(source=QuerySource(source), id=com_id, method=QueryMethod(method), limit=max_limit))
 
 	def execute_query(self, params: QueryParams) -> Any:
@@ -185,7 +193,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 			msg = f"无效来源: {source_value}"
 			raise ValueError(msg)
 		method_func, id_key, user_field = self._source_map[source_value]
-		comments = method_func(**{id_key: params.id, "limit": params.limit})
+		comments = method_func(**{id_key: cast("int", params.id), "limit": cast("int", params.limit)})  # pyright: ignore [reportArgumentType] # ty:ignore [redundant-cast]
 		reply_cache = {}
 
 		def extract_reply_user(reply: dict) -> int:
@@ -194,7 +202,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		def generate_replies(comment: dict) -> Generator:
 			if source_value == "post":
 				if comment["id"] not in reply_cache:
-					reply_cache[comment["id"]] = list(self._forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
+					reply_cache[comment["id"]] = list(self.forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
 				yield from reply_cache[comment["id"]]
 			else:
 				yield from comment.get("replies", {}).get("items", [])
@@ -244,7 +252,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 			raise ValueError(msg)
 		return method_handlers[params.method]()
 
-	# 新增:使用查询构建器的 API
+	# 新增: 使用查询构建器的 API
 	def query(self) -> QueryBuilder:
 		"""创建查询构建器"""
 		return QueryBuilder(self)
@@ -253,8 +261,8 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
 		per_source_limit = limit // 2
 		data_sources = [
-			(self._work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
-			(self._work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
+			(self.work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
+			(self.work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
 		]
 		field_mapping = {
 			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
@@ -274,7 +282,7 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 		for single_work in works:
 			work_comments = self.query().from_source("work").with_id(single_work["work_id"]).using_method("comments").with_limit(20).execute()
 			comments.extend(work_comments)
-		filtered_comments = self._tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
+		filtered_comments = self.tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
 		filtered_comments = cast("list [dict]", filtered_comments)
 		user_comments_map = {}
 		for comment in filtered_comments:
@@ -299,14 +307,14 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
 		"""获取教育账号信息"""
 		try:
-			students = list(self._edu_obtain.fetch_class_students_gen(limit=limit))
+			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
 			if not students:
 				print("没有可用的教育账号")
 				return iter([]) if return_method == "generator" else []
-			self._client.switch_identity(token=self._client.token.average, identity="average")
+			self.client.switch_identity(token=self.client.token.average, identity="average")
 
 			def process_student(student: dict) -> tuple[Any, Any]:
-				return (student["username"], self._edu_motion.reset_student_password(student["id"])["password"])
+				return (student["username"], self.edu_motion.reset_student_password(student["id"])["password"])
 
 			if return_method == "generator":
 
@@ -333,15 +341,15 @@ class Obtain(ClassUnion):  # ty:ignore[unsupported-base]
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
 		"""处理教育账号的切换、登录和执行操作"""
 		try:
-			self._client.switch_identity(token=self._client.token.average, identity="average")
+			self.client.switch_identity(token=self.client.token.average, identity="average")
 			accounts = self.switch_edu_account(limit=limit, return_method="list")
 			for identity, password in accounts:
 				print("切换教育账号")
 				sleep(3)
-				self._auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
+				self.auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
 				if action:
 					action()
 		except Exception as e:
 			print(f"教育账号处理失败: {e}")
 		finally:
-			self._client.switch_identity(token=self._client.token.average, identity="average")
+			self.client.switch_identity(token=self.client.token.average, identity="average")

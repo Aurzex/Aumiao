@@ -123,9 +123,6 @@ def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool 
 			# 调用缓存函数
 			return cached_func(*args, **kwargs)
 
-		# 添加缓存访问方法
-		wrapper.cache_info = cached_func.cache_info  # ty:ignore[unresolved-attribute]
-		wrapper.cache_clear = cached_func.cache_clear  # ty:ignore[unresolved-attribute]
 		return wrapper
 
 	return decorator

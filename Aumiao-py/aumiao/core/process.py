@@ -31,7 +31,7 @@ class ProcessingContext:
 	admin_id: int
 	report_type: str
 	# 配置信息
-	config: "SourceConfig" = field(default_factory=SourceConfig)  # 使用工厂函数  # ty:ignore[no-matching-overload]
+	config: "SourceConfig" = field(default_factory=lambda: SourceConfig())  # type: ignore  # noqa: PGH003, PLW0108
 	# 处理状态
 	processed: bool = False
 	action: str | None = None
@@ -113,7 +113,7 @@ class OfficialCheckProcessor(BaseProcessor):
 				try:
 					# 使用 ReportProcessor 中的方法
 					if hasattr(self, "_whale_motion"):
-						handle_method = getattr(self._whale_motion, config.handle_method)
+						handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
 						handle_method(report_id=record["item"]["id"], resolution=status_map["P"], admin_id=context.admin_id)
 					context.messages.append("已自动通过官方内容")
 				except AttributeError:
@@ -176,7 +176,7 @@ class DetailDisplayProcessor(BaseProcessor):
 class ActionSelectionProcessor(BaseProcessor):
 	"""动作选择处理器"""
 
-	SOURCE_TYPE_MAP: ClassVar = {
+	SOURCE_TYPE_MAP: dict[Literal["comment", "post", "discussion"], Literal["shop", "post", "discussion"]] = {  # noqa: RUF012
 		"comment": "shop",
 		"post": "post",
 		"discussion": "discussion",
@@ -261,24 +261,18 @@ class ActionSelectionProcessor(BaseProcessor):
 		source_id = item_ndd[config.source_id_field]
 		board_name = item_ndd.get("board_name", "UNKNOWN")
 		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
-		self.printer.print_message(
-			f"检查违规: source_id={source_id}, type={context.report_type}, board={board_name}, user={user_id}",
-			"INFO",
-		)
-		# 尝试转换为整数
-		source_id_int = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
-		if not source_id_int:
-			self.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
-			return
+		self.printer.print_message(f"检查违规: source_id={source_id}, type={context.report_type}, board={board_name}, user={user_id}", "INFO")
+
 		# 调整来源类型
-		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # ty:ignore [invalid-assignment]
-		ReportProcessor().check_violation(
-			source_id=source_id_int,
+		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # type: ignore  # noqa: PGH003
+
+		processor = ReportProcessor()
+		processor.check_violation(
+			source_id=source_id,
 			source_type=adjusted_source_type,
 			board_name=board_name,
 			user_id=user_id if user_id != "UNKNOWN" else None,
 		)
-		self.printer.print_message("违规检查功能需要完整的 ReportProcessor 实现", "WARNING")
 
 	def _apply_action(self, context: ProcessingContext) -> None:
 		"""应用处理动作"""
@@ -295,7 +289,7 @@ class ActionSelectionProcessor(BaseProcessor):
 		status_map = self.fetcher.registry.get_status_mapping()
 		# 执行处理动作
 		try:
-			handle_method = getattr(InfrastructureCoordinator()._whale_motion, config.handle_method)  # noqa: SLF001
+			handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
 			handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=context.admin_id)
 			# 更新记录状态
 			record["processed"] = True
@@ -820,8 +814,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"comment",
 			SourceConfig(
 				name="评论举报",
-				fetch_total=lambda status: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
-				fetch_generator=lambda status: self._whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
+				fetch_total=lambda status: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
+				fetch_generator=lambda status: self.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_comment_report",
 				content_field="comment_content",
 				user_field="comment_user",
@@ -846,8 +840,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"work",
 			SourceConfig(
 				name="作品举报",
-				fetch_total=lambda status: self._whale_obtain.fetch_work_reports_total(source_type="ALL", status=status),
-				fetch_generator=lambda status: self._whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
+				fetch_total=lambda status: self.whale_obtain.fetch_work_reports_total(source_type="ALL", status=status),
+				fetch_generator=lambda status: self.whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_work_report",
 				content_field="work_name",
 				user_field="work_user_nickname",
@@ -868,8 +862,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"post",
 			SourceConfig(
 				name="帖子举报",
-				fetch_total=lambda status: self._whale_obtain.fetch_post_reports_total(status=status),
-				fetch_generator=lambda status: self._whale_obtain.fetch_post_reports_gen(status=status, limit=100),
+				fetch_total=lambda status: self.whale_obtain.fetch_post_reports_total(status=status),
+				fetch_generator=lambda status: self.whale_obtain.fetch_post_reports_gen(status=status, limit=100),
 				handle_method="execute_process_post_report",
 				content_field="post_title",
 				user_field="post_user",
@@ -893,8 +887,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"discussion",
 			SourceConfig(
 				name="讨论举报",
-				fetch_total=lambda status: self._whale_obtain.fetch_discussion_reports_total(status=status),
-				fetch_generator=lambda status: self._whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
+				fetch_total=lambda status: self.whale_obtain.fetch_discussion_reports_total(status=status),
+				fetch_generator=lambda status: self.whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
 				handle_method="execute_process_discussion_report",
 				content_field="discussion_content",
 				user_field="discussion_user",
@@ -951,10 +945,10 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
 		"""获取所有举报类型的总数"""
 		report_configs = [
-			("comment", lambda: self._whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
-			("post", lambda: self._whale_obtain.fetch_post_reports_total(status=status)),
-			("discussion", lambda: self._whale_obtain.fetch_discussion_reports_total(status=status)),
-			("work", lambda: self._whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
+			("comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
+			("post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
+			("discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
+			("work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
@@ -1026,36 +1020,36 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"""获取处理管道 (懒加载)"""
 		if self._pipeline is None:
 			self._pipeline = ProcessingPipeline.create_default_pipeline(
-				self._printer,
+				self.printer,
 				self.fetcher,
 			)
 		return self._pipeline
 
 	def process_all_reports(self, admin_id: int) -> int:
 		"""处理所有举报 - 使用管道模式"""
-		self._printer.print_header("=== 开始处理所有举报 ===")
+		self.printer.print_header("=== 开始处理所有举报 ===")
 		self.batch_manager.clear_processed_records()
 		total_processed = 0
 		# 询问是否一键全部通过
-		auto_pass_choice = self._printer.get_valid_input(
+		auto_pass_choice = self.printer.get_valid_input(
 			prompt="是否一键全部通过所有待处理举报? (Y/N)",
 			valid_options={"Y", "N"},
 		).upper()
 		if auto_pass_choice == "Y":  # noqa: S105
 			return self._pass_all_pending_reports(admin_id)
 		for chunk_count, chunk in enumerate(self.fetcher.fetch_reports_chunked(status="TOBEDONE")):
-			self._printer.print_message(
-				f"处理第 {chunk_count} 块数据, 共 {len(chunk)} 条举报",
+			self.printer.print_message(
+				f"处理第 {chunk_count + 1} 块数据, 共 {len(chunk)} 条举报",
 				"INFO",
 			)
 			# 处理当前块
 			chunk_processed = self._process_chunk_with_pipeline(chunk, admin_id)
 			total_processed += chunk_processed
-			self._printer.print_message(
-				f"第 {chunk_count} 块处理完成, 处理了 {chunk_processed} 条举报",
+			self.printer.print_message(
+				f"第 {chunk_count + 1} 块处理完成, 处理了 {chunk_processed} 条举报",
 				"SUCCESS",
 			)
-		self._printer.print_message(
+		self.printer.print_message(
 			f"所有举报处理完成, 共处理 {total_processed} 条举报",
 			"SUCCESS",
 		)
@@ -1092,7 +1086,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		admin_id: int,
 	) -> None:
 		"""使用管道处理批量组"""
-		self._printer.print_message(
+		self.printer.print_message(
 			f"处理批量组 [{group.group_type}] {group.group_key} (共 {len(group.record_ids)} 条举报)",
 			"INFO",
 		)
@@ -1105,7 +1099,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			# 应用保存的批量动作
 			status_map = self.fetcher.registry.get_status_mapping()
 			action_name = status_map.get(saved_action, saved_action)
-			self._printer.print_message(
+			self.printer.print_message(
 				f"应用保存的批量动作: {action_name}",
 				"INFO",
 			)
@@ -1144,7 +1138,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 						):
 							self._apply_simple_action(record, result.action, admin_id)
 						else:
-							self._printer.print_message(
+							self.printer.print_message(
 								f"动作 {result.action} 对类型 {record['report_type']} 不可用, 跳过记录 {record['item']['id']}",
 								"WARNING",
 							)
@@ -1173,28 +1167,28 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		admin_id: int,
 	) -> None:
 		"""应用简单动作 (不经过完整管道)"""
-		_config = self.fetcher.registry.get_config(record["report_type"])
+		config = self.fetcher.registry.get_config(record["report_type"])
 		# 检查动作是否可用
 		if not self.fetcher.registry.is_action_available(record["report_type"], action):
 			return
 		# 执行处理动作
 		status_map = self.fetcher.registry.get_status_mapping()
-		handle_method = getattr(InfrastructureCoordinator()._whale_motion, record["item"]["id"])  # noqa: SLF001
+		handle_method = getattr(self.whale_motion, config.handle_method)
 		handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=admin_id)
 		record["processed"] = True
 		record["action"] = action
 
 	def _pass_all_pending_reports(self, admin_id: int) -> int:
 		"""一键通过所有待处理举报"""
-		self._printer.print_header("=== 开始一键通过所有待处理举报 ===")
+		self.printer.print_header("=== 开始一键通过所有待处理举报 ===")
 		total_processed = 0
 		for chunk_count, chunk in enumerate(self.fetcher.fetch_reports_chunked(status="TOBEDONE")):
-			self._printer.print_message(f"处理第 {chunk_count} 块数据, 共 {len(chunk)} 条举报", "INFO")
+			self.printer.print_message(f"处理第 {chunk_count} 块数据, 共 {len(chunk)} 条举报", "INFO")
 			# 批量通过当前块中的所有举报
 			chunk_processed = self._pass_chunk_reports(chunk, admin_id)
 			total_processed += chunk_processed
-			self._printer.print_message(f"第 {chunk_count} 块处理完成, 通过了 {chunk_processed} 条举报", "SUCCESS")
-		self._printer.print_message(f"一键通过完成, 共通过 {total_processed} 条待处理举报", "SUCCESS")
+			self.printer.print_message(f"第 {chunk_count} 块处理完成, 通过了 {chunk_processed} 条举报", "SUCCESS")
+		self.printer.print_message(f"一键通过完成, 共通过 {total_processed} 条待处理举报", "SUCCESS")
 		return total_processed
 
 	def _pass_chunk_reports(self, chunk: list[ReportRecord], admin_id: int) -> int:
@@ -1203,13 +1197,13 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		for record in chunk:
 			if not record["processed"]:
 				try:
-					self._apply_action(record, "P", admin_id)
+					self._apply_simple_action(record, "P", admin_id)
 					record["processed"] = True
 					record["action"] = "P"
 					processed_count += 1
 					self.batch_manager.mark_record_processed(record["item"]["id"])
 				except Exception as e:
-					self._printer.print_message(f"通过举报 {record['item']['id']} 失败: {e!s}", "ERROR")
+					self.printer.print_message(f"通过举报 {record['item']['id']} 失败: {e!s}", "ERROR")
 		return processed_count
 
 	def _identify_batch_groups(self, chunk: list[ReportRecord]) -> list[BatchGroup]:
@@ -1260,16 +1254,16 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 
 	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:
 		"""检查举报内容违规"""
-		self._printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
+		self.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id:
-			self._printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
+			self.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
 			return
 		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
 		# 分析违规评论
 		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
 		if not violations:
-			self._printer.print_message("未检测到违规评论", "INFO")
+			self.printer.print_message("未检测到违规评论", "INFO")
 			return
 		# 执行自动举报 (用学生账号)
 		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
@@ -1277,7 +1271,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		if source_type == "post" and user_id and user_id != "UNKNOWN":
 			try:
 				# 搜索同标题的帖子
-				post_results = list(self._forum_obtain.search_posts_gen(title=board_name, limit=None))
+				post_results = list(self.forum_obtain.search_posts_gen(title=board_name, limit=None))
 				# 筛选当前用户发布的帖子
 				user_posts = DataProcessor().filter_by_nested_values(
 					data=post_results,
@@ -1285,10 +1279,10 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					target_values=[user_id],
 				)
 				# 超过阈值判定为垃圾帖
-				if len(user_posts) >= self._setting.PARAMETER.spam_del_max:
-					self._printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
+				if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
+					self.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
 			except Exception as e:
-				self._printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
+				self.printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
 
 	def _analyze_comment_violations(self, source_id: int, source_type: Literal["post", "work", "shop"], board_name: str) -> list[str]:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
@@ -1297,9 +1291,9 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments")
 			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
-				"ads": self._data.USER_DATA.ads,
-				"blacklist": self._data.USER_DATA.black_room,
-				"spam_max": self._setting.PARAMETER.spam_del_max,
+				"ads": self.data.USER_DATA.ads,
+				"blacklist": self.data.USER_DATA.black_room,
+				"spam_max": self.setting.PARAMETER.spam_del_max,
 			}
 			# 3. 调用评论处理器分析违规
 			comment_processor = CommentProcessor()
@@ -1326,26 +1320,26 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			# 合并所有违规内容 (去重, 避免重复举报)
 			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
 		except Exception as e:
-			self._printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
+			self.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
 	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:
 		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查学生账号是否可用
 		if not (self.auth_manager.student_accounts or self.auth_manager.student_tokens):
-			self._printer.print_message("未加载学生账号, 无法执行自动举报", "WARNING")
+			self.printer.print_message("未加载学生账号, 无法执行自动举报", "WARNING")
 			return
 		# 2. 询问是否执行自动举报
-		if self._printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			self._printer.print_message("自动举报操作已取消", "INFO")
+		if self.printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+			self.printer.print_message("自动举报操作已取消", "INFO")
 			return
 		# 3. 获取举报原因
 		try:
-			report_reasons = self._community_obtain.fetch_report_reasons()
+			report_reasons = self.community_obtain.fetch_report_reasons()
 			report_reasons_ndd = data.NestedDefaultDict(report_reasons)
 			reason_content = report_reasons_ndd["items"][7]["content"]
 		except (KeyError, IndexError) as e:
-			self._printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
+			self.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
 			return
 		# 4. 来源类型映射
 		source_key_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {
@@ -1357,18 +1351,18 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		# 5. 准备账号管理
 		# 复制可用账号列表, 避免修改原列表
 		available_accounts = self.auth_manager.student_accounts.copy() if self.auth_manager.auth_method == "grab" else self.auth_manager.student_tokens.copy()
-		self._printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
+		self.printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
 		success_count = 0
 		# 6. 处理每条违规内容
 		for idx, violation in enumerate(violations, 1):
 			# 解析违规内容格式
 			violation_parts = violation.split(":")
 			if len(violation_parts) < 2:
-				self._printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
+				self.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
 				continue
 			item_id_part = violation_parts[0].split(".")
 			if len(item_id_part) < 2:
-				self._printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
+				self.printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
 				continue
 			_, comment_id = item_id_part
 			is_reply = "reply" in violation
@@ -1393,14 +1387,14 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					continue
 				# 获取当前学生账号 ID
 				try:
-					user_details = self._user_obtain.fetch_account_details()
+					user_details = self.user_obtain.fetch_account_details()
 					user_details_ndd = data.NestedDefaultDict(user_details)
 					reporter_id = user_details_ndd["id"]
 					if reporter_id == "UNKNOWN":
 						msg = "获取学生账号 ID 失败"
 						raise ValueError(msg)  # noqa: TRY301
 				except Exception as e:
-					self._printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
+					self.printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
 					# 移除当前账号并重试
 					if available_accounts:
 						available_accounts.pop(0)
@@ -1418,27 +1412,27 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 						parent_id=parent_id,
 						is_reply=is_reply,
 					):
-						self._printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
+						self.printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
 						success_count += 1
 						violation_success = True
 					else:
-						self._printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
+						self.printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
 						# 移除当前账号并重试
 						if available_accounts:
 							available_accounts.pop(0)
 						retry_count += 1
 				except Exception as e:
-					self._printer.print_message(f"[{idx}/{len(violations)}] 执行举报异常: {e!s}", "ERROR")
+					self.printer.print_message(f"[{idx}/{len(violations)}] 执行举报异常: {e!s}", "ERROR")
 					# 移除当前账号并重试
 					if available_accounts:
 						available_accounts.pop(0)
 					retry_count += 1
 			# 如果当前违规项处理失败, 记录日志
 			if not violation_success:
-				self._printer.print_message(f"[{idx}/{len(violations)}] 处理失败, 跳过: {violation}", "WARNING")
+				self.printer.print_message(f"[{idx}/{len(violations)}] 处理失败, 跳过: {violation}", "WARNING")
 		# 7. 举报完成: 恢复管理员账号
 		auth.AuthManager().terminate_session()
-		self._printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
+		self.printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
 	def _execute_report_action(
 		self,
@@ -1458,16 +1452,16 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			match source_key:
 				# 作品模块: 举报作品评论
 				case "work":
-					return self._work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
+					return self.work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
 				# 论坛模块: 举报帖子评论 / 回复
 				case "forum":
 					item_type = "COMMENT" if is_reply else "REPLY"  # 回复 / 普通评论区分
-					return self._forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
+					return self.forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
 				# 店铺模块: 举报店铺评论 / 回复
 				case "shop":
 					if is_reply and parent_id is not None:
 						# 回复类型: 需传入父评论 ID
-						return self._shop_motion.execute_report_comment(
+						return self.shop_motion.execute_report_comment(
 							comment_id=target_id,
 							reason_content=reason_content,
 							reason_id=reason_id,
@@ -1476,7 +1470,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 							description=description,
 						)
 					# 普通评论: 无需父 ID
-					return self._shop_motion.execute_report_comment(
+					return self.shop_motion.execute_report_comment(
 						comment_id=target_id,
 						reason_content=reason_content,
 						reason_id=reason_id,
@@ -1485,7 +1479,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					)
 			# 未知来源类型: 举报失败
 		except Exception as e:
-			self._printer.print_message(f"举报操作失败: {e!s}", "ERROR")
+			self.printer.print_message(f"举报操作失败: {e!s}", "ERROR")
 			return False
 		else:
 			return False
@@ -1502,33 +1496,33 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 	def load_student_accounts(self) -> None:
 		"""加载学生账号: 用于自动举报, 支持实时获取 / 文件加载"""
 		# 切换到普通账号上下文 (加载学生账号需普通权限)
-		self._client.switch_identity(token=self._client.token.average, identity="average")
+		self.client.switch_identity(token=self.client.token.average, identity="average")
 		# 询问是否加载学生账号
-		if self._printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			self._printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
+		if self.printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+			self.printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
 			auth.AuthManager().restore_admin_account()
 			return
 		# 选择账号获取方式 (实时获取 / 文件加载)
-		method = self._printer.get_valid_input(prompt="选择模式 (load. 加载文件 grab. 实时获取)", valid_options={"load", "grab"}, cast_type=str)
+		method = self.printer.get_valid_input(prompt="选择模式 (load. 加载文件 grab. 实时获取)", valid_options={"load", "grab"}, cast_type=str)
 		self.auth_method = cast("Literal ['load', 'grab']", method)
 		try:
 			if method == "grab":
 				# 实时获取学生账号 (调用 Obtain 工具)
-				account_count = self._printer.get_valid_input(
+				account_count = self.printer.get_valid_input(
 					prompt="输入获取账号数",
 					cast_type=int,
 					validator=lambda x: x >= 0,  # 确保数量非负
 				)
 				self.student_accounts = list(Obtain().switch_edu_account(limit=account_count, return_method="list"))
-				self._printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
+				self.printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 			elif method == "load":
 				# 从文件加载学生账号 Token (文件路径在 data 模块定义)
-				token_list = self._file.read_line(data.PathConfig.TOKEN_FILE_PATH)
+				token_list = self.file.read_line(data.PathConfig.TOKEN_FILE_PATH)
 				self.student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
-				self._printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号 Token", "SUCCESS")
+				self.printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号 Token", "SUCCESS")
 		except Exception as e:
 			# 捕获所有异常 (文件不存在、接口错误等)
-			self._printer.print_message(f"加载学生账号失败: {e!s}", "ERROR")
+			self.printer.print_message(f"加载学生账号失败: {e!s}", "ERROR")
 			self.student_accounts = []
 			self.student_tokens = []
 		# 恢复管理员账号上下文 (加载完成后切回管理员)
@@ -1546,9 +1540,9 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 			if self.auth_method == "grab":
 				# 实时获取的账号: 用账密认证
 				username, password = selected_account
-				self._printer.print_message(f"切换学生账号: {id(username)}", "INFO")
+				self.printer.print_message(f"切换学生账号: {id(username)}", "INFO")
 				sleep(2)  # 避免接口限流
-				self._auth.login(
+				self.auth.login(
 					identity=username,
 					password=password,
 					status="edu",  # 教育账号标识
@@ -1556,10 +1550,10 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 			else:
 				# 文件加载的账号: 用 Token 切换
 				token = cast("str", selected_account)
-				self._printer.print_message(f"切换学生账号: {id(token)}", "INFO")
-				self._client.switch_identity(token=token, identity="edu")
+				self.printer.print_message(f"切换学生账号: {id(token)}", "INFO")
+				self.client.switch_identity(token=token, identity="edu")
 		except Exception as e:
-			self._printer.print_message(f"学生账号切换失败: {e!s}", "ERROR")
+			self.printer.print_message(f"学生账号切换失败: {e!s}", "ERROR")
 			return False  # 切换失败
 		else:
 			return True
@@ -1591,10 +1585,10 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			return None
 		# 使用重构后的统一上传接口
 		url = uploader().upload(file_path=file_path, method=method, save_path=save_path)
-		file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
-		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self._tool.TimeUtils().current_timestamp())
-		self._upload_history.data.history.append(history)
-		self._upload_history.save()
+		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
+		self.upload_history.data.history.append(history)
+		self.upload_history.save()
 		return url
 
 	def handle_directory_upload(
@@ -1625,21 +1619,21 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					# 使用重构后的统一上传接口
 					url = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
-					file_size_human = self._tool.DataConverter().bytes_to_human(file_size)
+					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
 					history = data.UploadHistory(
 						file_name=str(relative_path),
 						file_size=file_size_human,
 						method=method,
 						save_url=url,
-						upload_time=self._tool.TimeUtils().current_timestamp(),
+						upload_time=self.tool.TimeUtils().current_timestamp(),
 					)
-					self._upload_history.data.history.append(history)
+					self.upload_history.data.history.append(history)
 					results[str(child_file)] = url
 				except Exception as e:
 					results[str(child_file)] = None
 					print(f"上传 {child_file} 失败: {e}")
 		# 保存历史记录
-		self._upload_history.save()
+		self.upload_history.save()
 		return results
 
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
@@ -1649,9 +1643,9 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			limit: 每页显示记录数 (默认 10 条)
 			reverse: 是否按时间倒序显示 (最新的在前)
 		"""
-		history_list = self._upload_history.data.history
+		history_list = self.upload_history.data.history
 		if not history_list:
-			self._printer.print_message("暂无上传历史记录", "INFO")
+			self.printer.print_message("暂无上传历史记录", "INFO")
 			return
 		# 排序历史记录
 		sorted_history = sorted(
@@ -1664,7 +1658,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		def format_upload_time(upload_time: float) -> str:
 			"""格式化上传时间"""
 			if isinstance(upload_time, (int, float)):
-				return self._tool.TimeUtils().format_timestamp(upload_time)
+				return self.tool.TimeUtils().format_timestamp(upload_time)
 			return str(upload_time)[:19]
 
 		def format_file_name(file_name: str) -> str:
@@ -1705,28 +1699,28 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			# 格式化上传时间
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
-				upload_time = self._tool.TimeUtils().format_timestamp(upload_time)
-			self._printer.print_header("=== 文件上传详情 ===")
-			self._printer.print_message("-" * 60, "INFO")
-			self._printer.print_message(f"文件名: {record.file_name}", "INFO")
-			self._printer.print_message(f"文件大小: {record.file_size}", "INFO")
-			self._printer.print_message(f"上传方式: {record.method}", "INFO")
-			self._printer.print_message(f"上传时间: {upload_time}", "INFO")
-			self._printer.print_message(f"完整 URL: {record.save_url}", "INFO")
+				upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+			self.printer.print_header("=== 文件上传详情 ===")
+			self.printer.print_message("-" * 60, "INFO")
+			self.printer.print_message(f"文件名: {record.file_name}", "INFO")
+			self.printer.print_message(f"文件大小: {record.file_size}", "INFO")
+			self.printer.print_message(f"上传方式: {record.method}", "INFO")
+			self.printer.print_message(f"上传时间: {upload_time}", "INFO")
+			self.printer.print_message(f"完整 URL: {record.save_url}", "INFO")
 			# 验证链接有效性
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
-			self._printer.print_message(f"链接状态: {status}", "INFO")
+			self.printer.print_message(f"链接状态: {status}", "INFO")
 			if record.save_url.startswith("http"):
-				self._printer.print_message("提示: 复制上方 URL 到浏览器可直接访问或下载", "INFO")
-			self._printer.print_message("-" * 60, "INFO")
+				self.printer.print_message("提示: 复制上方 URL 到浏览器可直接访问或下载", "INFO")
+			self.printer.print_message("-" * 60, "INFO")
 			input("按 Enter 键返回...")
 
 		def validate_url_only(record: data.UploadHistory) -> None:
 			"""仅验证链接"""
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
-			self._printer.print_message(f"链接 '{record.save_url}' 状态: {status}", "INFO")
+			self.printer.print_message(f"链接 '{record.save_url}' 状态: {status}", "INFO")
 			input("按 Enter 键返回...")
 
 		custom_operations = {
@@ -1734,7 +1728,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			"验证链接": validate_url_only,
 		}
 		# 使用通用数据查看器
-		viewer = GenericDataViewer(self._printer)
+		viewer = GenericDataViewer(self.printer)
 		viewer.display_data(
 			data_class=type(sorted_history[0]),
 			data_list=sorted_history,
@@ -1758,14 +1752,14 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"""
 		try:
 			# 首先尝试 HEAD 请求
-			response = self._client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
+			response = self.client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
 			if response.status_code == acquire.HTTPStatus.OK.value:  # 直接使用 200 状态码
 				content_length = response.headers.get("Content-Length")
 				# 如果有 Content-Length 且大于 0, 或者没有 Content-Length 都认为是有效的
 				if not content_length or int(content_length) > 0:
 					return True
 			# HEAD 请求失败或内容长度为 0, 尝试 GET 请求
-			response = self._client.send_request(endpoint=url, method="GET", timeout=5, log=False)
+			response = self.client.send_request(endpoint=url, method="GET", timeout=5, log=False)
 			if response.status_code != acquire.HTTPStatus.OK.value:
 				return False
 			# 检查响应内容是否非空
