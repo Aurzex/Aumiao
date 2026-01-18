@@ -183,7 +183,7 @@ class UserAction:
 		)
 		return response.status_code == HTTPStatus.OK.value
 
-	def execute_upgrade_to_teacher(
+	def execute_improve_teacher_info(
 		self,
 		user_id: int,
 		real_name: str,
