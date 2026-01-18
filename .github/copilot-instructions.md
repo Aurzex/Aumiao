@@ -7,18 +7,16 @@ Aumiao is a comprehensive API collection and toolset for the CodeMao (编程猫)
 
 ### Core Structure
 - **`aumiao/`**: Main package with lazy-loaded modules via `__getattr__`
-  - **`api/`**: REST API clients for CodeMao services (auth, community, forum, library, etc.)
-  - **`core/`**: Core business logic, data structures, and block programming support
-  - **`utils/`**: Utilities for data management, plugins, decorators, and tools
+	- **`api/`**: REST API clients for CodeMao services (auth, community, forum, library, etc.)
+	- **`core/`**: Core business logic, data structures, and block programming support
+	- **`utils/`**: Utilities for data management, decorators, and tools
 - **`main.py`**: CLI entry point with numbered menu system
 - **`mainWindows.py`**: GUI entry point (PyQt5-based)
 - **`gui/`**: GUI components and image processing
-- **`plugins/`**: Extensible plugin system with dynamic code modification
 
 ### Key Design Patterns
 - **Lazy Module Loading**: All submodules use `__getattr__` for on-demand imports, ensuring Nuitka compilation compatibility
 - **Singleton Pattern**: Core services like `Index()` use `@decorator.singleton`
-- **Dynamic Code Modification**: Plugins can inject code via line numbers, pattern matching, or function rewriting
 - **Configuration Management**: Separate `data.json` (auth/data) and `setting.json` (runtime settings)
 
 ## Development Workflow
@@ -64,11 +62,11 @@ Follow the detailed naming conventions in `document/Naming-Convention.md`:
 **Examples**:
 ```python
 # Correct
-def fetch_user_profile(user_id: int) -> dict:
+def fetch_user_profile (user_id: int) -> dict:
 def grab_local_config() -> dict:
-def validate_email_format(email: str) -> list[str]:
+def validate_email_format (email: str) -> list [str]:
 def is_user_logged_in() -> bool:
-def convert_json_to_xml(data: dict) -> str:
+def convert_json_to_xml (data: dict) -> str:
 ```
 
 ### ID System for Community Operations
@@ -111,17 +109,7 @@ The codebase extensively supports CodeMao's visual programming blocks:
 
 ### Utilities
 - `utils/data.py`: Configuration and cache management
-- `utils/plugin.py`: Plugin system framework
 - `utils/tool.py`: Common utilities
-
-## Plugin Development
-Plugins extend functionality through:
-1. **Command Registration**: Add new CLI commands
-2. **Code Injection**: Modify existing modules dynamically
-3. **Event Handling**: Hook into load/unload events
-4. **Configuration**: Schema-based settings
-
-See `document/Plugin-Development.md` for implementation details.
 
 ## Dependencies & Environment
 - **Python**: 3.12-3.14

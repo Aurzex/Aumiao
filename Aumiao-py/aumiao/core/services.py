@@ -888,7 +888,13 @@ class BatchOperationService:
 		print(f"已处理 {count} 个 {content_type}")
 		return count
 
-	def upgrade_to_teacher(self, real_name: str, school_id: int = 11000161, school_name: str = "北京景山学校", school_type: int = 1) -> bool:
+	def upgrade_to_teacher(
+		self,
+		real_name: str,
+		school_id: int = 11000161,
+		school_name: str = "北京景山学校",
+		school_type: int = 1,
+	) -> bool:
 		"""
 		升级账号为教师身份
 		Args:

@@ -24,7 +24,7 @@ class PathConfig:
 	DATA_DIR = CURRENT_DIR / "data"
 	DOWNLOAD_DIR = CURRENT_DIR / "download"
 	JS_DIR: Path = CURRENT_DIR / "js_module"
-	PLUGIN_DIR = CURRENT_DIR / "plugins"
+	# PLUGIN_DIR = CURRENT_DIR / "plugins"
 	# 文件夹嵌套文件夹
 	COMPILE_FILE_PATH = DOWNLOAD_DIR / "compile"
 	FICTION_FILE_PATH = DOWNLOAD_DIR / "fiction"
@@ -147,7 +147,7 @@ class CodeMaoCache:
 @dataclass
 class CodeMaoSetting:
 	PARAMETER: Parameter = field(default_factory=Parameter)
-	PLUGIN: dict[str, Any] = field(default_factory=dict)
+	# PLUGIN: dict[str, Any] = field(default_factory=dict)
 	PROGRAM: Program = field(default_factory=Program)
 
 
@@ -169,7 +169,7 @@ DEFAULT_SETTING_DATA = {
 		"report_work_max": 8,
 		"spam_del_max": 3,
 	},
-	"PLUGIN": {},
+	# "PLUGIN": {},
 	"PROGRAM": {
 		"AUTHOR": "Aurzex",
 		"HEADERS": {
