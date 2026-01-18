@@ -87,10 +87,6 @@ class AuthManager:
 			return self._execute_user_login(prefer_method, identity, password, token, cookies, pid, status)
 		except Exception as e:
 			print(f"用户登录失败: {e}")
-			# 如果首选方式失败, 尝试备用方式
-			if prefer_method != "simple_password" and identity and password:
-				print("尝试使用简单密码登录作为备用方案...")
-				return self._authenticate_with_simple_password(identity, password, pid, status)
 			raise
 
 	def _admin_login(
