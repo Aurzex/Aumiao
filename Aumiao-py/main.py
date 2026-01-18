@@ -14,7 +14,7 @@ from aumiao.core.compile import decompile_work
 from aumiao.core.deepser import CodeMaoTool
 from aumiao.core.process import FileProcessor
 from aumiao.core.services import services
-from aumiao.utils import data, plugin, tool
+from aumiao.utils import data, tool
 
 # 常量定义
 T = TypeVar("T")
@@ -49,8 +49,7 @@ class AppConfig:
 			"10": ("上传历史", False, True),
 			"11": ("编译作品", False, True),
 			"12": ("生成口令", True, True),
-			"13": ("插件管理", False, True),
-			"14": ("助手对话", True, True),
+			"13": ("助手对话", True, True),
 			"00": ("退出系统", False, True),
 			"1106": ("隐藏功能", True, False),
 		}
@@ -343,15 +342,6 @@ def logout(account_data_manager: AccountDataManager) -> None:
 
 
 @handle_errors
-def plugin_manager(_account_data_manager: AccountDataManager) -> None:
-	"""插件管理"""
-	printer.print_header("插件管理")
-	plugin_manager = plugin.LazyPluginManager(data.PathConfig.PLUGIN_DIR)
-	console = plugin.PluginConsole(plugin_manager)
-	console.run()
-
-
-@handle_errors
 def decompile_works(_account_data_manager: AccountDataManager) -> None:
 	"""编译作品"""
 	printer.print_header("编译作品")
@@ -428,8 +418,7 @@ class MenuSystem:
 			"10": print_history,
 			"11": decompile_works,
 			"12": generate_nemo_code,
-			"13": plugin_manager,
-			"14": interactive_chat,
+			"13": interactive_chat,
 			"00": exit_program,
 			"1106": handle_hidden_features,
 		}

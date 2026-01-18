@@ -49,8 +49,6 @@ A powerful API collection project and toolset for CodeMao community development,
   **Miao Code Generator**: Quickly generate work sharing codes
 - **小说下载器**：批量下载编程猫社区小说  
   **Novel Downloader**: Batch download CodeMao community novels
-- **插件系统**：支持第三方插件扩展功能  
-  **Plugin System**: Support for third-party plugin extensions
 
 ## 快速开始 | Quick Start
 
