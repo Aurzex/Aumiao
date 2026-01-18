@@ -8,7 +8,7 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Literal, cast
 
-from aumiao.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, auth, data, decorator, tool_ins
+from aumiao.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, auth, data, decorator, toolkit
 from aumiao.core.compile import CodemaoDecompiler
 from aumiao.core.editorkn import KNEditor, KNProject
 from aumiao.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
@@ -260,7 +260,7 @@ class ReplyService:
 
 	def _get_new_replies(self, valid_reply_types: set[str]) -> list:
 		"""获取新的回复通知"""
-		new_replies = self.coordinator.tool.DataProcessor().filter_by_nested_values(
+		new_replies = self.coordinator.toolkit.create_data_processor().filter_by_nested_values(
 			data=Obtain().get_new_replies(),
 			id_path="type",
 			target_values=list(valid_reply_types),
@@ -485,7 +485,7 @@ class CommunityService:
 	def __init__(self) -> None:
 		self.coordinator = ClassUnion()
 		self.comment_processor = CommentProcessor()
-		self.printer = tool_ins.Printer()
+		self.printer = toolkit.create_output_handler()
 		self.reply_service = ReplyService()
 		coordinator = self.coordinator
 		self.source_config: dict = {
@@ -685,7 +685,7 @@ class CommunityService:
 		print(f"简介: {info['introduction']}")
 		print(f"类别: {info['fanfic_type_name']}")
 		print(f"词数: {info['total_words']} 收藏数: {info['collect_times']}")
-		print(f"更新时间: {self.coordinator.tool.TimeUtils().format_timestamp(info['update_time'])}")
+		print(f"更新时间: {self.coordinator.toolkit.create_time_utils().format_timestamp(info['update_time'])}")
 		# 创建输出目录
 		if output_dir is None:
 			output_dir = data.PathConfig.FICTION_FILE_PATH
@@ -703,7 +703,7 @@ class CommunityService:
 			section_path = novel_dir / f"{i:03d}_{section_title}.txt"
 			content_data = self.coordinator.novel_obtain.fetch_chapter_details(chapter_id=section_id)
 			content = content_data["data"]["section"]["content"]
-			formatted_content = self.coordinator.tool.DataConverter().html_to_text(content, merge_empty_lines=True)
+			formatted_content = self.coordinator.toolkit.create_data_converter().html_to_text(content, merge_empty_lines=True)
 			self.coordinator.file.file_write(path=section_path, content=formatted_content)
 			print(f"已下载章节: {section_title}")
 		print(f"小说已保存到: {novel_dir}")
@@ -779,7 +779,7 @@ class CommunityService:
 		Returns:
 			帖子列表
 		"""
-		print(f"正在查找发布时间在 {self.coordinator.tool.TimeUtils().format_timestamp(timeline)} 之后的帖子")
+		print(f"正在查找发布时间在 {self.coordinator.toolkit.create_time_utils().format_timestamp(timeline)} 之后的帖子")
 		post_list = self.coordinator.forum_obtain.fetch_hot_posts_ids()["items"][0:19]
 		posts_details = self.coordinator.forum_obtain.fetch_posts_details(post_ids=post_list)["items"]
 		recent_posts = []
@@ -787,7 +787,7 @@ class CommunityService:
 			create_time = post["created_at"]
 			if create_time > timeline:
 				recent_posts.append(post)
-				print(f"帖子 {post['title']}-ID {post['id']}- 发布于 {self.coordinator.tool.TimeUtils().format_timestamp(create_time)}")
+				print(f"帖子 {post['title']}-ID {post['id']}- 发布于 {self.coordinator.toolkit.create_time_utils().format_timestamp(create_time)}")
 		return recent_posts
 
 	def get_admin_statistics(self) -> list[AdminStatistics]:
@@ -888,43 +888,6 @@ class BatchOperationService:
 		print(f"已处理 {count} 个 {content_type}")
 		return count
 
-	def upgrade_to_teacher(
-		self,
-		real_name: str,
-		school_id: int = 11000161,
-		school_name: str = "北京景山学校",
-		school_type: int = 1,
-	) -> bool:
-		"""
-		升级账号为教师身份
-		Args:
-			real_name: 真实姓名
-			school_id: 学校 ID
-			school_name: 学校名称
-			school_type: 学校类型
-		Returns:
-			是否成功
-		"""
-		generator = tool_ins.EduDataGenerator()
-		try:
-			result = self.coordinator.edu_motion.execute_upgrade_to_teacher(
-				user_id=int(self.coordinator.data.ACCOUNT_DATA.id),
-				real_name=real_name,
-				grade=["2", "3", "4"],
-				school_id=school_id,
-				school_name=school_name,
-				school_type=school_type,
-				country_id="156",
-				province_id=1,
-				city_id=1,
-				district_id=1,
-				teacher_card_number=generator.generate_teacher_certificate_number(),
-			)
-			return bool(result)
-		except Exception as e:
-			print(f"升级教师身份失败: {e!s}")
-			return False
-
 	def manage_edu_accounts(self, action: Literal["create", "delete", "token", "password"], limit: int | None = None) -> bool:
 		"""
 		管理教育账号
@@ -966,7 +929,7 @@ class BatchOperationService:
 		try:
 			class_capacity = 95
 			class_count = (student_limit + class_capacity - 1) // class_capacity
-			generator = tool_ins.EduDataGenerator()
+			generator = toolkit.create_edu_data_generator()
 			# 生成班级和学生名称
 			class_names = generator.generate_class_names(num_classes=class_count, add_specialty=True)
 			student_names = generator.generate_student_names(num_students=student_limit)
@@ -1127,7 +1090,7 @@ class ReportService:
 		self.report_manager = ReportAuthManager()
 		self.report_processor = ReportProcessor()
 		self.report_fetcher = ReportFetcher()
-		self.printer = tool_ins.Printer()
+		self.printer = toolkit.create_output_handler()
 		self.processed_count = 0
 		self.total_reports = 0
 
@@ -1198,7 +1161,7 @@ class KNEditorService:
 	def __init__(self) -> None:
 		self.editor = KNEditor()
 		self.current_project: KNProject | None = None
-		self.printer = tool_ins.Printer()
+		self.printer = toolkit.create_output_handler()
 
 	def create_project(self, name: str) -> bool:
 		"""创建新项目"""

@@ -11,10 +11,12 @@ from aumiao.api import auth as auth_ins
 from aumiao.utils import data, decorator
 from aumiao.utils import file as file_ins
 from aumiao.utils import tool as tool_ins
-from aumiao.utils.acquire import ClientFactory
-from aumiao.utils.data import CacheManager, DataManager, HistoryManager, SettingManager
+from aumiao.utils.acquire import ClientFactory, CodeMaoClient
+from aumiao.utils.data import CacheManager, CodeMaoCache, CodeMaoData, CodemaoHistory, CodeMaoSetting, DataManager, HistoryManager, SettingManager
 from aumiao.utils.decorator import singleton
+from aumiao.utils.tool import ToolKitFactory
 
+toolkit = tool_ins.ToolKitFactory()
 # ==============================
 # 类型变量定义
 # ==============================
@@ -871,29 +873,29 @@ class CoreManager:
 	def __init__(self) -> None:
 		# 立即初始化的核心组件
 		self.client = ClientFactory().create_codemao_client()
-		self.tool = tool_ins
+		self.toolkit = toolkit
 		self.data_manager = DataManager()
 		self.setting_manager = SettingManager()
 		self.cache_manager = CacheManager()
 		self.history_manager = HistoryManager()
 
 	@property
-	def data(self) -> ...:
+	def data(self) -> CodeMaoData:
 		"""快捷访问数据"""
 		return self.data_manager.data
 
 	@property
-	def setting(self) -> ...:
+	def setting(self) -> CodeMaoSetting:
 		"""快捷访问设置"""
 		return self.setting_manager.data
 
 	@property
-	def cache(self) -> ...:
+	def cache(self) -> CodeMaoCache:
 		"""快捷访问缓存"""
 		return self.cache_manager.data
 
 	@property
-	def upload_history(self) -> ...:
+	def upload_history(self) -> HistoryManager:
 		"""快捷访问历史记录"""
 		return self.history_manager
 
@@ -938,7 +940,7 @@ class InfrastructureCoordinator:
 			"whale_motion": whale.ReportHandler,
 			"whale_obtain": whale.ReportFetcher,
 			# 工具模块
-			"printer": tool_ins.Printer,
+			"printer": tool_ins.OutputHandler,
 			"file": file_ins.CodeMaoFile,
 		}
 		for name, creator in api_modules.items():
@@ -967,32 +969,32 @@ class InfrastructureCoordinator:
 	# 核心组件属性(类型明确)
 	# ==============================
 	@property
-	def client(self) -> Any:
+	def client(self) -> CodeMaoClient:
 		"""核心客户端"""
 		return self._core.client
 
 	@property
-	def tool(self) -> Any:
+	def toolkit(self) -> ToolKitFactory:
 		"""工具模块"""
-		return self._core.tool
+		return self._core.toolkit
 
 	@property
-	def data(self) -> Any:
+	def data(self) -> CodeMaoData:
 		"""数据"""
 		return self._core.data
 
 	@property
-	def setting(self) -> Any:
+	def setting(self) -> CodeMaoSetting:
 		"""设置"""
 		return self._core.setting
 
 	@property
-	def cache(self) -> Any:
+	def cache(self) -> CodeMaoCache:
 		"""缓存"""
 		return self._core.cache
 
 	@property
-	def upload_history(self) -> Any:
+	def upload_history(self) -> HistoryManager:
 		"""上传历史"""
 		return self._core.upload_history
 
@@ -1088,7 +1090,7 @@ class InfrastructureCoordinator:
 	# 工具模块属性(延迟加载,类型明确)
 	# ==============================
 	@property
-	def printer(self) -> "tool_ins.Printer":
+	def printer(self) -> "tool_ins.OutputHandler":
 		"""打印工具模块"""
 		return self._modules.get("printer")
 
@@ -1118,12 +1120,12 @@ class _InfrastructureCoordinatorStub:
 	"""
 
 	# 核心组件
-	client: Any
-	tool: Any
-	data: Any
-	setting: Any
-	cache: Any
-	upload_history: Any
+	client: CodeMaoClient
+	toolkit: ToolKitFactory
+	data: CodeMaoData
+	setting: CodeMaoSetting
+	cache: CodeMaoCache
+	upload_history: CodemaoHistory
 	# API 模块
 	auth: "auth.AuthManager"
 	community_motion: "community.UserAction"
@@ -1143,7 +1145,7 @@ class _InfrastructureCoordinatorStub:
 	whale_motion: "whale.ReportHandler"
 	whale_obtain: "whale.ReportFetcher"
 	# 工具模块
-	printer: "tool_ins.Printer"
+	printer: "tool_ins.OutputHandler"
 	file: "file_ins.CodeMaoFile"
 
 
@@ -1241,7 +1243,7 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 		}
 		# 如果有缓存数据, 进行对比分析
 		if self._cache_manager.data:
-			self.tool.DataAnalyzer().compare_datasets(
+			self.toolkit.create_data_analyzer().compare_datasets(
 				before=self._cache_manager.data,
 				after=user_data,
 				metrics={

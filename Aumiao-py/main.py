@@ -18,7 +18,6 @@ from aumiao.utils import data, tool
 
 # 常量定义
 T = TypeVar("T")
-AUI = "jkslnlkqrljojqlkrlkqqljpjqrkqs"  # cSpell:ignore jkslnlkqrljojqlkrlkqqljpjqrkqs
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +55,7 @@ class AppConfig:
 
 
 config = AppConfig()
-printer = tool.Printer()
+printer = tool.OutputHandler()
 
 
 @dataclass
@@ -363,16 +362,10 @@ def interactive_chat(account_data_manager: AccountDataManager) -> None:
 @require_login
 def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 	"""处理隐藏功能. 仅管理员可访问"""
-	encrypted_result = tool.Encrypt().decrypt(AUI)
-	decrypted_str = "".join(str(item) for item in encrypted_result) if isinstance(encrypted_result, list) else str(encrypted_result)
-	user_input = printer.prompt_input("请输入验证码")
-	if user_input not in decrypted_str:
-		return
 	printer.print_header("隐藏功能")
 	print(printer.color_text("1. 自动点赞", "COMMENT"))
 	print(printer.color_text("2. 学生管理", "COMMENT"))
-	print(printer.color_text("3. 账号提权", "COMMENT"))
-	sub_choice = get_enum_input("操作选择", {"1", "2", "3"})
+	sub_choice = get_enum_input("操作选择", {"1", "2"})
 	if sub_choice == "1":
 		user_id = get_positive_int_input("训练师 ID")
 		services.batch_operations.batch_like(user_id=user_id, content_type="work")
@@ -383,11 +376,7 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 		limit = get_positive_int_input("数量", max_value=200)
 		services.batch_operations.manage_edu_accounts(action=mode, limit=limit)
 		print(printer.color_text("学生管理完成", "SUCCESS"))
-	elif sub_choice == "3":
-		real_name = printer.prompt_input("输入姓名")
-		services.batch_operations.upgrade_to_teacher(real_name=real_name)
-		print(printer.color_text("账号提权完成", "SUCCESS"))
-		services.clear_cache()
+	services.clear_cache()
 
 
 def exit_program(_account_data_manager: AccountDataManager) -> None:

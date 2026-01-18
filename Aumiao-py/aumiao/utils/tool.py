@@ -7,21 +7,24 @@ import json
 import random
 import re
 import time
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from functools import lru_cache
 from html import unescape
 from types import GeneratorType
-from typing import Any, ClassVar, Final, Literal, TypeGuard, TypeVar, cast, final
+from typing import Any, ClassVar, Final, Literal, TypeVar, cast
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# 类型定义
+from aumiao.utils.decorator import singleton
+
+# ========== 类型定义 ==========
 T = TypeVar("T")
 DataDict = dict[str, Any]
 DataObject = DataDict | list[DataDict] | Iterable[DataDict]
-# 常量定义
+# ========== 常量定义 ==========
 FILE_SIZE: Final[int] = 1024
 CLASS_NUM_LIMIT: Final[int] = 12
 LETTER_PROBABILITY: Final[float] = 0.3
@@ -32,10 +35,12 @@ MIN_CHOICE_LENGTH: Final[int] = 2
 AES_IV_LENGTH: Final[int] = 12
 
 
-@final
-class ColorConfig:
-	"""优化的颜色配置管理"""
+# ========== 颜色配置管理器 ==========
+@singleton
+class ColorManager:
+	"""颜色管理单例类"""
 
+	_instance: ClassVar[ColorManager | None] = None
 	_COLOR_MAP: ClassVar[dict[str, str]] = {
 		"COMMENT": "\033[38;5;245m",
 		"ERROR": "\033[38;5;203m",
@@ -48,40 +53,37 @@ class ColorConfig:
 		"INFO": "\033[38;5;39m",
 		"WARNING": "\033[38;5;214m",
 	}
-	_SEPARATOR: ClassVar[str] = f"{_COLOR_MAP['PROMPT']}══════════════════════════════════════════════════════════{_COLOR_MAP['RESET']}"
 
 	@classmethod
 	@lru_cache(maxsize=64)
-	def get_color(cls, color_name: str) -> str:
+	def get(cls, color_name: str) -> str:
 		"""获取颜色代码, 使用缓存提高性能"""
 		return cls._COLOR_MAP.get(color_name, cls._COLOR_MAP["RESET"])
 
-	@classmethod
-	def get_separator(cls) -> str:
+	@property
+	def separator(self) -> str:
 		"""获取分隔符"""
-		return cls._SEPARATOR
-
-	@classmethod
-	def is_valid_color(cls, color_name: str) -> bool:
-		"""验证颜色名称是否有效"""
-		return color_name in cls._COLOR_MAP
+		return f"{self.get('PROMPT')}══════════════════════════════════════════════════════════{self.get('RESET')}"
 
 
-ColorType = Literal["COMMENT", "ERROR", "MENU_ITEM", "MENU_TITLE", "PROMPT", "RESET", "STATUS", "SUCCESS", "INFO", "WARNING"]
+# ========== 数据处理器接口 ==========
+class DataProcessorStrategy(ABC):
+	"""数据处理策略接口"""
+
+	@abstractmethod
+	def process(self, data: Any) -> Any:
+		"""处理数据"""
 
 
-def is_dataclass_instance(obj: object) -> TypeGuard[Any]:
-	"""检查对象是否是数据类实例"""
-	return isinstance(obj, object) and not isinstance(obj, type) and is_dataclass(obj)
-
-
+# ========== 具体数据处理策略 ==========
+@singleton
 class PathCache:
 	"""路径缓存管理器"""
 
 	def __init__(self) -> None:
 		self._cache: dict[str, tuple[str, ...]] = {}
 
-	def get_path(self, path: str) -> tuple[str, ...]:
+	def get(self, path: str) -> tuple[str, ...]:
 		"""获取解析后的路径"""
 		if path not in self._cache:
 			self._cache[path] = tuple(path.split("."))
@@ -92,21 +94,16 @@ class PathCache:
 		self._cache.clear()
 
 
-class DataProcessor:
-	"""核心数据处理工具类"""
+@singleton
+class NestedFilterStrategy(DataProcessorStrategy):
+	"""嵌套字段过滤策略"""
 
-	_path_cache = PathCache()
+	def __init__(self, path_cache: PathCache | None = None) -> None:
+		self._path_cache = path_cache or PathCache()
 
-	@classmethod
-	def filter_by_nested_values(
-		cls,
-		data: DataObject,
-		id_path: str,
-		target_values: Iterable[object],
-		*,
-		strict_mode: bool = False,
-	) -> list[DataDict]:
-		"""性能优化的嵌套字段过滤"""
+	def process(self, data: tuple[DataObject, str, Iterable[object], bool]) -> list[DataDict]:
+		"""过滤数据"""
+		data_object, id_path, target_values, strict_mode = data
 		if not id_path or not isinstance(id_path, str):
 			msg = "id_path 必须是非空字符串"
 			raise ValueError(msg)
@@ -114,34 +111,11 @@ class DataProcessor:
 			msg = "target_values 必须是可迭代对象"
 			raise TypeError(msg)
 		target_set = set(target_values)
-		path_keys = cls._path_cache.get_path(id_path)
-		items = cls._normalize_input(data)
+		path_keys = self._path_cache.get(id_path)
+		items = self._normalize_input(data_object)
 		if strict_mode:
-			return [item for item in items if cls._get_nested_strict(item, path_keys) in target_set]
-		return [item for item in items if cls._get_nested_safe(item, path_keys) in target_set]
-
-	@classmethod
-	def _get_nested_strict(cls, data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object:
-		"""严格模式下的嵌套值获取"""
-		current = data
-		for key in path_keys:
-			if not isinstance(current, Mapping):
-				msg = f"路径 {key} 处遇到非字典类型: {type(current)}"
-				raise TypeError(msg)
-			current = current[key]
-		return current
-
-	@classmethod
-	def _get_nested_safe(cls, data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object | None:
-		"""安全模式下的嵌套值获取"""
-		current = data
-		for key in path_keys:
-			if not isinstance(current, Mapping):
-				return None
-			current = current.get(key)
-			if current is None:
-				break
-		return current
+			return [item for item in items if self._get_nested_strict(item, path_keys) in target_set]
+		return [item for item in items if self._get_nested_safe(item, path_keys) in target_set]
 
 	@staticmethod
 	def _normalize_input(data: DataObject) -> ...:
@@ -157,38 +131,50 @@ class DataProcessor:
 		msg = f"输入数据必须是字典或可迭代的字典集合, 实际类型: {type(data).__name__}"
 		raise TypeError(msg)
 
-	@classmethod
-	def filter_data(
-		cls,
-		data: DataObject,
-		*,
-		include: list[str] | None = None,
-		exclude: list[str] | None = None,
-	) -> DataObject:
-		"""通用字段过滤方法"""
-		if include is not None and exclude is not None:
-			msg = "不能同时指定包含和排除字段"
-			raise ValueError(msg)
-		include_set = set(include) if include else None
-		exclude_set = set(exclude) if exclude else None
-		return cls._filter_dispatch(data, include_set, exclude_set)
+	@staticmethod
+	def _get_nested_strict(data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object:
+		"""严格模式下的嵌套值获取"""
+		current = data
+		for key in path_keys:
+			if not isinstance(current, Mapping):
+				msg = f"路径 {key} 处遇到非字典类型: {type(current)}"
+				raise TypeError(msg)
+			current = current[key]
+		return current
 
-	@classmethod
-	def _filter_dispatch(cls, data: DataObject, include: set[str] | None, exclude: set[str] | None) -> DataObject:
-		"""类型分发方法"""
-		if isinstance(data, dict):
-			data = cast("dict", data)
-			return cls._filter_dict(data, include, exclude)
-		if isinstance(data, list):
-			data = cast("list", data)
-			return cls._filter_list(data, include, exclude)
-		if hasattr(data, "__iter__"):
-			return cls._filter_iterable(data, include, exclude)
-		msg = f"不支持的数据类型: {type(data).__name__}"
+	@staticmethod
+	def _get_nested_safe(data: Mapping[str, Any], path_keys: tuple[str, ...]) -> object | None:
+		"""安全模式下的嵌套值获取"""
+		current = data
+		for key in path_keys:
+			if not isinstance(current, Mapping):
+				return None
+			current = current.get(key)
+			if current is None:
+				break
+		return current
+
+
+@singleton
+class FieldFilterStrategy(DataProcessorStrategy):
+	"""字段过滤策略"""
+
+	def process(self, data: tuple[DataObject, set[str] | None, set[str] | None]) -> DataObject:
+		"""过滤字段"""
+		data_object, include_set, exclude_set = data
+		if isinstance(data_object, dict):
+			data_object = cast("dict", data_object)
+			return self._filter_dict(data_object, include_set, exclude_set)
+		if isinstance(data_object, list):
+			data_object = cast("list", data_object)
+			return self._filter_list(data_object, include_set, exclude_set)
+		if hasattr(data_object, "__iter__"):
+			return self._filter_iterable(data_object, include_set, exclude_set)
+		msg = f"不支持的数据类型: {type(data_object).__name__}"
 		raise TypeError(msg)
 
-	@classmethod
-	def _filter_dict(cls, data: DataDict, include: set[str] | None, exclude: set[str] | None) -> DataDict:
+	@staticmethod
+	def _filter_dict(data: DataDict, include: set[str] | None, exclude: set[str] | None) -> DataDict:
 		"""字典类型过滤"""
 		if include is not None:
 			return {k: v for k, v in data.items() if k in include}
@@ -196,27 +182,72 @@ class DataProcessor:
 			return {k: v for k, v in data.items() if k not in exclude}
 		return data
 
-	@classmethod
-	def _filter_list(cls, data: list[DataDict], include: set[str] | None, exclude: set[str] | None) -> list[DataDict]:
+	@staticmethod
+	def _filter_list(data: list[DataDict], include: set[str] | None, exclude: set[str] | None) -> list[DataDict]:
 		"""列表类型过滤"""
-		return [cls._filter_dict(item, include, exclude) for item in data]
+		return [FieldFilterStrategy._filter_dict(item, include, exclude) for item in data]
 
-	@classmethod
-	def _filter_iterable(cls, data: Iterable[DataDict], include: set[str] | None, exclude: set[str] | None) -> Iterable[DataDict]:
+	@staticmethod
+	def _filter_iterable(data: Iterable[DataDict], include: set[str] | None, exclude: set[str] | None) -> Iterable[DataDict]:
 		"""通用可迭代类型过滤"""
-		return (cls._filter_dict(item, include, exclude) for item in data)
+		return (FieldFilterStrategy._filter_dict(item, include, exclude) for item in data)
 
-	@classmethod
-	def get_nested_value(cls, data: Mapping[str, Any], path: str, *, strict: bool = False) -> object | None:
-		"""增强的嵌套值获取方法"""
-		path_keys = cls._path_cache.get_path(path)
+
+# ========== 数据处理器工厂 ==========
+@singleton
+class DataProcessor:
+	"""数据处理器工厂"""
+
+	@staticmethod
+	def create_filter_processor() -> NestedFilterStrategy:
+		"""创建过滤器处理器"""
+		return NestedFilterStrategy()
+
+	@staticmethod
+	def create_field_filter_processor() -> FieldFilterStrategy:
+		"""创建字段过滤器处理器"""
+		return FieldFilterStrategy()
+
+	@staticmethod
+	def filter_by_nested_values(
+		data: DataObject,
+		id_path: str,
+		target_values: Iterable[object],
+		*,
+		strict_mode: bool = False,
+	) -> list[DataDict]:
+		"""过滤数据"""
+		processor = DataProcessor.create_filter_processor()
+		return processor.process((data, id_path, target_values, strict_mode))
+
+	@staticmethod
+	def filter_fields(
+		data: DataObject,
+		*,
+		include: list[str] | None = None,
+		exclude: list[str] | None = None,
+	) -> DataObject:
+		"""过滤字段"""
+		if include is not None and exclude is not None:
+			msg = "不能同时指定包含和排除字段"
+			raise ValueError(msg)
+		include_set = set(include) if include else None
+		exclude_set = set(exclude) if exclude else None
+		processor = DataProcessor.create_field_filter_processor()
+		return processor.process((data, include_set, exclude_set))
+
+	@staticmethod
+	def get_nested_value(data: Mapping[str, Any], path: str, *, strict: bool = False) -> object | None:
+		"""获取嵌套值"""
+		path_cache = PathCache()
+		path_keys = path_cache.get(path)
 		if strict:
-			return cls._get_nested_strict(data, path_keys)
-		return cls._get_nested_safe(data, path_keys)
+			return NestedFilterStrategy._get_nested_strict(data, path_keys)  # noqa: SLF001
+		return NestedFilterStrategy._get_nested_safe(data, path_keys)  # noqa: SLF001
 
 	@staticmethod
 	def deduplicate(sequence: Iterable[object]) -> list[object]:
-		"""性能优化的保持顺序去重"""
+		"""保持顺序去重"""
 		seen = set()
 		result = []
 		for item in sequence:
@@ -226,6 +257,8 @@ class DataProcessor:
 		return result
 
 
+# ========== 数据转换器 ==========
+@singleton
 class DataConverter:
 	"""数据转换工具类"""
 
@@ -238,9 +271,14 @@ class DataConverter:
 	def to_serializable(data: object) -> dict[str, object]:
 		"""转换为可序列化字典"""
 		if isinstance(data, dict):
-			return data.copy()  # ty:ignore[invalid-return-type]
+			return cast("dict", data.copy())
+
+		def is_dataclass_instance(obj: object) -> bool:
+			"""检查对象是否是数据类实例"""
+			return isinstance(obj, object) and not isinstance(obj, type) and is_dataclass(obj)
+
 		if is_dataclass_instance(data):
-			return asdict(data)
+			return asdict(data)  # pyright: ignore [reportArgumentType] # ty:ignore [invalid-argument-type]
 		if hasattr(data, "__dict__"):
 			return vars(data)
 		msg = f"不支持的类型: {type(data).__name__}。支持类型: dict, 数据类实例, 或包含__dict__属性的对象"
@@ -248,13 +286,7 @@ class DataConverter:
 
 	@staticmethod
 	def bbcode_to_html(bbcode: str) -> str:
-		"""
-		将 BBCode 转换为 HTML 的简化版本
-		Args:
-			bbcode: BBCode 字符串
-		Returns:
-			HTML 字符串
-		"""
+		"""将 BBCode 转换为 HTML"""
 		if not bbcode or not bbcode.strip():
 			return ""
 		result = bbcode.strip()
@@ -271,7 +303,6 @@ class DataConverter:
 			r"\[center\](.*?)\[/center\]": r'<div style="text-align:center;">\1</div>',
 			r"\[right\](.*?)\[/right\]": r'<div style="text-align:right;">\1</div>',
 		}
-		# 执行替换
 		for pattern, replacement in replacements.items():
 			result = re.sub(pattern, replacement, result, flags=re.DOTALL)
 		# 带参数的标签
@@ -312,7 +343,7 @@ class DataConverter:
 		)
 		# 转义 HTML
 		result = html.escape(result)
-		# 还原 HTML 标签 (避免被转义)
+		# 还原 HTML 标签
 		tag_replacements = {
 			"&lt;strong&gt;": "<strong>",
 			"&lt;/strong&gt;": "</strong>",
@@ -344,7 +375,6 @@ class DataConverter:
 		lines = result.split("\n")
 		lines = [line.strip() for line in lines if line.strip()]
 		if lines:
-			# 检查是否已经有 HTML 块级元素
 			has_block_elements = any(any(tag in line for tag in ["<div", "<img", "<a href", "<code>", "<pre>"]) for line in lines)
 			result = "\n".join(lines) if has_block_elements else "\n".join(f"<p>{line}</p>" for line in lines)
 		return result
@@ -408,6 +438,8 @@ class DataConverter:
 		return f"{size_float:.2f} GB"
 
 
+# ========== 字符串处理器 ==========
+@singleton
 class StringProcessor:
 	"""字符串处理工具类"""
 
@@ -433,6 +465,8 @@ class StringProcessor:
 		return None, None
 
 
+# ========== 时间工具 ==========
+@singleton
 class TimeUtils:
 	"""时间工具类"""
 
@@ -451,6 +485,8 @@ class TimeUtils:
 		return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
 
 
+# ========== 数据分析器 ==========
+@singleton
 class DataAnalyzer:
 	"""数据分析工具类"""
 
@@ -483,242 +519,16 @@ class DataAnalyzer:
 			raise ValueError(msg) from e
 
 
-class DataMerger:
-	"""数据合并工具类"""
-
-	@staticmethod
-	def merge(datasets: Iterable[dict]) -> dict:
-		"""智能合并多个字典"""
-		merged = {}
-		for dataset in filter(None, datasets):
-			for key, value in dataset.items():
-				if isinstance(value, dict):
-					merged.setdefault(key, {}).update(value)
-				else:
-					merged[key] = value
-		return merged
-
-
-class MathUtils:
-	"""数学工具类"""
-
-	@staticmethod
-	def clamp(value: int, min_val: int, max_val: int) -> int:
-		"""数值范围约束"""
-		return max(min_val, min(value, max_val))
-
-
+# ========== 教育数据生成器 ==========
+@singleton
 class EduDataGenerator:
 	"""教育数据生成器"""
 
 	_CHINESE_NUMBERS: Final[list[str]] = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"]
-	_SPECIALTIES: Final[list[str]] = ["实验", "重点", "国际", "理科", "文科", "艺术", "体育", "国防"]
-	_SURNAMES: Final[list[str]] = [
-		"李",
-		"王",
-		"张",
-		"刘",
-		"陈",
-		"杨",
-		"黄",
-		"赵",
-		"周",
-		"吴",
-		"徐",
-		"孙",
-		"马",
-		"朱",
-		"胡",
-		"郭",
-		"何",
-		"高",
-		"林",
-		"罗",
-		"郑",
-		"梁",
-		"谢",
-		"宋",
-		"唐",
-		"许",
-		"韩",
-		"冯",
-		"邓",
-		"曹",
-		"彭",
-		"曾",
-		"肖",
-		"田",
-		"董",
-		"袁",
-		"潘",
-		"于",
-		"蒋",
-		"蔡",
-		"余",
-		"杜",
-		"叶",
-		"程",
-		"苏",
-		"魏",
-		"吕",
-		"丁",
-		"任",
-		"沈",
-		"姚",
-		"卢",
-		"姜",
-		"崔",
-		"钟",
-		"谭",
-		"陆",
-		"汪",
-		"范",
-		"金",
-		"石",
-		"廖",
-		"贾",
-		"夏",
-		"韦",
-		"付",
-		"方",
-		"白",
-		"邹",
-		"孟",
-		"熊",
-		"秦",
-		"邱",
-		"江",
-		"尹",
-		"薛",
-		"闫",
-		"段",
-		"雷",
-		"侯",
-		"龙",
-		"史",
-		"陶",
-		"黎",
-		"贺",
-		"顾",
-		"毛",
-		"郝",
-		"龚",
-		"邵",
-		"万",
-		"钱",
-		"严",
-		"覃",
-		"武",
-	]
-	_MALE_NAMES: Final[list[str]] = [
-		"浩",
-		"宇",
-		"轩",
-		"杰",
-		"博",
-		"晨",
-		"俊",
-		"鑫",
-		"昊",
-		"睿",
-		"涛",
-		"鹏",
-		"翔",
-		"泽",
-		"楷",
-		"子轩",
-		"浩然",
-		"俊杰",
-		"宇航",
-		"皓轩",
-		"子豪",
-		"宇轩",
-		"致远",
-		"天佑",
-		"明轩",
-		"雨泽",
-		"思聪",
-		"瑞霖",
-		"瑾瑜",
-		"煜城",
-		"逸辰",
-		"梓睿",
-		"旭尧",
-		"晟睿",
-		"明哲",
-	]
-	_FEMALE_NAMES: Final[list[str]] = [
-		"欣",
-		"怡",
-		"婷",
-		"雨",
-		"梓",
-		"涵",
-		"诗",
-		"静",
-		"雅",
-		"娜",
-		"雪",
-		"雯",
-		"璐",
-		"颖",
-		"琳",
-		"雨萱",
-		"梓涵",
-		"诗琪",
-		"欣怡",
-		"紫萱",
-		"思雨",
-		"梦瑶",
-		"梓晴",
-		"语嫣",
-		"可馨",
-		"雨彤",
-		"若曦",
-		"欣妍",
-		"雅雯",
-		"慧敏",
-		"佳琪",
-		"美琳",
-		"晓菲",
-		"思婷",
-		"雨欣",
-		"静怡",
-		"晨曦",
-	]
-	_PROVINCE_CODES: Final[list[str]] = [
-		"11",
-		"12",
-		"13",
-		"14",
-		"15",  # 华北
-		"21",
-		"22",
-		"23",  # 东北
-		"31",
-		"32",
-		"33",
-		"34",
-		"35",
-		"36",
-		"37",  # 华东
-		"41",
-		"42",
-		"43",
-		"44",
-		"45",
-		"46",  # 中南
-		"50",
-		"51",
-		"52",
-		"53",
-		"54",  # 西南
-		"61",
-		"62",
-		"63",
-		"64",
-		"65",  # 西北
-	]
+	_SPECIALTIES: Final[list[str]] = ["实验", "国际", "理科", "文科"]
+	_SURNAMES: Final[list[str]] = ["李", "王", "张", "刘", "陈", "杨", "黄", "赵", "周", "吴"]
+	_MALE_NAMES: Final[list[str]] = ["浩", "宇", "轩", "杰", "博", "晨", "俊", "鑫", "昊", "睿", "子轩", "浩然", "俊杰", "宇航", "皓轩", "子豪", "宇轩", "致远", "天佑", "明轩"]
+	_FEMALE_NAMES: Final[list[str]] = ["欣", "怡", "婷", "雨", "梓", "涵", "诗", "静", "雅", "娜", "雨萱", "梓涵", "诗琪", "欣怡", "紫萱", "思雨", "梦瑶", "梓晴", "语嫣", "可馨"]
 
 	@classmethod
 	def generate_class_names(
@@ -767,19 +577,9 @@ class EduDataGenerator:
 			names.append(f"{surname}{first_name}")
 		return names
 
-	@classmethod
-	def generate_teacher_certificate_number(cls) -> str:
-		"""生成教师证书编号"""
-		year = random.randint(2000, 2025)
-		province = random.choice(cls._PROVINCE_CODES)
-		agency = f"{random.randint(0, 999):03d}"
-		teacher_type = random.randint(1, 7)
-		gender = random.choice(["male", "female"])
-		gender_code = "0" if gender == "male" else "1" if year <= 2009 else "2"
-		sequence = f"{random.randint(1, 999999):06d}"
-		return f"{year}{province}{agency}{teacher_type}{gender_code}{sequence}"
 
-
+# ========== 加密工具 ==========
+@singleton
 class Crypto:
 	"""加密工具类"""
 
@@ -834,212 +634,42 @@ class Crypto:
 			msg = "数据太短, 无法分离 IV 和密文"
 			raise ValueError(msg)
 		iv = decoded_data[:AES_IV_LENGTH]
-		ciphertext = decoded_data[AES_IV_LENGTH:]
+		cipher_text = decoded_data[AES_IV_LENGTH:]
 		# 生成密钥并解密
 		key = self.generate_aes_key()
-		decrypted_bytes = self.decrypt_aes_gcm(ciphertext, key, iv)
-		return self.clean_and_repair_json(decrypted_bytes)
-
-	@staticmethod
-	def find_valid_json_end(text: str) -> int:
-		"""找到有效的 JSON 结束位置"""
-		stack: list[str] = []
-		in_string = False
-		escape = False
-		for i, char in enumerate(text):
-			if escape:
-				escape = False
-				continue
-			if char == "\\":
-				escape = True
-				continue
-			if char == '"':
-				in_string = not in_string
-				continue
-			if in_string:
-				continue
-			if char in "{[":
-				stack.append(char)
-			elif char in "}]":
-				if not stack:
-					return i
-				opening = stack.pop()
-				if (opening == "{" and char != "}") or (opening == "[" and char != "]"):
-					return i
-				if not stack:
-					return i + 1
-		# 处理未闭合的情况
-		if stack:
-			for i in range(len(text) - 1, -1, -1):
-				if text[i] in "}]":
-					try:
-						json.loads(text[: i + 1])
-						return i + 1
-					except json.JSONDecodeError:
-						continue
-		return len(text)
-
-	def clean_and_repair_json(self, raw_bytes: bytes) -> dict[str, Any]:
-		"""清理和修复 JSON 数据"""
+		raw_bytes = self.decrypt_aes_gcm(cipher_text, key, iv)
 		text_content = raw_bytes.decode("utf-8", errors="ignore")
-		valid_end = self.find_valid_json_end(text_content)
-		if valid_end < len(text_content):
-			text_content = text_content[:valid_end]
-		try:
-			return json.loads(text_content)
-		except json.JSONDecodeError:
-			repaired_content = self.repair_json(text_content)
-			try:
-				return json.loads(repaired_content)
-			except json.JSONDecodeError as decode_error:
-				msg = "JSON 解析失败, 数据可能已损坏"
-				raise ValueError(msg) from decode_error
-
-	@staticmethod
-	def repair_json(text: str) -> str:
-		"""尝试修复 JSON 数据"""
-		text = text.rstrip()
-		while text and text[-1] in ", \t\n\r":
-			text = text[:-1]
-		if not text.endswith("}") and not text.endswith("]"):
-			last_brace = text.rfind("}")
-			last_bracket = text.rfind("]")
-			last_valid = max(last_brace, last_bracket)
-			if last_valid > 0:
-				text = text[: last_valid + 1]
-		return text
+		return json.loads(text_content)
 
 
-class Encrypt:
-	"""加密工具类"""
+# ========== 输出处理器 ==========
+@singleton
+class OutputHandler:
+	"""输出处理器"""
 
 	def __init__(self) -> None:
-		self.MAPPING = "jklmnopqrst"
-		self.REVERSE_MAPPING = {char: str(i) for i, char in enumerate(self.MAPPING)}
-		self.KEY = 0x7F
-
-	def encrypt(self, data: int | str | list[int | str]) -> str:
-		"""加密数据"""
-		if isinstance(data, int):
-			str_data = f"i {data}"
-		elif isinstance(data, str):
-			str_data = f"s {data}"
-		elif isinstance(data, list):
-			list_str = ",".join(f"i {item}" if isinstance(item, int) else f"s {item}" for item in data)
-			str_data = f"l {list_str}"
-		else:
-			msg = f"不支持的类型: {type(data)}"
-			raise TypeError(msg)
-		return self._encrypt_string(str_data)
-
-	def decrypt(self, cipher: str) -> int | str | list[int | Any]:
-		"""解密数据"""
-		decrypted_str = self._decrypt_string(cipher)
-		marker = decrypted_str[0]
-		data_str = decrypted_str[1:]
-		if marker == "i":
-			return int(data_str)
-		if marker == "s":
-			return data_str
-		if marker == "l":
-			return self._parse_list(data_str)
-		msg = f"未知的类型标记: {marker}"
-		raise ValueError(msg)
-
-	@staticmethod
-	def _parse_list(data_str: str) -> list[int | Any]:
-		"""解析列表数据"""
-		items = []
-		current = ""
-		in_escape = False
-		for char in data_str:
-			if char == "\\" and not in_escape:
-				in_escape = True
-			elif char == "," and not in_escape:
-				items.append(current)
-				current = ""
-			else:
-				current += char
-				in_escape = False
-		if current:
-			items.append(current)
-		return [int(item[1:]) if item[0] == "i" else item[1:] for item in items]
-
-	def _encrypt_string(self, s: str) -> str:
-		"""加密字符串"""
-		result = []
-		for i, char in enumerate(s):
-			idx = i % 4
-			char_val = ord(char)
-			if idx == 0:
-				val = char_val ^ self.KEY
-			elif idx == 1:
-				val = (char_val + self.KEY) % 256
-			elif idx == 2:
-				val = (char_val - self.KEY) % 256
-			else:
-				val = ~char_val & 0xFF
-			val_str = f"{val:03d}"
-			result.extend(self.MAPPING[int(d) % 10] for d in val_str)
-		return "".join(result)
-
-	def _decrypt_string(self, cipher: str) -> str:
-		"""解密字符串"""
-		digits = "".join(self.REVERSE_MAPPING[char] for char in cipher)
-		parts = []
-		i = 0
-		while i + 3 <= len(digits):
-			num_str = digits[i : i + 3]
-			if num_str.isdigit():
-				val = int(num_str)
-				if 0 <= val <= 255:
-					parts.append(val)
-					i += 3
-				else:
-					i += 1
-			else:
-				i += 1
-		result = []
-		for i, val in enumerate(parts):
-			idx = i % 4
-			if idx == 0:
-				result.append(chr(val ^ self.KEY))
-			elif idx == 1:
-				result.append(chr((val - self.KEY) % 256))
-			elif idx == 2:
-				result.append(chr((val + self.KEY) % 256))
-			else:
-				result.append(chr(~val & 0xFF))
-		return "".join(result)
-
-
-@final
-class Printer:
-	"""优化后的打印器类"""
-
-	def __init__(self) -> None:
+		self.color_mgr = ColorManager()
 		self._input_prefix = "↳"
 		self._input_suffix = ":"
 		self._header_width = 60
 
-	@staticmethod
-	def color_text(text: str, color_name: ColorType) -> str:
+	def color_text(self, text: str, color_name: str) -> str:
 		"""为文本添加颜色"""
-		return f"{ColorConfig.get_color(color_name)}{text}{ColorConfig.get_color('RESET')}"
+		return f"{self.color_mgr.get(color_name)}{text}{self.color_mgr.get('RESET')}"
 
-	def prompt_input(self, text: str, color: ColorType = "PROMPT") -> str:
+	def prompt_input(self, text: str, color: str = "PROMPT") -> str:
 		"""统一的输入提示函数"""
 		prompt_text = f"{self._input_prefix}{text}{self._input_suffix}"
 		colored_prompt = self.color_text(prompt_text, color)
 		return input(colored_prompt)
 
-	def print_message(self, text: str, color_name: ColorType) -> None:
+	def print_message(self, text: str, color_name: str) -> None:
 		"""打印消息"""
 		print(self.color_text(text, color_name))
 
 	def print_header(self, text: str) -> None:
 		"""打印装饰头部"""
-		separator = ColorConfig.get_separator()
+		separator = self.color_mgr.separator
 		formatted_text = text.center(self._header_width)
 		print(f"\n {separator}")
 		print(self.color_text(formatted_text, "MENU_TITLE"))
@@ -1072,7 +702,7 @@ class Printer:
 		self,
 		prompt: str,
 		valid_options: set[T] | range | None = None,
-		cast_type: Callable[[str], T] = str,  # ty:ignore[invalid-parameter-default]
+		cast_type: Callable[[str], T] = str,  # ty:ignore [invalid-parameter-default]
 		validator: Callable[[T], bool] | None = None,
 		max_attempts: int = 10,
 	) -> T:
@@ -1110,7 +740,7 @@ class Printer:
 					attempts += 1
 					continue
 			except ValueError as e:
-				type_name = cast_type.__name__  # ty:ignore[unresolved-attribute]
+				type_name = cast_type.__name__  # ty:ignore [unresolved-attribute]
 				self.print_message(f"格式错误: 请输入 {type_name} 类型的值 ({e})", "ERROR")
 				attempts += 1
 			except KeyboardInterrupt:
@@ -1125,7 +755,7 @@ class Printer:
 		raise ValueError(msg)
 
 
-# 配置类
+# ========== 配置类 ==========
 @dataclass
 class DisplayConfig:
 	"""显示配置"""
@@ -1146,11 +776,13 @@ class OperationConfig:
 	batch_processor: Callable[[list[Any]], dict[int, str]] | None = None
 
 
+# ========== 显示渲染器 ==========
+@singleton
 class DisplayRenderer:
 	"""负责数据渲染显示"""
 
-	def __init__(self, printer: Printer) -> None:
-		self.printer = printer
+	def __init__(self, output_handler: OutputHandler) -> None:
+		self.output = output_handler
 
 	def render_page(
 		self,
@@ -1168,8 +800,8 @@ class DisplayRenderer:
 
 	def _render_header(self, page_info: dict[str, Any]) -> None:
 		"""渲染页眉"""
-		self.printer.print_header(f"=== {page_info['title']} ===")
-		self.printer.print_message(f"第 {page_info['current_page']}/{page_info['total_pages']} 页 (共 {page_info['total_items']} 条记录)", "INFO")
+		self.output.print_header(f"=== {page_info['title']} ===")
+		self.output.print_message(f"第 {page_info['current_page']}/{page_info['total_pages']} 页 (共 {page_info['total_items']} 条记录)", "INFO")
 
 	def _render_table_header(self, field_info: dict[str, Any], batch_results: dict[int, str] | None) -> None:
 		"""渲染表头"""
@@ -1179,9 +811,9 @@ class DisplayRenderer:
 			header_parts.append("状态".ljust(15))
 		header = "".join(header_parts)
 		separator = "-" * len(header)
-		self.printer.print_message(separator, "INFO")
-		self.printer.print_message(header, "INFO")
-		self.printer.print_message(separator, "INFO")
+		self.output.print_message(separator, "INFO")
+		self.output.print_message(header, "INFO")
+		self.output.print_message(separator, "INFO")
 
 	def _render_data_rows(
 		self,
@@ -1209,11 +841,11 @@ class DisplayRenderer:
 			# 批量处理状态
 			if batch_results and global_index in batch_results:
 				row += f"{batch_results[global_index]}".ljust(15)
-			self.printer.print_message(row, "INFO")
+			self.output.print_message(row, "INFO")
 
 	def _render_footer(self) -> None:
 		"""渲染页脚"""
-		self.printer.print_message("-" * 100, "INFO")
+		self.output.print_message("-" * 100, "INFO")
 
 	@staticmethod
 	def _format_operations(operations: dict[str, str] | None, local_index: int) -> str:
@@ -1241,7 +873,7 @@ class DisplayRenderer:
 		try:
 			return getattr(item, field, "N/A")
 		except Exception as e:
-			self.printer.print_message(f"获取字段 {field} 时出错: {e}", "ERROR")
+			self.output.print_message(f"获取字段 {field} 时出错: {e}", "ERROR")
 			return "ERROR"
 
 	@staticmethod
@@ -1252,11 +884,13 @@ class DisplayRenderer:
 		return value
 
 
+# ========== 输入处理器 ==========
+@singleton
 class InputProcessor:
 	"""负责处理用户输入"""
 
-	def __init__(self, printer: Printer) -> None:
-		self.printer = printer
+	def __init__(self, output_handler: OutputHandler) -> None:
+		self.output = output_handler
 
 	def get_user_choice(
 		self,
@@ -1270,11 +904,11 @@ class InputProcessor:
 		"""获取用户选择"""
 		valid_choices = self._build_valid_choices(current_page, total_pages, nav_config, current_page_item_count, operation_shortcuts)
 		options = self._build_options_display(current_page, total_pages, nav_config, custom_operations, operation_shortcuts)
-		self.printer.print_message("|".join(options), "INFO")
+		self.output.print_message("|".join(options), "INFO")
 		try:
-			return self.printer.get_valid_input(prompt="请选择", valid_options=valid_choices, cast_type=str)
+			return self.output.get_valid_input(prompt="请选择", valid_options=valid_choices, cast_type=str)
 		except (EOFError, KeyboardInterrupt):
-			self.printer.print_message("\n 操作已取消", "INFO")
+			self.output.print_message("\n 操作已取消", "INFO")
 			return nav_config["quit"]
 
 	@staticmethod
@@ -1322,13 +956,15 @@ class InputProcessor:
 		return options
 
 
+# ========== 通用数据查看器 ==========
+@singleton
 class GenericDataViewer:
 	"""通用的数据查看器"""
 
-	def __init__(self, printer: Printer) -> None:
-		self.printer = printer
-		self.renderer = DisplayRenderer(printer)
-		self.input_processor = InputProcessor(printer)
+	def __init__(self, output_handler: OutputHandler | None = None) -> None:
+		self.output = output_handler or OutputHandler()
+		self.renderer = DisplayRenderer(self.output)
+		self.input_processor = InputProcessor(self.output)
 		self.default_navigation = {"next_page": "n", "previous_page": "p", "quit": "q", "back": "b"}
 
 	def display_data(
@@ -1350,7 +986,7 @@ class GenericDataViewer:
 		# 参数验证
 		self._validate_parameters(data_class, data_list, page_size, display_fields, id_field, nav_config)
 		if not data_list:
-			self.printer.print_message("没有数据可显示", "WARNING")
+			self.output.print_message("没有数据可显示", "WARNING")
 			return
 		# 预计算和初始化
 		field_info = self._precompute_field_info(data_class, display_fields, field_formatters)
@@ -1428,7 +1064,7 @@ class GenericDataViewer:
 		if self._is_operation_choice(choice, operation_shortcuts, len(current_page_items)):
 			self._execute_operation(choice, operation_shortcuts, current_page_items, custom_operations)
 			return current_page  # 操作后停留在当前页
-		self.printer.print_message("无效的输入", "ERROR")
+		self.output.print_message("无效的输入", "ERROR")
 		return current_page
 
 	def _execute_operation(
@@ -1447,13 +1083,13 @@ class GenericDataViewer:
 			if custom_operations and op_name in custom_operations:
 				try:
 					custom_operations[op_name](selected_item)
-					self.printer.print_message(f"操作 '{op_name}' 执行成功", "SUCCESS")
+					self.output.print_message(f"操作 '{op_name}' 执行成功", "SUCCESS")
 				except Exception as e:
-					self.printer.print_message(f"操作 '{op_name}' 执行失败: {e}", "ERROR")
+					self.output.print_message(f"操作 '{op_name}' 执行失败: {e}", "ERROR")
 			else:
-				self.printer.print_message("没有可用的操作", "ERROR")
+				self.output.print_message("没有可用的操作", "ERROR")
 		else:
-			self.printer.print_message("无效的选择", "ERROR")
+			self.output.print_message("无效的选择", "ERROR")
 
 	@staticmethod
 	def _is_operation_choice(choice: str, operation_shortcuts: dict[str, str], current_item_count: int) -> bool:
@@ -1514,11 +1150,11 @@ class GenericDataViewer:
 			if is_dataclass(data_class):
 				field_names = [field.name for field in fields(data_class)]
 				if id_field not in field_names:
-					self.printer.print_message(f"警告: dataclass 中没有找到字段 '{id_field}'", "WARNING")
+					self.output.print_message(f"警告: dataclass 中没有找到字段 '{id_field}'", "WARNING")
 			else:
-				self.printer.print_message("警告: 提供的类不是 dataclass", "WARNING")
+				self.output.print_message("警告: 提供的类不是 dataclass", "WARNING")
 		except (TypeError, AttributeError):
-			self.printer.print_message(f"警告: 无法验证字段 '{id_field}', 请确保是有效的 dataclass", "WARNING")
+			self.output.print_message(f"警告: 无法验证字段 '{id_field}', 请确保是有效的 dataclass", "WARNING")
 
 	def _precompute_field_info(
 		self,
@@ -1545,7 +1181,7 @@ class GenericDataViewer:
 		available_fields = [field for field in display_fields if field in all_fields]
 		missing_fields = set(display_fields) - set(all_fields)
 		if missing_fields:
-			self.printer.print_message(f"警告: 以下字段不存在: {', '.join(missing_fields)}", "WARNING")
+			self.output.print_message(f"警告: 以下字段不存在: {', '.join(missing_fields)}", "WARNING")
 		return available_fields or all_fields
 
 	@staticmethod
@@ -1564,3 +1200,54 @@ class GenericDataViewer:
 			shortcut = available_letters[i] if i < len(available_letters) else str(i - len(available_letters))
 			shortcuts[shortcut] = op_name
 		return shortcuts
+
+
+# ========== 工具集工厂 ==========
+@singleton
+class ToolKitFactory:
+	"""工具集工厂, 提供统一的工具访问接口"""
+
+	@staticmethod
+	def create_data_processor() -> DataProcessor:
+		"""创建数据处理器"""
+		return DataProcessor()
+
+	@staticmethod
+	def create_data_converter() -> DataConverter:
+		"""创建数据转换器"""
+		return DataConverter()
+
+	@staticmethod
+	def create_string_processor() -> StringProcessor:
+		"""创建字符串处理器"""
+		return StringProcessor()
+
+	@staticmethod
+	def create_time_utils() -> TimeUtils:
+		"""创建时间工具"""
+		return TimeUtils()
+
+	@staticmethod
+	def create_data_analyzer() -> DataAnalyzer:
+		"""创建数据分析器"""
+		return DataAnalyzer()
+
+	@staticmethod
+	def create_edu_data_generator() -> EduDataGenerator:
+		"""创建教育数据生成器"""
+		return EduDataGenerator()
+
+	@staticmethod
+	def create_crypto(salt: bytes) -> Crypto:
+		"""创建加密工具"""
+		return Crypto(salt)
+
+	@staticmethod
+	def create_output_handler() -> OutputHandler:
+		"""创建输出处理器"""
+		return OutputHandler()
+
+	@staticmethod
+	def create_data_viewer(output_handler: OutputHandler | None = None) -> GenericDataViewer:
+		"""创建数据查看器"""
+		return GenericDataViewer(output_handler)
