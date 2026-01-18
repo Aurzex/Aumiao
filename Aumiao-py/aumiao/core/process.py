@@ -215,14 +215,29 @@ class ActionSelectionProcessor(BaseProcessor):
 			if choice == "F":
 				config = context.config
 				item_ndd = context.record["item"]
-				if config.special_check(item_ndd):
-					self._check_violation(context)
+				print(f"开始违规检查,config 类型: {type(config)}")
+				if hasattr(config, "special_check") and config.special_check:
+					try:
+						result = config.special_check(item_ndd)
+						if result:
+							self._check_violation(context)
+							# 检查完成后, 显示完成信息并继续等待用户选择
+							self.printer.print_message("违规检查完成, 请选择处理动作", "INFO")
+							continue
+						self.printer.print_message("该类型不支持检查违规操作", "ERROR")
+						continue
+					except Exception as e:
+						self.printer.print_message(f"违规检查出错: {e}", "ERROR")
+						continue
+				else:
+					print("配置中没有 special_check 或不可调用")
+					self.printer.print_message("该类型不支持检查违规操作", "ERROR")
 					continue
-				self.printer.print_message("该类型不支持检查违规操作", "ERROR")
-				continue
 			if choice == "J":
 				context.skip_reason = "用户选择跳过"
 				self.printer.print_message("已跳过该举报", "INFO")
+				# 对于跳过, 我们设置 processed 为 True, 但记录跳过原因
+				context.processed = True
 				break
 
 	def _show_item_details(self, context: ProcessingContext) -> None:
@@ -261,18 +276,21 @@ class ActionSelectionProcessor(BaseProcessor):
 		source_id = item_ndd[config.source_id_field]
 		board_name = item_ndd.get("board_name", "UNKNOWN")
 		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
-		self.printer.print_message(f"检查违规: source_id={source_id}, type={context.report_type}, board={board_name}, user={user_id}", "INFO")
-
+		self.printer.print_header("=== 开始检查违规 ===")
 		# 调整来源类型
 		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # type: ignore  # noqa: PGH003
-
 		processor = ReportProcessor()
-		processor.check_violation(
-			source_id=source_id,
-			source_type=adjusted_source_type,
-			board_name=board_name,
-			user_id=user_id if user_id != "UNKNOWN" else None,
-		)
+		try:
+			processor.check_violation(
+				source_id=source_id,
+				source_type=adjusted_source_type,
+				board_name=board_name,
+				user_id=user_id if user_id != "UNKNOWN" else None,
+			)
+			self.printer.print_message("违规检查完成", "SUCCESS")
+		except Exception as e:
+			self.printer.print_message(f"违规检查失败: {e!s}", "ERROR")
+		self.printer.print_header("=== 检查结束 ===")
 
 	def _apply_action(self, context: ProcessingContext) -> None:
 		"""应用处理动作"""
@@ -386,7 +404,7 @@ class CommentProcessor:
 		self,
 		comments: list[dict[str, Any]],
 		item_id: int,
-		_title: str,
+		title: str,  # noqa: ARG002
 		params: dict[str, Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
@@ -909,37 +927,58 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		)
 
 	def fetch_reports_chunked(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> Generator[list[ReportRecord]]:
-		for report_type in self.registry.get_all_types():
-			config = self.registry.get_config(report_type=report_type)
-			yield from self._fetch_type_chunked(report_type=report_type, config=config, status=status)
-
-	@staticmethod
-	def _fetch_type_chunked(report_type: str, config: SourceConfig, status: str) -> Generator[list[ReportRecord]]:
 		chunk: list[ReportRecord] = []
-		for item in config.fetch_generator(status):
-			# 如果状态是 TOBEDONE, 确保只获取未处理的
-			if status == "TOBEDONE":
-				# 检查是否为已处理状态
-				item_status = item.get("status", "")
-				if item_status and item_status != "TOBEDONE":
-					continue
-			item_ndd = data.NestedDefaultDict(item)
-			# 创建举报记录
-			record = ReportRecord(
-				item=item_ndd,
-				report_type=report_type,  # pyright: ignore [reportArgumentType]  # ty:ignore [invalid-argument-type]
-				item_id=str(item_ndd[config.item_id_field]),
-				content=item_ndd[config.content_field],
-				processed=False,
-				action=None,
-			)
-			chunk.append(record)
-			# 达到分块大小时返回
-			if len(chunk) >= config.chunk_size:
+		current_type_index = 0
+		report_types = self.registry.get_all_types()
+		print(f"开始分块获取举报, 总类型数: {len(report_types)}")
+		while current_type_index < len(report_types):
+			report_type = report_types[current_type_index]
+			config = self.registry.get_config(report_type=report_type)
+			print(f"处理类型: {report_type}, chunk 大小配置: {config.chunk_size}")
+			# 临时收集当前类型的记录
+			type_chunk: list[ReportRecord] = []
+			items_processed = 0
+			for item in config.fetch_generator(status):
+				# 如果状态是 TOBEDONE, 确保只获取未处理的
+				if status == "TOBEDONE":
+					item_status = item.get("status", "")
+					if item_status and item_status != "TOBEDONE":
+						continue
+				item_ndd = data.NestedDefaultDict(item)
+				# 创建举报记录
+				record = ReportRecord(
+					item=item_ndd,
+					report_type=report_type,  # pyright: ignore [reportArgumentType]
+					item_id=str(item_ndd[config.item_id_field]),
+					content=item_ndd[config.content_field],
+					processed=False,
+					action=None,
+				)
+				type_chunk.append(record)
+				items_processed += 1
+				# 如果当前类型的 chunk 达到配置大小, 添加到总 chunk
+				if len(type_chunk) >= config.chunk_size:
+					print(f"类型 {report_type} 达到 chunk 大小, 准备合并")
+					break
+			print(f"类型 {report_type} 获取了 {len(type_chunk)} 条记录")
+			# 将当前类型的记录添加到总 chunk
+			chunk.extend(type_chunk)
+			# 检查是否需要切换到下一个类型
+			if len(type_chunk) < config.chunk_size:
+				# 当前类型已无更多数据, 切换到下一个类型
+				current_type_index += 1
+				print(f"类型 {report_type} 数据不足, 切换到下一个类型")
+			else:
+				# 当前类型还有数据, 下次继续获取
+				print(f"类型 {report_type} 还有数据, 继续获取")
+			# 如果总 chunk 达到 100 或处理完所有类型, 则返回
+			if (len(chunk) >= 100 or current_type_index >= len(report_types)) and chunk:
+				print(f"返回 chunk, 大小: {len(chunk)}")
 				yield chunk
-				chunk = []
-		# 返回剩余记录
+				chunk = []  # 重置 chunk
+		# 返回最后剩余的记录
 		if chunk:
+			print(f"返回最后剩余的 chunk, 大小: {len(chunk)}")
 			yield chunk
 
 	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
@@ -1288,7 +1327,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
 			# 1. 获取评论详情列表
-			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments")
+			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=200)
 			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
 				"ads": self.data.USER_DATA.ads,

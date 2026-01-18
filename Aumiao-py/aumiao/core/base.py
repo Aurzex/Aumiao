@@ -812,7 +812,7 @@ class SourceConfig:
 	item_id_field: str
 	source_name_field: str | None = None
 	# 特殊检查
-	special_check: Callable[..., bool] = field(default_factory=lambda: lambda: True)
+	special_check: Callable[..., bool] = field(default_factory=lambda: lambda *args, **kwargs: True)  # noqa: ARG005
 	# 分块大小
 	chunk_size: int = 100
 	available_actions: list["ActionConfig"] | None = None
