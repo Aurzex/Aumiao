@@ -832,6 +832,22 @@ class CommunityService:
 			print()
 		return statistics
 
+	def get_fans_statistics(self, user_id: str, like_num: int = 1000) -> None:
+		"""获取粉丝统计信息"""
+		fans = self.coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id)
+		for fan in fans:
+			if int(fan.get("total_likes", 0)) >= like_num:
+				print("\n符合条件的粉丝:")
+				print(f"昵称: {fan['nickname']}")
+				print(f"ID: {fan['id']}")
+				print(f"获赞数: {fan['total_likes']}")
+
+				user_data = self.coordinator.user_obtain.fetch_user_honors(user_id=fan["id"])
+				if user_data:
+					print(f"粉丝数: {user_data.get('fans_total', 'N/A')}")
+					print(f"作品收藏数: {user_data.get('collected_total', 'N/A')}")
+					print(f"作者等级: {user_data.get('author_level', 'N/A')}")
+
 
 # ==============================
 # 批量操作服务

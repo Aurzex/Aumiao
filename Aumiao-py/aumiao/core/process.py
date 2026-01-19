@@ -1624,8 +1624,14 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			return None
 		# 使用重构后的统一上传接口
 		url = uploader().upload(file_path=file_path, method=method, save_path=save_path)
-		file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
-		history = data.UploadHistory(file_name=file_path.name, file_size=file_size_human, method=method, save_url=url, upload_time=self.tool.TimeUtils().current_timestamp())
+		file_size_human = self.toolkit.create_data_converter().bytes_to_human(file_size)
+		history = data.UploadHistory(
+			file_name=file_path.name,
+			file_size=file_size_human,
+			method=method,
+			save_url=url,
+			upload_time=self.toolkit.create_time_utils().current_timestamp(),
+		)
 		self.upload_history.data.history.append(history)
 		self.upload_history.save()
 		return url
@@ -1658,13 +1664,13 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					# 使用重构后的统一上传接口
 					url = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
-					file_size_human = self.tool.DataConverter().bytes_to_human(file_size)
+					file_size_human = self.toolkit.create_data_converter().bytes_to_human(file_size)
 					history = data.UploadHistory(
 						file_name=str(relative_path),
 						file_size=file_size_human,
 						method=method,
 						save_url=url,
-						upload_time=self.tool.TimeUtils().current_timestamp(),
+						upload_time=self.toolkit.create_time_utils().current_timestamp(),
 					)
 					self.upload_history.data.history.append(history)
 					results[str(child_file)] = url
@@ -1697,7 +1703,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		def format_upload_time(upload_time: float) -> str:
 			"""格式化上传时间"""
 			if isinstance(upload_time, (int, float)):
-				return self.tool.TimeUtils().format_timestamp(upload_time)
+				return self.toolkit.create_time_utils().format_timestamp(upload_time)
 			return str(upload_time)[:19]
 
 		def format_file_name(file_name: str) -> str:
@@ -1738,7 +1744,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			# 格式化上传时间
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
-				upload_time = self.tool.TimeUtils().format_timestamp(upload_time)
+				upload_time = self.toolkit.create_time_utils().format_timestamp(upload_time)
 			self.printer.print_header("=== 文件上传详情 ===")
 			self.printer.print_message("-" * 60, "INFO")
 			self.printer.print_message(f"文件名: {record.file_name}", "INFO")
