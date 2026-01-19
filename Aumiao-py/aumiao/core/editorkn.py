@@ -245,7 +245,7 @@ class XMLParser:
 		return XMLParser._parse_element(root)
 
 	@staticmethod
-	def _parse_element(element: ET.Element) -> dict[str, Any]:  # noqa: PLR0915
+	def _parse_element(element: ET.Element) -> dict[str, Any]:
 		"""解析 XML 元素"""
 		# 解析属性
 		result: dict[str, Any] = dict(element.attrib.items())

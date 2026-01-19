@@ -9,7 +9,7 @@ from time import sleep
 from typing import Any, Literal, cast
 
 from aumiao.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, auth, data, decorator, toolkit
-from aumiao.core.compile import CodemaoDecompiler
+from aumiao.core.compiler import CodemaoDecompiler
 from aumiao.core.editorkn import KNEditor, KNProject
 from aumiao.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from aumiao.core.retrieve import Obtain

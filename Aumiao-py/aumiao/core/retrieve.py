@@ -116,8 +116,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 			"post": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
 			"shop": (self.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
 		}
-		self._math_utils = self.tool.MathUtils()
-		self._data_processor = self.tool.DataProcessor()
+		self._data_processor = self.toolkit.create_data_processor()
 		self.query_manager = QueryManager(self)
 
 	def get_new_replies(
@@ -138,7 +137,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 		offset = 0
 		replies = []
 		while remaining > 0:
-			current_limit = self._math_utils.clamp(remaining, 5, 200)
+			current_limit = max(5, min(remaining, 200))
 			try:
 				response = self.community_obtain.fetch_replies(
 					types=type_item,
@@ -282,7 +281,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 		for single_work in works:
 			work_comments = self.query().from_source("work").with_id(single_work["work_id"]).using_method("comments").with_limit(20).execute()
 			comments.extend(work_comments)
-		filtered_comments = self.tool.DataProcessor().filter_data(data=comments, include=["user_id", "content", "nickname"])
+		filtered_comments = self._data_processor.filter_fields(data=comments, include=["user_id", "content", "nickname"])
 		filtered_comments = cast("list [dict]", filtered_comments)
 		user_comments_map = {}
 		for comment in filtered_comments:
