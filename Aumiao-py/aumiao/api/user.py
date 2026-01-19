@@ -20,16 +20,17 @@ class UserDataFetcher:
 	# 		endpoint="/web/user/info",
 	# 	)
 	# 	return response.json()
-	def fetch_user_profile(self, user_id: str) -> dict:
-		"""
-		获取用户详细信息
-		Args:
-			user_id: 用户 ID
-		Returns:
-			用户详细信息字典
-		"""
-		response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
-		return response.json()
+	# BUG 2026/1/19 日测试报错 410 , 推测 api 已经弃用
+	# def fetch_user_profile(self, user_id: str) -> dict:
+	# 	"""
+	# 	获取用户详细信息
+	# 	Args:
+	# 		user_id: 用户 ID
+	# 	Returns:
+	# 		用户详细信息字典
+	# 	"""
+	# 	response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
+	# 	return response.json()
 
 	def fetch_user_honors(self, user_id: str) -> dict:
 		"""
@@ -396,7 +397,7 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_followers_gen(self, user_id: str, limit: int = 15) -> Generator[dict]:
+	def fetch_followers_gen(self, user_id: str, limit: int | None = 15) -> Generator[dict]:
 		"""
 		获取用户粉丝列表生成器
 		Args:
@@ -447,13 +448,14 @@ class UserDataFetcher:
 		Returns:
 			收藏作品生成器
 		"""
+		# 2026/1/19日发现api已经更新到 v2,v1可以正常使用
 		params = {
 			"user_id": user_id,
 			"offset": 0,
 			"limit": 5,
 		}
 		return self._client.fetch_paginated_data(
-			endpoint="/creation-tools/v1/user/center/collect/list",
+			endpoint="/creation-tools/v2/user/center/collect/list",
 			params=params,
 			total_key="total",
 			limit=limit,

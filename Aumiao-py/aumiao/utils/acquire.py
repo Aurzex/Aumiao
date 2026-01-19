@@ -253,11 +253,16 @@ class BaseHTTPClient:
 		self._file_handler = file.CodeMaoFile()
 		self._data_processor = tool.DataProcessor()
 		self.log_file = Path.cwd() / "logs" / f"requests_{tool.TimeUtils().current_timestamp()}.txt"
-		self._pagination_config: PaginationConfig = {}
+		self._pagination_config: PaginationConfig = {
+			"offset_key": "offset",
+			"amount_key": "limit",
+			"response_amount_key": "limit",
+			"response_offset_key": "offset",
+		}
 
 	def send_request(
 		self,
-		method: Literal["GET", "POST", "DELETE", "PUT", "PATCH"],
+		method: HttpMethod,
 		endpoint: str,
 		params: dict[str, Any] | None = None,
 		data: dict[str, Any] | None = None,
@@ -470,7 +475,11 @@ class BaseHTTPClient:
 		"""构建页面请求参数"""
 		page_params = base_params.copy()
 		if pagination_method == "offset":
-			page_params[offset_key] = first_page_size + (page_idx - 1) * items_per_page
+			# 修正: 直接计算offset, 不从first_page_size开始
+			# 因为第一页的offset已经在base_params中设置过了(通常是0)
+			# 所以后续页应该基于这个基础计算
+			current_offset = base_params.get(offset_key, 0)
+			page_params[offset_key] = current_offset + (page_idx * items_per_page)
 		elif pagination_method == "page":
 			page_params[offset_key] = page_idx + 1  # 第一页已经获取, 从第二页开始
 		else:
