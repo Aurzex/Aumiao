@@ -469,7 +469,7 @@ class BaseHTTPClient:
 		offset_key: str,
 		page_idx: int,
 		items_per_page: int,
-		first_page_size: int,
+		_first_page_size: int,
 		pagination_method: Literal["offset", "page"],
 	) -> dict[str, Any]:
 		"""构建页面请求参数"""
@@ -852,8 +852,11 @@ class FileUploader(IFileUploader):
 				"key": token_info["file_path"],
 				"fname": unique_filename,
 			}
-			self._upload_request("POST", token_info["upload_url"], files=files, data=data)
-		return token_info["pic_host"] + token_info["file_path"]
+			# 获取上传响应结果
+			response = self._upload_request("POST", token_info["upload_url"], files=files, data=data)
+			result = response.json()
+		# 使用返回的 key 构建完整 URL
+		return f"{token_info['bucket_url']}{result['key']}"
 
 	def _upload_request(self, method: str, endpoint: str, files: dict[str, Any] | None = None, data: dict[str, Any] | None = None, timeout: float = 120.0) -> Response:
 		"""专门用于文件上传的请求方法"""
@@ -886,16 +889,18 @@ class FileUploader(IFileUploader):
 			"cdnName": "qiniu",
 		}
 		response = self.client.send_request(
-			"GET",
-			"https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
+			method="GET",
+			endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
 			params=params,
 		)
 		data = response.json()
+		token_info = data["tokens"][0]
 		return {
-			"token": data["tokens"][0]["token"],
-			"file_path": data["tokens"][0]["file_path"],
+			"token": token_info["token"],
+			"file_path": token_info["file_path"],
 			"upload_url": data["upload_url"],
-			"pic_host": data["bucket_url"],
+			# 修改字段名以匹配实际数据
+			"bucket_url": data["bucket_url"],  # 原来是 "pic_host"
 		}
 
 	def _get_codegame_token(self, prefix: str, file_path: Path) -> dict[str, Any]:
