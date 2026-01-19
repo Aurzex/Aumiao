@@ -12,7 +12,7 @@ from aumiao.utils import data, decorator
 from aumiao.utils import file as file_ins
 from aumiao.utils import tool as tool_ins
 from aumiao.utils.acquire import ClientFactory, CodeMaoClient
-from aumiao.utils.data import CacheManager, CodeMaoCache, CodeMaoData, CodemaoHistory, CodeMaoSetting, DataManager, HistoryManager, SettingManager
+from aumiao.utils.data import CacheManager, CodeMaoCache, CodeMaoData, CodeMaoSetting, DataManager, HistoryManager, SettingManager
 from aumiao.utils.decorator import singleton
 from aumiao.utils.tool import ToolKitFactory
 
@@ -885,6 +885,11 @@ class CoreManager:
 		return self.data_manager.data
 
 	@property
+	def data_man(self) -> DataManager:
+		"""快捷访问数据"""
+		return self.data_manager
+
+	@property
 	def setting(self) -> CodeMaoSetting:
 		"""快捷访问设置"""
 		return self.setting_manager.data
@@ -982,6 +987,11 @@ class InfrastructureCoordinator:
 	def data(self) -> CodeMaoData:
 		"""数据"""
 		return self._core.data
+
+	@property
+	def data_man(self) -> DataManager:
+		"""快捷访问数据"""
+		return self._core.data_man
 
 	@property
 	def setting(self) -> CodeMaoSetting:
@@ -1108,45 +1118,6 @@ class InfrastructureCoordinator:
 		这是类型安全的,因为调用者知道返回类型
 		"""
 		return self._modules.get(name)
-
-
-# ==============================
-# 类型存根(可选,用于 IDE 类型提示)
-# ==============================
-class _InfrastructureCoordinatorStub:
-	"""
-	类型存根类,用于 IDE 类型提示
-	这不是实际代码,只是为类型检查器提供信息
-	"""
-
-	# 核心组件
-	client: CodeMaoClient
-	toolkit: ToolKitFactory
-	data: CodeMaoData
-	setting: CodeMaoSetting
-	cache: CodeMaoCache
-	upload_history: CodemaoHistory
-	# API 模块
-	auth: "auth.AuthManager"
-	community_motion: "community.UserAction"
-	community_obtain: "community.DataFetcher"
-	edu_motion: "edu.UserAction"
-	edu_obtain: "edu.DataFetcher"
-	forum_motion: "forum.ForumActionHandler"
-	forum_obtain: "forum.ForumDataFetcher"
-	novel_motion: "library.NovelActionHandler"
-	novel_obtain: "library.NovelDataFetcher"
-	shop_motion: "shop.WorkshopActionHandler"
-	shop_obtain: "shop.WorkshopDataFetcher"
-	user_motion: "user.UserManager"
-	user_obtain: "user.UserDataFetcher"
-	work_motion: "work.BaseWorkManager"
-	work_obtain: "work.WorkDataFetcher"
-	whale_motion: "whale.ReportHandler"
-	whale_obtain: "whale.ReportFetcher"
-	# 工具模块
-	printer: "tool_ins.OutputHandler"
-	file: "file_ins.CodeMaoFile"
 
 
 # ==============================
