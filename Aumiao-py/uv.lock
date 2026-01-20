@@ -17,7 +17,7 @@ wheels = [
 
 [[package]]
 name = "aumiao"
-version = "2.6.0"
+version = "2.6.5"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
