@@ -113,49 +113,6 @@ Download precompiled versions from the [Release page](https://github.com/aurzex/
 
 [![Star History Chart](https://api.star-history.com/svg?repos=aurzex/Aumiao&type=Date)](https://star-history.com/#aurzex/Aumiao&Date)
 
-## 相关项目 | Related Projects
-
-### API 与文档 | API & Documentation
-
-- [codemao-api](https://github.com/lambdark/codemao-api) - 编程猫社区官方 API 文档 | Official CodeMao community API documentation
-- [CoCo-Source-Code-Plan](https://github.com/glacier-studio/CoCo-Source-Code-Plan) - CoCo 编辑器源代码还原计划 | CoCo editor source code restoration project
-
-### 开发工具 | Development Tools
-
-- [Kitten-4-Decompiler](https://github.com/S-LIGHTNING/Kitten-4-Decompiler) - Kitten4 作品反编译器 | Kitten4 work decompiler
-- [Kitten-Cloud-Function](https://github.com/S-LIGHTNING/Kitten-Cloud-Function) - 云变量客户端工具 | Cloud variable client tool
-- [JsToKn](https://github.com/PiicatXstate/JsToKn) - JavaScript 转 KittenN 积木工具 | JavaScript to KittenN block tool
-- [CodemaoNemoMultiDecompiler](https://github.com/MoonBcmTools/CodemaoNemoMultiDecompiler) - Nemo 作品源代码还原 | Nemo work source code restoration
-- [CodemaoNemoOneKeyBuildShareCode](https://github.com/MoonBcmTools/CodemaoNemoOneKeyBuildShareCode) - 一键生成 Nemo 作品分享口令 | One-click Nemo work share code generation
-- [coco-packager](https://github.com/cocotais-lab/coco-packager) - CoCo 作品打包工具 | CoCo work packaging tool
-- [widget-template](https://github.com/liulyxandy-codemao/widget-template) - CoCo 自定义控件模板 | CoCo custom widget template
-
-### 社区增强与优化 | Community Enhancement & Optimization
-
-- [Better-Codemao](https://github.com/LuYingYiLong/Better-Codemao) - 编程猫社区增强脚本 | CodeMao community enhancement script
-- [codemaoOptimization](https://github.com/sf-yuzifu/codemaoOptimization) - 社区使用问题优化 | Community usage optimization
-- [pickcat](https://github.com/sf-yuzifu/pickcat) - 编程猫社区重新设计与功能扩展 | CodeMao community redesign and feature extension
-
-### 实用工具 | Utility Tools
-
-- [CodemaoEDUTools](https://github.com/Wangs-official/CodemaoEDUTools) - 学生账号管理工具 | Student account management tool
-- [Codemao-Storage](https://github.com/ornwind/Codemao-Storage) - 编程猫 CDN 文件上传工具 | CodeMao CDN file upload tool
-- [bcm_convertor](https://github.com/sf-yuzifu/bcm_convertor) - 作品转桌面应用工具 | Work to desktop application converter
-- [codemaonoveldownloader](https://github.com/rumunius/codemaonoveldownloader) - 小说下载爬虫 | Novel download crawler
-- [CodemaoDrive](https://github.com/CrackerCat/CodemaoDrive) - 编程猫云盘，支持任意文件上传与下载 | CodeMao cloud drive supporting any file upload/download
-- [PostCodemao](https://github.com/stonehfzs/PostCodemao) - 编程猫的时光邮箱/明信片生成 DEMO | CodeMao time email/postcard generation demo
-- [Codemao-Studio-Ranking](https://github.com/Hatmic/Codemao-Studio-Ranking) - 编程猫工作室评论数排行榜 | CodeMao studio comment ranking
-- [codemao-diger-rebuild](https://github.com/Rov-Waff/codemao-diger-rebuild) - 编程猫社区挖坟工具 | CodeMao community necromancy tool
-
-### 数据采集与分析 | Data Collection & Analysis
-
-- [CodemaoSpider](https://github.com/wbteve/CodemaoSpider) - 作品素材采集工具 | Work material collection tool
-- [-Codemao-](https://github.com/Liu-YuC/-Codemao-) - 评论数据爬取与分析 | Comment data crawling and analysis
-
-### CoCo 生态 | CoCo Ecosystem
-
-- [CoCo-Community](https://github.com/zitzhen/CoCo-Community) - CoCo 第三方社区 | CoCo third-party community
-
 ## 联系我们 | Contact Us
 
 - **官方网站**：[https://aumiao.aurzex.top](https://aumiao.aurzex.top)  
