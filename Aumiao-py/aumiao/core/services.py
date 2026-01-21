@@ -848,6 +848,88 @@ class CommunityService:
 					print(f"作品收藏数: {user_data.get('collected_total', 'N/A')}")
 					print(f"作者等级: {user_data.get('author_level', 'N/A')}")
 
+	@staticmethod
+	def check_follower(follower: dict) -> tuple:
+		default_avatars = [f"https://cdn-community.codemao.cn/community_frontend/community_default_avatar/avatar_300x300_{i:02d}.jpg" for i in range(1, 9)]
+		default_descriptions = ["", "无", "这个人很懒", "什么都没写"]
+		suspicious_name_parts = ["用户", "test", "测试", "temp", "临时", "小号", "备用", "bot", "的"]
+		reasons, score = [], 0.0
+		n_works = follower.get("n_works", 0)
+		total_likes = follower.get("total_likes", 0)
+		if n_works == 0:
+			reasons.append("零作品")
+			score += 0.3
+		if total_likes == 0:
+			reasons.append("零点赞")
+			score += 0.3
+		if n_works == 0 and total_likes == 0:
+			reasons.append("零作品零点赞")
+			score += 0.2
+		# 头像检查
+		avatar = follower.get("avatar_url", "")
+		if not avatar or avatar in default_avatars or "default_avatar" in avatar:
+			reasons.append("默认头像")
+			score += 0.2
+		# 描述检查
+		desc = follower.get("description", "").strip()
+		if not desc or desc in default_descriptions:
+			reasons.append("空描述")
+			score += 0.1
+		# 用户名检查
+		nickname = follower.get("nickname", "")
+		if nickname:
+			nickname_lower = nickname.lower()
+			suspicious_name = any(part in nickname_lower for part in suspicious_name_parts)
+			digit_name = nickname.isdigit() and len(nickname) >= 6
+			pattern_name = bool(any(c.isalnum() for c in nickname_lower))
+			long_non_chinese = len(nickname) > 10 and not any("一" <= ch <= "\u9fff" for ch in nickname)
+
+			if suspicious_name or digit_name or pattern_name or long_non_chinese:
+				reasons.append("可疑用户名")
+				score += 0.1
+		score = min(score, 1.0)
+		return score >= 0.5 or len(reasons) >= 2, reasons, score
+
+	def analyze_user_followers(self, user_id: str) -> dict:
+		"""分析用户的所有粉丝"""
+		fetcher = self.coordinator.user_obtain
+		user_info = fetcher.fetch_user_honors(user_id)
+		followers = list(fetcher.fetch_followers_gen(str(user_id), limit=300))
+		suspicious, normal = [], []
+		for follower in followers:
+			is_suspicious, reasons, score = self.check_follower(follower)
+			info = {
+				"id": follower.get("id"),
+				"nickname": follower.get("nickname"),
+				"avatar_url": follower.get("avatar_url"),
+				"n_works": follower.get("n_works", 0),
+				"total_likes": follower.get("total_likes", 0),
+				"description": follower.get("description", ""),
+				"suspicious": is_suspicious,
+				"reasons": reasons,
+				"score": score,
+			}
+			suspicious.append(info) if is_suspicious else normal.append(info)
+		total = len(followers)
+		suspicious_count = len(suspicious)
+		suspicious_percentage = (suspicious_count / total * 100) if total > 0 else 0
+		return {
+			"target_user": {
+				"id": user_id,
+				"nickname": user_info.get("nickname"),
+				"fans_total": user_info.get("fans_total", 0),
+				"attention_total": user_info.get("attention_total", 0),
+			},
+			"statistics": {
+				"total_followers": total,
+				"suspicious_count": suspicious_count,
+				"suspicious_percentage": round(suspicious_percentage, 2),
+				"normal_count": len(normal),
+			},
+			"suspicious_followers": suspicious,
+			"normal_followers": normal,
+		}
+
 
 # ==============================
 # 批量操作服务
