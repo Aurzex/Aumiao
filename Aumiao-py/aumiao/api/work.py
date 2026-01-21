@@ -312,10 +312,18 @@ class BaseWorkManager:
 		Returns:
 			重命名是否成功
 		"""
+		# 这个api还没有测试是否已经弃用
+		# response = self._client.send_request(
+		# 	endpoint=f"/tiger/work/works/{work_id}/rename",
+		# 	method="PATCH",
+		# 	params={"is_check_name": is_check_name, "name": name, "work_type": work_type},
+		# )
+		# 2026/1/21 新 api
 		response = self._client.send_request(
-			endpoint=f"/tiger/work/works/{work_id}/rename",
+			endpoint=f"/work/works/{work_id}/rename",
 			method="PATCH",
 			params={"is_check_name": is_check_name, "name": name, "work_type": work_type},
+			base_url_key="creation",
 		)
 		return response.status_code == HTTPStatus.OK.value
 
@@ -1813,3 +1821,119 @@ class NekoPlatformServices:
 		"""
 		response = self._client.send_request(endpoint=f"/neko/ranking-list/clear?id={ranking_id}", method="PUT", base_url_key="creation")
 		return response.json()
+
+
+@singleton
+class WoodWorkManager:
+	"""海龟编辑器 (Wood) 作品管理类"""
+
+	def __init__(self) -> None:
+		"""初始化海龟编辑器作品管理类"""
+		self._client = acquire.CodeMaoClient()
+
+	def fetch_wood_project(self, work_id: int) -> dict:
+		"""获取海龟编辑器项目信息"""
+		response = self._client.send_request(
+			endpoint="/wood/project",
+			method="GET",
+			params={"work_id": work_id},
+			base_url_key="creation",
+		)
+		return response.json()
+
+	def create_wood_project(
+		self,
+		work_name: str = "新的作品",
+		language_type: int = 3,
+		run_mode: int = 0,
+		files: list | None = None,
+		preview_code: str = "",
+		preview_url: str = "",
+		*,
+		is_turn_on_debug: bool = True,
+		editor_mode: str = "code",
+		update_time: int = 0,
+	) -> dict:
+		"""创建海龟编辑器作品"""
+		if files is None:
+			files = []
+
+		payload = {
+			"work_name": work_name,
+			"language_type": language_type,
+			"run_mode": run_mode,
+			"update_time": update_time,
+			"addition": {
+				"readonly_paths": [],
+				"locking_file_lines": {},
+				"isTurnOnDebug": is_turn_on_debug,
+				"editorMode": editor_mode,
+			},
+			"files": files,
+			"preview_url": preview_url,
+			"preview_code": preview_code,
+		}
+
+		response = self._client.send_request(
+			endpoint="/wood/project",
+			method="POST",
+			payload=payload,
+			base_url_key="creation",
+		)
+		return response.json()
+
+	def delete_wood_draft(self, work_id: int) -> bool:
+		"""删除海龟编辑器草稿"""
+		response = self._client.send_request(
+			endpoint=f"/wood/project/{work_id}/temporarily",
+			method="DELETE",
+			base_url_key="creation",
+		)
+		return response.status_code == HTTPStatus.OK.value
+
+	def search_user_wood_projects(self, query: str = "", page: int = 1, limit: int = 15, language_type: int = 0) -> dict:
+		"""搜索用户的Wood作品"""
+		params = {"query": query, "page": page, "limit": limit, "language_type": language_type}
+
+		response = self._client.send_request(
+			endpoint="/wood/user/project/search",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
+		return response.json()
+
+	def create_wood_file(
+		self,
+		work_id: int,
+		file_name: str = "main.py",
+		source_code: str = "",
+		file_type: int = 2,
+		*,
+		is_open: bool = False,
+	) -> dict:
+		"""在海龟编辑器作品中创建文件"""
+		file_data = {
+			"work_id": work_id,
+			"file_id": -1,  # 新文件通常用-1
+			"file_name": file_name,
+			"source": source_code,
+			"open": is_open,
+			"pid": 0,
+			"file_type": file_type,
+		}
+		project = self.fetch_wood_project(work_id)
+		if "files" not in project:
+			project["files"] = []
+		project["files"].append(file_data)
+		return self.create_wood_project(
+			work_name=project.get("work_name", "新的作品"),
+			language_type=project.get("language_type", 3),
+			run_mode=project.get("run_mode", 0),
+			files=project["files"],
+			preview_code=project.get("preview_code", ""),
+			preview_url=project.get("preview_url", ""),
+			is_turn_on_debug=project.get("addition", {}).get("isTurnOnDebug", True),
+			editor_mode=project.get("addition", {}).get("editorMode", "code"),
+			update_time=project.get("update_time", 0),
+		)

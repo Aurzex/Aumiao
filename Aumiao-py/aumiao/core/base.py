@@ -46,13 +46,6 @@ class ReportRecord(TypedDict):
 # ==============================
 # 配置类定义
 # ==============================
-@dataclass(frozen=True)
-class HTTPConfig:
-	"""HTTP 相关配置"""
-
-	SUCCESS_CODE: int = 200
-	CONNECTION_TIMEOUT: int = 30
-	REQUEST_TIMEOUT: int = 10
 
 
 @dataclass(frozen=True)

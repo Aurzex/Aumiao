@@ -1,6 +1,8 @@
 """服务类: 认证管理、文件上传、高级服务"""
 
+import contextlib
 import json
+import operator
 from collections import defaultdict
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
@@ -9,11 +11,12 @@ from time import sleep
 from typing import Any, Literal, cast
 
 from aumiao.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, auth, data, decorator, toolkit
+from aumiao.core.cloudcfg import CloudAPI
 from aumiao.core.compiler import CodemaoDecompiler
 from aumiao.core.editorkn import KNEditor, KNProject
 from aumiao.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from aumiao.core.retrieve import Obtain
-from aumiao.utils.acquire import HTTPStatus
+from aumiao.utils.acquire import CodeMaoClient, HTTPStatus
 
 
 # ==============================
@@ -929,6 +932,113 @@ class CommunityService:
 			"suspicious_followers": suspicious,
 			"normal_followers": normal,
 		}
+
+	def fetch_and_aggregate_works(self) -> list[dict]:
+		"""获取最热作品"""
+		filtered_works = []
+		seen_ids = set()
+		# 处理第一个数据源
+		works1 = self.coordinator.work_obtain.fetch_themed_works_web(limit=50)
+		if works1 and "items" in works1:
+			for item in works1["items"]:
+				work_id = item.get("work_id")
+				if work_id and work_id not in seen_ids:
+					seen_ids.add(work_id)
+					filtered_works.append(
+						{
+							"likes_count": item.get("likes_count", 0),
+							"collect_count": 0,  # 该数据源无收藏数
+							"author_id": item.get("user_id", ""),
+							"author_nickname": item.get("nickname", ""),
+							"work_name": item.get("work_name", ""),
+							"work_id": work_id,
+						},
+					)
+		# 处理第二个数据源
+		works2 = self.coordinator.work_obtain.fetch_all_subject_works(limit=50)
+		if works2 and "items" in works2:
+			for subject in works2["items"]:
+				if "subject_works" in subject:
+					for work in subject["subject_works"]:
+						work_id = work.get("id")
+						if work_id and work_id not in seen_ids:
+							seen_ids.add(work_id)
+							filtered_works.append(
+								{
+									"likes_count": work.get("n_likes", 0),
+									"collect_count": 0,  # 该数据源无收藏数
+									"author_id": work.get("user_id", ""),
+									"author_nickname": work.get("nickname", ""),
+									"work_name": work.get("work_name", ""),
+									"work_id": work_id,
+								},
+							)
+		# 处理第三个数据源
+		works3 = self.coordinator.work_obtain.fetch_nemo_discover()
+		if works3:
+			# 处理主推荐列表
+			if "recommend_work_list" in works3:
+				for work in works3["recommend_work_list"]:
+					work_base = work.get("work_base", {})
+					work_id = work_base.get("id")
+					if work_id and work_id not in seen_ids:
+						seen_ids.add(work_id)
+						work_mix = work.get("work_mix", {})
+						filtered_works.append(
+							{
+								"likes_count": work_mix.get("like_times", 0),
+								"collect_count": work_mix.get("collect_times", 0),
+								"author_id": work.get("author_info", {}).get("user_id", ""),
+								"author_nickname": work.get("author_info", {}).get("nickname", ""),
+								"work_name": work_base.get("name", ""),
+								"work_id": work_id,
+							},
+						)
+			# 处理工作集推荐列表
+			if "work_set" in works3 and "recommend_work_list" in works3["work_set"]:
+				for work in works3["work_set"]["recommend_work_list"]:
+					work_base = work.get("work_base", {})
+					work_id = work_base.get("id")
+					if work_id and work_id not in seen_ids:
+						seen_ids.add(work_id)
+						work_mix = work.get("work_mix", {})
+						filtered_works.append(
+							{
+								"likes_count": work_mix.get("like_times", 0),
+								"collect_count": work_mix.get("collect_times", 0),
+								"author_id": work.get("author_info", {}).get("user_id", ""),
+								"author_nickname": work.get("author_info", {}).get("nickname", ""),
+								"work_name": work_base.get("name", ""),
+								"work_id": work_id,
+							},
+						)
+		return filtered_works
+
+	def generate_online_leaderboard(self) -> None:
+		def _get_online_users(work_id: int, token: str) -> int:
+			"""获取作品的在线用户数"""
+			client = CloudAPI(work_id=work_id, authorization_token=token)
+			if not client.connect(wait_for_data=True):
+				return 0
+			try:
+				return client.get_online_users()
+			finally:
+				client.disconnect()
+
+		works = self.fetch_and_aggregate_works()
+		token = CodeMaoClient().token.average
+		results: list[tuple[str, int]] = []
+		for work in works:
+			if work.get("type") == "WOOD":
+				continue
+			with contextlib.suppress(Exception):
+				response = self.coordinator.work_obtain.fetch_work_details(work["work_id"])
+				work_name = response.get("work_name", response.get("name", "未知作品"))
+				online_count = _get_online_users(work["work_id"], token)
+				results.append((work_name, online_count))
+		print("\n=== 作品在线人数排行榜 ===")
+		for name, count in sorted(results, key=operator.itemgetter(1), reverse=True):
+			print(f"{name}: {count}人在线")
 
 
 # ==============================
