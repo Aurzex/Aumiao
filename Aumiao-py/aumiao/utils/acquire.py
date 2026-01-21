@@ -286,6 +286,7 @@ class BaseHTTPClient:
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
 		log_enabled = bool(self.config.log_requests and log)
+		sleep(0.5)
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)

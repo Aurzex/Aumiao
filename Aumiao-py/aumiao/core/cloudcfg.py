@@ -1,15 +1,13 @@
-import cmd
 import json
-import shlex
 import threading
 import time
 import traceback
 from collections.abc import Callable
 from typing import Any, cast
 
-import httpx
 import websocket
 
+from aumiao.api import work
 from aumiao.api.auth import Authenticator
 from aumiao.core.base import (
 	DataConfig,
@@ -17,7 +15,6 @@ from aumiao.core.base import (
 	DisplayConfig,
 	EditorType,
 	ErrorMessages,
-	HTTPConfig,
 	ReceiveMessageType,
 	SendMessageType,
 	ValidationConfig,
@@ -436,18 +433,13 @@ class CloudConnection:
 				headers = {}
 				if self.authenticator.authorization_token:
 					headers["Cookie"] = f"Authorization={self.authenticator.authorization_token}"
-				response = httpx.get(
-					f"https://api.codemao.cn/creation-tools/v1/works/{self.work_id}",
-					headers=headers,
-					timeout=HTTPConfig.REQUEST_TIMEOUT,
-				)
-				if response.status_code == HTTPConfig.SUCCESS_CODE:
-					raw_info = response.json()
-					self._work_info = WorkInfo(raw_info)
+				response = work.WorkDataFetcher().fetch_work_details(self.work_id)
+				try:
+					self._work_info = WorkInfo(response)
 					print(f"✓ 作品: {self._work_info.name}")
 					print(f"✓ 类型: {self._work_info.type}")
-				else:
-					print(f"获取作品信息失败: HTTP {response.status_code}")
+				except Exception:
+					print("获取作品信息失败")
 					self._work_info = WorkInfo({"id": self.work_id, "name": "未知作品", "type": "KITTEN"})
 			except Exception as e:
 				print(f"获取作品信息失败: {e}")
@@ -458,6 +450,9 @@ class CloudConnection:
 		"""根据作品类型确定编辑器类型"""
 		work_info = self._get_work_info()
 		work_type = work_info.type
+		if work_type == "WOOD":
+			msg = "不支持 WOOD 作品类型"
+			raise ValueError(msg)
 		editor_mapping = {
 			"KITTEN": EditorType.KITTEN,
 			"KITTEN2": EditorType.KITTEN,
@@ -664,7 +659,7 @@ class CloudConnection:
 			}
 			handler = message_handlers.get(message_type)
 			if handler:
-				handler(data)  # ty:ignore [invalid-argument-type]
+				handler(data)  # pyright: ignore[reportArgumentType] # ty:ignore [invalid-argument-type]
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {DisplayHelper.truncate_value(data)}")
 		except Exception as error:
@@ -680,7 +675,7 @@ class CloudConnection:
 	def _handle_receive_all_data(self, data: list[dict[str, Any]]) -> None:
 		"""处理接收完整数据消息"""
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
-		# 如果 data 是字符串,尝试解析
+		# 如果 data 是字符串, 尝试解析
 		if isinstance(data, str):
 			try:
 				data = json.loads(data)
@@ -1079,7 +1074,7 @@ class CloudConnection:
 				return False
 		return True
 
-	def wait_for_connection(self, timeout: int = HTTPConfig.CONNECTION_TIMEOUT) -> bool:
+	def wait_for_connection(self, timeout: int = 30) -> bool:
 		"""等待连接建立"""
 		start_time = time.time()
 		last_log_time = start_time
@@ -1298,495 +1293,324 @@ class CloudConnection:
 			print("无云列表")
 		print(f"\n 在线用户数: {self.online_users}")
 		print("=" * 50)
+		# ==============================
 
 
-# ==============================
 # 高级接口 (API Layer)
 # ==============================
-class CloudManager:
-	"""云数据管理器 - 高级 API"""
+class CloudAPI:
+	"""高级 API 接口 - 提供简洁的云数据操作接口"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
-		self.connection = CloudConnection(work_id, editor, authorization_token)
+		self._connection = CloudConnection(work_id, editor, authorization_token)
+		self._data_ready_callbacks: list[Callable[[], None]] = []
+		self._online_users_callbacks: list[Callable[[int, int], None]] = []
+		self._ranking_callbacks: list[Callable[[PrivateCloudVariable, list[dict[str, Any]]], None]] = []
+		# 注册内部回调
+		self._connection.on_data_ready(self._handle_data_ready)
+		self._connection.on_online_users_change(self._handle_online_users_change)
+		self._connection.on_ranking_received(self._handle_ranking_received)
 
-	def connect(self, *, wait_for_data: bool = True) -> bool:
-		"""连接并等待数据就绪"""
-		print("开始连接云服务...")
-		self.connection.connect()
-		if not self.connection.wait_for_connection():
-			return False
-		if wait_for_data:
-			return self.connection.wait_for_data()
-		return True
-
-	def close(self) -> None:
-		"""关闭连接"""
-		self.connection.close()
-
-	def get_available_variables(self) -> dict[str, list[str]]:
-		"""获取所有可用变量信息"""
-		return {
-			"private_variables": list(self.connection.get_all_private_variables().keys()),
-			"public_variables": list(self.connection.get_all_public_variables().keys()),
-			"lists": list(self.connection.get_all_lists().keys()),
-		}
-
-
-class CloudCommandLineInterface(cmd.Cmd):
-	"""云数据交互式命令行界面"""
-
-	def __init__(self, cloud_manager: CloudManager) -> None:
-		super().__init__()
-		self.manager = cloud_manager
-		self.connection = cloud_manager.connection
-		self.prompt = "云数据 >"
-		self.intro = self._get_welcome_message()
-		self.connection.on_ranking_received(self._print_ranking_result)
-
-	def _get_welcome_message(self) -> str:
-		"""生成欢迎消息"""
-		welcome = "欢迎使用云数据交互式命令行! 输入 help 或 ? 查看可用命令。\n"
-		if self.connection.data_ready:
-			available = self.manager.get_available_variables()
-			welcome += "\n 当前可用数据:\n"
-			if available["private_variables"]:
-				welcome += f"私有变量: {', '.join(available['private_variables'])}\n"
-			if available["public_variables"]:
-				welcome += f"公有变量: {', '.join(available['public_variables'])}\n"
-			if available["lists"]:
-				welcome += f"云列表: {', '.join(available['lists'])}\n"
-		return welcome
-
-	@staticmethod
-	def _print_ranking_result(variable: PrivateCloudVariable, ranking_data: list[dict[str, Any]]) -> None:
-		"""打印排行榜结果"""
-		print(f"\n=== {variable.name} 排行榜 ===")
-		if not ranking_data:
-			print("无数据")
-			return
-		for i, item in enumerate(ranking_data):
-			value = item["value"]
-			user = item["user"]
-			print(f"{i + 1}. {user['nickname']} (ID: {user['id']}): {value}")
-		print()
-
-	def preloop(self) -> None:
-		"""在循环开始前检查连接状态"""
-		if not self.connection.connected:
-			print("警告: 云连接未建立, 请先等待连接成功")
-
-	def cmdloop(self, intro: str | None = None) -> None:
-		"""重写 cmdloop 以支持动态更新提示符"""
-		self.preloop()
-		if intro is not None:
-			self.intro = intro
-		if self.intro:
-			print(self.intro)
-		stop = None
-		while not stop:
+	def _handle_data_ready(self) -> None:
+		"""处理数据就绪事件"""
+		for callback in self._data_ready_callbacks:
 			try:
-				status_indicator = "✓" if self.connection.connected else "✗"
-				data_indicator = "✓" if self.connection.data_ready else "✗"
-				self.prompt = f"云数据 [{status_indicator}{data_indicator}]>"
-				line = input(self.prompt)
-				line = self.precmd(line)
-				stop = self.onecmd(line)
-				stop = self.postcmd(stop, line)
-			except KeyboardInterrupt:
-				print("\n 使用 'exit' 命令退出程序")
-			except EOFError:
-				print()
-				break
+				callback()
+			except Exception as error:
+				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
-	# ========== 命令方法 ==========
-	def do_status(self, _arg: str) -> None:
-		"""查看连接状态和数据状态"""
-		print(f"连接状态: {' 已连接 ' if self.connection.connected else ' 未连接 '}")
-		print(f"数据就绪: {' 是 ' if self.connection.data_ready else ' 否 '}")
-		print(f"在线用户: {self.connection.online_users}")
-		if self.connection.data_ready:
-			available = self.manager.get_available_variables()
-			print("\n 可用数据统计:")
-			print(f"私有变量: {len(available['private_variables'])} 个")
-			print(f"公有变量: {len(available['public_variables'])} 个")
-			print(f"云列表: {len(available['lists'])} 个")
+	def _handle_online_users_change(self, old_count: int, new_count: int) -> None:
+		"""处理在线用户数变更事件"""
+		for callback in self._online_users_callbacks:
+			try:
+				callback(old_count, new_count)
+			except Exception as error:
+				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
-	def do_available(self, arg: str) -> None:
-		"""显示所有可用变量和列表
-		用法: available [详细]"""
-		if not self.connection.data_ready:
-			print("数据尚未就绪, 请等待连接完成")
-			return
-		available = self.manager.get_available_variables()
-		show_details = arg.strip().lower() in {"详细", "detail", "verbose"}
-		print("\n" + "=" * 40)
-		print("可用数据列表")
-		print("=" * 40)
-		print("\n=== 私有变量 ===")
-		if available["private_variables"]:
-			for name in available["private_variables"]:
-				var = self.connection.get_private_variable(name)
-				if var and show_details:
-					value_display = DisplayHelper.truncate_value(var.get())
-					print(f"{name}: {value_display}")
-				else:
-					print(f"{name}")
-		else:
-			print("无私有变量")
-		print("\n=== 公有变量 ===")
-		if available["public_variables"]:
-			for name in available["public_variables"]:
-				var = self.connection.get_public_variable(name)
-				if var and show_details:
-					value_display = DisplayHelper.truncate_value(var.get())
-					print(f"{name}: {value_display}")
-				else:
-					print(f"{name}")
-		else:
-			print("无公有变量")
-		print("\n=== 云列表 ===")
-		if available["lists"]:
-			for name in available["lists"]:
-				cloud_list = self.connection.get_list(name)
-				if cloud_list and show_details:
-					value_display = DisplayHelper.truncate_value(cloud_list.value)
-					print(f"{name}: {value_display} (长度: {cloud_list.length()})")
-				else:
-					print(f"{name}")
-		else:
-			print("无云列表")
+	def _handle_ranking_received(self, variable: PrivateCloudVariable, ranking_data: list[dict[str, Any]]) -> None:
+		"""处理排行榜数据接收事件"""
+		for callback in self._ranking_callbacks:
+			try:
+				callback(variable, ranking_data)
+			except Exception as error:
+				print(f"{ErrorMessages.CALLBACK_EXECUTION}: {error}")
 
-	def do_list(self, arg: str) -> None:
-		"""列出所有数据
-		用法: list [type]
-		type: private (私有变量) /public (公有变量) /lists (列表) /all (全部)"""
-		args = shlex.split(arg)
-		show_type = args[0] if args else "all"
-		valid_types = {"all", "private", "public", "lists"}
-		if show_type not in valid_types:
-			print(f"错误: 类型必须是 {', '.join(valid_types)} 之一")
-			return
-		if show_type in {"all", "private"}:
-			print("\n=== 私有变量 ===")
-			private_vars = self.connection.get_all_private_variables()
-			if private_vars:
-				for name, var in private_vars.items():
-					value_display = DisplayHelper.truncate_value(var.get())
-					print(f"{name}: {value_display}")
-			else:
-				print("无私有变量")
-		if show_type in {"all", "public"}:
-			print("\n=== 公有变量 ===")
-			public_vars = self.connection.get_all_public_variables()
-			if public_vars:
-				for name, var in public_vars.items():
-					value_display = DisplayHelper.truncate_value(var.get())
-					print(f"{name}: {value_display}")
-			else:
-				print("无公有变量")
-		if show_type in {"all", "lists"}:
-			print("\n=== 云列表 ===")
-			lists = self.connection.get_all_lists()
-			if lists:
-				for name, cloud_list in lists.items():
-					value_display = DisplayHelper.truncate_value(cloud_list.value)
-					print(f"{name}: {value_display} (长度: {cloud_list.length()})")
-			else:
-				print("无云列表")
-
-	def do_get(self, arg: str) -> None:
-		"""获取特定变量的值
-		用法: get < 变量名 >"""
-		if not arg:
-			print("错误: 请指定变量名")
-			return
-		name = arg.strip()
-		private_var = self.connection.get_private_variable(name)
-		if private_var:
-			value_display = DisplayHelper.truncate_value(private_var.get())
-			print(f"私有变量 {name}: {value_display}")
-			return
-		public_var = self.connection.get_public_variable(name)
-		if public_var:
-			value_display = DisplayHelper.truncate_value(public_var.get())
-			print(f"公有变量 {name}: {value_display}")
-			return
-		cloud_list = self.connection.get_list(name)
-		if cloud_list:
-			value_display = DisplayHelper.truncate_value(cloud_list.value)
-			print(f"云列表 {name}: {value_display} (长度: {cloud_list.length()})")
-			return
-		print(f"错误: 未找到变量或列表 '{name}'")
-		print("使用 'available' 命令查看所有可用变量")
-
-	def do_set_private(self, arg: str) -> None:
-		"""设置私有变量的值
-		用法: set_private < 变量名 > < 值 >"""
-		args = shlex.split(arg)
-		if len(args) < ValidationConfig.MIN_SET_ARGS:
-			print("错误: 用法: set_private < 变量名 > < 值 >")
-			print("使用 'available' 查看可用私有变量")
-			return
-		name = args[0]
-		value = args[1]
-		value = self._parse_value(value)
-		if self.connection.set_private_variable(name, value):
-			print(f"成功设置私有变量 {name} = {value}")
-		else:
-			print(f"错误: 设置私有变量失败, 请检查变量名 '{name}'")
-			print("使用 'available' 查看可用私有变量")
-
-	def do_set_public(self, arg: str) -> None:
-		"""设置公有变量的值
-		用法: set_public < 变量名 > < 值 >"""
-		args = shlex.split(arg)
-		if len(args) < ValidationConfig.MIN_SET_ARGS:
-			print("错误: 用法: set_public < 变量名 > < 值 >")
-			print("使用 'available' 查看可用公有变量")
-			return
-		name = args[0]
-		value = args[1]
-		value = self._parse_value(value)
-		if self.connection.set_public_variable(name, value):
-			print(f"成功设置公有变量 {name} = {value}")
-		else:
-			print(f"错误: 设置公有变量失败, 请检查变量名 '{name}'")
-			print("使用 'available' 查看可用公有变量")
-
-	@staticmethod
-	def _parse_value(value: str) -> int | str:
-		"""解析输入的值"""
-		try:
-			if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
-				return int(value)
-		except Exception:
-			return value
-		return value
-
-	def do_list_ops(self, arg: str) -> None:
-		"""云列表操作
-		用法:
-			list_ops push < 列表名 > < 值 >      # 追加元素
-			list_ops pop < 列表名 >            # 弹出最后一个元素
-			list_ops unshift < 列表名 > < 值 >   # 在开头添加元素
-			list_ops shift < 列表名 >          # 移除第一个元素
-			list_ops insert < 列表名 > < 位置 > < 值 >  # 在指定位置插入
-			list_ops remove < 列表名 > < 位置 >  # 移除指定位置元素
-			list_ops replace < 列表名 > < 位置 > < 值 > # 替换指定位置元素
-			list_ops clear < 列表名 >          # 清空列表
-			list_ops get < 列表名 > < 位置 >     # 获取指定位置元素
+	# ========== 连接管理 ==========
+	def connect(self, *, wait_for_data: bool = True, timeout: int = 30) -> bool:
+		"""建立连接并等待数据
+		Args:
+			wait_for_data: 是否等待数据加载完成
+			timeout: 超时时间(秒)
+		Returns:
+			bool: 连接和数据加载是否成功
 		"""
-		self._handle_list_operations(arg)
-
-	def _handle_list_operations(self, arg: str) -> None:
-		"""处理列表操作"""
-		args = shlex.split(arg)
-		if len(args) < ValidationConfig.MIN_LIST_OPERATION_ARGS:
-			print("错误: 参数不足")
-			self.help_list_ops()
-			return
-		operation = args[0]
-		list_name = args[1]
-		cloud_list = self.connection.get_list(list_name)
-		if not cloud_list:
-			print(f"错误: 未找到列表 '{list_name}'")
-			print("使用 'available' 查看可用列表")
-			return
-		operation_handlers = {
-			"push": self._handle_list_push,
-			"pop": self._handle_list_pop,
-			"unshift": self._handle_list_unshift,
-			"shift": self._handle_list_shift,
-			"insert": self._handle_list_insert,
-			"remove": self._handle_list_remove,
-			"replace": self._handle_list_replace,
-			"clear": self._handle_list_clear,
-			"get": self._handle_list_get,
-		}
-		handler = operation_handlers.get(operation)
-		if handler:
-			handler(cloud_list, args[2:])
-		else:
-			print(f"错误: 未知操作 '{operation}'")
-			self.help_list_ops()
-
-	def _handle_list_push(self, cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 push 操作"""
-		if len(args) < ValidationConfig.MIN_GET_ARGS:
-			print("错误: 需要提供要添加的值")
-			return
-		value = self._parse_value(args[0])
-		if self.connection.list_push(cloud_list.name, value):
-			print(f"成功向列表 {cloud_list.name} 添加元素: {value}")
-		else:
-			print("添加元素失败")
-
-	def _handle_list_pop(self, cloud_list: CloudList, _args: list[str]) -> None:
-		"""处理列表 pop 操作"""
-		if self.connection.list_pop(cloud_list.name):
-			print(f"成功从列表 {cloud_list.name} 弹出最后一个元素")
-		else:
-			print("弹出元素失败")
-
-	def _handle_list_unshift(self, cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 unshift 操作"""
-		if len(args) < ValidationConfig.MIN_GET_ARGS:
-			print("错误: 需要提供要添加的值")
-			return
-		value = self._parse_value(args[0])
-		if self.connection.list_unshift(cloud_list.name, value):
-			print(f"成功向列表 {cloud_list.name} 开头添加元素: {value}")
-		else:
-			print("添加元素失败")
-
-	def _handle_list_shift(self, cloud_list: CloudList, _args: list[str]) -> None:
-		"""处理列表 shift 操作"""
-		if self.connection.list_shift(cloud_list.name):
-			print(f"成功从列表 {cloud_list.name} 移除第一个元素")
-		else:
-			print("移除元素失败")
-
-	def _handle_list_insert(self, cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 insert 操作"""
-		if len(args) < ValidationConfig.MIN_INSERT_ARGS:
-			print("错误: 需要提供位置和值")
-			return
 		try:
-			index = int(args[0])
-			value = self._parse_value(args[1])
-			if self.connection.list_insert(cloud_list.name, index, value):
-				print(f"成功在列表 {cloud_list.name} 位置 {index} 插入元素: {value}")
-			else:
-				print("插入元素失败")
-		except ValueError:
-			print("错误: 位置必须是整数")
-
-	def _handle_list_remove(self, cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 remove 操作"""
-		if len(args) < ValidationConfig.MIN_REMOVE_ARGS:
-			print("错误: 需要提供位置")
-			return
-		try:
-			index = int(args[0])
-			if self.connection.list_remove(cloud_list.name, index):
-				print(f"成功从列表 {cloud_list.name} 位置 {index} 移除元素")
-			else:
-				print("移除元素失败")
-		except ValueError:
-			print("错误: 位置必须是整数")
-
-	def _handle_list_replace(self, cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 replace 操作"""
-		if len(args) < ValidationConfig.MIN_REPLACE_ARGS:
-			print("错误: 需要提供位置和值")
-			return
-		try:
-			index = int(args[0])
-			value = self._parse_value(args[1])
-			if self.connection.list_replace(cloud_list.name, index, value):
-				print(f"成功替换列表 {cloud_list.name} 位置 {index} 的元素为: {value}")
-			else:
-				print("替换元素失败")
-		except ValueError:
-			print("错误: 位置必须是整数")
-
-	def _handle_list_clear(self, cloud_list: CloudList, _args: list[str]) -> None:
-		"""处理列表 clear 操作"""
-		if self.connection.list_clear(cloud_list.name):
-			print(f"成功清空列表 {cloud_list.name}")
+			self._connection.connect()
+			# 等待连接建立
+			if not self._connection.wait_for_connection(timeout):
+				return False
+			# 等待数据加载
+			if wait_for_data:
+				return self._connection.wait_for_data(timeout)
+		except Exception as error:
+			print(f"连接失败: {error}")
+			return False
 		else:
-			print("清空列表失败")
+			return True
 
-	@staticmethod
-	def _handle_list_get(cloud_list: CloudList, args: list[str]) -> None:
-		"""处理列表 get 操作"""
-		if len(args) < ValidationConfig.MIN_GET_ARGS:
-			print("错误: 需要提供位置")
-			return
-		try:
-			index = int(args[0])
-			value = cloud_list.get(index)
-			if value is not None:
-				print(f"列表 {cloud_list.name} 位置 {index} 的元素: {value}")
-			else:
-				print(f"错误: 位置 {index} 超出范围")
-		except ValueError:
-			print("错误: 位置必须是整数")
+	def disconnect(self) -> None:
+		"""断开连接"""
+		self._connection.close()
 
-	@staticmethod
-	def help_list_ops() -> None:
-		"""显示列表操作帮助"""
-		print("""
-		列表操作命令:
-		list_ops push < 列表名 > < 值 >      - 向列表末尾添加元素
-		list_ops pop < 列表名 >            - 移除并返回列表最后一个元素
-		list_ops unshift < 列表名 > < 值 >   - 向列表开头添加元素
-		list_ops shift < 列表名 >          - 移除并返回列表第一个元素
-		list_ops insert < 列表名 > < 位置 > < 值 > - 在指定位置插入元素
-		list_ops remove < 列表名 > < 位置 >  - 移除指定位置的元素
-		list_ops replace < 列表名 > < 位置 > < 值 > - 替换指定位置的元素
-		list_ops clear < 列表名 >          - 清空列表所有元素
-		list_ops get < 列表名 > < 位置 >     - 获取指定位置的元素
-		""")
+	def is_connected(self) -> bool:
+		"""检查是否已连接"""
+		return self._connection.connected
 
-	def do_ranking(self, arg: str) -> None:
-		"""获取私有变量的排行榜
-		用法: ranking < 变量名 > [数量] [排序]
-		数量: 默认 10, 最大 31
-		排序: 1 (升序) 或 -1 (降序, 默认)"""
-		args = shlex.split(arg)
-		if not args:
-			print("错误: 请指定变量名")
-			print("使用 'available' 查看可用私有变量")
-			return
-		name = args[0]
-		limit = 10
-		order = ValidationConfig.DESCENDING_ORDER
-		if len(args) > 1:
+	def is_data_ready(self) -> bool:
+		"""检查数据是否就绪"""
+		return self._connection.data_ready
+
+	def get_online_users(self) -> int:
+		"""获取在线用户数"""
+		return self._connection.online_users
+
+	# ========== 事件监听 ==========
+	def on_data_ready(self, callback: Callable[[], None]) -> None:
+		"""注册数据就绪回调"""
+		self._data_ready_callbacks.append(callback)
+
+	def on_online_users_change(self, callback: Callable[[int, int], None]) -> None:
+		"""注册在线用户数变更回调"""
+		self._online_users_callbacks.append(callback)
+
+	def on_ranking_received(self, callback: Callable[[PrivateCloudVariable, list[dict[str, Any]]], None]) -> None:
+		"""注册排行榜数据接收回调"""
+		self._ranking_callbacks.append(callback)
+
+	# ========== 变量操作 ==========
+	def get_private_variable(self, name: str) -> PrivateCloudVariable | None:
+		"""获取私有变量"""
+		return self._connection.get_private_variable(name)
+
+	def get_public_variable(self, name: str) -> PublicCloudVariable | None:
+		"""获取公有变量"""
+		return self._connection.get_public_variable(name)
+
+	def get_list(self, name: str) -> CloudList | None:
+		"""获取云列表"""
+		return self._connection.get_list(name)
+
+	def set_private_variable(self, name: str, value: int | str) -> bool:
+		"""设置私有变量值"""
+		return self._connection.set_private_variable(name, value)
+
+	def set_public_variable(self, name: str, value: int | str) -> bool:
+		"""设置公有变量值"""
+		return self._connection.set_public_variable(name, value)
+
+	# ========== 列表操作 ==========
+	def list_push(self, name: str, value: int | str) -> bool:
+		"""向列表末尾添加元素"""
+		return self._connection.list_push(name, value)
+
+	def list_pop(self, name: str) -> bool:
+		"""移除列表最后一个元素"""
+		return self._connection.list_pop(name)
+
+	def list_unshift(self, name: str, value: int | str) -> bool:
+		"""向列表开头添加元素"""
+		return self._connection.list_unshift(name, value)
+
+	def list_shift(self, name: str) -> bool:
+		"""移除列表第一个元素"""
+		return self._connection.list_shift(name)
+
+	def list_insert(self, name: str, index: int, value: int | str) -> bool:
+		"""在列表指定位置插入元素"""
+		return self._connection.list_insert(name, index, value)
+
+	def list_remove(self, name: str, index: int) -> bool:
+		"""移除列表指定位置的元素"""
+		return self._connection.list_remove(name, index)
+
+	def list_replace(self, name: str, index: int, value: int | str) -> bool:
+		"""替换列表指定位置的元素"""
+		return self._connection.list_replace(name, index, value)
+
+	def list_replace_last(self, name: str, value: int | str) -> bool:
+		"""替换列表最后一个元素"""
+		return self._connection.list_replace_last(name, value)
+
+	def list_clear(self, name: str) -> bool:
+		"""清空列表所有元素"""
+		return self._connection.list_clear(name)
+
+	# ========== 排行榜操作 ==========
+	def get_ranking(self, variable_name: str, limit: int = 10, order: int = -1) -> None:
+		"""获取私有变量排行榜"""
+		self._connection.get_private_variable_ranking(variable_name, limit, order)
+
+	# ========== 数据查询 ==========
+	def get_all_variables(self) -> dict[str, dict[str, Any]]:
+		"""获取所有变量信息"""
+		return {"private_variables": self.get_all_private_variables(), "public_variables": self.get_all_public_variables(), "lists": self.get_all_lists()}
+
+	def get_all_private_variables(self) -> dict[str, CloudValueType]:
+		"""获取所有私有变量"""
+		result = {}
+		for name, var in self._connection.get_all_private_variables().items():
+			result[name] = var.get()
+		return result
+
+	def get_all_public_variables(self) -> dict[str, CloudValueType]:
+		"""获取所有公有变量"""
+		result = {}
+		for name, var in self._connection.get_all_public_variables().items():
+			result[name] = var.get()
+		return result
+
+	def get_all_lists(self) -> dict[str, list[CloudValueType]]:
+		"""获取所有云列表"""
+		result = {}
+		for name, lst in self._connection.get_all_lists().items():
+			result[name] = lst.copy()
+		return result
+
+	def print_summary(self) -> None:
+		"""打印数据摘要"""
+		self._connection.print_all_data()
+
+
+# ==============================
+# 实用工具类
+# ==============================
+class CloudManager:
+	"""云数据管理器 - 提供批量操作和同步方法"""
+
+	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
+		self.api = CloudAPI(work_id, editor, authorization_token)
+
+	def connect_and_wait(self, timeout: int = 30) -> bool:
+		"""连接并等待数据就绪"""
+		return self.api.connect(wait_for_data=True, timeout=timeout)
+
+	def batch_set_variables(self, variables: dict[str, int | str], variable_type: str = "private") -> dict[str, bool]:
+		"""批量设置变量值
+		Args:
+			variables: {变量名: 值} 的字典
+			variable_type: 变量类型 ("private" 或 "public")
+		Returns:
+			dict: 每个变量的设置结果
+		"""
+		results = {}
+		if variable_type == "private":
+			for name, value in variables.items():
+				results[name] = self.api.set_private_variable(name, value)
+		else:
+			for name, value in variables.items():
+				results[name] = self.api.set_public_variable(name, value)
+		return results
+
+	def batch_list_operations(self, operations: list[tuple]) -> list[bool]:
+		"""批量执行列表操作
+
+		Args:
+			operations: 操作列表, 格式:
+				- 简单操作: ("pop", "list_name") 或 ("shift", "list_name") 或 ("clear", "list_name")
+				- 带一个参数的操作: ("push", "list_name", value) 或 ("unshift", "list_name", value) 或 ("replace_last", "list_name", value)
+				- 带两个参数的操作: ("insert", "list_name", index, value) 或 ("replace", "list_name", index, value) 或 ("remove", "list_name", index)
+		Returns:
+			list: 每个操作的结果
+		"""
+		results = []
+		for operation in operations:
+			if not operation or len(operation) < 2:
+				results.append(False)
+				continue
+
+			op_name = operation[0]
+			list_name = operation[1]
+
 			try:
-				limit = int(args[1])
-				if limit < ValidationConfig.MIN_RANKING_LIMIT or limit > ValidationConfig.MAX_RANKING_LIMIT:
-					print(f"警告: 数量范围 {ValidationConfig.MIN_RANKING_LIMIT}-{ValidationConfig.MAX_RANKING_LIMIT}, 使用默认值 10")
-					limit = 10
-			except ValueError:
-				print("错误: 数量必须是数字")
-				return
-		if len(args) > 2:
-			try:
-				order = int(args[2])
-				if order not in {ValidationConfig.ASCENDING_ORDER, ValidationConfig.DESCENDING_ORDER}:
-					print("错误: 排序必须是 1 (升序) 或 - 1 (降序)")
-					return
-			except ValueError:
-				print("错误: 排序必须是数字")
-				return
-		variable = self.connection.get_private_variable(name)
-		if not variable:
-			print(f"错误: 未找到私有变量 '{name}'")
-			print("使用 'available' 查看可用私有变量")
-			return
-		print(f"获取 {name} 的排行榜...")
-		self.connection.get_private_variable_ranking(name, limit, order)
+				if op_name == "push" and len(operation) >= 3:
+					results.append(self.api.list_push(list_name, operation[2]))
+				elif op_name == "pop":
+					results.append(self.api.list_pop(list_name))
+				elif op_name == "unshift" and len(operation) >= 3:
+					results.append(self.api.list_unshift(list_name, operation[2]))
+				elif op_name == "shift":
+					results.append(self.api.list_shift(list_name))
+				elif op_name == "insert" and len(operation) >= 4:
+					results.append(self.api.list_insert(list_name, operation[2], operation[3]))
+				elif op_name == "remove" and len(operation) >= 3:
+					results.append(self.api.list_remove(list_name, operation[2]))
+				elif op_name == "replace" and len(operation) >= 4:
+					results.append(self.api.list_replace(list_name, operation[2], operation[3]))
+				elif op_name == "replace_last" and len(operation) >= 3:
+					results.append(self.api.list_replace_last(list_name, operation[2]))
+				elif op_name == "clear":
+					results.append(self.api.list_clear(list_name))
+				else:
+					print(f"未知操作或参数不足: {op_name}")
+					results.append(False)
+			except Exception as error:
+				print(f"操作 {op_name} 失败: {error}")
+				results.append(False)
+		return results
 
-	def do_refresh(self, _arg: str) -> None:
-		"""刷新显示所有数据"""
-		self.connection.print_all_data()
+	def subscribe_to_variable(self, variable_name: str, callback: Callable[[CloudValueType, CloudValueType, str], None], variable_type: str = "private") -> bool:
+		"""订阅变量变更
+		Args:
+			variable_name: 变量名
+			callback: 变更回调函数
+			variable_type: 变量类型("private" 或 "public")
+		Returns:
+			bool: 订阅是否成功
+		"""
+		var = self.api.get_private_variable(variable_name) if variable_type == "private" else self.api.get_public_variable(variable_name)
+		if var:
+			var.on_change(callback)
+			return True
+		return False
 
-	def do_online(self, _arg: str) -> None:
-		"""查看在线用户数"""
-		print(f"当前在线用户: {self.connection.online_users}")
+	def subscribe_to_list(self, list_name: str, operation: str, callback: ListOperationCallbackType) -> bool:
+		"""订阅列表操作
+		Args:
+			list_name: 列表名
+			operation: 操作类型("push", "pop" 等)
+			callback: 操作回调函数
+		Returns:
+			bool: 订阅是否成功
+		"""
+		lst = self.api.get_list(list_name)
+		if lst:
+			lst.on_operation(operation, callback)
+			return True
+		return False
 
-	def do_exit(self, _arg: str) -> bool:
-		"""退出程序"""
-		print("正在关闭连接...")
-		self.manager.close()
-		return True
 
-	def do_quit(self, _arg: str) -> bool:
-		"""退出程序"""
-		return self.do_exit(_arg)
+# ==============================
+# 快速启动工具
+# ==============================
+def create_cloud_client(work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> CloudAPI:
+	"""快速创建云客户端
+	Args:
+		work_id: 作品 ID
+		editor: 编辑器类型(可选)
+		authorization_token: 授权令牌(可选)
+	Returns:
+		CloudAPI: 配置好的 API 实例
+	"""
+	return CloudAPI(work_id, editor, authorization_token)
 
-	def do_eof(self, _arg: str) -> bool:
-		"""Ctrl+D 退出"""
-		print()
-		return self.do_exit(_arg)
+
+def create_cloud_manager(work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> CloudManager:
+	"""快速创建云管理器
+	Args:
+		work_id: 作品 ID
+		editor: 编辑器类型(可选)
+		authorization_token: 授权令牌(可选)
+	Returns:
+		CloudManager: 配置好的管理器实例
+	"""
+	return CloudManager(work_id, editor, authorization_token)
