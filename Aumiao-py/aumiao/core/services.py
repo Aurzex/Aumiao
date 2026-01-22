@@ -1174,7 +1174,9 @@ class CommunityService:
 						)
 		return filtered_works
 
-	def generate_online_leaderboard(self) -> dict:
+	def generate_online_leaderboard(self, works: list | None) -> dict:
+		"""works数据类型和 fetch_and_aggregate_works 返回的一样"""
+
 		def _get_online_users(work_id: int, token: str) -> int:
 			"""获取作品的在线用户数"""
 			client = CloudAPI(work_id=work_id, authorization_token=token)
@@ -1185,7 +1187,7 @@ class CommunityService:
 			finally:
 				client.disconnect()
 
-		works = self.fetch_and_aggregate_works()
+		works = works or self.fetch_and_aggregate_works()
 		token = CodeMaoClient().token.average
 		results: list[tuple[str, int]] = []
 		for work in works:
