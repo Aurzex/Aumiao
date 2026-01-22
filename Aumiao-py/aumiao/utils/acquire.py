@@ -286,7 +286,7 @@ class BaseHTTPClient:
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
 		log_enabled = bool(self.config.log_requests and log)
-		sleep(0.5)
+		sleep(1)
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
@@ -894,6 +894,7 @@ class FileUploader(IFileUploader):
 			endpoint="https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading",
 			params=params,
 		)
+		# https://open-service.codemao.cn/cdn/qi-niu/tokens/uploading?cdnName=qiniu&insertOnly=true&filePaths=873%2Fuser-files%2Ftart-work%2FFqmlzGm39V9Y86iPbgCp0vIhvhyd&projectName=turtle
 		data = response.json()
 		token_info = data["tokens"][0]
 		return {
