@@ -506,60 +506,70 @@ class CommunityService:
 			),
 		}
 
-	def clean_comments(self, source: Literal["work", "post"], action_type: Literal["ads", "duplicates", "blacklist"]) -> bool:
+	def clean_comments(self, source: Literal["work", "post"], action_type: Literal["ads", "duplicates", "blacklist"]) -> dict:
 		"""
 		清理评论
 		Args:
 			source: 数据来源 work = 作品评论 post = 帖子回复
 			action_type: 处理类型 ads = 广告评论 duplicates = 重复刷屏 blacklist = 黑名单用户
 		Returns:
-			是否成功
+			清理结果数据
 		"""
 		config = self.source_config[source]
-		# 获取参数, 使用字典字面量类型注解
 		params: dict[Literal["ads", "blacklist", "spam_max"], Any] = {
 			"ads": self.coordinator.data.USER_DATA.ads,
 			"blacklist": self.coordinator.data.USER_DATA.black_room,
 			"spam_max": self.coordinator.setting.PARAMETER.spam_del_max,
 		}
-		# 处理目标列表
 		target_lists = defaultdict(list)
 		for item in config.get_items():
 			self.comment_processor.process_item(item, config, action_type, params, target_lists)
-		# 执行删除
 		label_map = {"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}
-		return self._execute_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
+		result = self._execute_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
+		return {
+			"success": result["success"],
+			"action_type": action_type,
+			"label": label_map[action_type],
+			"found_count": len(target_lists[action_type]),
+			"deleted_count": result["deleted_count"],
+			"details": result["details"],
+		}
 
 	@staticmethod
 	@decorator.skip_on_error
-	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> bool:
+	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> dict:
 		"""执行删除操作"""
 		if not target_list:
 			print(f"未发现 {label}")
-			return True
+			return {"success": True, "deleted_count": 0, "details": []}
 		print(f"\n 发现以下 {label}(共 {len(target_list)} 条):")
 		for item in reversed(target_list):
 			print(f"- {item.split(':')[0]}")
 		if input(f"\n 确认删除所有 {label}? (Y/N)").lower() != "y":
 			print("操作已取消")
-			return True
+			return {"success": False, "deleted_count": 0, "details": []}
+		deleted_count = 0
+		details = []
 		for entry in reversed(target_list):
 			parts = entry.split(":")[0].split(".")
 			item_id, comment_id = map(int, parts)
 			is_reply = ":reply" in entry
 			if not delete_handler(item_id, comment_id, is_reply):
 				print(f"删除失败: {entry}")
-				return False
-			print(f"已删除: {entry}")
-		return True
+				details.append({"entry": entry, "status": "failed"})
+			else:
+				print(f"已删除: {entry}")
+				deleted_count += 1
+				details.append({"entry": entry, "status": "success"})
+		return {"success": True, "deleted_count": deleted_count, "details": details}
 
-	def mark_notifications_as_read(self, method: Literal["nemo", "web"] = "web") -> bool:
+	def mark_notifications_as_read(self, method: Literal["nemo", "web"] = "web") -> dict:
 		"""
 		清除未读消息红点提示
 		Args:
 			method: 处理模式 web = 网页端消息类型 nemo = 客户端消息类型
 		Returns:
-			是否全部清除成功
+			清除结果数据
 		"""
 		method_config = {
 			"web": {
@@ -573,9 +583,11 @@ class CommunityService:
 				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
 			},
 		}
+
 		if method not in method_config:
 			msg = f"不支持的方法类型: {method}"
 			raise ValueError(msg)
+
 		config = method_config[method]
 		page_size = 200
 		params = {"limit": page_size, "offset": 0}
@@ -599,87 +611,157 @@ class CommunityService:
 			return all(code == HTTPStatus.OK.value for code in responses.values())
 
 		try:
+			cleared_batches = 0
 			while True:
 				current_counts = self.coordinator.community_obtain.fetch_message_count(method)
 				if is_all_cleared(current_counts):
-					return True
+					print(f"所有 {method} 消息已标记为已读")
+					return {"success": True, "method": method, "cleared_batches": cleared_batches, "message": "所有消息已标记为已读"}
+
 				if not send_batch_requests():
-					return False
+					print(f"清除 {method} 消息请求失败")
+					return {"success": False, "method": method, "cleared_batches": cleared_batches, "error": "请求失败"}
+
+				cleared_batches += 1
 				params["offset"] += page_size
+				print(f"已处理第 {cleared_batches} 批消息")
+
 		except Exception as e:
 			print(f"清除红点过程中发生异常: {e}")
-			return False
+			return {"success": False, "method": method, "error": str(e)}
 
-	def like_and_collect_works(self, user_id: str, works_list: list[dict] | Generator[dict]) -> None:
+	def like_and_collect_works(self, user_id: str, works_list: list[dict] | Generator[dict]) -> dict:
 		"""点赞和收藏用户作品"""
-		self.coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
+		print(f"开始处理用户 {user_id} 的作品")
+		follow_result = self.coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
+		print(f"关注用户: {'成功' if follow_result else '失败'}")
+		like_count = 0
+		collect_count = 0
+		processed_count = 0
 		for item in works_list:
 			work_id = item.get("id")
 			if isinstance(work_id, int):
-				self.coordinator.work_motion.execute_toggle_like(work_id=work_id)
-				self.coordinator.work_motion.execute_toggle_collection(work_id=work_id)
+				processed_count += 1
+				like_result = self.coordinator.work_motion.execute_toggle_like(work_id=work_id)
+				collect_result = self.coordinator.work_motion.execute_toggle_collection(work_id=work_id)
+				if like_result:
+					like_count += 1
+					print(f"作品 {work_id} 点赞成功")
+				if collect_result:
+					collect_count += 1
+					print(f"作品 {work_id} 收藏成功")
+		print(f"处理完成: 点赞 {like_count}/{processed_count}, 收藏 {collect_count}/{processed_count}")
+		return {
+			"success": True,
+			"user_id": user_id,
+			"followed": follow_result,
+			"liked_count": like_count,
+			"collected_count": collect_count,
+			"processed_count": processed_count,
+		}
 
-	def toggle_novel_favorites(self, novel_list: list[dict]) -> None:
+	def toggle_novel_favorites(self, novel_list: list[dict]) -> dict:
 		"""切换小说收藏状态"""
+		print(f"开始处理 {len(novel_list)} 部小说")
+		toggled_count = 0
+		failed_ids = []
 		for item in novel_list:
 			novel_id = item.get("id")
 			if isinstance(novel_id, int):
-				self.coordinator.novel_motion.execute_toggle_novel_favorite(novel_id)
+				result = self.coordinator.novel_motion.execute_toggle_novel_favorite(novel_id)
+				if result:
+					toggled_count += 1
+					print(f"小说 {novel_id} 收藏状态切换成功")
+				else:
+					failed_ids.append(novel_id)
+					print(f"小说 {novel_id} 收藏状态切换失败")
+		print(f"处理完成: 成功 {toggled_count}/{len(novel_list)}")
+		return {
+			"success": toggled_count > 0,
+			"toggled_count": toggled_count,
+			"total_novels": len(novel_list),
+			"failed_ids": failed_ids,
+		}
 
-	def update_workshop_details(self, workshop_id: int | None = None) -> bool:
+	def update_workshop_details(self, workshop_id: int | None = None) -> dict:
 		"""更新工作室详情"""
 		if workshop_id is None:
 			detail = self.coordinator.shop_obtain.fetch_workshop_details_list()
 			workshop_id = detail.get("id")
+			print(f"自动获取工作室 ID: {workshop_id}")
 		if workshop_id is None:
 			print("未找到工作室 ID")
-			return False
-		# 确保 workshop_id 是字符串类型
+			return {"success": False, "error": "未找到工作室 ID"}
 		workshop_id_str = str(workshop_id)
 		workshop_detail = self.coordinator.shop_obtain.fetch_workshop_details(workshop_id_str)
 		if not workshop_detail:
 			print("获取工作室详情失败")
-			return False
+			return {"success": False, "error": "获取工作室详情失败", "workshop_id": workshop_id}
+		print(f"正在更新工作室: {workshop_detail['name']}")
 		result = self.coordinator.shop_motion.update_workshop_details(
 			description=workshop_detail["description"],
 			workshop_id=workshop_id_str,
 			name=workshop_detail["name"],
 			preview_url=workshop_detail["preview_url"],
 		)
-		return bool(result)
+		if result:
+			print(f"工作室更新成功: {workshop_detail['name']}")
+		else:
+			print(f"工作室更新失败: {workshop_detail['name']}")
+		return {
+			"success": bool(result),
+			"workshop_id": workshop_id,
+			"workshop_name": workshop_detail["name"],
+			"updated_fields": ["description", "name", "preview_url"] if result else [],
+		}
 
-	def publish_novel_chapter(self, novel_id: int, chapter_index: int = 0) -> bool:
+	def publish_novel_chapter(self, novel_id: int, chapter_index: int = 0) -> dict:
 		"""发布小说章节"""
+		print(f"开始发布小说 {novel_id} 的第 {chapter_index} 章")
 		novel_detail = self.coordinator.novel_obtain.fetch_novel_details(novel_id=novel_id)
 		if not novel_detail:
 			print("获取小说详情失败")
-			return False
+			return {"success": False, "error": "获取小说详情失败", "novel_id": novel_id}
 		chapters = novel_detail["data"]["sectionList"]
 		if not chapters:
 			print("该小说没有章节")
-			return False
+			return {"success": False, "error": "该小说没有章节", "novel_id": novel_id}
 		if chapter_index >= len(chapters):
 			print(f"章节索引超出范围, 最大索引: {len(chapters) - 1}")
-			return False
+			return {"success": False, "error": "章节索引超出范围", "novel_id": novel_id, "max_index": len(chapters) - 1, "requested_index": chapter_index}
 		chapter_id = chapters[chapter_index]["id"]
+		chapter_title = chapters[chapter_index]["title"]
+		print(f"准备发布章节: {chapter_title} (ID: {chapter_id})")
 		result = self.coordinator.novel_motion.publish_chapter(chapter_id)
-		return bool(result)
+		if result:
+			print(f"章节发布成功: {chapter_title}")
+		else:
+			print(f"章节发布失败: {chapter_title}")
+		return {
+			"success": bool(result),
+			"novel_id": novel_id,
+			"chapter_id": chapter_id,
+			"chapter_index": chapter_index,
+			"chapter_title": chapter_title,
+			"total_chapters": len(chapters),
+		}
 
 	def get_account_status(self) -> dict:
 		"""获取账户状态"""
 		status = self.coordinator.user_obtain.fetch_account_details()
 		return {"muted": status["voice_forbidden"], "agreement_signed": status["has_signed"]}
 
-	def download_novel(self, novel_id: int, output_dir: Path | None = None) -> Path:
+	def download_novel(self, novel_id: int, output_dir: Path | None = None) -> dict:
 		"""
 		下载小说内容
 		Args:
 			novel_id: 小说 ID
 			output_dir: 输出目录
 		Returns:
-			小说目录路径
+			下载结果数据
 		"""
 		details = self.coordinator.novel_obtain.fetch_novel_details(novel_id)
+
 		if not details:
 			msg = "获取小说详情失败"
 			raise ValueError(msg)
@@ -700,6 +782,7 @@ class CommunityService:
 			json.dump(info, f, ensure_ascii=False, indent=2)
 		# 下载章节
 		chapters = details["data"]["sectionList"]
+		downloaded_chapters = []
 		for i, section in enumerate(chapters, 1):
 			section_id = section["id"]
 			section_title = section["title"]
@@ -708,23 +791,38 @@ class CommunityService:
 			content = content_data["data"]["section"]["content"]
 			formatted_content = self.coordinator.toolkit.create_data_converter().html_to_text(content, merge_empty_lines=True)
 			self.coordinator.file.file_write(path=section_path, content=formatted_content)
+			downloaded_chapters.append({"index": i, "title": section_title, "id": section_id, "path": str(section_path)})
 			print(f"已下载章节: {section_title}")
 		print(f"小说已保存到: {novel_dir}")
-		return novel_dir
+		return {
+			"success": True,
+			"novel_id": novel_id,
+			"novel_title": info["title"],
+			"author": info["nickname"],
+			"introduction": info["introduction"],
+			"total_words": info["total_words"],
+			"collect_times": info["collect_times"],
+			"fanfic_type": info["fanfic_type_name"],
+			"output_dir": str(novel_dir),
+			"info_file": str(info_file),
+			"total_chapters": len(chapters),
+			"downloaded_chapters": downloaded_chapters,
+		}
 
-	def generate_miao_code(self, work_id: int) -> str | None:
+	def generate_miao_code(self, work_id: int) -> dict:
 		"""
 		生成喵口令
 		Args:
 			work_id: 作品 ID
 		Returns:
-			喵口令字符串
+			喵口令生成结果
 		"""
 		info = self.coordinator.client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}", method="GET").json()
-		print(f"作品名称: {info.get('work_name', info.get('name', '未知作品'))}")
+		work_name = info.get("work_name", info.get("name", "未知作品"))
+		print(f"作品名称: {work_name}")
 		if info.get("type") != "NEMO":
 			print(f"该作品类型为{info.get('type')}, 不能生成喵口令")
-			return None
+			return {"success": False, "work_id": work_id, "work_name": work_name, "error": f"该作品类型为{info.get('type')}, 不能生成喵口令"}
 		work_info_url = f"/creation-tools/v1/works/{work_id}/source/public"
 		work_info = self.coordinator.client.send_request(endpoint=work_info_url, method="GET").json()
 		print(work_info)
@@ -744,25 +842,41 @@ class CommunityService:
 			result = response.json()
 			miao_code = f"【喵口令】$&{result['token']}&$"
 			print(f"生成的喵口令: {miao_code}")
-			return miao_code
-		return None
+
+			return {
+				"success": True,
+				"work_id": work_id,
+				"work_name": work_name,
+				"miao_code": miao_code,
+				"token": result["token"],
+				"bcm_url": bcm_url,
+			}
+		print(f"生成喵口令失败, 状态码: {response.status_code}")
+		return {
+			"success": False,
+			"work_id": work_id,
+			"work_name": work_name,
+			"error": f"生成喵口令失败, 状态码: {response.status_code}",
+		}
 
 	@staticmethod
-	def analyze_comments_statistics(comments_data: list[dict], min_comments: int = 1) -> list[dict]:
+	def analyze_comments_statistics(comments_data: list[dict], min_comments: int = 1) -> dict:
 		"""
 		分析用户评论统计
 		Args:
 			comments_data: 用户评论数据列表
 			min_comments: 最小评论数目阈值
 		Returns:
-			过滤后的用户数据
+			分析结果数据
 		"""
 		filtered_users = [user for user in comments_data if user["comment_count"] >= min_comments]
 		if not filtered_users:
 			print(f"没有用户评论数达到或超过 {min_comments} 条")
-			return []
+			return {"min_comments_threshold": min_comments, "total_users": len(comments_data), "filtered_users_count": 0, "filtered_users": []}
+
 		print(f"评论数达到 {min_comments}+ 的用户统计:")
 		print("=" * 60)
+		result_data = []
 		for user_data in filtered_users:
 			nickname = user_data["nickname"]
 			user_id = user_data["user_id"]
@@ -772,15 +886,21 @@ class CommunityService:
 			for i, comment in enumerate(user_data["comments"], 1):
 				print(f"{i}. {comment}")
 			print("*" * 50)
-		return filtered_users
+			result_data.append({"user_id": user_id, "nickname": nickname, "comment_count": comment_count, "comments": user_data["comments"]})
+		return {
+			"min_comments_threshold": min_comments,
+			"total_users": len(comments_data),
+			"filtered_users_count": len(filtered_users),
+			"filtered_users": result_data,
+		}
 
-	def find_recent_posts(self, timeline: int) -> list[dict]:
+	def find_recent_posts(self, timeline: int) -> dict:
 		"""
 		查找近期帖子
 		Args:
 			timeline: 时间戳, 查找此时间之后的帖子
 		Returns:
-			帖子列表
+			帖子查找结果
 		"""
 		print(f"正在查找发布时间在 {self.coordinator.toolkit.create_time_utils().format_timestamp(timeline)} 之后的帖子")
 		post_list = self.coordinator.forum_obtain.fetch_hot_posts_ids()["items"][0:19]
@@ -789,11 +909,26 @@ class CommunityService:
 		for post in posts_details:
 			create_time = post["created_at"]
 			if create_time > timeline:
-				recent_posts.append(post)
+				recent_posts.append(
+					{
+						"post_id": post["id"],
+						"title": post["title"],
+						"created_at": create_time,
+						"created_at_formatted": self.coordinator.toolkit.create_time_utils().format_timestamp(create_time),
+						"author_id": post.get("user_id"),
+						"author_nickname": post.get("nickname", ""),
+					},
+				)
 				print(f"帖子 {post['title']}-ID {post['id']}- 发布于 {self.coordinator.toolkit.create_time_utils().format_timestamp(create_time)}")
-		return recent_posts
+		return {
+			"timeline": timeline,
+			"timeline_formatted": self.coordinator.toolkit.create_time_utils().format_timestamp(timeline),
+			"searched_posts": len(posts_details),
+			"recent_posts_count": len(recent_posts),
+			"recent_posts": recent_posts,
+		}
 
-	def get_admin_statistics(self) -> list[AdminStatistics]:
+	def get_admin_statistics(self) -> dict:
 		"""获取管理员统计信息"""
 		admins = [
 			{"id": 220, "name": "石榴 Grant"},
@@ -814,42 +949,67 @@ class CommunityService:
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
-				target_id=admin_id,  # 确保是整数
+				target_id=admin_id,
 			)["total"]
 			work_count = self.coordinator.whale_obtain.fetch_work_reports_total(
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
-				target_id=admin_id,  # 确保是整数
+				target_id=admin_id,
 			)["total"]
-			stats = AdminStatistics(
-				admin_id=admin_id,  # 确保是整数
-				admin_name=str(admin["name"]),  # 确保是字符串
-				comment_reports=comment_count,
-				work_reports=work_count,
-			)
-			statistics.append(stats)
 			print(f"{admin['name']} (ID: {admin['id']}):")
 			print(f"评论举报处理数: {comment_count}")
 			print(f"作品举报处理数: {work_count}")
 			print()
-		return statistics
+			statistics.append(
+				{
+					"admin_id": admin_id,
+					"admin_name": admin["name"],
+					"comment_reports": comment_count,
+					"work_reports": work_count,
+					"total_reports": comment_count + work_count,
+				},
+			)
+		return {
+			"total_admins": len(statistics),
+			"total_comment_reports": sum(s["comment_reports"] for s in statistics),
+			"total_work_reports": sum(s["work_reports"] for s in statistics),
+			"statistics": statistics,
+		}
 
-	def get_fans_statistics(self, user_id: str, like_num: int = 1000) -> None:
+	def get_fans_statistics(self, user_id: str, like_num: int = 1000) -> dict:
 		"""获取粉丝统计信息"""
-		fans = self.coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id)
+		fans = list(self.coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id))
+		qualified_fans = []
 		for fan in fans:
 			if int(fan.get("total_likes", 0)) >= like_num:
 				print("\n符合条件的粉丝:")
 				print(f"昵称: {fan['nickname']}")
 				print(f"ID: {fan['id']}")
 				print(f"获赞数: {fan['total_likes']}")
-
 				user_data = self.coordinator.user_obtain.fetch_user_honors(user_id=fan["id"])
 				if user_data:
 					print(f"粉丝数: {user_data.get('fans_total', 'N/A')}")
 					print(f"作品收藏数: {user_data.get('collected_total', 'N/A')}")
 					print(f"作者等级: {user_data.get('author_level', 'N/A')}")
+				qualified_fans.append(
+					{
+						"user_id": fan["id"],
+						"nickname": fan["nickname"],
+						"total_likes": fan.get("total_likes", 0),
+						"fans_total": user_data.get("fans_total", "N/A") if user_data else "N/A",
+						"collected_total": user_data.get("collected_total", "N/A") if user_data else "N/A",
+						"author_level": user_data.get("author_level", "N/A") if user_data else "N/A",
+						"n_works": fan.get("n_works", 0),
+					},
+				)
+		return {
+			"target_user_id": user_id,
+			"like_threshold": like_num,
+			"total_fans": len(fans),
+			"qualified_fans_count": len(qualified_fans),
+			"qualified_fans": qualified_fans,
+		}
 
 	@staticmethod
 	def check_follower(follower: dict) -> tuple:
@@ -1014,7 +1174,7 @@ class CommunityService:
 						)
 		return filtered_works
 
-	def generate_online_leaderboard(self) -> None:
+	def generate_online_leaderboard(self) -> dict:
 		def _get_online_users(work_id: int, token: str) -> int:
 			"""获取作品的在线用户数"""
 			client = CloudAPI(work_id=work_id, authorization_token=token)
@@ -1029,16 +1189,24 @@ class CommunityService:
 		token = CodeMaoClient().token.average
 		results: list[tuple[str, int]] = []
 		for work in works:
-			if work.get("type") == "WOOD":
-				continue
 			with contextlib.suppress(Exception):
 				response = self.coordinator.work_obtain.fetch_work_details(work["work_id"])
 				work_name = response.get("work_name", response.get("name", "未知作品"))
+				if response.get("type") == "WOOD":
+					continue
 				online_count = _get_online_users(work["work_id"], token)
 				results.append((work_name, online_count))
 		print("\n=== 作品在线人数排行榜 ===")
+		sorted_results = []
 		for name, count in sorted(results, key=operator.itemgetter(1), reverse=True):
 			print(f"{name}: {count}人在线")
+			sorted_results.append({"work_name": name, "online_count": count})
+		return {
+			"total_works": len(sorted_results),
+			"leaderboard": sorted_results,
+			"top_online": sorted_results[0] if sorted_results else None,
+			"average_online": sum(item["online_count"] for item in sorted_results) / len(sorted_results) if sorted_results else 0,
+		}
 
 
 # ==============================
