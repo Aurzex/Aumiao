@@ -1,9 +1,10 @@
+import contextlib
 import json
 import threading
 import time
-import traceback
 from collections.abc import Callable
-from typing import Any, cast
+from dataclasses import dataclass
+from typing import Any, Protocol, cast
 
 import websocket
 
@@ -20,6 +21,41 @@ from aumiao.core.base import (
 	ValidationConfig,
 	WebSocketConfig,
 )
+
+
+# ==============================
+# 命令模式接口
+# ==============================
+class Command(Protocol):
+	"""命令接口"""
+
+	def execute(self, connection: "CloudConnection") -> None: ...
+
+
+@dataclass
+class VariableUpdateCommand:
+	"""变量更新命令"""
+
+	command_type: str
+	data: dict[str, Any]
+
+	def execute(self, connection: "CloudConnection") -> None:
+		if self.command_type == "update_private_vars":
+			connection.send_message(SendMessageType.UPDATE_PRIVATE_VARIABLE, [self.data])
+		elif self.command_type == "update_vars":
+			connection.send_message(SendMessageType.UPDATE_PUBLIC_VARIABLE, [self.data])
+
+
+@dataclass
+class ListUpdateCommand:
+	"""列表更新命令"""
+
+	cvid: str
+	operations: list[dict[str, Any]]
+
+	def execute(self, connection: "CloudConnection") -> None:
+		connection.send_message(SendMessageType.UPDATE_LIST, {self.cvid: self.operations})
+
 
 # ==============================
 # 类型别名定义 (Type Aliases)
@@ -71,6 +107,23 @@ class WorkInfo:
 		self.user_id = data.get("user_id", 0)
 		self.preview_url = data.get("preview", "")
 		self.source_urls = data.get("source_urls", data.get("work_urls", []))
+
+
+# ==============================
+# 命令工厂
+# ==============================
+class CommandFactory:
+	"""命令工厂类"""
+
+	@staticmethod
+	def create_variable_command(command_type: str, data: dict[str, Any]) -> VariableUpdateCommand:
+		"""创建变量更新命令"""
+		return VariableUpdateCommand(command_type, data)
+
+	@staticmethod
+	def create_list_command(cvid: str, operations: list[dict[str, Any]]) -> ListUpdateCommand:
+		"""创建列表更新命令"""
+		return ListUpdateCommand(cvid, operations)
 
 
 # ==============================
@@ -126,7 +179,7 @@ class CloudVariable(CloudDataItem):
 
 	def get(self) -> CloudValueType:
 		"""获取变量值"""
-		return cast("CloudValueType", self.value)  # 添加类型转换
+		return cast("CloudValueType", self.value)
 
 	def set(self, value: CloudValueType) -> bool:
 		"""设置变量值"""
@@ -139,11 +192,9 @@ class CloudVariable(CloudDataItem):
 
 	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
 		"""触发变量变更回调"""
-		# 类型检查: 确保是 int 或 str 类型
 		if not isinstance(old_value, (int, str)) or not isinstance(new_value, (int, str)):
 			print(f"警告: 云变量值类型不匹配, 期望 int 或 str, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
-		# 直接调用回调, 不需要类型转换
 		for callback in self._change_callbacks[:]:
 			try:
 				callback(old_value, new_value, source)
@@ -210,11 +261,9 @@ class CloudList(CloudDataItem):
 
 	def emit_change(self, old_value: CloudValueType | CloudListValueType, new_value: CloudValueType | CloudListValueType, source: str) -> None:
 		"""触发数据变更回调"""
-		# CloudList 的值应该是列表类型
 		if not isinstance(old_value, list) or not isinstance(new_value, list):
 			print(f"警告: 云列表值类型不匹配, 期望 list, 得到 old_value: {type(old_value)}, new_value: {type(new_value)}")
 			return
-		# 调用父类的回调 (如果有)
 		for callback in self._change_callbacks[:]:
 			try:
 				callback(old_value, new_value, source)
@@ -385,7 +434,7 @@ class CloudList(CloudDataItem):
 
 
 class CloudConnection:
-	"""云连接核心类 - 使用外部导入的配置"""
+	"""云连接核心类"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self._ping_thread: threading.Thread | None = None
@@ -409,19 +458,19 @@ class CloudConnection:
 			"data_ready": [],
 			"online_users_change": [],
 			"ranking_received": [],
-			"server_close": [],  # 添加服务器关闭事件回调
+			"server_close": [],
 		}
 		self._connection_lock = threading.RLock()
 		self._is_closing = False
 		self._join_sent = False
 		self._last_activity_time = 0.0
-		self._lists_lock = threading.RLock()  # 添加列表操作锁
+		self._lists_lock = threading.RLock()
 		self._pending_ranking_requests: list[PrivateCloudVariable] = []
 		self._pending_requests_lock = threading.Lock()
 		self._ping_active = False
 		self._ping_interval = 0
 		self._ping_timeout = 0
-		self._variables_lock = threading.RLock()  # 添加变量操作锁
+		self._variables_lock = threading.RLock()
 		self._websocket_thread: threading.Thread | None = None
 		self._work_info: WorkInfo | None = None
 		self.data_ready = False
@@ -431,16 +480,25 @@ class CloudConnection:
 		self._ping_interval: int = DataConfig.PING_INTERVAL_MS
 		self._ping_timeout: int = DataConfig.PING_TIMEOUT_MS
 		self._heartbeat_timer: threading.Timer | None = None
-		self._command_queue: list[tuple[str, dict]] = []  # (command_type, data)
+		self._command_queue: list[Command] = []  # 使用命令对象队列
 		self._command_queue_lock = threading.RLock()
 		self._upload_timer: threading.Timer | None = None
-		self._upload_interval: float = 0.1  # 100ms上传间隔
+		self._upload_interval: float = 0.1
 
-	def _queue_command(self, command_type: str, data: dict) -> None:
+	def _queue_variable_command(self, command_type: str, data: dict[str, Any]) -> None:
+		"""将变量更新命令加入队列"""
+		command = CommandFactory.create_variable_command(command_type, data)
+		self._queue_command(command)
+
+	def _queue_list_command(self, cvid: str, operations: list[dict[str, Any]]) -> None:
+		"""将列表更新命令加入队列"""
+		command = CommandFactory.create_list_command(cvid, operations)
+		self._queue_command(command)
+
+	def _queue_command(self, command: Command) -> None:
 		"""将命令加入队列等待批量上传"""
 		with self._command_queue_lock:
-			self._command_queue.append((command_type, data))
-			# 如果没有定时器, 启动一个
+			self._command_queue.append(command)
 			if self._upload_timer is None:
 				self._upload_timer = threading.Timer(self._upload_interval, self._upload_batch)
 				self._upload_timer.daemon = True
@@ -449,39 +507,66 @@ class CloudConnection:
 	def _upload_batch(self) -> None:
 		"""批量上传队列中的命令"""
 		with self._command_queue_lock:
+			if not self.connected or not self.websocket_client or self._is_closing:
+				self._command_queue.clear()
+				self._upload_timer = None
+				return
 			if not self._command_queue:
 				self._upload_timer = None
 				return
 
-			# 按类型分组命令
-			commands_by_type: dict[str, list[dict]] = {}
-			for command_type, data in self._command_queue:
-				if command_type not in commands_by_type:
-					commands_by_type[command_type] = []
-				commands_by_type[command_type].append(data)
+			# 分组命令
+			variable_commands: list[VariableUpdateCommand] = []
+			list_commands: dict[str, ListUpdateCommand] = {}
+
+			for command in self._command_queue:
+				if isinstance(command, VariableUpdateCommand):
+					variable_commands.append(command)
+				elif isinstance(command, ListUpdateCommand):
+					if command.cvid not in list_commands:
+						list_commands[command.cvid] = command
+					else:
+						# 合并相同cvid的操作
+						list_commands[command.cvid].operations.extend(command.operations)
 
 			# 清空队列
 			self._command_queue.clear()
 
-			# 发送批量命令
-			for command_type, data_list in commands_by_type.items():
-				if command_type == "update_private_vars":
-					self.send_message(SendMessageType.UPDATE_PRIVATE_VARIABLE, data_list)
-				elif command_type == "update_vars":
-					self.send_message(SendMessageType.UPDATE_PUBLIC_VARIABLE, data_list)
-				elif command_type == "update_lists":
-					# 合并列表更新
-					merged_updates: dict[str, list] = {}
-					for data in data_list:
-						for cvid, operations in data.items():
-							if cvid not in merged_updates:
-								merged_updates[cvid] = []
-							merged_updates[cvid].extend(operations)
-					for cvid, operations in merged_updates.items():
-						self.send_message(SendMessageType.UPDATE_LIST, {cvid: operations})
+		try:
+			# 执行批量命令
+			# 合并变量命令
+			if variable_commands:
+				private_updates: list[dict[str, Any]] = []
+				public_updates: list[dict[str, Any]] = []
 
-			# 重置定时器
-			self._upload_timer = None
+				for cmd in variable_commands:
+					if cmd.command_type == "update_private_vars":
+						private_updates.append(cmd.data)
+					elif cmd.command_type == "update_vars":
+						public_updates.append(cmd.data)
+
+				if private_updates:
+					self.send_message(SendMessageType.UPDATE_PRIVATE_VARIABLE, private_updates)
+				if public_updates:
+					self.send_message(SendMessageType.UPDATE_PUBLIC_VARIABLE, public_updates)
+
+			# 执行列表命令
+			for list_cmd in list_commands.values():
+				list_cmd.execute(self)
+
+		except Exception as e:
+			print(f"批量上传失败: {e}")
+			# 将失败的命令重新加入队列
+			with self._command_queue_lock:
+				self._command_queue.extend(variable_commands)
+				self._command_queue.extend(list_commands.values())
+		finally:
+			with self._command_queue_lock:
+				self._upload_timer = None
+				if self._command_queue and not self._upload_timer:
+					self._upload_timer = threading.Timer(self._upload_interval, self._upload_batch)
+					self._upload_timer.daemon = True
+					self._upload_timer.start()
 
 	def _get_work_info(self) -> WorkInfo:
 		"""获取作品信息"""
@@ -554,8 +639,13 @@ class CloudConnection:
 
 	def _emit_event(self, event: str, *args: object) -> None:
 		"""触发事件回调"""
+		# 如果正在关闭, 不触发事件
+		if self._is_closing:
+			return
 		if event in self._callbacks:
-			for callback in self._callbacks[event][:]:
+			# 创建回调列表的副本, 避免在迭代时被修改
+			callbacks_copy = self._callbacks[event].copy()
+			for callback in callbacks_copy:
 				try:
 					callback(*args)
 				except Exception as error:
@@ -588,36 +678,35 @@ class CloudConnection:
 
 	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
 		"""WebSocket 消息处理"""
-		self._last_activity_time = time.time()
-		if isinstance(message, bytes):
-			try:
-				message_str = message.decode("utf-8")
-			except UnicodeDecodeError:
-				return
-		else:
-			message_str = str(message)
-		# 更新活动时间, 但不处理 ping 消息 (库会自动处理)
-		if message_str in {WebSocketConfig.PING_MESSAGE, WebSocketConfig.PONG_MESSAGE}:
+		if self._is_closing:
 			return
-		# 处理其他消息
+		self._last_activity_time = time.time()
 		try:
-			# 处理握手消息
+			if isinstance(message, bytes):
+				try:
+					message_str = message.decode("utf-8")
+				except UnicodeDecodeError:
+					return
+			else:
+				message_str = str(message)
+			# 处理 ping/pong 消息
+			if message_str in {WebSocketConfig.PING_MESSAGE, WebSocketConfig.PONG_MESSAGE}:
+				return
+			# 处理不同类型消息
 			if message_str.startswith(WebSocketConfig.HANDSHAKE_MESSAGE_PREFIX):
 				self._handle_handshake_message(message_str)
 				return
-			# 处理连接确认消息
 			if message_str == WebSocketConfig.CONNECTED_MESSAGE:
 				self._handle_connected_message()
 				return
-			# 处理服务器关闭请求 (type 41)
-			if message_str.startswith(WebSocketConfig.SEVER_CLOSED_MESSAGE):
-				self._handle_server_close_request()
+			if message_str.startswith(WebSocketConfig.SERVER_CLOSED_MESSAGE):
+				# 服务器关闭请求在单独线程中处理
+				threading.Thread(target=self._handle_server_close_request, daemon=True).start()
 				return
-			# 处理事件消息 (type 42)
 			if message_str.startswith(WebSocketConfig.EVENT_MESSAGE_PREFIX):
 				self._handle_event_message(message_str)
 				return
-			# 未知消息类型
+			# 记录未知消息
 			if len(message_str) < 50:
 				print(f"收到未知消息: {message_str}")
 			else:
@@ -632,7 +721,6 @@ class CloudConnection:
 			self._ping_interval = handshake_data.get("pingInterval", 25000)
 			self._ping_timeout = handshake_data.get("pingTimeout", 60000)
 			print(f"✓ 握手成功, ping 间隔: {self._ping_interval} ms, ping 超时: {self._ping_timeout} ms")
-			# 不启动自定义 ping 线程, 让 websocket 库处理
 			if self.websocket_client:
 				self.websocket_client.send(WebSocketConfig.CONNECT_MESSAGE)
 				print("✓ 已发送连接请求")
@@ -652,6 +740,8 @@ class CloudConnection:
 
 	def _handle_event_message(self, message: str) -> None:
 		"""处理事件消息"""
+		if self._is_closing or not self.connected:
+			return
 		try:
 			data_str = message[WebSocketConfig.MESSAGE_TYPE_LENGTH :]
 			data_list = json.loads(data_str)
@@ -675,28 +765,38 @@ class CloudConnection:
 		"""处理服务器发送的关闭请求 (类型41)"""
 		print("收到服务器关闭请求 (类型41)")
 
-		# 记录服务器关闭原因
-		server_close_reason = "服务器主动要求关闭连接"
+		# 首先检查是否已经在关闭过程中
+		if self._is_closing:
+			return
 
-		# 触发服务器关闭事件
+		# 发送服务器关闭事件
+		server_close_reason = "服务器主动要求关闭连接"
 		self._emit_event("server_close", {"type": "server_close", "reason": server_close_reason, "timestamp": time.time(), "code": 1000})
 
-		# 检查是否需要自动重连
-		should_reconnect = False
-		if self.auto_reconnect and not self._is_closing and self.reconnect_attempts < self.max_reconnect_attempts:
-			should_reconnect = True
+		# 设置关闭标志
+		self._is_closing = True
 
-		# 清理当前连接
-		self._cleanup_connection()
+		# 在单独的线程中执行清理和重连, 避免阻塞当前消息处理线程
+		def cleanup_and_reconnect() -> None:
+			# 清理连接
+			self._cleanup_connection()
+			# 检查是否应该重连
+			should_reconnect = False
+			if self.auto_reconnect and not self._is_closing and self.reconnect_attempts < self.max_reconnect_attempts:
+				should_reconnect = True
 
-		# 如果允许重连, 尝试重新连接
-		if should_reconnect:
-			self.reconnect_attempts += 1
-			delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
-			print(f"服务器要求关闭, 尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
-			threading.Timer(delay, self._safe_reconnect).start()
-		else:
-			print("服务器关闭连接, 重连已禁用或已达最大重试次数")
+			if should_reconnect:
+				self.reconnect_attempts += 1
+				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
+				print(f"服务器要求关闭, 尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
+				time.sleep(delay)
+				self._safe_reconnect()
+			else:
+				print("服务器关闭连接, 重连已禁用或已达最大重试次数")
+
+		# 在新线程中执行清理和重连
+		cleanup_thread = threading.Thread(target=cleanup_and_reconnect, daemon=True)
+		cleanup_thread.start()
 
 	def _send_join_message(self) -> None:
 		"""发送加入消息"""
@@ -727,12 +827,17 @@ class CloudConnection:
 	def _stop_ping(self) -> None:
 		"""停止 ping 线程"""
 		self._ping_active = False
-		if self._ping_thread is not None:
-			self._ping_thread.join(timeout=2.0)
+		if self._ping_thread and self._ping_thread.is_alive():
+			# 检查不是当前线程
+			if self._ping_thread != threading.current_thread():
+				with contextlib.suppress(RuntimeError):
+					self._ping_thread.join(timeout=1.0)
 			self._ping_thread = None
 
 	def _handle_cloud_message(self, message_type: str, data: dict[str, Any] | list[Any] | str) -> None:
 		"""处理云消息"""
+		if self._is_closing or not self.connected:
+			return
 		try:
 			message_handlers = {
 				ReceiveMessageType.JOIN.value: self._handle_join_message,
@@ -746,12 +851,11 @@ class CloudConnection:
 			}
 			handler = message_handlers.get(message_type)
 			if handler:
-				handler(data)  # pyright: ignore[reportArgumentType] # ty:ignore [invalid-argument-type]
+				handler(data)  # pyright: ignore[reportArgumentType]
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {DisplayHelper.truncate_value(data)}")
 		except Exception as error:
 			print(f"{ErrorMessages.CLOUD_MESSAGE_PROCESSING}: {error}")
-			traceback.print_exc()
 			self._emit_event("error", error)
 
 	def _handle_join_message(self, _data: object) -> None:
@@ -762,14 +866,12 @@ class CloudConnection:
 	def _handle_receive_all_data(self, data: list[dict[str, Any]]) -> None:
 		"""处理接收完整数据消息"""
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
-		# 如果 data 是字符串, 尝试解析
 		if isinstance(data, str):
 			try:
 				data = json.loads(data)
 			except json.JSONDecodeError as e:
 				print(f"数据解析失败: {e}")
 				return
-		# 确保 data 是列表
 		if not isinstance(data, list):
 			print(f"数据格式错误, 期望列表, 得到: {type(data)}")
 			print(f"原始数据: {DisplayHelper.truncate_value(data)}")
@@ -798,40 +900,32 @@ class CloudConnection:
 			except (ValueError, TypeError):
 				print(f"无效的数据类型: {data_type}")
 				return
-			# 根据数据类型调用不同的创建函数, 避免类型错误
 			if data_type == DataType.PRIVATE_VARIABLE.value:
-				# 私有变量: 需要 CloudValueType (int | str)
 				if not isinstance(value, (int, str)):
 					print(f"警告: 私有变量值类型错误, 期望 int 或 str, 得到 {type(value)}")
-					# 尝试转换
 					try:
 						value = int(value) if isinstance(value, (float, bool)) else str(value)
 					except Exception:
 						value = str(value)
 				self._create_private_variable(str(cloud_variable_id), str(name), value)
 			elif data_type == DataType.PUBLIC_VARIABLE.value:
-				# 公有变量: 需要 CloudValueType (int | str)
 				if not isinstance(value, (int, str)):
 					print(f"警告: 公有变量值类型错误, 期望 int 或 str, 得到 {type(value)}")
-					# 尝试转换
 					try:
 						value = int(value) if isinstance(value, (float, bool)) else str(value)
 					except Exception:
 						value = str(value)
 				self._create_public_variable(str(cloud_variable_id), str(name), value)
 			elif data_type == DataType.LIST.value:
-				# 列表类型: 需要 CloudListValueType (list [CloudValueType])
 				if not isinstance(value, list):
 					print(f"警告: 列表数据不是列表类型, 进行转换: {type(value)} -> list")
 					value = []
-				# 确保列表元素类型正确
 				validated_list: CloudListValueType = []
 				if isinstance(value, list):
 					for item_val in value:
 						if isinstance(item_val, (int, str)):
 							validated_list.append(item_val)
 						else:
-							# 尝试转换非法的列表元素
 							try:
 								if isinstance(item_val, (float, bool)):
 									validated_list.append(int(item_val))
@@ -893,7 +987,6 @@ class CloudConnection:
 			print(f"{ErrorMessages.INVALID_RANKING_DATA}: {DisplayHelper.truncate_value(data)}")
 			return
 		ranking_data: list[dict[str, Any]] = []
-		# 安全地获取 items
 		items = data.get("items")
 		if not isinstance(items, list):
 			print(f"警告: items 不是列表类型: {type(items)}")
@@ -901,7 +994,6 @@ class CloudConnection:
 		for item in items:
 			if isinstance(item, dict):
 				try:
-					# 安全地获取各个字段
 					value = item.get("value")
 					identifier = item.get("identifier")
 					nickname = item.get("nickname")
@@ -1020,19 +1112,11 @@ class CloudConnection:
 			self.data_ready = False
 			self._join_sent = False
 		self._stop_ping()
-		# 区分正常关闭和服务器要求的关闭
-		if close_status_code == 1000:  # 正常关闭
-			close_type = "normal_close"
-			close_desc = f"正常关闭: {close_status_code} - {close_msg}"
-		else:
-			close_type = "unexpected_close"
-			close_desc = f"意外关闭: {close_status_code} - {close_msg}"
+		close_type = "unknown_close"
+		close_desc = f"正常关闭: {close_status_code} - {close_msg}"
 
 		print(f"WebSocket连接已关闭: {close_desc}")
-
-		# 触发关闭事件
 		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time.time(), "was_connected": was_connected})
-		# 如果不是服务器要求的关闭, 并且允许重连, 则尝试重连
 		if was_connected and self.auto_reconnect and not self._is_closing:
 			if self.reconnect_attempts < self.max_reconnect_attempts:
 				self.reconnect_attempts += 1
@@ -1048,7 +1132,16 @@ class CloudConnection:
 			if self.connected or self._is_closing:
 				return
 		print("开始重连...")
-		self.connect()
+		try:
+			self.connect()
+		except Exception as e:
+			print(f"重连失败: {e}")
+			# 继续尝试重连
+			if self.auto_reconnect and self.reconnect_attempts < self.max_reconnect_attempts:
+				self.reconnect_attempts += 1
+				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
+				print(f"重连失败, 下次尝试 ({self.reconnect_attempts}/{self.max_reconnect_attempts}) 等待 {delay} 秒...")
+				threading.Timer(delay, self._safe_reconnect).start()
 
 	def _on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
 		"""WebSocket 错误回调"""
@@ -1069,49 +1162,78 @@ class CloudConnection:
 			print(f"{ErrorMessages.SEND_MESSAGE}: {error}")
 			self._emit_event("error", error)
 
-	# 修改 _cleanup_connection 方法中的 send_close 调用
 	def _cleanup_connection(self) -> None:
 		"""清理连接资源"""
-		self._stop_ping()
+		# 设置关闭标志
+		self._is_closing = True
 
-		# 清理批量上传定时器
+		# 停止批量上传定时器
 		with self._command_queue_lock:
 			if self._upload_timer:
 				self._upload_timer.cancel()
 				self._upload_timer = None
 			self._command_queue.clear()
 
-		# 清理 WebSocket 连接
+		# 停止心跳定时器
+		if self._heartbeat_timer:
+			self._heartbeat_timer.cancel()
+			self._heartbeat_timer = None
+
+		# 停止 ping 线程
+		self._stop_ping()
+
+		# 关闭 WebSocket 连接
 		if self.websocket_client:
 			try:
-				# 如果连接还存在, 关闭连接
-				if self.connected:
-					# 使用正确的关闭方法
-					self.websocket_client.close()
-			except Exception as e:
-				print(e)
+				# 使用异步关闭避免阻塞
+				def close_ws() -> None:
+					with contextlib.suppress(Exception):
+						self.websocket_client.close()  # pyright: ignore[reportOptionalMemberAccess]
+
+				# 在新线程中关闭 WebSocket
+				close_thread = threading.Thread(target=close_ws, daemon=True)
+				close_thread.start()
+				close_thread.join(timeout=1.0)
+			except Exception:  # noqa: S110
+				pass
 			finally:
 				self.websocket_client = None
-		# 清理线程
+
+		# 等待 WebSocket 线程结束
 		if self._websocket_thread and self._websocket_thread.is_alive():
-			# 等待线程结束, 但不要太久
-			self._websocket_thread.join(timeout=1.0)
+			# 检查不是当前线程
+			if self._websocket_thread != threading.current_thread():
+				self._websocket_thread.join(timeout=2.0)
 			self._websocket_thread = None
-		# 清理数据
+
+		# 清除所有数据
 		with self._variables_lock:
 			self.private_variables.clear()
 			self.public_variables.clear()
 		with self._lists_lock:
 			self.lists.clear()
-		# 重置状态
+
+		# 清除工作信息缓存
+		self._work_info = None
+
 		with self._connection_lock:
 			self.connected = False
 			self.data_ready = False
 			self._join_sent = False
 		with self._pending_requests_lock:
 			self._pending_ranking_requests.clear()
+		# 重置状态
 		self.online_users = 0
 		self._last_activity_time = 0.0
+		self._last_ping_time = 0.0
+		self._last_pong_time = 0.0
+		self.reconnect_attempts = 0
+		# 重置关闭标志
+		self._is_closing = False
+		# 清除事件回调, 保留 server_close
+		for event_name in self._callbacks:
+			if event_name != "server_close":
+				self._callbacks[event_name].clear()
 
 	def connect(self) -> None:
 		"""建立云连接"""
@@ -1160,16 +1282,12 @@ class CloudConnection:
 		"""关闭云连接"""
 		self._is_closing = True
 		self.auto_reconnect = False
-		# 首先标记为断开状态
 		with self._connection_lock:
 			was_connected = self.connected
 			self.connected = False
 		if was_connected:
 			print("正在关闭连接...")
-		# 清理连接资源
 		self._cleanup_connection()
-		# 清理回调 (可选, 取决于需求)
-		# self.clear_callbacks()
 		print("连接已关闭")
 
 	def check_connection_health(self) -> bool:
@@ -1274,7 +1392,7 @@ class CloudConnection:
 		variable = self.get_private_variable(name)
 		if variable and variable.set(value):
 			command_data = {"cvid": variable.cloud_variable_id, "value": value, "param_type": "number" if isinstance(value, int) else "string"}
-			self._queue_command("update_private_vars", command_data)
+			self._queue_variable_command("update_private_vars", command_data)
 			return True
 		return False
 
@@ -1283,7 +1401,7 @@ class CloudConnection:
 		variable = self.get_public_variable(name)
 		if variable and variable.set(value):
 			command_data = {"action": "set", "cvid": variable.cloud_variable_id, "value": value, "param_type": "number" if isinstance(value, int) else "string"}
-			self._queue_command("update_vars", command_data)
+			self._queue_variable_command("update_vars", command_data)
 			return True
 		return False
 
@@ -1291,8 +1409,8 @@ class CloudConnection:
 		"""向列表末尾添加元素 - 支持批量上传"""
 		cloud_list = self.get_list(name)
 		if cloud_list and cloud_list.push(value):
-			command_data = {cloud_list.cloud_variable_id: [{"action": "append", "value": value}]}
-			self._queue_command("update_lists", command_data)
+			operations = [{"action": "append", "value": value}]
+			self._queue_list_command(cloud_list.cloud_variable_id, operations)
 			return True
 		return False
 
