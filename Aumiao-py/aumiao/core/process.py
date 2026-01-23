@@ -1291,7 +1291,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 				return record
 		return None
 
-	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: str | None) -> None:
+	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: int | None) -> None:
 		"""检查举报内容违规"""
 		self.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0

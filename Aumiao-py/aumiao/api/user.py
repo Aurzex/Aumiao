@@ -21,7 +21,7 @@ class UserDataFetcher:
 	# 	)
 	# 	return response.json()
 	# BUG 2026/1/19 日测试报错 410 , 推测 api 已经弃用
-	# def fetch_user_profile(self, user_id: str) -> dict:
+	# def fetch_user_profile(self, user_id: int) -> dict:
 	# 	"""
 	# 	获取用户详细信息
 	# 	Args:
@@ -32,7 +32,7 @@ class UserDataFetcher:
 	# 	response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
 	# 	return response.json()
 
-	def fetch_user_honors(self, user_id: str) -> dict:
+	def fetch_user_honors(self, user_id: int) -> dict:
 		"""
 		获取用户荣誉信息
 		Args:
@@ -48,7 +48,7 @@ class UserDataFetcher:
 		)
 		return response.json()
 
-	def fetch_user_metrics(self, user_id: str) -> dict:
+	def fetch_user_metrics(self, user_id: int) -> dict:
 		"""
 		获取用户业务数据指标
 		Args:
@@ -60,7 +60,7 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/nemo/v2/works/business/total", method="GET", params=params)
 		return response.json()
 
-	def fetch_basic_user_info(self, user_id: str) -> dict:
+	def fetch_basic_user_info(self, user_id: int) -> dict:
 		"""
 		获取用户基本信息
 		Args:
@@ -146,7 +146,7 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/api/v2/pc/lesson/user/info", method="GET")
 		return response.json()
 
-	def fetch_user_works_web_gen(self, user_id: str, types: Literal["newest", "hot"] = "newest", limit: int | None = 5) -> Generator[dict]:
+	def fetch_user_works_web_gen(self, user_id: int, types: Literal["newest", "hot"] = "newest", limit: int | None = 5) -> Generator[dict]:
 		"""
 		获取用户作品列表生成器 (Web 端)
 		Args:
@@ -204,7 +204,7 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint="/creation-tools/v1/works/list/user", params=params, method="GET")
 		return response.json()
 
-	def fetch_user_certificate(self, user_id: str) -> dict:
+	def fetch_user_certificate(self, user_id: int) -> dict:
 		"""
 		获取用户证书信息
 		Args:
@@ -397,7 +397,7 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_followers_gen(self, user_id: str, limit: int | None = 15) -> Generator[dict]:
+	def fetch_followers_gen(self, user_id: int, limit: int | None = 15) -> Generator[dict]:
 		"""
 		获取用户粉丝列表生成器
 		Args:
@@ -418,7 +418,7 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_following_gen(self, user_id: str, limit: int = 15) -> Generator[dict]:
+	def fetch_following_gen(self, user_id: int, limit: int = 15) -> Generator[dict]:
 		"""
 		获取用户关注列表生成器
 		Args:
@@ -439,7 +439,7 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_collections_gen(self, user_id: str, limit: int = 5) -> Generator[dict]:
+	def fetch_collections_gen(self, user_id: int, limit: int = 5) -> Generator[dict]:
 		"""
 		获取用户收藏作品生成器
 		Args:

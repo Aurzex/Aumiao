@@ -69,7 +69,7 @@ class AccountData:
 	author_level: str = ""
 	create_time: str = ""
 	description: str = ""
-	id: str = ""
+	id: int = 0
 	identity: str = ""
 	nickname: str = ""
 	password: str = ""

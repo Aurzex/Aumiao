@@ -1192,7 +1192,7 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 		super().__init__()
 		self._cache_manager = data.CacheManager()
 
-	def message_report(self, user_id: str) -> None:
+	def message_report(self, user_id: int) -> None:
 		"""生成用户数据报告"""
 		response = self.user_obtain.fetch_user_honors(user_id=user_id)
 		timestamp = self.community_obtain.fetch_current_timestamp_10()["data"]

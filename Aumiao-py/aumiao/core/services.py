@@ -630,7 +630,7 @@ class CommunityService:
 			print(f"清除红点过程中发生异常: {e}")
 			return {"success": False, "method": method, "error": str(e)}
 
-	def like_and_collect_works(self, user_id: str, works_list: list[dict] | Generator[dict]) -> dict:
+	def like_and_collect_works(self, user_id: int, works_list: list[dict] | Generator[dict]) -> dict:
 		"""点赞和收藏用户作品"""
 		print(f"开始处理用户 {user_id} 的作品")
 		follow_result = self.coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
@@ -977,7 +977,7 @@ class CommunityService:
 			"statistics": statistics,
 		}
 
-	def get_fans_statistics(self, user_id: str, like_num: int = 1000) -> dict:
+	def get_fans_statistics(self, user_id: int, like_num: int = 1000) -> dict:
 		"""获取粉丝统计信息"""
 		fans = list(self.coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id))
 		qualified_fans = []
@@ -1053,11 +1053,11 @@ class CommunityService:
 		score = min(score, 1.0)
 		return score >= 0.5 or len(reasons) >= 2, reasons, score
 
-	def analyze_user_followers(self, user_id: str) -> dict:
+	def analyze_user_followers(self, user_id: int) -> dict:
 		"""分析用户的所有粉丝"""
 		fetcher = self.coordinator.user_obtain
 		user_info = fetcher.fetch_user_honors(user_id)
-		followers = list(fetcher.fetch_followers_gen(str(user_id), limit=300))
+		followers = list(fetcher.fetch_followers_gen(user_id, limit=300))
 		suspicious, normal = [], []
 		for follower in followers:
 			is_suspicious, reasons, score = self.check_follower(follower)
@@ -1242,7 +1242,7 @@ class BatchOperationService:
 		if content_list:
 			target_list = content_list
 		elif content_type == "work" and user_id:
-			target_list = list(self.coordinator.user_obtain.fetch_user_works_web_gen(str(user_id), limit=None))
+			target_list = list(self.coordinator.user_obtain.fetch_user_works_web_gen(user_id, limit=None))
 		elif content_type == "novel":
 			target_list = self.coordinator.novel_obtain.fetch_my_novels()
 		else:
@@ -1258,7 +1258,7 @@ class BatchOperationService:
 		"""直接批量点赞"""
 		count = 0
 		if content_type == "work" and user_id:
-			self.community_service.like_and_collect_works(str(user_id), target_list)
+			self.community_service.like_and_collect_works(user_id, target_list)
 			count = len(target_list)
 		elif content_type == "novel":
 			self.community_service.toggle_novel_favorites(target_list)

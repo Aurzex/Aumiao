@@ -316,12 +316,6 @@ class InternalImplementations:
 			decryptor = InternalImplementations.BCMKNDecryptor()
 			try:
 				decrypted_data = decryptor.decrypt_data(encrypted_content)
-				print("NEKO 作品解密成功!")
-				print("食用教程:")
-				print("首先确保你有 ROOT 权限或者 MT 管理器")
-				print("将反编译的文件复制到 NEMO 客户端数据目录")
-				print("一般为 /data/data/com.codemao.nemo/files/nemo_users_db")
-				print("重启客户端, 打开并保存一次")
 			except Exception as e:
 				error_msg = "解密失败"
 				raise ValueError(error_msg) from e
@@ -344,6 +338,12 @@ class InternalImplementations:
 			dirs = self._create_directories(work_dir, work_id)
 			self._save_core_files(dirs, work_id, bcm_data, source_info)
 			self._download_resources(dirs, bcm_data)
+			print("NEMO 作品解密成功!")
+			print("食用教程:")
+			print("首先确保你有 ROOT 权限或者 MT 管理器")
+			print("将反编译的文件复制到 NEMO 客户端数据目录")
+			print("一般为 /data/data/com.codemao.nemo/files/nemo_users_db")
+			print("重启客户端, 打开并保存一次")
 			return str(work_dir)
 
 		@staticmethod
