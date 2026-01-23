@@ -22,6 +22,8 @@ from aumiao.core.base import (
 	WebSocketConfig,
 )
 
+# neko(KittenN)貌似不支持查询在线人数, 而排行榜数据需要反编译后获取 work_file["rankings"]["rankingsDict"],之后获取 rankingId 得到的id通过两个api进行更改和获取
+
 
 # ==============================
 # 命令模式接口

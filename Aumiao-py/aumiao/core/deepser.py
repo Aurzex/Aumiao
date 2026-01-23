@@ -192,7 +192,7 @@ class CodeMaoAICore(EventHandler):
 		# 状态管理
 		self.session_id: str | None = None
 		self.search_session: str | None = None
-		self.user_id: str | None = None
+		self.user_id: int | None = None
 		self.current_response = ""
 		self.is_receiving_response = False
 		# 数据存储

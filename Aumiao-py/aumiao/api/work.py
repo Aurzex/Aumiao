@@ -195,7 +195,11 @@ class BaseWorkManager:
 		Returns:
 			操作结果 (成功状态或完整响应数据)
 		"""
-		response = self._client.send_request(endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top", method=method, payload={})
+		response = self._client.send_request(
+			endpoint=f"/creation-tools/v1/works/{work_id}/comment/{comment_id}/top",
+			method=method,
+			payload={},
+		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_toggle_comment_like(self, work_id: int, comment_id: int, method: SelectMethod = "POST") -> bool:
@@ -778,7 +782,11 @@ class WorkDataFetcher:
 		Returns:
 			Kitten 标签列表字典
 		"""
-		response = self._client.send_request(endpoint="/kitten/work/labels", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/kitten/work/labels",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_kitten_default_covers(self) -> dict:
@@ -819,10 +827,14 @@ class WorkDataFetcher:
 			验证结果字典
 		"""
 		params = {"name": name, "work_id": work_id}
-		response = self._client.send_request(endpoint="/tiger/work/checkname", method="GET", params=params)
+		response = self._client.send_request(
+			endpoint="/tiger/work/checkname",
+			method="GET",
+			params=params,
+		)
 		return response.json()
 
-	def fetch_author_portfolio(self, user_id: str) -> dict:
+	def fetch_author_portfolio(self, user_id: int) -> dict:
 		"""
 		获取作者作品集
 		Args:
@@ -830,7 +842,10 @@ class WorkDataFetcher:
 		Returns:
 			作者作品集字典
 		"""
-		response = self._client.send_request(endpoint=f"/web/works/users/{user_id}", method="GET")
+		response = self._client.send_request(
+			endpoint=f"/web/works/users/{user_id}",
+			method="GET",
+		)
 		return response.json()
 
 	def fetch_work_source_code(self, work_id: int) -> dict:
@@ -891,7 +906,10 @@ class WorkDataFetcher:
 		Returns:
 			发现页作品列表字典
 		"""
-		response = self._client.send_request(endpoint="/creation-tools/v1/home/discover", method="GET")
+		response = self._client.send_request(
+			endpoint="/creation-tools/v1/home/discover",
+			method="GET",
+		)
 		return response.json()
 
 	def fetch_new_works_nemo(
@@ -919,7 +937,10 @@ class WorkDataFetcher:
 		Returns:
 			主题 ID 列表
 		"""
-		response = self._client.send_request(endpoint="/nemo/v3/work-subject/random", method="GET")
+		response = self._client.send_request(
+			endpoint="/nemo/v3/work-subject/random",
+			method="GET",
+		)
 		return response.json()
 
 	def fetch_subject_details(self, ids: int) -> dict:
@@ -930,7 +951,10 @@ class WorkDataFetcher:
 		Returns:
 			主题信息字典
 		"""
-		response = self._client.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/info", method="GET")
+		response = self._client.send_request(
+			endpoint=f"/nemo/v3/work-subject/{ids}/info",
+			method="GET",
+		)
 		return response.json()
 
 	def fetch_subject_works(self, ids: int, limit: int = 15, offset: int = 0) -> dict:
@@ -944,7 +968,11 @@ class WorkDataFetcher:
 			主题作品列表字典
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint=f"/nemo/v3/work-subject/{ids}/works", method="GET", params=params)
+		response = self._client.send_request(
+			endpoint=f"/nemo/v3/work-subject/{ids}/works",
+			method="GET",
+			params=params,
+		)
 		return response.json()
 
 	def fetch_all_subject_works(self, limit: int = 15, offset: int = 0) -> dict:
@@ -957,7 +985,11 @@ class WorkDataFetcher:
 			主题作品列表字典
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="/nemo/v3/work-subject/home", method="GET", params=params)
+		response = self._client.send_request(
+			endpoint="/nemo/v3/work-subject/home",
+			method="GET",
+			params=params,
+		)
 		return response.json()
 
 	def manage_collaboration_code(self, work_id: int, method: Literal["GET", "DELETE"] = "GET") -> dict:
@@ -1029,7 +1061,10 @@ class WorkDataFetcher:
 		Returns:
 			谱系信息字典
 		"""
-		response = self._client.send_request(endpoint=f"/nemo/v2/works/root/{work_id}", method="GET")
+		response = self._client.send_request(
+			endpoint=f"/nemo/v2/works/root/{work_id}",
+			method="GET",
+		)
 		return response.json()
 
 	def fetch_kn_work_versions(self, work_id: int) -> dict:
@@ -1356,7 +1391,11 @@ class NekoAIServices:
 		Returns:
 			提示词信息
 		"""
-		response = self._client.send_request(endpoint="/neko/text2img/prompt", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/text2img/prompt",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_ai_painting_templates(self, template_type: str) -> dict:
@@ -1367,7 +1406,13 @@ class NekoAIServices:
 		Returns:
 			模板列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ai-painting/templates?type={template_type}", method="GET", base_url_key="creation")
+		params = {"type": template_type}
+		response = self._client.send_request(
+			endpoint="/neko/ai-painting/templates",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def match_ai_painting(self, data: dict) -> dict:
@@ -1449,7 +1494,11 @@ class NekoPlatformServices:
 		Returns:
 			已发布作品详情
 		"""
-		response = self._client.send_request(endpoint=f"/neko/community/player/published-work-detail/{work_id}", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/community/player/published-work-detail/{work_id}",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 素材相关 API
@@ -1461,7 +1510,8 @@ class NekoPlatformServices:
 		Returns:
 			分类列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/material/categories?type={material_type}", method="GET", base_url_key="creation")
+		params = {"type": material_type}
+		response = self._client.send_request(endpoint="/neko/material/categories", method="GET", params=params, base_url_key="creation")
 		return response.json()
 
 	def fetch_material_list(self, second_id: str, limit: int = 20, offset: int = 0) -> dict:
@@ -1475,11 +1525,16 @@ class NekoPlatformServices:
 			素材列表
 		"""
 		params = {"second_id": second_id, "limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="/neko/material/list", method="GET", params=params, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/material/list",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 排行榜相关 API
-	def fetch_ranking_records(self, ranking_id: str, work_id: str) -> dict:
+	def fetch_ranking_records(self, ranking_id: str, work_id: int) -> dict:
 		"""
 		获取排行榜记录
 		Args:
@@ -1488,10 +1543,16 @@ class NekoPlatformServices:
 		Returns:
 			排行榜记录列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/record/list?id={ranking_id}&work_id={work_id}", method="GET", base_url_key="creation")
+		params = {"id": ranking_id, "work_id": work_id}
+		response = self._client.send_request(
+			endpoint="/neko/ranking-list/record/list",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
-	def add_ranking_record(self, data: dict) -> dict:
+	def add_ranking_record(self, work_id: int, value: str, ranking_id: int) -> dict:
 		"""
 		添加排行榜记录
 		Args:
@@ -1499,6 +1560,7 @@ class NekoPlatformServices:
 		Returns:
 			添加结果
 		"""
+		data = {"work_id": work_id, "value": value, "id": ranking_id}
 		response = self._client.send_request(endpoint="/neko/ranking-list/record", method="POST", payload=data, base_url_key="creation")
 		return response.json()
 
@@ -1513,7 +1575,7 @@ class NekoPlatformServices:
 		response = self._client.send_request(endpoint="/neko/ranking-list", method="POST", payload=data, base_url_key="creation")
 		return response.json()
 
-	def delete_ranking_list(self, ranking_id: str, work_id: str) -> dict:
+	def delete_ranking_list(self, ranking_id: str, work_id: int) -> dict:
 		"""
 		删除排行榜
 		Args:
@@ -1574,7 +1636,11 @@ class NekoPlatformServices:
 		Returns:
 			删除结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/package/{package_id}", method="DELETE", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/package/{package_id}",
+			method="DELETE",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 课程相关 API
@@ -1586,7 +1652,12 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint="/neko/course/user/progress", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/course/user/progress",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def submit_course_work(self, data: dict) -> dict:
@@ -1597,7 +1668,12 @@ class NekoPlatformServices:
 		Returns:
 			提交结果
 		"""
-		response = self._client.send_request(endpoint="/neko/course/user/course-work", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/course/user/course-work",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def translate_kitten_work(self, data: dict) -> dict:
@@ -1608,7 +1684,12 @@ class NekoPlatformServices:
 		Returns:
 			翻译结果
 		"""
-		response = self._client.send_request(endpoint="/kitten/work/translate", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/kitten/work/translate",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 图像分类相关 API
@@ -1622,7 +1703,12 @@ class NekoPlatformServices:
 			分类列表
 		"""
 		params = {"limit": limit, "offset": offset}
-		response = self._client.send_request(endpoint="/neko/image-classify/list", method="GET", params=params, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/image-classify/list",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def submit_image_classify(self, data: dict) -> dict:
@@ -1633,7 +1719,12 @@ class NekoPlatformServices:
 		Returns:
 			分类结果
 		"""
-		response = self._client.send_request(endpoint="/neko/image-classify", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/image-classify",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def update_image_classify(self, classify_id: str, data: dict) -> dict:
@@ -1645,7 +1736,12 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/image-classify/{classify_id}", method="PUT", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/image-classify/{classify_id}",
+			method="PUT",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def delete_image_classify(self, classify_id: str) -> dict:
@@ -1656,7 +1752,11 @@ class NekoPlatformServices:
 		Returns:
 			删除结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/image-classify/{classify_id}", method="DELETE", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/image-classify/{classify_id}",
+			method="DELETE",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 教学计划相关 API
@@ -1668,10 +1768,15 @@ class NekoPlatformServices:
 		Returns:
 			保存结果
 		"""
-		response = self._client.send_request(endpoint="/neko/teaching-plan/save/team/work", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/teaching-plan/save/team/work",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
-	def fetch_teaching_plan_logs(self, work_id: str, offset: int = 0, limit: int = 20) -> dict:
+	def fetch_teaching_plan_logs(self, work_id: int, offset: int = 0, limit: int = 20) -> dict:
 		"""
 		获取教学计划操作日志
 		Args:
@@ -1682,7 +1787,12 @@ class NekoPlatformServices:
 			操作日志列表
 		"""
 		params = {"work_id": work_id, "offset": offset, "limit": limit}
-		response = self._client.send_request(endpoint="/neko/teaching-plan/list/opr/log", method="GET", params=params, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/teaching-plan/list/opr/log",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def add_teaching_plan_log(self, data: dict) -> dict:
@@ -1693,10 +1803,15 @@ class NekoPlatformServices:
 		Returns:
 			添加结果
 		"""
-		response = self._client.send_request(endpoint="/neko/teaching-plan/add/opr/log", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/teaching-plan/add/opr/log",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
-	def fetch_work_editing_status(self, work_id: str) -> dict:
+	def fetch_work_editing_status(self, work_id: int) -> dict:
 		"""
 		获取作品编辑状态
 		Args:
@@ -1704,7 +1819,11 @@ class NekoPlatformServices:
 		Returns:
 			编辑状态信息
 		"""
-		response = self._client.send_request(endpoint=f"/neko/teaching-plan/work/editing-status/{work_id}", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/teaching-plan/work/editing-status/{work_id}",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def set_work_editing_status(self, data: dict) -> dict:
@@ -1715,7 +1834,12 @@ class NekoPlatformServices:
 		Returns:
 			设置结果
 		"""
-		response = self._client.send_request(endpoint="/neko/teaching-plan/set/work/editing-status", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/teaching-plan/set/work/editing-status",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 作品相关补充 API
@@ -1727,7 +1851,12 @@ class NekoPlatformServices:
 		Returns:
 			保存结果
 		"""
-		response = self._client.send_request(endpoint="/neko/works/save-teacher-course-invite-url", method="POST", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/works/save-teacher-course-invite-url",
+			method="POST",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_player_work_detail(self, work_id: int) -> dict:
@@ -1738,7 +1867,11 @@ class NekoPlatformServices:
 		Returns:
 			作品详情
 		"""
-		response = self._client.send_request(endpoint=f"/neko/works/player/work-detail/{work_id}", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/works/player/work-detail/{work_id}",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_work_by_course_code(self, course_code: str) -> dict:
@@ -1750,7 +1883,12 @@ class NekoPlatformServices:
 			作品信息
 		"""
 		params = {"course_code": course_code}
-		response = self._client.send_request(endpoint="/neko/works/get-player-by-course-code", method="GET", params=params, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/works/get-player-by-course-code",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def troubleshoot_work_pics(self, work_id: int) -> dict:
@@ -1761,7 +1899,11 @@ class NekoPlatformServices:
 		Returns:
 			排查结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/works/pic-troubleshoot/{work_id}", method="PUT", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/works/pic-troubleshoot/{work_id}",
+			method="PUT",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 社区相关补充 API
@@ -1773,7 +1915,11 @@ class NekoPlatformServices:
 		Returns:
 			操作状态
 		"""
-		response = self._client.send_request(endpoint=f"/neko/community/check-user-opr-work-status/{work_id}", method="GET", base_url_key="creation")
+		response = self._client.send_request(
+			endpoint=f"/neko/community/check-user-opr-work-status/{work_id}",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 示例相关 API
@@ -1785,7 +1931,12 @@ class NekoPlatformServices:
 		Returns:
 			示例详情
 		"""
-		response = self._client.send_request(endpoint="/neko/sample/detail", method="GET", params=params, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/sample/detail",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_sample_list(self, subject_id: str) -> dict:
@@ -1796,7 +1947,13 @@ class NekoPlatformServices:
 		Returns:
 			示例列表
 		"""
-		response = self._client.send_request(endpoint=f"/neko/sample/list?subject_id={subject_id}", method="GET", base_url_key="creation")
+		params = {"subject_id": subject_id}
+		response = self._client.send_request(
+			endpoint="/neko/sample/list",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	# 排行榜补充 API
@@ -1808,7 +1965,12 @@ class NekoPlatformServices:
 		Returns:
 			更新结果
 		"""
-		response = self._client.send_request(endpoint="/neko/ranking-list/fullUpdate", method="PUT", payload=data, base_url_key="creation")
+		response = self._client.send_request(
+			endpoint="/neko/ranking-list/fullUpdate",
+			method="PUT",
+			payload=data,
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def clear_ranking_list(self, ranking_id: str) -> dict:
@@ -1819,7 +1981,13 @@ class NekoPlatformServices:
 		Returns:
 			清空结果
 		"""
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/clear?id={ranking_id}", method="PUT", base_url_key="creation")
+		params = {"id": ranking_id}
+		response = self._client.send_request(
+			endpoint="/neko/ranking-list/clear",
+			method="PUT",
+			params=params,
+			base_url_key="creation",
+		)
 		return response.json()
 
 
