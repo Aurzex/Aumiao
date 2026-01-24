@@ -285,7 +285,11 @@ class DataFetcher:
 
 	def fetch_user_certificate_info(self, user_id: int) -> dict:
 		params = {"user_id": user_id}
-		response = self._client.send_request(endpoint="https://api-wechatsbp-codemaster.codemao.cn/user/info/certificate", params=params, method="GET")
+		response = self._client.send_request(
+			endpoint="https://api-wechatsbp-codemaster.codemao.cn/user/info/certificate",
+			params=params,
+			method="GET",
+		)
 		return response.json()
 
 	# 获取未读板块消息数量

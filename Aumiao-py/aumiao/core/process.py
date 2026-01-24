@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from json import JSONDecodeError, loads
 from pathlib import Path
-from random import choice, randint
+from random import choice
 from time import sleep
 from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
@@ -139,6 +139,10 @@ class DetailDisplayProcessor(BaseProcessor):
 		elif context.is_reprocess_mode:
 			self.printer.print_header("=== 重新处理项目 ===")
 		# 显示举报详情
+		self._display_report_details(item_ndd, report_type, config)
+
+	def _display_report_details(self, item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
+		"""显示举报详情"""
 		self.printer.print_header("=== 举报详情 ===")
 		self.printer.print_message(f"举报 ID: {item_ndd['id']}", "INFO")
 		self.printer.print_message(f"举报类型: {report_type}", "INFO")
@@ -150,6 +154,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			self.printer.print_message(f"举报内容: {content_text}", "SUCCESS")
 		else:
 			self.printer.print_message("举报内容: 无内容", "SUCCESS")
+
 		# 显示板块信息
 		board_name = item_ndd.get("board_name", "UNKNOWN")
 		if board_name == "UNKNOWN" and config.source_name_field:
@@ -1157,7 +1162,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 				context = self._create_context(
 					first_record,
 					admin_id,
-					batch_mode=True,
+					is_batch_mode=True,
 				)
 				result = self.pipeline.execute(context)
 				if result.action:
@@ -1327,7 +1332,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
 			# 1. 获取评论详情列表
-			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=200)
+			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=500)
 			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
 				"ads": self.data.USER_DATA.ads,
@@ -1362,10 +1367,10 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			self.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
-	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:
+	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0914
 		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查学生账号是否可用
-		if not (self.auth_manager.student_accounts or self.auth_manager.student_tokens):
+		if not (self.auth_manager.student_accounts):
 			self.printer.print_message("未加载学生账号, 无法执行自动举报", "WARNING")
 			return
 		# 2. 询问是否执行自动举报
@@ -1388,8 +1393,11 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		}
 		source_key = source_key_map[source_type]
 		# 5. 准备账号管理
-		# 复制可用账号列表, 避免修改原列表
-		available_accounts = self.auth_manager.student_accounts.copy() if self.auth_manager.auth_method == "grab" else self.auth_manager.student_tokens.copy()
+		# 新增: 初始化账号使用计数器
+		available_accounts = self.auth_manager.student_accounts.copy()  # 创建账号副本
+		account_usage_counter = dict.fromkeys(range(len(available_accounts)), 0)
+		current_account_index = 0
+		current_account_fail_count = 0  # 当前账号连续失败次数
 		self.printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
 		success_count = 0
 		# 6. 处理每条违规内容
@@ -1411,34 +1419,62 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			# 为当前违规项尝试举报
 			violation_success = False
 			retry_count = 0
-			max_retries = min(3, len(available_accounts))  # 最多重试 3 次或可用账号数
+			max_retries = min(3, len(available_accounts))
+			# 在开始处理当前违规项时检查是否需切换账号
+			if account_usage_counter.get(current_account_index, 0) >= 10:
+				old_index = current_account_index
+				current_account_index = (current_account_index + 1) % len(available_accounts)
+				account_usage_counter[current_account_index] = 0
+				current_account_fail_count = 0
+				self.printer.print_message(f"账号{old_index + 1}已使用10次, 切换到账号{current_account_index + 1}", "INFO")
+
 			while not violation_success and retry_count < max_retries and available_accounts:
-				# 切换学生账号
-				if self.auth_manager.auth_method == "grab":
-					self.auth_manager.student_accounts = available_accounts.copy()
-				else:
-					self.auth_manager.student_tokens = available_accounts.copy()
+				# 设置当前账号
+				current_account = available_accounts[current_account_index]
+				self.auth_manager.student_accounts = [current_account]
+
+				# 切换到学生账号
 				if not self.auth_manager.switch_to_student_account():
-					# 切换失败, 移除当前账号并重试
-					if available_accounts:
-						available_accounts.pop(0)
+					# 切换失败
+					current_account_fail_count += 1
 					retry_count += 1
+
+					# 如果当前账号连续失败3次
+					if current_account_fail_count >= 3:
+						self.printer.print_message(f"账号{current_account_index + 1}连续失败3次, 从列表中移除", "WARNING")
+						# 移除失败账号
+						available_accounts.pop(current_account_index)
+						# 从使用计数器中移除对应账号
+						account_usage_counter = dict.fromkeys(range(len(available_accounts)), 0)
+
+						# 如果还有账号, 调整索引
+						if available_accounts:
+							# 重新初始化计数器后, current_account_index需要调整
+							current_account_index = current_account_index % len(available_accounts) if len(available_accounts) > 0 else 0
+							current_account_fail_count = 0
+							self.printer.print_message(f"切换到账号{current_account_index + 1}继续处理", "INFO")
+						else:
+							self.printer.print_message("所有账号均已失效, 停止处理", "ERROR")
+							break
+
 					continue
-				# 获取当前学生账号 ID
+				# 重置连续失败计数
+				current_account_fail_count = 0
+				# 获取当前学生账号ID
 				try:
 					user_details = self.user_obtain.fetch_account_details()
 					user_details_ndd = data.NestedDefaultDict(user_details)
 					reporter_id = user_details_ndd["id"]
+					print(reporter_id)
 					if reporter_id == "UNKNOWN":
-						msg = "获取学生账号 ID 失败"
+						msg = "获取学生账号ID失败"
 						raise ValueError(msg)  # noqa: TRY301
 				except Exception as e:
 					self.printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
-					# 移除当前账号并重试
-					if available_accounts:
-						available_accounts.pop(0)
+					current_account_fail_count += 1
 					retry_count += 1
 					continue
+
 				# 执行举报操作
 				try:
 					if self._execute_report_action(
@@ -1451,20 +1487,28 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 						parent_id=parent_id,
 						is_reply=is_reply,
 					):
-						self.printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
+						# 举报成功
+						current_usage = account_usage_counter.get(current_account_index, 0) + 1
+						account_usage_counter[current_account_index] = current_usage
+
+						self.printer.print_message(f"[{idx}/{len(violations)}] 账号{current_account_index + 1} (使用{current_usage}/10次) 举报成功: {violation}", "SUCCESS")
 						success_count += 1
 						violation_success = True
 					else:
-						self.printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
-						# 移除当前账号并重试
-						if available_accounts:
-							available_accounts.pop(0)
+						# 举报失败
+						current_usage = account_usage_counter.get(current_account_index, 0) + 1
+						account_usage_counter[current_account_index] = current_usage
+
+						self.printer.print_message(f"[{idx}/{len(violations)}] 账号{current_account_index + 1} (使用{current_usage}/10次) 举报失败: {violation}", "ERROR")
+						current_account_fail_count += 1
 						retry_count += 1
 				except Exception as e:
+					# 异常情况
+					current_usage = account_usage_counter.get(current_account_index, 0) + 1
+					account_usage_counter[current_account_index] = current_usage
+
 					self.printer.print_message(f"[{idx}/{len(violations)}] 执行举报异常: {e!s}", "ERROR")
-					# 移除当前账号并重试
-					if available_accounts:
-						available_accounts.pop(0)
+					current_account_fail_count += 1
 					retry_count += 1
 			# 如果当前违规项处理失败, 记录日志
 			if not violation_success:
@@ -1491,7 +1535,11 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			match source_key:
 				# 作品模块: 举报作品评论
 				case "work":
-					return self.work_motion.execute_report_comment(work_id=target_id, comment_id=source_id, reason=reason_content)
+					return self.work_motion.execute_report_comment(
+						work_id=source_id,
+						comment_id=target_id,
+						reason=reason_content,
+					)
 				# 论坛模块: 举报帖子评论 / 回复
 				case "forum":
 					item_type = "COMMENT" if is_reply else "REPLY"  # 回复 / 普通评论区分
@@ -1527,8 +1575,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 @decorator.singleton
 class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 	def __init__(self) -> None:
-		self.student_accounts = []
-		self.student_tokens = []
+		self.student_accounts: list[tuple] = []
 		self.auth_method = "grab"
 		super().__init__()
 
@@ -1555,10 +1602,31 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 				self.student_accounts = list(Obtain().switch_edu_account(limit=account_count, return_method="list"))
 				self.printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 			elif method == "load":
-				# 从文件加载学生账号 Token (文件路径在 data 模块定义)
-				token_list = self.file.read_line(data.PathConfig.TOKEN_FILE_PATH)
-				self.student_tokens = [token.strip() for token in token_list if token.strip()]  # 过滤空行
-				self.printer.print_message(f"已从文件加载 {len(self.student_tokens)} 个学生账号 Token", "SUCCESS")
+				password_file_path = Path(data.PathConfig.PASSWORD_FILE_PATH)
+				if not password_file_path.exists():
+					self.printer.print_message(f"密码文件不存在: {password_file_path}", "ERROR")
+					self.student_accounts = []
+					return
+
+				# 读取文件内容
+				with password_file_path.open("r", encoding="utf-8") as f:
+					lines = f.readlines()
+				# 解析每行格式: {identity}:{password}
+				self.student_accounts = []
+				for line in lines:
+					line = line.strip()  # noqa: PLW2901
+					if not line or line.startswith("#"):
+						continue  # 跳过空行和注释
+					if ":" not in line:
+						self.printer.print_message(f"跳过格式错误的行: {line}", "WARNING")
+						continue
+					identity, password = line.split(":", 1)
+					self.student_accounts.append((identity.strip(), password.strip()))
+				if not self.student_accounts:
+					self.printer.print_message("密码文件中没有有效的账号密码", "ERROR")
+					return
+
+				self.printer.print_message(f"已从文件加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 		except Exception as e:
 			# 捕获所有异常 (文件不存在、接口错误等)
 			self.printer.print_message(f"加载学生账号失败: {e!s}", "ERROR")
@@ -1568,32 +1636,23 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 		auth.AuthManager().restore_admin_account()
 
 	def switch_to_student_account(self) -> bool:
-		"""切换到学生账号: 供举报处理类调用, 返回切换结果"""
-		# 确定可用账号列表 (实时获取的账密 / 文件加载的 Token)
-		available_accounts = self.student_accounts or self.student_tokens
-		if not available_accounts:
+		"""切换到学生账号"""
+		if not self.student_accounts:
 			return False
-		# 随机选择一个账号 (避免重复使用)
-		selected_account = available_accounts.pop(randint(0, len(available_accounts) - 1))
 		try:
-			if self.auth_method == "grab":
-				# 实时获取的账号: 用账密认证
-				username, password = selected_account
-				self.printer.print_message(f"切换学生账号: {id(username)}", "INFO")
-				sleep(2)  # 避免接口限流
-				self.auth.login(
-					identity=username,
-					password=password,
-					status="edu",  # 教育账号标识
-				)
-			else:
-				# 文件加载的账号: 用 Token 切换
-				token = cast("str", selected_account)
-				self.printer.print_message(f"切换学生账号: {id(token)}", "INFO")
-				self.client.switch_identity(token=token, identity="edu")
+			# 账密登录方式
+			username, password = self.student_accounts.pop()
+			print(f"切换学生账号: {username}")
+			# 登录获取 token
+			self.auth.login(
+				identity=username,
+				password=password,
+				status="edu",
+			)
+
 		except Exception as e:
-			self.printer.print_message(f"学生账号切换失败: {e!s}", "ERROR")
-			return False  # 切换失败
+			print(f"学生账号切换失败: {e}")
+			return False
 		else:
 			return True
 

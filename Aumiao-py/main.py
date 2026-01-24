@@ -369,7 +369,7 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 		services.batch_operations.batch_like(user_id=user_id, content_type="work")
 		print(printer.color_text("自动点赞完成", "SUCCESS"))
 	elif sub_choice == "2":
-		mode = get_enum_input("模式", {"delete", "create", "token"})
+		mode = get_enum_input("模式", {"delete", "create", "token", "password"})
 		mode = cast("Literal ['delete', 'create', 'token', 'password']", mode)
 		limit = get_positive_int_input("数量", max_value=200)
 		services.batch_operations.manage_edu_accounts(action=mode, limit=limit)
