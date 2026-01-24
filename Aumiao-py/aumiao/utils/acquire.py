@@ -289,15 +289,15 @@ class BaseHTTPClient:
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
-				print("&" * 50)
-				print("Headers:", request_headers)
-				print("URL:", url)
-				print("Method:", method)
-				print("Params:", params)
-				print("Data:", data)
-				print("Payload:", payload)
-				print("Files:", files)
-				print("&" * 50)
+				# print("&" * 50)
+				# print("Headers:", request_headers)
+				# print("URL:", url)
+				# print("Method:", method)
+				# print("Params:", params)
+				# print("Data:", data)
+				# print("Payload:", payload)
+				# print("Files:", files)
+				# print("&" * 50)
 				response = self._execute_request(
 					method=method,
 					url=url,

@@ -207,7 +207,6 @@ class LoginHandler:
 		ticket = ticket_response["ticket"]
 
 		response = self.processor.get_login_security_info(identity, password, ticket, pid)
-		print(response)
 		self.client.switch_identity(token=response["auth"]["token"], identity=status.value)
 
 		return LoginResult(success=True, method=LoginMethod.SECURE_PASSWORD, message="安全密码登录成功", data=response)

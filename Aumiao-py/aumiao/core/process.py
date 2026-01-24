@@ -678,7 +678,7 @@ class ViolationChecker:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
 			# 1. 获取评论详情列表
-			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=500)
+			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=2000)
 
 			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
