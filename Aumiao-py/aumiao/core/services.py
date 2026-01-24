@@ -1332,7 +1332,12 @@ class BatchOperationService:
 			return True
 
 	def _generate_account_credentials(self, cred_type: Literal["token", "password"], limit: int | None) -> bool:
-		"""生成账号凭证"""
+		"""生成账号凭证
+
+		Args:
+			cred_type: 凭证类型, token 或 password
+			limit: 生成凭证的数量限制, None 表示无限制
+		"""
 		try:
 			accounts = Obtain().switch_edu_account(limit=limit, return_method="list")
 			credentials = []
@@ -1341,16 +1346,21 @@ class BatchOperationService:
 					# 登录获取 token
 					response = self.auth_manager.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
 					credential = response["data"]["auth"]["token"]
+					# 只写入 token,不包含账号信息
+					content = f"{credential}\n"
 					file_path = data.PathConfig.TOKEN_FILE_PATH
-					file_method = "a"  # 追加模式
 				else:  # password
 					credential = password
+					# 写入账号和密码, 格式:账号:密码
+					content = f"{identity}:{password}\n"
 					file_path = data.PathConfig.PASSWORD_FILE_PATH
-					file_method = "a"
 				credentials.append(credential)
 				# 写入文件
-				content = f"{credential}\n" if cred_type == "token" else f"{identity}:{credential}\n"
-				self.coordinator.file.file_write(path=file_path, content=content, method=file_method)
+				self.coordinator.file.file_write(
+					path=file_path,
+					content=content,
+					method="a",  # 追加模式
+				)
 			print(f"已生成 {len(credentials)} 个 {cred_type}")
 		except Exception as e:
 			print(f"生成 {cred_type} 失败: {e!s}")
@@ -1395,64 +1405,6 @@ class BatchOperationService:
 			return bool(result)
 		except Exception as e:
 			print(f"创建评论失败: {e!s}")
-			return False
-
-	def report_item(
-		self,
-		source_type: Literal["forum", "work", "shop"],
-		target_id: int,
-		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
-		reason_content: str,
-		description: str = "",
-		*,
-		is_reply: bool = False,
-		parent_id: int | None = None,
-	) -> bool:
-		"""
-		执行举报操作
-		Args:
-			source_type: 来源类型
-			target_id: 目标 ID
-			reason_id: 原因 ID
-			reason_content: 原因内容
-			description: 描述
-			is_reply: 是否为回复
-			parent_id: 父 ID (仅 shop 类型需要)
-		Returns:
-			是否成功
-		"""
-		try:
-			if source_type == "work":
-				return self.coordinator.work_motion.execute_report_comment(
-					work_id=target_id,
-					comment_id=target_id,
-					reason=reason_content,
-				)
-			if source_type == "forum":
-				item_type = "COMMENT" if is_reply else "REPLY"
-				return self.coordinator.forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
-			if source_type == "shop":
-				if is_reply and parent_id is not None:
-					return self.coordinator.shop_motion.execute_report_comment(
-						comment_id=target_id,
-						reason_content=reason_content,
-						reason_id=reason_id,
-						reporter_id=int(self.coordinator.data.ACCOUNT_DATA.id),
-						comment_parent_id=parent_id,
-						description=description,
-					)
-				return self.coordinator.shop_motion.execute_report_comment(
-					comment_id=target_id,
-					reason_content=reason_content,
-					reason_id=reason_id,
-					reporter_id=int(self.coordinator.data.ACCOUNT_DATA.id),
-					description=description,
-				)
-			print(f"不支持的来源类型: {source_type}")
-		except Exception as e:
-			print(f"举报操作失败: {e!s}")
-			return False
-		else:
 			return False
 
 

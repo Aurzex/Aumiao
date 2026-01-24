@@ -300,10 +300,10 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 		return result
 
 	@overload
-	def switch_edu_account(self, limit: int | None, return_method: Literal["generator"]) -> Iterator[Any]: ...
+	def switch_edu_account(self, limit: int | None, return_method: Literal["generator"]) -> Iterator[tuple]: ...
 	@overload
-	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[Any]: ...
-	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[Any] | list[Any]:
+	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[tuple]: ...
+	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[tuple] | list[tuple]:
 		"""获取教育账号信息"""
 		try:
 			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
@@ -331,8 +331,6 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 					student = students_copy.pop(randint(0, len(students_copy) - 1))
 					result.append(process_student(student))
 				return result
-			msg = f"不支持的返回方式: {return_method}"
-			raise ValueError(msg)  # noqa: TRY301
 		except Exception as e:
 			print(f"获取教育账号失败: {e}")
 			return iter([]) if return_method == "generator" else []

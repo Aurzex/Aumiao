@@ -8,7 +8,7 @@ from pathlib import Path
 from random import choice
 from time import sleep
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict
 
 import httpx
 import websocket
@@ -286,10 +286,18 @@ class BaseHTTPClient:
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
 		log_enabled = bool(self.config.log_requests and log)
-		sleep(1)
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
+				print("&" * 50)
+				print("Headers:", request_headers)
+				print("URL:", url)
+				print("Method:", method)
+				print("Params:", params)
+				print("Data:", data)
+				print("Payload:", payload)
+				print("Files:", files)
+				print("&" * 50)
 				response = self._execute_request(
 					method=method,
 					url=url,
@@ -644,7 +652,7 @@ class BaseHTTPClient:
 		"""关闭 HTTP 客户端"""
 		self._http_client.close()
 
-	def __enter__(self) -> "BaseHTTPClient":
+	def __enter__(self) -> Self:
 		return self
 
 	def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
@@ -685,13 +693,22 @@ class CodeMaoClient(BaseHTTPClient):
 		try:
 			# 使用身份管理器切换身份
 			self.identity_manager.switch_identity(identity, token)
-			# 获取身份认证头并更新
+			# 获取身份认证头
 			identity_headers = self.identity_manager.get_identity_headers()
 			if identity_headers and identity_headers.get("Authorization"):
-				self.update_headers(identity_headers)
+				# 关键修复: 直接更新底层 HTTP 客户端的 headers
+				auth_header = identity_headers["Authorization"]
+				if not auth_header.startswith("Bearer "):
+					auth_header = f"Bearer {auth_header}"
+				# 强制更新到 httpx 客户端
+				self._http_client.headers["Authorization"] = auth_header
+				# 同时更新实例的 headers 属性
+				if hasattr(self, "headers"):
+					self.headers["Authorization"] = auth_header
 				print(f"已切换到身份: {identity}")
+				print(f"认证头已更新: {auth_header[:30]}...")
 			else:
-				print(f"警告: 身份 '{identity}' 的认证头为空")
+				print(f"切换失败: 身份 '{identity}' 的认证头为空")
 		except Exception as e:
 			print(f"切换身份失败: {e}")
 
@@ -784,7 +801,7 @@ class CodeMaoWebSocketClient(IWebSocketClient):
 	def close(self) -> None:
 		self.disconnect()
 
-	def __enter__(self) -> "CodeMaoWebSocketClient":
+	def __enter__(self) -> Self:
 		return self
 
 	def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
