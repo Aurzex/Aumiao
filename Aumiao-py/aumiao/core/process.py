@@ -16,6 +16,203 @@ from aumiao.core.retrieve import Obtain
 from aumiao.utils import acquire
 from aumiao.utils.tool import DataConverter, DataProcessor, GenericDataViewer, StringProcessor, TimeUtils
 
+# ========================== 策略模式相关定义 ==========================
+
+
+class ProcessStrategy[T: Literal["duplicates", "ads", "blacklist"]](ABC):
+	"""处理策略抽象基类"""
+
+	@abstractmethod
+	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[T, Any], target_lists: defaultdict[str, list[str]]) -> None:
+		"""处理评论的核心方法"""
+
+
+class AdsProcessStrategy(ProcessStrategy):
+	"""广告处理策略"""
+
+	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["ads"], Any], target_lists: defaultdict[str, list[str]]) -> None:
+		"""处理广告评论"""
+		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists)
+
+	def _process_abnormal_comments(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		action_type: str,
+		params: dict[Literal["ads"], Any],
+		target_lists: defaultdict[str, list[str]],
+	) -> None:
+		"""处理异常评论: 广告"""
+		for comment in comments:
+			# 跳过置顶评论
+			if comment.get("is_top"):
+				continue
+
+			# 检查主评论
+			if self._check_condition(comment, action_type, params):
+				identifier = f"{item_id}.{comment['id']}:comment"
+				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
+
+			# 检查回复
+			for reply in comment.get("replies", []):
+				if self._check_condition(reply, action_type, params):
+					identifier = f"{item_id}.{reply['id']}:reply"
+					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
+
+	@staticmethod
+	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["ads"], Any]) -> bool:
+		"""检查内容是否符合处理条件"""
+		content = data.get("content", "").lower()
+		if action_type == "ads":
+			return any(ad in content for ad in params.get("ads", []))
+		return False
+
+	@staticmethod
+	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
+		"""记录日志并添加标识到目标列表"""
+		log_templates = {"ads": "广告 {type} [{title}]{parent} : {content}"}
+
+		# 区分评论/回复类型
+		log_type = "回复" if ":reply" in identifier else "评论"
+		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
+
+		# 生成日志信息
+		if action_type in log_templates:
+			log_message = log_templates[action_type].format(
+				type=log_type,
+				title=title[:10],
+				parent=parent_info,
+				content=data.get("content", "")[:50],
+				nickname=data.get("nickname", "未知用户"),
+			)
+			print(log_message)
+
+		# 添加到目标列表
+		target_lists[action_type].append(identifier)
+
+
+class BlacklistProcessStrategy(ProcessStrategy):
+	"""黑名单处理策略"""
+
+	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["blacklist"], Any], target_lists: defaultdict[str, list[str]]) -> None:
+		"""处理黑名单用户评论"""
+		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="blacklist", params=params, target_lists=target_lists)
+
+	def _process_abnormal_comments(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		action_type: str,
+		params: dict[Literal["blacklist"], Any],
+		target_lists: defaultdict[str, list[str]],
+	) -> None:
+		"""处理异常评论: 黑名单"""
+		for comment in comments:
+			# 跳过置顶评论
+			if comment.get("is_top"):
+				continue
+
+			# 检查主评论
+			if self._check_condition(comment, action_type, params):
+				identifier = f"{item_id}.{comment['id']}:comment"
+				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
+
+			# 检查回复
+			for reply in comment.get("replies", []):
+				if self._check_condition(reply, action_type, params):
+					identifier = f"{item_id}.{reply['id']}:reply"
+					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
+
+	@staticmethod
+	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["blacklist"], Any]) -> bool:
+		"""检查内容是否符合处理条件"""
+		user_id = str(data.get("user_id", ""))
+		if action_type == "blacklist":
+			return user_id in params.get("blacklist", set())
+		return False
+
+	@staticmethod
+	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
+		"""记录日志并添加标识到目标列表"""
+		log_templates = {"blacklist": "黑名单 {type} [{title}]{parent} : {nickname}"}
+
+		# 区分评论/回复类型
+		log_type = "回复" if ":reply" in identifier else "评论"
+		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
+
+		# 生成日志信息
+		if action_type in log_templates:
+			log_message = log_templates[action_type].format(
+				type=log_type,
+				title=title[:10],
+				parent=parent_info,
+				content=data.get("content", "")[:50],
+				nickname=data.get("nickname", "未知用户"),
+			)
+			print(log_message)
+
+		# 添加到目标列表
+		target_lists[action_type].append(identifier)
+
+
+class DuplicatesProcessStrategy(ProcessStrategy):
+	"""重复评论处理策略"""
+
+	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["duplicates"], Any], target_lists: defaultdict[str, list[str]]) -> None:  # noqa: ARG002
+		"""处理重复刷屏评论"""
+		content_map: defaultdict[tuple, list[str]] = defaultdict(list)
+
+		# 追踪所有评论和回复
+		for comment in comments:
+			self._track_comment(comment, item_id, content_map, is_reply=False)
+			for reply in comment.get("replies", []):
+				self._track_comment(reply, item_id, content_map, is_reply=True)
+
+		# 筛选出超过阈值的重复内容
+		for (user_id, content), identifiers in content_map.items():
+			if len(identifiers) >= params["duplicates"]:
+				print(f"用户 {user_id} 刷屏评论: {content[:50]}... - 出现 {len(identifiers)} 次")
+				target_lists["duplicates"].extend(identifiers)
+
+	@staticmethod
+	def _track_comment(data: dict[str, Any], item_id: int, content_map: defaultdict[tuple, list[str]], *, is_reply: bool = False) -> None:
+		"""追踪评论内容用于重复检测"""
+		content_key = (data.get("user_id"), data.get("content", "").lower())
+		identifier = f"{item_id}.{data.get('id')}:{'reply' if is_reply else 'comment'}"
+		content_map[content_key].append(identifier)
+
+
+class ProcessStrategyFactory:
+	"""处理策略工厂"""
+
+	def __init__(self) -> None:
+		self._strategies: dict[str, ProcessStrategy] = {}
+		self._register_default_strategies()
+
+	def _register_default_strategies(self) -> None:
+		"""注册默认策略"""
+		self.register_strategy("ads", AdsProcessStrategy())
+		self.register_strategy("blacklist", BlacklistProcessStrategy())
+		self.register_strategy("duplicates", DuplicatesProcessStrategy())
+
+	def register_strategy(self, action_type: str, strategy: ProcessStrategy) -> None:
+		"""注册处理策略"""
+		self._strategies[action_type] = strategy
+
+	def get_strategy(self, action_type: Literal["ads", "blacklist", "duplicates"]) -> ProcessStrategy:
+		"""获取处理策略"""
+		strategy = self._strategies.get(action_type)
+		if not strategy:
+			msg = f"未支持的处理类型: {action_type}"
+			raise NotImplementedError(msg)
+		return strategy
+
+	def get_all_strategy_types(self) -> list[str]:
+		"""获取所有支持的处理类型"""
+		return list(self._strategies.keys())
+
 
 # ========================== 管道模式相关定义 ==========================
 class ProcessingError(Exception):
@@ -88,19 +285,23 @@ class OfficialCheckProcessor(BaseProcessor):
 		config = context.config
 		item_ndd = context.record["item"]
 		user_id_str = item_ndd[f"{config.user_field}_id"]
+
 		# 尝试获取用户 ID
 		if user_id_str != "UNKNOWN" and user_id_str.isdigit():
 			user_id = int(user_id_str)
 			context.user_id = user_id
+
 			# 检查是否为官方账号
 			if user_id in self.OFFICIAL_IDS:
 				context.messages.append("这是一条官方发布的内容, 自动通过")
 				context.action = "P"
 				context.processed = True
+
 				# 应用动作到记录
 				record = context.record
 				record["processed"] = True
 				record["action"] = "P"
+
 				# 获取状态映射
 				status_map = {
 					"D": "DELETE",
@@ -109,6 +310,7 @@ class OfficialCheckProcessor(BaseProcessor):
 					"U": "UNLOAD",
 					"P": "PASS",
 				}
+
 				# 这里需要实际执行动作
 				try:
 					# 使用 ReportProcessor 中的方法
@@ -133,11 +335,13 @@ class DetailDisplayProcessor(BaseProcessor):
 		item_ndd = context.record["item"]
 		report_type = context.report_type
 		config = context.config
+
 		# 显示处理头信息
 		if context.is_batch_mode:
 			self.printer.print_header("=== 批量处理首个项目 ===")
 		elif context.is_reprocess_mode:
 			self.printer.print_header("=== 重新处理项目 ===")
+
 		# 显示举报详情
 		self._display_report_details(item_ndd, report_type, config)
 
@@ -146,6 +350,7 @@ class DetailDisplayProcessor(BaseProcessor):
 		self.printer.print_header("=== 举报详情 ===")
 		self.printer.print_message(f"举报 ID: {item_ndd['id']}", "INFO")
 		self.printer.print_message(f"举报类型: {report_type}", "INFO")
+
 		# 显示内容
 		content = item_ndd[config.content_field]
 		if content != "UNKNOWN":
@@ -160,11 +365,13 @@ class DetailDisplayProcessor(BaseProcessor):
 		if board_name == "UNKNOWN" and config.source_name_field:
 			board_name = item_ndd[config.source_name_field]
 		self.printer.print_message(f"所属板块: {board_name}", "INFO")
+
 		# 显示被举报人信息
 		user_nickname = item_ndd.get(f"{config.user_field}_nick_name", "UNKNOWN")
 		if user_nickname == "UNKNOWN":
 			user_nickname = item_ndd.get(f"{config.user_field}_nickname", "UNKNOWN")
 		self.printer.print_message(f"被举报人: {user_nickname}", "INFO")
+
 		# 显示举报原因和时间
 		self.printer.print_message(f"举报原因: {item_ndd.get('reason_content', 'UNKNOWN')}", "INFO")
 		create_time = item_ndd.get("created_at", "UNKNOWN")
@@ -173,6 +380,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			self.printer.print_message(f"举报时间: {create_time_str}", "INFO")
 		else:
 			self.printer.print_message("举报时间: 未知", "INFO")
+
 		# 帖子类型额外信息
 		if report_type in {"post", "work"}:
 			self.printer.print_message(f"举报线索: {item_ndd.get('description', 'UNKNOWN')}", "INFO")
@@ -197,9 +405,11 @@ class ActionSelectionProcessor(BaseProcessor):
 		_record = context.record
 		_admin_id = context.admin_id
 		report_type = context.report_type
+
 		# 获取可用操作
 		available_actions = self.fetcher.registry.get_available_actions(report_type)
 		action_keys = [action.key for action in available_actions]
+
 		# 操作选择循环
 		while not context.processed:
 			prompt = self.fetcher.registry.get_action_prompt(report_type)
@@ -207,16 +417,19 @@ class ActionSelectionProcessor(BaseProcessor):
 				prompt=prompt,
 				valid_options=set(action_keys),
 			).upper()
+
 			# 处理状态变更操作
 			if choice in {"D", "S", "T", "P"}:
 				context.action = choice
 				self._apply_action(context)
 				context.processed = True
 				break
+
 			# 处理辅助操作
 			if choice == "C":
 				self._show_item_details(context)
 				continue
+
 			if choice == "F":
 				config = context.config
 				item_ndd = context.record["item"]
@@ -238,6 +451,7 @@ class ActionSelectionProcessor(BaseProcessor):
 					print("配置中没有 special_check 或不可调用")
 					self.printer.print_message("该类型不支持检查违规操作", "ERROR")
 					continue
+
 			if choice == "J":
 				context.skip_reason = "用户选择跳过"
 				self.printer.print_message("已跳过该举报", "INFO")
@@ -250,6 +464,7 @@ class ActionSelectionProcessor(BaseProcessor):
 		item_ndd = context.record["item"]
 		report_type = context.report_type
 		config = context.config
+
 		self.printer.print_header("=== 详细信息 ===")
 		post_id = item_ndd[config.source_id_field]
 		if post_id != "UNKNOWN":
@@ -266,6 +481,7 @@ class ActionSelectionProcessor(BaseProcessor):
 					f"所属帖子链接: https://shequ.codemao.cn/community/{source_id}",
 					"INFO",
 				)
+
 		# 违规用户链接
 		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
 		if user_id != "UNKNOWN":
@@ -281,6 +497,7 @@ class ActionSelectionProcessor(BaseProcessor):
 		source_id = item_ndd[config.source_id_field]
 		board_name = item_ndd.get("board_name", "UNKNOWN")
 		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
+
 		self.printer.print_header("=== 开始检查违规 ===")
 		# 调整来源类型
 		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # type: ignore  # noqa: PGH003
@@ -303,20 +520,26 @@ class ActionSelectionProcessor(BaseProcessor):
 		action = context.action
 		if not action:
 			return
+
 		config = self.fetcher.registry.get_config(record["report_type"])
+
 		# 检查动作是否可用
 		if not self.fetcher.registry.is_action_available(record["report_type"], action):
 			self.printer.print_message(f"动作 {action} 对类型 {record['report_type']} 不可用", "ERROR")
 			return
+
 		# 获取状态映射
 		status_map = self.fetcher.registry.get_status_mapping()
+
 		# 执行处理动作
 		try:
 			handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
 			handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=context.admin_id)
+
 			# 更新记录状态
 			record["processed"] = True
 			record["action"] = action
+
 			# 获取动作名称显示
 			action_config = next(
 				(ac for ac in config.available_actions if ac.key == action),
@@ -360,134 +583,257 @@ class ProcessingPipeline:
 		return cls(official_processor)
 
 
+# ========================== 处理器工厂 ==========================
+class ProcessorFactory:
+	"""处理器工厂 - 统一管理处理器的创建"""
+
+	@staticmethod
+	def create_processing_pipeline(printer: Any, fetcher: Any) -> ProcessingPipeline:
+		"""创建处理管道"""
+		return ProcessingPipeline.create_default_pipeline(printer, fetcher)
+
+
 @decorator.singleton
 class CommentProcessor:
+	"""评论处理器 - 使用策略模式优化"""
+
 	def __init__(self) -> None:
-		self._process_strategies = {"ads": self._process_ads, "blacklist": self._process_blacklist, "duplicates": self._process_duplicates}
+		self._strategy_factory = ProcessStrategyFactory()
 
 	def process_item(
 		self,
 		item: dict[str, Any],
 		config: ...,
-		action_type: str,
-		params: dict[Literal["ads", "blacklist", "spam_max"], Any],
+		action_type: Literal["duplicates", "ads", "blacklist"],
+		params: dict[Literal["ads", "blacklist", "duplicates"], Any],
 		target_lists: defaultdict[str, list[str]],
 	) -> None:
 		"""处理项目主入口, 根据 action_type 分发到对应处理策略"""
 		item_id = int(item["id"])
 		comments = config.get_comments(self, item_id)
 		title = item.get(config.title_key, "")
-		# 获取处理函数并执行
-		strategy = self._get_strategy(action_type)
-		strategy(comments=comments, item_id=item_id, title=title, params=params, target_lists=target_lists)
 
-	def register_strategy(self, action_type: str, handler: Callable) -> None:
+		# 获取处理策略并执行
+		strategy = self._strategy_factory.get_strategy(action_type)
+		strategy.process(comments=comments, item_id=item_id, title=title, params=params, target_lists=target_lists)
+
+	def register_strategy(self, action_type: str, strategy: ProcessStrategy) -> None:
 		"""注册自定义处理策略"""
-		if not callable(handler):
-			msg = "处理策略必须是可调用对象"
-			raise TypeError(msg)
-		self._process_strategies[action_type] = handler
+		self._strategy_factory.register_strategy(action_type, strategy)
 
-	def _get_strategy(self, action_type: str) -> Callable:
-		"""获取处理策略, 不存在则抛出异常"""
-		strategy = self._process_strategies.get(action_type)
-		if not strategy:
-			msg = f"未支持的处理类型: {action_type}"
-			raise NotImplementedError(msg)
-		return strategy
+	def get_all_strategy_types(self) -> list[str]:
+		"""获取所有支持的处理类型"""
+		return self._strategy_factory.get_all_strategy_types()
 
-	# ========================== 内置处理策略 ==========================
-	def _process_ads(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]) -> None:
-		"""处理广告评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists)
 
-	def _process_blacklist(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[str, Any], target_lists: defaultdict[str, list[str]]) -> None:
-		"""处理黑名单用户评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="blacklist", params=params, target_lists=target_lists)
+# ========================== 违规检查器 ==========================
+class ViolationChecker:
+	"""违规检查器 - 提取ReportProcessor中的违规检查逻辑"""
 
-	def _process_duplicates(
+	def __init__(
 		self,
-		comments: list[dict[str, Any]],
-		item_id: int,
-		title: str,  # noqa: ARG002
-		params: dict[str, Any],
-		target_lists: defaultdict[str, list[str]],
+		printer: Any,
+		setting: Any,
+		data: Any,
+		comment_processor: CommentProcessor,
+		community_obtain: Any,
+		work_motion: Any,
+		forum_motion: Any,
+		shop_motion: Any,
+		forum_obtain: Any,
+		user_obtain: Any,
+		client: Any,
+		auth: Any,
 	) -> None:
-		"""处理重复刷屏评论"""
-		content_map: defaultdict[tuple, list[str]] = defaultdict(list)
-		# 追踪所有评论和回复
-		for comment in comments:
-			self._track_comment(comment, item_id, content_map, is_reply=False)
-			for reply in comment.get("replies", []):
-				self._track_comment(reply, item_id, content_map, is_reply=True)
-		# 筛选出超过阈值的重复内容
-		for (user_id, content), identifiers in content_map.items():
-			if len(identifiers) >= params["spam_max"]:
-				print(f"用户 {user_id} 刷屏评论: {content[:50]}... - 出现 {len(identifiers)} 次")
-				target_lists["duplicates"].extend(identifiers)
+		self.printer = printer
+		self.setting = setting
+		self.data = data
+		self.comment_processor = comment_processor
+		self.community_obtain = community_obtain
+		self.work_motion = work_motion
+		self.forum_motion = forum_motion
+		self.shop_motion = shop_motion
+		self.forum_obtain = forum_obtain
+		self.user_obtain = user_obtain
+		self.client = client
+		self.auth = auth
 
-	def _process_abnormal_comments(
-		self,
-		comments: list[dict[str, Any]],
-		item_id: int,
-		title: str,
-		action_type: str,
-		params: dict[str, Any],
-		target_lists: defaultdict[str, list[str]],
-	) -> None:
-		"""处理异常评论 广告 / 黑名单:"""
-		for comment in comments:
-			# 跳过置顶评论
-			if comment.get("is_top"):
-				continue
-			# 检查主评论
-			if self._check_condition(comment, action_type, params):
-				identifier = f"{item_id}.{comment['id']}:comment"
-				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
-			# 检查回复
-			for reply in comment.get("replies", []):
-				if self._check_condition(reply, action_type, params):
-					identifier = f"{item_id}.{reply['id']}:reply"
-					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
+	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: int | None) -> None:
+		"""检查举报内容违规"""
+		self.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
 
-	@staticmethod
-	def _check_condition(data: dict[str, Any], action_type: str, params: dict[str, Any]) -> bool:
-		"""检查内容是否符合处理条件"""
-		content = data.get("content", "").lower()
-		user_id = str(data.get("user_id", ""))
-		if action_type == "ads":
-			return any(ad in content for ad in params.get("ads", []))
-		if action_type == "blacklist":
-			return user_id in params.get("blacklist", set())
+		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
+		if not source_id:
+			self.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
+			return
+
+		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
+
+		# 分析违规评论
+		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
+
+		if not violations:
+			self.printer.print_message("未检测到违规评论", "INFO")
+			return
+
+		# 执行自动举报 (用学生账号)
+		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
+
+		# 帖子的违规检查: 重复发帖 (同一用户发布同标题帖子过多)
+		if source_type == "post" and user_id and user_id != "UNKNOWN":
+			try:
+				# 搜索同标题的帖子
+				post_results = list(self.forum_obtain.search_posts_gen(title=board_name, limit=None))
+				# 筛选当前用户发布的帖子
+				user_posts = DataProcessor().filter_by_nested_values(
+					data=post_results,
+					id_path="user.id",
+					target_values=[user_id],
+				)
+				# 超过阈值判定为垃圾帖
+				if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
+					self.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
+			except Exception as e:
+				self.printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
+
+	def _analyze_comment_violations(self, source_id: int, source_type: Literal["post", "work", "shop"], board_name: str) -> list[str]:
+		"""分析评论违规内容: 广告、黑名单、重复评论"""
+		try:
+			# 1. 获取评论详情列表
+			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=500)
+
+			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
+			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
+				"ads": self.data.USER_DATA.ads,
+				"blacklist": self.data.USER_DATA.black_room,
+				"duplicates": self.setting.PARAMETER.spam_del_max,
+			}
+
+			# 3. 调用评论处理器分析违规
+			class CommentCheckConfig:
+				title_key = "title"  # 标题字段名
+
+				@staticmethod
+				def get_comments(_processor: Callable, _item_id: int) -> list[dict]:
+					return comments  # 返回评论列表
+
+			config = CommentCheckConfig()
+			violation_targets: defaultdict[str, list[str]] = defaultdict(list)  # 违规内容列表
+
+			# 检查广告、黑名单、重复评论
+			for check_type in ["ads", "blacklist", "duplicates"]:
+				check_type = cast("Literal['ads', 'blacklist', 'duplicates']", check_type)
+				self.comment_processor.process_item(
+					item={"id": source_id, "title": board_name},
+					config=config,
+					action_type=check_type,
+					params=check_params,
+					target_lists=violation_targets,
+				)
+
+			# 合并所有违规内容 (去重, 避免重复举报)
+			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
+		except Exception as e:
+			self.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
+			return []
+
+	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:
+		"""处理自动举报: 用学生账号批量举报违规评论"""
+		# 1. 询问是否执行自动举报
+		if self.printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
+			self.printer.print_message("自动举报操作已取消", "INFO")
+			return
+
+		# 2. 获取举报原因
+		try:
+			report_reasons = self.community_obtain.fetch_report_reasons()
+			report_reasons_ndd = data.NestedDefaultDict(report_reasons)
+			reason_content = report_reasons_ndd["items"][7]["content"]
+		except (KeyError, IndexError) as e:
+			self.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
+			return
+
+		# 3. 来源类型映射
+		source_key_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {
+			"work": "work",
+			"post": "forum",
+			"shop": "shop",
+		}
+		source_key = source_key_map[source_type]
+
+		self.printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
+		success_count = 0
+
+		# 4. 处理每条违规内容
+		for idx, violation in enumerate(violations, 1):
+			try:
+				result = self._execute_single_report(violation=violation, source_id=source_id, source_key=source_key, reason_content=reason_content)
+				if result:
+					success_count += 1
+					self.printer.print_message(f"[{idx}/{len(violations)}] 举报成功: {violation}", "SUCCESS")
+				else:
+					self.printer.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
+			except Exception as e:
+				self.printer.print_message(f"[{idx}/{len(violations)}] 举报异常: {e!s}", "ERROR")
+
+		self.printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
+
+	def _execute_single_report(self, violation: str, source_id: int, source_key: Literal["work", "forum", "shop"], reason_content: str) -> bool:
+		"""执行单条举报"""
+		# 解析违规内容格式
+		violation_parts = violation.split(":")
+		if len(violation_parts) < 2:
+			self.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
+			return False
+
+		item_id_part = violation_parts[0].split(".")
+		if len(item_id_part) < 2:
+			self.printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
+			return False
+
+		_, comment_id = item_id_part
+		is_reply = "reply" in violation
+
+		# 查找父评论 ID
+		parent_id, _ = StringProcessor().find_substrings(text=comment_id, candidates=[violation])
+		parent_id = int(parent_id) if parent_id and parent_id != "UNKNOWN" else None
+
+		# 执行举报操作
+		try:
+			match source_key:
+				case "work":
+					return self.work_motion.execute_report_comment(
+						work_id=source_id,
+						comment_id=int(comment_id),
+						reason=reason_content,
+					)
+				case "forum":
+					item_type = "COMMENT" if is_reply else "REPLY"  # 回复/普通评论区分
+					return self.forum_motion.report_item(item_id=int(comment_id), reason_id=7, description="", item_type=item_type, return_data=False)
+				case "shop":
+					if is_reply and parent_id is not None:
+						# 回复类型: 需传入父评论 ID
+						return self.shop_motion.execute_report_comment(
+							comment_id=int(comment_id),
+							reason_content=reason_content,
+							reason_id=7,
+							reporter_id=0,  # 使用当前登录用户
+							comment_parent_id=parent_id,
+							description="",
+						)
+					# 普通评论: 无需父 ID
+					return self.shop_motion.execute_report_comment(
+						comment_id=int(comment_id),
+						reason_content=reason_content,
+						reason_id=7,
+						reporter_id=0,  # 使用当前登录用户
+						description="",
+					)
+		except Exception as e:
+			self.printer.print_message(f"举报操作失败: {e!s}", "ERROR")
+			return False
+
 		return False
-
-	@staticmethod
-	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
-		"""记录日志并添加标识到目标列表"""
-		# 日志模板配置
-		log_templates = {"ads": "广告 {type} [{title}]{parent} : {content}", "blacklist": "黑名单 {type} [{title}]{parent} : {nickname}"}
-		# 区分评论 / 回复类型
-		log_type = "回复" if ":reply" in identifier else "评论"
-		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
-		# 生成日志信息
-		if action_type in log_templates:
-			log_message = log_templates[action_type].format(
-				type=log_type,
-				title=title[:10],
-				parent=parent_info,
-				content=data.get("content", "")[:50],
-				nickname=data.get("nickname", "未知用户"),
-			)
-			print(log_message)
-		# 添加到目标列表
-		target_lists[action_type].append(identifier)
-
-	@staticmethod
-	def _track_comment(data: dict[str, Any], item_id: int, content_map: defaultdict[tuple, list[str]], *, is_reply: bool = False) -> None:
-		"""追踪评论内容用于重复检测"""
-		content_key = (data.get("user_id"), data.get("content", "").lower())
-		identifier = f"{item_id}.{data.get('id')}:{'reply' if is_reply else 'comment'}"
-		content_map[content_key].append(identifier)
 
 
 class ReplyProcessor:
@@ -1055,15 +1401,39 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self.auth_manager = ReportAuthManager()
 		self.fetcher = ReportFetcher()
 		self.batch_manager = BatchActionManager()
-		# 创建处理管道
-		self._pipeline = None
+		self.violation_checker = None  # 延迟初始化
+		self.comment_processor = CommentProcessor()
 		super().__init__()
+
+	@property
+	def violation_checker(self) -> ...:
+		"""获取违规检查器 (懒加载)"""
+		if self._violation_checker is None:
+			self._violation_checker = ViolationChecker(
+				printer=self.printer,
+				setting=self.setting,
+				data=self.data,
+				comment_processor=self.comment_processor,
+				community_obtain=self.community_obtain,
+				work_motion=self.work_motion,
+				forum_motion=self.forum_motion,
+				shop_motion=self.shop_motion,
+				forum_obtain=self.forum_obtain,
+				user_obtain=self.user_obtain,
+				client=self.client,
+				auth=self.auth,
+			)
+		return self._violation_checker
+
+	@violation_checker.setter
+	def violation_checker(self, value: ...) -> None:
+		self._violation_checker = value
 
 	@property
 	def pipeline(self) -> ProcessingPipeline:
 		"""获取处理管道 (懒加载)"""
 		if self._pipeline is None:
-			self._pipeline = ProcessingPipeline.create_default_pipeline(
+			self._pipeline = ProcessorFactory.create_processing_pipeline(
 				self.printer,
 				self.fetcher,
 			)
@@ -1074,6 +1444,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self.printer.print_header("=== 开始处理所有举报 ===")
 		self.batch_manager.clear_processed_records()
 		total_processed = 0
+
 		# 询问是否一键全部通过
 		auto_pass_choice = self.printer.get_valid_input(
 			prompt="是否一键全部通过所有待处理举报? (Y/N)",
@@ -1081,6 +1452,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		).upper()
 		if auto_pass_choice == "Y":  # noqa: S105
 			return self._pass_all_pending_reports(admin_id)
+
 		for chunk_count, chunk in enumerate(self.fetcher.fetch_reports_chunked(status="TOBEDONE")):
 			self.printer.print_message(
 				f"处理第 {chunk_count + 1} 块数据, 共 {len(chunk)} 条举报",
@@ -1093,6 +1465,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 				f"第 {chunk_count + 1} 块处理完成, 处理了 {chunk_processed} 条举报",
 				"SUCCESS",
 			)
+
 		self.printer.print_message(
 			f"所有举报处理完成, 共处理 {total_processed} 条举报",
 			"SUCCESS",
@@ -1102,12 +1475,15 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 	def _process_chunk_with_pipeline(self, chunk: list[ReportRecord], admin_id: int) -> int:
 		"""使用管道模式处理单个数据块"""
 		processed_count = 0
+
 		# 识别批量处理组
 		batch_groups = self._identify_batch_groups(chunk)
+
 		# 处理批量组
 		for group in batch_groups:
 			self._handle_batch_group_with_pipeline(group, chunk, admin_id)
 			processed_count += len(group.record_ids)
+
 		# 处理剩余单个项目
 		for record in chunk:
 			record_id = record["item"]["id"]
@@ -1118,9 +1494,11 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 				if result.action or result.skip_reason:
 					processed_count += 1
 					self.batch_manager.mark_record_processed(record_id)
+
 				# 更新记录状态
 				record["processed"] = result.processed
 				record["action"] = result.action
+
 		return processed_count
 
 	def _handle_batch_group_with_pipeline(
@@ -1134,6 +1512,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			f"处理批量组 [{group.group_type}] {group.group_key} (共 {len(group.record_ids)} 条举报)",
 			"INFO",
 		)
+
 		# 检查是否有保存的批量动作
 		saved_action = self.batch_manager.get_batch_action(
 			group.group_type,
@@ -1212,9 +1591,11 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 	) -> None:
 		"""应用简单动作 (不经过完整管道)"""
 		config = self.fetcher.registry.get_config(record["report_type"])
+
 		# 检查动作是否可用
 		if not self.fetcher.registry.is_action_available(record["report_type"], action):
 			return
+
 		# 执行处理动作
 		status_map = self.fetcher.registry.get_status_mapping()
 		handle_method = getattr(self.whale_motion, config.handle_method)
@@ -1254,20 +1635,24 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"""识别当前块中的批量处理组"""
 		item_id_groups = defaultdict(list)
 		content_groups = defaultdict(list)
+
 		for record in chunk:
 			record_id = record["item"]["id"]
 			item_id = record["item_id"]
 			content_key = self._get_content_key(record)
 			item_id_groups[item_id].append(record_id)
 			content_groups[content_key].append(record_id)
+
 		# 构建批量组
 		batch_groups = []
 		processed_record_ids = set()
+
 		# 同 ID 分组
 		for item_id, record_ids in item_id_groups.items():
 			if len(record_ids) >= self.batch_config["duplicate_threshold"]:
 				batch_groups.append(BatchGroup("item_id", item_id, tuple(record_ids)))
 				processed_record_ids.update(record_ids)
+
 		# 同内容分组
 		for content_key, record_ids in content_groups.items():
 			if len(record_ids) >= self.batch_config["content_threshold"]:
@@ -1276,6 +1661,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					content_summary = f"{content_key[1]}:{content_key[0][:20]}..."
 					batch_groups.append(BatchGroup("content", content_summary, tuple(filtered_record_ids)))
 					processed_record_ids.update(filtered_record_ids)
+
 		return batch_groups
 
 	def _get_content_key(self, record: ReportRecord) -> tuple:
@@ -1297,279 +1683,8 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		return None
 
 	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: int | None) -> None:
-		"""检查举报内容违规"""
-		self.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
-		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
-		if not source_id:
-			self.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
-			return
-		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
-		# 分析违规评论
-		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
-		if not violations:
-			self.printer.print_message("未检测到违规评论", "INFO")
-			return
-		# 执行自动举报 (用学生账号)
-		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
-		# 2. 帖子的违规检查: 重复发帖 (同一用户发布同标题帖子过多)
-		if source_type == "post" and user_id and user_id != "UNKNOWN":
-			try:
-				# 搜索同标题的帖子
-				post_results = list(self.forum_obtain.search_posts_gen(title=board_name, limit=None))
-				# 筛选当前用户发布的帖子
-				user_posts = DataProcessor().filter_by_nested_values(
-					data=post_results,
-					id_path="user.id",
-					target_values=[user_id],
-				)
-				# 超过阈值判定为垃圾帖
-				if len(user_posts) >= self.setting.PARAMETER.spam_del_max:
-					self.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
-			except Exception as e:
-				self.printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
-
-	def _analyze_comment_violations(self, source_id: int, source_type: Literal["post", "work", "shop"], board_name: str) -> list[str]:
-		"""分析评论违规内容: 广告、黑名单、重复评论"""
-		try:
-			# 1. 获取评论详情列表
-			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=500)
-			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
-			check_params: dict[Literal["ads", "blacklist", "spam_max"], list[str] | int] = {
-				"ads": self.data.USER_DATA.ads,
-				"blacklist": self.data.USER_DATA.black_room,
-				"spam_max": self.setting.PARAMETER.spam_del_max,
-			}
-			# 3. 调用评论处理器分析违规
-			comment_processor = CommentProcessor()
-			# 临时配置类: 适配评论处理器的参数要求
-
-			class CommentCheckConfig:
-				title_key = "title"  # 标题字段名
-
-				@staticmethod
-				def get_comments(_processor: Callable, _item_id: int) -> list[dict]:
-					return comments  # 返回评论列表
-
-			config = CommentCheckConfig()
-			violation_targets: defaultdict[str, list[str]] = defaultdict(list)  # 违规内容列表
-			# 检查广告、黑名单、重复评论
-			for check_type in ["ads", "blacklist", "duplicates"]:
-				comment_processor.process_item(
-					item={"id": source_id, "title": board_name},
-					config=config,
-					action_type=check_type,
-					params=check_params,
-					target_lists=violation_targets,
-				)
-			# 合并所有违规内容 (去重, 避免重复举报)
-			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
-		except Exception as e:
-			self.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
-			return []
-
-	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:  # noqa: PLR0914
-		"""处理自动举报: 用学生账号批量举报违规评论"""
-		# 1. 检查学生账号是否可用
-		if not (self.auth_manager.student_accounts):
-			self.printer.print_message("未加载学生账号, 无法执行自动举报", "WARNING")
-			return
-		# 2. 询问是否执行自动举报
-		if self.printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			self.printer.print_message("自动举报操作已取消", "INFO")
-			return
-		# 3. 获取举报原因
-		try:
-			report_reasons = self.community_obtain.fetch_report_reasons()
-			report_reasons_ndd = data.NestedDefaultDict(report_reasons)
-			reason_content = report_reasons_ndd["items"][7]["content"]
-		except (KeyError, IndexError) as e:
-			self.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
-			return
-		# 4. 来源类型映射
-		source_key_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {
-			"work": "work",
-			"post": "forum",
-			"shop": "shop",
-		}
-		source_key = source_key_map[source_type]
-		# 5. 准备账号管理
-		# 新增: 初始化账号使用计数器
-		available_accounts = self.auth_manager.student_accounts.copy()  # 创建账号副本
-		account_usage_counter = dict.fromkeys(range(len(available_accounts)), 0)
-		current_account_index = 0
-		current_account_fail_count = 0  # 当前账号连续失败次数
-		self.printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
-		success_count = 0
-		# 6. 处理每条违规内容
-		for idx, violation in enumerate(violations, 1):
-			# 解析违规内容格式
-			violation_parts = violation.split(":")
-			if len(violation_parts) < 2:
-				self.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
-				continue
-			item_id_part = violation_parts[0].split(".")
-			if len(item_id_part) < 2:
-				self.printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
-				continue
-			_, comment_id = item_id_part
-			is_reply = "reply" in violation
-			# 查找父评论 ID
-			parent_id, _ = StringProcessor().find_substrings(text=comment_id, candidates=violations)
-			parent_id = int(parent_id) if parent_id and parent_id != "UNKNOWN" else None
-			# 为当前违规项尝试举报
-			violation_success = False
-			retry_count = 0
-			max_retries = min(3, len(available_accounts))
-			# 在开始处理当前违规项时检查是否需切换账号
-			if account_usage_counter.get(current_account_index, 0) >= 10:
-				old_index = current_account_index
-				current_account_index = (current_account_index + 1) % len(available_accounts)
-				account_usage_counter[current_account_index] = 0
-				current_account_fail_count = 0
-				self.printer.print_message(f"账号{old_index + 1}已使用10次, 切换到账号{current_account_index + 1}", "INFO")
-
-			while not violation_success and retry_count < max_retries and available_accounts:
-				# 设置当前账号
-				current_account = available_accounts[current_account_index]
-				self.auth_manager.student_accounts = [current_account]
-
-				# 切换到学生账号
-				if not self.auth_manager.switch_to_student_account():
-					# 切换失败
-					current_account_fail_count += 1
-					retry_count += 1
-
-					# 如果当前账号连续失败3次
-					if current_account_fail_count >= 3:
-						self.printer.print_message(f"账号{current_account_index + 1}连续失败3次, 从列表中移除", "WARNING")
-						# 移除失败账号
-						available_accounts.pop(current_account_index)
-						# 从使用计数器中移除对应账号
-						account_usage_counter = dict.fromkeys(range(len(available_accounts)), 0)
-
-						# 如果还有账号, 调整索引
-						if available_accounts:
-							# 重新初始化计数器后, current_account_index需要调整
-							current_account_index = current_account_index % len(available_accounts) if len(available_accounts) > 0 else 0
-							current_account_fail_count = 0
-							self.printer.print_message(f"切换到账号{current_account_index + 1}继续处理", "INFO")
-						else:
-							self.printer.print_message("所有账号均已失效, 停止处理", "ERROR")
-							break
-
-					continue
-				# 重置连续失败计数
-				current_account_fail_count = 0
-				# 获取当前学生账号ID
-				try:
-					user_details = self.user_obtain.fetch_account_details()
-					user_details_ndd = data.NestedDefaultDict(user_details)
-					reporter_id = user_details_ndd["id"]
-					print(reporter_id)
-					if reporter_id == "UNKNOWN":
-						msg = "获取学生账号ID失败"
-						raise ValueError(msg)  # noqa: TRY301
-				except Exception as e:
-					self.printer.print_message(f"获取学生账号信息失败: {e!s}", "ERROR")
-					current_account_fail_count += 1
-					retry_count += 1
-					continue
-
-				# 执行举报操作
-				try:
-					if self._execute_report_action(
-						source_key=source_key,
-						target_id=int(comment_id),
-						source_id=source_id,
-						reason_id=7,
-						reporter_id=int(reporter_id),
-						reason_content=reason_content,
-						parent_id=parent_id,
-						is_reply=is_reply,
-					):
-						# 举报成功
-						current_usage = account_usage_counter.get(current_account_index, 0) + 1
-						account_usage_counter[current_account_index] = current_usage
-
-						self.printer.print_message(f"[{idx}/{len(violations)}] 账号{current_account_index + 1} (使用{current_usage}/10次) 举报成功: {violation}", "SUCCESS")
-						success_count += 1
-						violation_success = True
-					else:
-						# 举报失败
-						current_usage = account_usage_counter.get(current_account_index, 0) + 1
-						account_usage_counter[current_account_index] = current_usage
-
-						self.printer.print_message(f"[{idx}/{len(violations)}] 账号{current_account_index + 1} (使用{current_usage}/10次) 举报失败: {violation}", "ERROR")
-						current_account_fail_count += 1
-						retry_count += 1
-				except Exception as e:
-					# 异常情况
-					current_usage = account_usage_counter.get(current_account_index, 0) + 1
-					account_usage_counter[current_account_index] = current_usage
-
-					self.printer.print_message(f"[{idx}/{len(violations)}] 执行举报异常: {e!s}", "ERROR")
-					current_account_fail_count += 1
-					retry_count += 1
-			# 如果当前违规项处理失败, 记录日志
-			if not violation_success:
-				self.printer.print_message(f"[{idx}/{len(violations)}] 处理失败, 跳过: {violation}", "WARNING")
-		# 7. 举报完成: 恢复管理员账号
-		auth.AuthManager().terminate_session()
-		self.printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
-
-	def _execute_report_action(
-		self,
-		source_key: Literal["forum", "work", "shop"],
-		target_id: int,
-		source_id: int,
-		reason_id: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8],
-		reporter_id: int,
-		reason_content: str,
-		parent_id: int | None = None,
-		*,
-		is_reply: bool = False,
-		description: str = "",
-	) -> bool:
-		"""执行举报操作: 根据来源类型调用不同模块的举报接口"""
-		try:
-			match source_key:
-				# 作品模块: 举报作品评论
-				case "work":
-					return self.work_motion.execute_report_comment(
-						work_id=source_id,
-						comment_id=target_id,
-						reason=reason_content,
-					)
-				# 论坛模块: 举报帖子评论 / 回复
-				case "forum":
-					item_type = "COMMENT" if is_reply else "REPLY"  # 回复 / 普通评论区分
-					return self.forum_motion.report_item(item_id=target_id, reason_id=reason_id, description=description, item_type=item_type, return_data=False)
-				# 店铺模块: 举报店铺评论 / 回复
-				case "shop":
-					if is_reply and parent_id is not None:
-						# 回复类型: 需传入父评论 ID
-						return self.shop_motion.execute_report_comment(
-							comment_id=target_id,
-							reason_content=reason_content,
-							reason_id=reason_id,
-							reporter_id=reporter_id,
-							comment_parent_id=parent_id,
-							description=description,
-						)
-					# 普通评论: 无需父 ID
-					return self.shop_motion.execute_report_comment(
-						comment_id=target_id,
-						reason_content=reason_content,
-						reason_id=reason_id,
-						reporter_id=reporter_id,
-						description=description,
-					)
-			# 未知来源类型: 举报失败
-		except Exception as e:
-			self.printer.print_message(f"举报操作失败: {e!s}", "ERROR")
-			return False
-		else:
-			return False
+		"""检查举报内容违规 - 委托给ViolationChecker"""
+		self.violation_checker.check_violation(source_id=source_id, source_type=source_type, board_name=board_name, user_id=user_id)
 
 
 @decorator.singleton
