@@ -1533,61 +1533,6 @@ class NekoPlatformServices:
 		)
 		return response.json()
 
-	# 排行榜相关 API
-	def fetch_ranking_records(self, ranking_id: str, work_id: int) -> dict:
-		"""
-		获取排行榜记录
-		Args:
-			ranking_id: 排行榜 ID
-			work_id: 作品 ID
-		Returns:
-			排行榜记录列表
-		"""
-		params = {"id": ranking_id, "work_id": work_id}
-		response = self._client.send_request(
-			endpoint="/neko/ranking-list/record/list",
-			method="GET",
-			params=params,
-			base_url_key="creation",
-		)
-		return response.json()
-
-	def add_ranking_record(self, work_id: int, value: str, ranking_id: int) -> dict:
-		"""
-		添加排行榜记录
-		Args:
-			data: 记录数据
-		Returns:
-			添加结果
-		"""
-		data = {"work_id": work_id, "value": value, "id": ranking_id}
-		response = self._client.send_request(endpoint="/neko/ranking-list/record", method="POST", payload=data, base_url_key="creation")
-		return response.json()
-
-	def create_ranking_list(self, data: dict) -> dict:
-		"""
-		创建排行榜
-		Args:
-			data: 排行榜数据
-		Returns:
-			创建结果
-		"""
-		response = self._client.send_request(endpoint="/neko/ranking-list", method="POST", payload=data, base_url_key="creation")
-		return response.json()
-
-	def delete_ranking_list(self, ranking_id: str, work_id: int) -> dict:
-		"""
-		删除排行榜
-		Args:
-			ranking_id: 排行榜 ID
-			work_id: 作品 ID
-		Returns:
-			删除结果
-		"""
-		params = {"id": ranking_id, "work_id": work_id}
-		response = self._client.send_request(endpoint=f"/neko/ranking-list/{ranking_id}", method="DELETE", params=params, base_url_key="creation")
-		return response.json()
-
 	# 包管理相关 API
 	def fetch_package_list(self, package_type: str, limit: int = 20, offset: int = 0) -> dict:
 		"""
@@ -1951,40 +1896,6 @@ class NekoPlatformServices:
 		response = self._client.send_request(
 			endpoint="/neko/sample/list",
 			method="GET",
-			params=params,
-			base_url_key="creation",
-		)
-		return response.json()
-
-	# 排行榜补充 API
-	def update_ranking_list(self, data: dict) -> dict:
-		"""
-		更新排行榜 (全量更新)
-		Args:
-			data: 排行榜数据
-		Returns:
-			更新结果
-		"""
-		response = self._client.send_request(
-			endpoint="/neko/ranking-list/fullUpdate",
-			method="PUT",
-			payload=data,
-			base_url_key="creation",
-		)
-		return response.json()
-
-	def clear_ranking_list(self, ranking_id: str) -> dict:
-		"""
-		清空排行榜
-		Args:
-			ranking_id: 排行榜 ID
-		Returns:
-			清空结果
-		"""
-		params = {"id": ranking_id}
-		response = self._client.send_request(
-			endpoint="/neko/ranking-list/clear",
-			method="PUT",
 			params=params,
 			base_url_key="creation",
 		)
