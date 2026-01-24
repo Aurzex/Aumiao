@@ -9,7 +9,7 @@ from typing import Any, Protocol, cast
 import websocket
 
 from aumiao.api import work
-from aumiao.api.auth import Authenticator
+from aumiao.api.auth import CloudAuthenticator
 from aumiao.core.base import (
 	DataConfig,
 	DataType,
@@ -440,7 +440,7 @@ class CloudConnection:
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
 		self._ping_thread: threading.Thread | None = None
-		self.authenticator = Authenticator(authorization_token)
+		self.authenticator = CloudAuthenticator(authorization_token)
 		self.auto_reconnect = True
 		self.connected = False
 		self.editor = editor

@@ -14,9 +14,9 @@ class Configuration:
 	"""配置管理器"""
 
 	CLIENT_FACTORY = acquire.ClientFactory()
-	AUTHENTICATOR = auth.Authenticator()
+	AUTHENTICATOR = auth.AuthManager
 	CRYPTO_SALT = bytes(range(31))
-	CLIENT_SECRET = "pBlYqXbJDu"  # noqa: S105
+	CLIENT_SECRET = "pBlYqXbJDu"
 	BASE_URL = "https://api.codemao.cn"
 	CREATION_BASE_URL = "https://api-creation.codemao.cn"
 	DEFAULT_OUTPUT_DIR = PathConfig().COMPILE_FILE_PATH
@@ -295,7 +295,7 @@ class InternalImplementations:
 			print(f"🔓 开始解密 NEKO 作品: {self.work_info.id}")
 			# 获取作品详情以获取加密文件 URL
 			detail_url = f"{Configuration.CREATION_BASE_URL}/neko/community/player/published-work-detail/{self.work_info.id}"
-			device_auth_dict = auth.Authenticator().generate_x_device_auth()
+			device_auth_dict = auth.CloudAuthenticator().generate_x_device_auth()
 			device_auth_json = json.dumps(device_auth_dict)
 			headers = {"x-creation-tools-device-auth": device_auth_json}
 			try:

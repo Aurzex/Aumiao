@@ -516,10 +516,10 @@ class CommunityService:
 			清理结果数据
 		"""
 		config = self.source_config[source]
-		params: dict[Literal["ads", "blacklist", "spam_max"], Any] = {
+		params: dict[Literal["ads", "blacklist", "duplicates"], Any] = {
 			"ads": self.coordinator.data.USER_DATA.ads,
 			"blacklist": self.coordinator.data.USER_DATA.black_room,
-			"spam_max": self.coordinator.setting.PARAMETER.spam_del_max,
+			"duplicates": self.coordinator.setting.PARAMETER.spam_del_max,
 		}
 		target_lists = defaultdict(list)
 		for item in config.get_items():
@@ -1345,7 +1345,7 @@ class BatchOperationService:
 				if cred_type == "token":
 					# 登录获取 token
 					response = self.auth_manager.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
-					credential = response["data"]["auth"]["token"]
+					credential = response.data["auth"]["token"]
 					# 只写入 token,不包含账号信息
 					content = f"{credential}\n"
 					file_path = data.PathConfig.TOKEN_FILE_PATH
