@@ -17,6 +17,7 @@ on:
       - ".github/workflows/build.yml"
       - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
+    # 移除 types: [closed]，让 PR 创建和更新时也触发构建验证
   workflow_dispatch: # 手动触发
 
 env:
@@ -146,17 +147,18 @@ jobs:
             NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
             RELEASE_TAG="v$NEW_VERSION"
             FILE_VERSION="$NEW_VERSION"
+            FULL_VERSION="$NEW_VERSION"
 
             echo "手动触发新版本号: $NEW_VERSION"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-            echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
             echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
             echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # PR事件处理
+          # PR事件处理（包括创建、更新、合并）
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             echo "检测到PR事件"
             echo "PR状态: ${{ github.event.pull_request.state }}"
@@ -169,9 +171,8 @@ jobs:
               echo "should_build=true" >> $GITHUB_OUTPUT
               echo "release_tag=" >> $GITHUB_OUTPUT
               
-              # 为PR构建生成文件版本（必须纯数字）
+              # 为PR构建生成版本号
               FILE_VERSION="$PROJECT_VERSION.0"
-              # 完整版本可以包含PR信息
               FULL_VERSION="$PROJECT_VERSION.0-pr${{ github.event.pull_request.number }}"
               
               echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
@@ -184,6 +185,10 @@ jobs:
             # PR合并到main的事件处理
             if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
               echo "检测到PR合并到main分支"
+
+              # 获取PR的提交数量（从PR创建到合并）
+              PR_COMMIT_COUNT=$(git rev-list --count ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+              echo "PR包含的提交数: $PR_COMMIT_COUNT"
 
               # 计算累计提交数（从上次发布到当前合并点）
               if [ -n "$LATEST_FULL_TAG" ]; then
@@ -234,10 +239,11 @@ jobs:
                 NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
                 RELEASE_TAG="v$NEW_VERSION"
                 FILE_VERSION="$NEW_VERSION"
+                FULL_VERSION="$NEW_VERSION"
 
                 echo "新版本号: $NEW_VERSION"
                 echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-                echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
                 echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
                 echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
                 echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
@@ -285,10 +291,11 @@ jobs:
             NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
             RELEASE_TAG="v$NEW_VERSION"
             FILE_VERSION="$NEW_VERSION"
+            FULL_VERSION="$NEW_VERSION"
 
             echo "main分支推送新版本号: $NEW_VERSION"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-            echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
             echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
             echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
@@ -444,44 +451,43 @@ jobs:
           Write-Host "构建完整版本: $FULL_VERSION"
           Write-Host "构建文件版本: $FILE_VERSION"
 
+          # 检查图标文件路径
+          Write-Host "当前工作目录: $(Get-Location)"
+          Write-Host "检查图标文件: ./resource/icons/favicon.ico"
+          Write-Host "图标文件存在: $(Test-Path ./resource/icons/favicon.ico)"
+
           # 根据是否为发版构建决定是否包含更多优化选项
           if ("${{ env.SHOULD_RELEASE }}" -eq "true") {
-            Write-Host "执行发版构建"
-            $LTO_OPTION = "--lto=${{ env.LTO_MODE }}"
+              Write-Host "执行发版构建"
+              $LTO_OPTION = "--lto=${{ env.LTO_MODE }}"
           } else {
-            Write-Host "执行验证构建（不启用LTO以加快构建速度）"
-            $LTO_OPTION = "--lto=no"
+              Write-Host "执行验证构建（不启用LTO以加快构建速度）"
+              $LTO_OPTION = "--lto=no"
           }
 
-          # 构建 Nuitka 命令
-          $nuitkaArgs = @(
-            "--assume-yes-for-downloads",
-            "--company-name=`"${{ env.COMPANY_NAME }}`"",
-            "--copyright=`"Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved.`"",
-            "--file-version=`"$FILE_VERSION`"",
-            "--follow-imports",
-            "--jobs=${{ env.BUILD_JOBS }}",
-            $LTO_OPTION,
-            "--mode=standalone",
-            "--output-dir=../${{ env.BUILD_DIR }}",
-            "--output-filename=aumiao",
-            "--product-name=`"${{ env.PRODUCT_NAME }}`"",
-            "--product-version=`"$FULL_VERSION`"",
-            "--show-progress",
-            "--windows-console-mode=force",
-            "--windows-icon-from-ico=`"./resource/icons/favicon.ico`"",
-            "./main.py"
-          )
-
-          Write-Host "执行 Nuitka 命令:"
-          Write-Host "uv run python -m nuitka $nuitkaArgs"
-
+          Write-Host "执行 Nuitka 命令..."
           # 执行构建
-          uv run python -m nuitka @nuitkaArgs
+          uv run python -m nuitka `
+            --assume-yes-for-downloads `
+            --company-name="${{ env.COMPANY_NAME }}" `
+            --copyright="Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved." `
+            --file-version="$FILE_VERSION" `
+            --follow-imports `
+            --jobs=${{ env.BUILD_JOBS }} `
+            $LTO_OPTION `
+            --mode=standalone `
+            --output-dir=../${{ env.BUILD_DIR }} `
+            --output-filename=aumiao `
+            --product-name="${{ env.PRODUCT_NAME }}" `
+            --product-version="$FULL_VERSION" `
+            --show-progress `
+            --windows-console-mode=force `
+            --windows-icon-from-ico="./resource/icons/favicon.ico" `
+            ./main.py
 
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Nuitka 编译失败"
-            exit 1
+              Write-Error "Nuitka 编译失败"
+              exit 1
           }
 
           Write-Host "Nuitka 编译完成"
@@ -522,10 +528,7 @@ jobs:
               Version = "${{ env.FULL_VERSION }}"
               FileVersion = "${{ env.FILE_VERSION }}"
               BaseVersion = "${{ env.PROJECT_VERSION }}"
-              BuildType = "${{ env.BUILD_TYPE }}"
-              IsReleaseBuild = "${{ env.SHOULD_RELEASE }}" -eq "true"
-              IsPRBuild = "${{ env.IS_PR }}" -eq "true"
-              IsManualBuild = "${{ env.IS_MANUAL }}" -eq "true"
+              BuildNumber = "${{ env.FULL_VERSION }}".Split('.')[3]
               BuildDate = "${{ env.BUILD_DATE }}"
               BuildTime = "${{ env.BUILD_TIME }}"
               GitCommit = "${{ env.GIT_SHA }}"
@@ -539,6 +542,7 @@ jobs:
                   UV = "${{ env.UV_VERSION }}"
               }
               BuildInfo = @{
+                  Type = "${{ env.BUILD_TYPE }}"
                   LTO = "${{ env.LTO_MODE }}"
                   Jobs = "${{ env.BUILD_JOBS }}"
               }
@@ -591,10 +595,10 @@ jobs:
           # 根据构建类型决定包名
           if ("${{ env.SHOULD_RELEASE }}" -eq "true") {
               # 发布构建：产品名_版本_架构_日期
-              $packageName = "${{ env.PRODUCT_NAME }}_${fullVersion}_x64_${buildDate}.zip"
+              $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}.zip"
           } else {
               # 验证构建：产品名_版本_架构_日期_验证
-              $packageName = "${{ env.PRODUCT_NAME }}_${fullVersion}_x64_${buildDate}_VERIFY.zip"
+              $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}_VERIFY.zip"
           }
 
           $zipPath = "${{ env.BUILD_DIR }}/$packageName"
@@ -619,7 +623,6 @@ jobs:
         run: |
           Write-Host "构建安装程序"
           $fullVersion = "${{ env.FULL_VERSION }}"
-          $fileVersion = "${{ env.FILE_VERSION }}"
           $buildDate = "${{ env.BUILD_DATE }}"
 
           # 确保输出目录存在
@@ -639,29 +642,29 @@ jobs:
           if (Test-Path $issPath) {
               Write-Host "使用 Inno Setup 编译安装程序"
               Write-Host "完整版本: $fullVersion"
-              Write-Host "文件版本: $fileVersion"
+              Write-Host "文件版本: ${{ env.FILE_VERSION }}"
               Write-Host "构建日期: $buildDate"
               Write-Host "图标文件路径: $iconPath"
               Write-Host "图标文件存在: $(Test-Path $iconPath)"
-
+              
               # 检查构建目录是否存在
               $buildDistPath = "./${{ env.BUILD_DIR }}/main.dist"
               if (-not (Test-Path $buildDistPath)) {
                   Write-Error "构建目录不存在: $buildDistPath"
                   exit 1
               }
-
+              
               # 运行 Inno Setup 编译
               $process = Start-Process -FilePath "ISCC.exe" -ArgumentList "`"$issPath`"" -Wait -PassThru -NoNewWindow
-
+              
               if ($process.ExitCode -eq 0) {
                   Write-Host "Inno Setup 编译成功完成"
-
+                  
                   # 检查是否生成了安装程序
                   $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
                   if ($installerFiles) {
                       # 重命名安装程序以包含版本信息
-                      $newInstallerName = "${{ env.PRODUCT_NAME }}_${fullVersion}_Setup.exe"
+                      $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
                       Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
                       Write-Host "安装程序构建成功: $newInstallerName"
                   } else {
@@ -736,30 +739,3 @@ jobs:
             ## 构建信息
             - 版本: ${{ needs.check-release-condition.outputs.full_version }}
             - 文件版本: ${{ needs.check-release-condition.outputs.file_version }}
-            - 提交: ${{ env.GIT_SHA }}
-            - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
-            - 触发方式: ${{ env.IS_MANUAL == 'true' && '手动触发' || '自动触发' }}
-            - 提交数量: ${{ env.COMMIT_COUNT }}
-            - 前一个标签: ${{ env.LATEST_TAG }}
-          files: |
-            ./release-assets/**/*
-          draft: false
-          prerelease: false
-
-  upload-debug-files:
-    name: "Upload Debug Files"
-    runs-on: windows-latest
-    needs: build-application
-    if: always()
-    steps:
-      - name: Upload Build Logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Debug-Logs-${{ needs.build-application.outputs.build_date }}
-          path: |
-            ${{ env.BUILD_DIR }}/**/*.log
-            ${{ env.BUILD_DIR }}/**/*.json
-            **/nuitka-*.log
-            ${{ env.DIST_DIR }}/version.json
-          if-no-files-found: ignore
-          retention-days: 7
