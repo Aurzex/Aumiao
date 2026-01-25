@@ -15,7 +15,7 @@ class QuerySource(Enum):
 	"""查询来源枚举"""
 
 	WORK = "work"
-	POST = "post"
+	FORUM = "forum"
 	SHOP = "shop"
 
 
@@ -45,7 +45,7 @@ class QueryBuilder:
 		self.obtain = obtain_instance
 		self.params = QueryParams(source=QuerySource.WORK, id=0, method=QueryMethod.USER_ID, limit=500)
 
-	def from_source(self, source: Literal["work", "post", "shop"]) -> "QueryBuilder":
+	def from_source(self, source: Literal["work", "forum", "shop"]) -> "QueryBuilder":
 		"""设置查询来源"""
 		self.params.source = QuerySource(source)
 		return self
@@ -113,7 +113,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 		super().__init__()
 		self._source_map = {
 			"work": (self.work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),
-			"post": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
+			"forum": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
 			"shop": (self.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
 		}
 		self._data_processor = self.toolkit.create_data_processor()
@@ -161,7 +161,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 	def get_comments_detail(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
+		source: Literal["work", "forum", "shop"],
 		method: Literal["user_id", "comment_id"],
 		max_limit: int | None = 500,
 	) -> list[str]: ...
@@ -169,7 +169,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 	def get_comments_detail(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
+		source: Literal["work", "forum", "shop"],
 		method: Literal["comments"],
 		max_limit: int | None = 500,
 	) -> list[dict]: ...
@@ -178,7 +178,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 	def get_comments_detail(
 		self,
 		com_id: int,
-		source: Literal["work", "post", "shop"],
+		source: Literal["work", "forum", "shop"],
 		method: str = "user_id",
 		max_limit: int | None = 500,
 	) -> list[dict] | list[str]:
@@ -199,7 +199,7 @@ class Obtain(ClassUnion):  # ty:ignore [unsupported-base]
 			return reply[user_field]["id"]
 
 		def generate_replies(comment: dict) -> Generator:
-			if source_value == "post":
+			if source_value == "forum":
 				if comment["id"] not in reply_cache:
 					reply_cache[comment["id"]] = list(self.forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
 				yield from reply_cache[comment["id"]]

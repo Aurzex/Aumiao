@@ -214,9 +214,9 @@ def get_enum_input(prompt: str, valid_options: set[str]) -> str:
 def clear_comments(_account_data_manager: AccountDataManager) -> None:
 	"""清除评论 - 优化验证逻辑"""
 	printer.print_header("清除评论")
-	source = get_enum_input("请输入来源类型", {"work", "post"})
+	source = get_enum_input("请输入来源类型", {"work", "forum"})
 	action_type = get_enum_input("请输入操作类型", {"ads", "duplicates", "blacklist"})
-	source = cast("Literal ['work', 'post']", source)
+	source = cast("Literal ['work', 'forum']", source)
 	action_type = cast("Literal ['ads', 'duplicates', 'blacklist']", action_type)
 	services.community.clean_comments(source=source, action_type=action_type)
 	print(printer.color_text(f"已成功执行 {source} 的 {action_type} 评论", "SUCCESS"))
