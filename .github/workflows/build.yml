@@ -17,7 +17,6 @@ on:
       - ".github/workflows/build.yml"
       - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
-    # 移除 types: [closed]，让 PR 创建和更新时也触发构建验证
   workflow_dispatch: # 手动触发
 
 env:
@@ -65,6 +64,7 @@ jobs:
       should_build: ${{ steps.check-commits.outputs.should_build }}
       release_tag: ${{ steps.check-commits.outputs.release_tag }}
       full_version: ${{ steps.check-commits.outputs.full_version }}
+      file_version: ${{ steps.check-commits.outputs.file_version }}
       commit_count: ${{ steps.check-commits.outputs.commit_count }}
       latest_tag: ${{ steps.check-commits.outputs.latest_tag }}
       is_manual: ${{ steps.check-commits.outputs.is_manual }}
@@ -126,7 +126,7 @@ jobs:
 
             # 计算新的四段式版本号
             if [ -n "$LATEST_FULL_TAG" ]; then
-              # 解析版本号：v2.3.0.8 -> 2.3.0.8
+              # 解析版本号：v2.6.5.8 -> 2.6.5.8
               VERSION_WITHOUT_V=${LATEST_FULL_TAG#v}
               # 分割版本号
               IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$VERSION_WITHOUT_V"
@@ -145,16 +145,18 @@ jobs:
 
             NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
             RELEASE_TAG="v$NEW_VERSION"
+            FILE_VERSION="$NEW_VERSION"
 
             echo "手动触发新版本号: $NEW_VERSION"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
             echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
             echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # PR事件处理（包括创建、更新、合并）
+          # PR事件处理
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             echo "检测到PR事件"
             echo "PR状态: ${{ github.event.pull_request.state }}"
@@ -166,7 +168,14 @@ jobs:
               echo "should_release=false" >> $GITHUB_OUTPUT
               echo "should_build=true" >> $GITHUB_OUTPUT
               echo "release_tag=" >> $GITHUB_OUTPUT
-              echo "full_version=$PROJECT_VERSION.0-pr${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+              
+              # 为PR构建生成文件版本（必须纯数字）
+              FILE_VERSION="$PROJECT_VERSION.0"
+              # 完整版本可以包含PR信息
+              FULL_VERSION="$PROJECT_VERSION.0-pr${{ github.event.pull_request.number }}"
+              
+              echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+              echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
               echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
               echo "commit_count=0" >> $GITHUB_OUTPUT
               exit 0
@@ -175,10 +184,6 @@ jobs:
             # PR合并到main的事件处理
             if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
               echo "检测到PR合并到main分支"
-
-              # 获取PR的提交数量（从PR创建到合并）
-              PR_COMMIT_COUNT=$(git rev-list --count ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
-              echo "PR包含的提交数: $PR_COMMIT_COUNT"
 
               # 计算累计提交数（从上次发布到当前合并点）
               if [ -n "$LATEST_FULL_TAG" ]; then
@@ -228,10 +233,12 @@ jobs:
 
                 NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
                 RELEASE_TAG="v$NEW_VERSION"
+                FILE_VERSION="$NEW_VERSION"
 
                 echo "新版本号: $NEW_VERSION"
                 echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
                 echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
                 echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
                 echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
               else
@@ -239,7 +246,12 @@ jobs:
                 echo "should_release=false" >> $GITHUB_OUTPUT
                 echo "should_build=true" >> $GITHUB_OUTPUT
                 echo "release_tag=" >> $GITHUB_OUTPUT
-                echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
+                
+                FILE_VERSION="$PROJECT_VERSION.0"
+                FULL_VERSION="$PROJECT_VERSION.0"
+                
+                echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+                echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
                 echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
                 echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
               fi
@@ -272,10 +284,12 @@ jobs:
 
             NEW_VERSION="$PROJECT_VERSION.$NEW_BUILD_NUMBER"
             RELEASE_TAG="v$NEW_VERSION"
+            FILE_VERSION="$NEW_VERSION"
 
             echo "main分支推送新版本号: $NEW_VERSION"
             echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
             echo "full_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
             echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
             exit 0
@@ -286,7 +300,12 @@ jobs:
           echo "should_release=false" >> $GITHUB_OUTPUT
           echo "should_build=true" >> $GITHUB_OUTPUT
           echo "release_tag=" >> $GITHUB_OUTPUT
-          echo "full_version=$PROJECT_VERSION.0" >> $GITHUB_OUTPUT
+
+          FILE_VERSION="$PROJECT_VERSION.0"
+          FULL_VERSION="$PROJECT_VERSION.0"
+
+          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "file_version=$FILE_VERSION" >> $GITHUB_OUTPUT
           echo "latest_tag=$LATEST_FULL_TAG" >> $GITHUB_OUTPUT
           echo "commit_count=0" >> $GITHUB_OUTPUT
 
@@ -355,6 +374,7 @@ jobs:
           echo "COMMIT_COUNT=${{ needs.check-release-condition.outputs.commit_count }}" >> $GITHUB_ENV
           echo "LATEST_TAG=${{ needs.check-release-condition.outputs.latest_tag }}" >> $GITHUB_ENV
           echo "FULL_VERSION=${{ needs.check-release-condition.outputs.full_version }}" >> $GITHUB_ENV
+          echo "FILE_VERSION=${{ needs.check-release-condition.outputs.file_version }}" >> $GITHUB_ENV
           echo "IS_MANUAL=${{ needs.check-release-condition.outputs.is_manual }}" >> $GITHUB_ENV
           echo "IS_PR=${{ needs.check-release-condition.outputs.is_pr }}" >> $GITHUB_ENV
           echo "BUILD_DATE=$(TZ=${{ env.TIMEZONE }} date +'%y%m%d')" >> $GITHUB_OUTPUT
@@ -416,38 +436,55 @@ jobs:
 
       - name: Build with Nuitka
         working-directory: ./${{ env.PROJECT_DIR }}
+        shell: pwsh
         run: |
-          echo "开始 Nuitka 编译"
+          Write-Host "开始 Nuitka 编译"
           $FULL_VERSION = "${{ env.FULL_VERSION }}"
-          echo "构建版本: $FULL_VERSION"
+          $FILE_VERSION = "${{ env.FILE_VERSION }}"
+          Write-Host "构建完整版本: $FULL_VERSION"
+          Write-Host "构建文件版本: $FILE_VERSION"
 
           # 根据是否为发版构建决定是否包含更多优化选项
           if ("${{ env.SHOULD_RELEASE }}" -eq "true") {
-            echo "执行发版构建"
+            Write-Host "执行发版构建"
             $LTO_OPTION = "--lto=${{ env.LTO_MODE }}"
           } else {
-            echo "执行验证构建（不启用LTO以加快构建速度）"
+            Write-Host "执行验证构建（不启用LTO以加快构建速度）"
             $LTO_OPTION = "--lto=no"
           }
 
-          uv run python -m nuitka `
-            --assume-yes-for-downloads `
-            --company-name="${{ env.COMPANY_NAME }}" `
-            --copyright="Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved." `
-            --file-version="$FULL_VERSION" `
-            --follow-imports `
-            --jobs=${{ env.BUILD_JOBS }} `
-            $LTO_OPTION `
-            --mode=standalone `
-            --output-dir=../${{ env.BUILD_DIR }} `
-            --output-filename=aumiao `
-            --product-name="${{ env.PRODUCT_NAME }}" `
-            --product-version="$FULL_VERSION" `
-            --show-progress `
-            --windows-console-mode=force `
-            --windows-icon-from-ico="./resource/icons/favicon.ico" `
-            ./main.py
-          echo "Nuitka 编译完成"
+          # 构建 Nuitka 命令
+          $nuitkaArgs = @(
+            "--assume-yes-for-downloads",
+            "--company-name=`"${{ env.COMPANY_NAME }}`"",
+            "--copyright=`"Copyright © ${{ env.COPYRIGHT_YEAR }} 喵鱼a. All rights reserved.`"",
+            "--file-version=`"$FILE_VERSION`"",
+            "--follow-imports",
+            "--jobs=${{ env.BUILD_JOBS }}",
+            $LTO_OPTION,
+            "--mode=standalone",
+            "--output-dir=../${{ env.BUILD_DIR }}",
+            "--output-filename=aumiao",
+            "--product-name=`"${{ env.PRODUCT_NAME }}`"",
+            "--product-version=`"$FULL_VERSION`"",
+            "--show-progress",
+            "--windows-console-mode=force",
+            "--windows-icon-from-ico=`"./resource/icons/favicon.ico`"",
+            "./main.py"
+          )
+
+          Write-Host "执行 Nuitka 命令:"
+          Write-Host "uv run python -m nuitka $nuitkaArgs"
+
+          # 执行构建
+          uv run python -m nuitka @nuitkaArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Nuitka 编译失败"
+            exit 1
+          }
+
+          Write-Host "Nuitka 编译完成"
 
       - name: Prepare Distribution Files
         shell: pwsh
@@ -483,6 +520,7 @@ jobs:
           # 创建版本信息文件
           $versionInfo = @{
               Version = "${{ env.FULL_VERSION }}"
+              FileVersion = "${{ env.FILE_VERSION }}"
               BaseVersion = "${{ env.PROJECT_VERSION }}"
               BuildType = "${{ env.BUILD_TYPE }}"
               IsReleaseBuild = "${{ env.SHOULD_RELEASE }}" -eq "true"
@@ -553,10 +591,10 @@ jobs:
           # 根据构建类型决定包名
           if ("${{ env.SHOULD_RELEASE }}" -eq "true") {
               # 发布构建：产品名_版本_架构_日期
-              $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}.zip"
+              $packageName = "${{ env.PRODUCT_NAME }}_${fullVersion}_x64_${buildDate}.zip"
           } else {
               # 验证构建：产品名_版本_架构_日期_验证
-              $packageName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_x64_${buildDate}_VERIFY.zip"
+              $packageName = "${{ env.PRODUCT_NAME }}_${fullVersion}_x64_${buildDate}_VERIFY.zip"
           }
 
           $zipPath = "${{ env.BUILD_DIR }}/$packageName"
@@ -581,6 +619,7 @@ jobs:
         run: |
           Write-Host "构建安装程序"
           $fullVersion = "${{ env.FULL_VERSION }}"
+          $fileVersion = "${{ env.FILE_VERSION }}"
           $buildDate = "${{ env.BUILD_DATE }}"
 
           # 确保输出目录存在
@@ -599,8 +638,9 @@ jobs:
           $issPath = "./${{ env.PROJECT_DIR }}/resource/aumiao.iss"
           if (Test-Path $issPath) {
               Write-Host "使用 Inno Setup 编译安装程序"
-              Write-Host "ISS 文件版本: 2.6.5 (硬编码)"
-              Write-Host "构建版本: $fullVersion"
+              Write-Host "完整版本: $fullVersion"
+              Write-Host "文件版本: $fileVersion"
+              Write-Host "构建日期: $buildDate"
               Write-Host "图标文件路径: $iconPath"
               Write-Host "图标文件存在: $(Test-Path $iconPath)"
 
@@ -621,10 +661,9 @@ jobs:
                   $installerFiles = Get-ChildItem "./${{ env.PROJECT_DIR }}/Output/*.exe" -ErrorAction SilentlyContinue
                   if ($installerFiles) {
                       # 重命名安装程序以包含版本信息
-                      $newInstallerName = "${{ env.PRODUCT_NAME }}_v${fullVersion}_Setup.exe"
+                      $newInstallerName = "${{ env.PRODUCT_NAME }}_${fullVersion}_Setup.exe"
                       Rename-Item -Path $installerFiles[0].FullName -NewName $newInstallerName
                       Write-Host "安装程序构建成功: $newInstallerName"
-                      Write-Host "注意: ISS 文件中版本号为硬编码 2.6.5，安装程序文件名为 $fullVersion"
                   } else {
                       Write-Error "Inno Setup 编译成功但未找到生成的安装程序"
                       Write-Host "Output 目录内容:"
@@ -696,6 +735,7 @@ jobs:
 
             ## 构建信息
             - 版本: ${{ needs.check-release-condition.outputs.full_version }}
+            - 文件版本: ${{ needs.check-release-condition.outputs.file_version }}
             - 提交: ${{ env.GIT_SHA }}
             - 构建时间: ${{ env.BUILD_DATE }} ${{ env.BUILD_TIME }}
             - 触发方式: ${{ env.IS_MANUAL == 'true' && '手动触发' || '自动触发' }}
