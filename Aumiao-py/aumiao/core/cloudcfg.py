@@ -22,9 +22,8 @@ from aumiao.core.base import (
 	WebSocketConfig,
 )
 
-# neko(KittenN)貌似不支持查询在线人数, 而排行榜数据需要反编译后获取 work_file["rankings"]["rankingsDict"],之后获取 rankingId 得到的id通过两个api进行更改和获取
 
-
+# neko (KittenN) 貌似不支持查询在线人数, 而排行榜数据需要反编译后获取 work_file ["rankings"]["rankingsDict"], 之后获取 rankingId 得到的 id 通过两个 api 进行更改和获取
 # ==============================
 # 命令模式接口
 # ==============================
@@ -516,11 +515,9 @@ class CloudConnection:
 			if not self._command_queue:
 				self._upload_timer = None
 				return
-
 			# 分组命令
 			variable_commands: list[VariableUpdateCommand] = []
 			list_commands: dict[str, ListUpdateCommand] = {}
-
 			for command in self._command_queue:
 				if isinstance(command, VariableUpdateCommand):
 					variable_commands.append(command)
@@ -528,34 +525,28 @@ class CloudConnection:
 					if command.cvid not in list_commands:
 						list_commands[command.cvid] = command
 					else:
-						# 合并相同cvid的操作
+						# 合并相同 cvid 的操作
 						list_commands[command.cvid].operations.extend(command.operations)
-
 			# 清空队列
 			self._command_queue.clear()
-
 		try:
 			# 执行批量命令
 			# 合并变量命令
 			if variable_commands:
 				private_updates: list[dict[str, Any]] = []
 				public_updates: list[dict[str, Any]] = []
-
 				for cmd in variable_commands:
 					if cmd.command_type == "update_private_vars":
 						private_updates.append(cmd.data)
 					elif cmd.command_type == "update_vars":
 						public_updates.append(cmd.data)
-
 				if private_updates:
 					self.send_message(SendMessageType.UPDATE_PRIVATE_VARIABLE, private_updates)
 				if public_updates:
 					self.send_message(SendMessageType.UPDATE_PUBLIC_VARIABLE, public_updates)
-
 			# 执行列表命令
 			for list_cmd in list_commands.values():
 				list_cmd.execute(self)
-
 		except Exception as e:
 			print(f"批量上传失败: {e}")
 			# 将失败的命令重新加入队列
@@ -764,21 +755,18 @@ class CloudConnection:
 			print(f"处理事件消息时发生未知错误: {error}")
 
 	def _handle_server_close_request(self) -> None:
-		"""处理服务器发送的关闭请求 (类型41)"""
-		print("收到服务器关闭请求 (类型41)")
-
+		"""处理服务器发送的关闭请求 (类型 41)"""
+		print("收到服务器关闭请求 (类型 41)")
 		# 首先检查是否已经在关闭过程中
 		if self._is_closing:
 			return
-
 		# 发送服务器关闭事件
 		server_close_reason = "服务器主动要求关闭连接"
 		self._emit_event("server_close", {"type": "server_close", "reason": server_close_reason, "timestamp": time.time(), "code": 1000})
-
 		# 设置关闭标志
 		self._is_closing = True
-
 		# 在单独的线程中执行清理和重连, 避免阻塞当前消息处理线程
+
 		def cleanup_and_reconnect() -> None:
 			# 清理连接
 			self._cleanup_connection()
@@ -786,7 +774,6 @@ class CloudConnection:
 			should_reconnect = False
 			if self.auto_reconnect and not self._is_closing and self.reconnect_attempts < self.max_reconnect_attempts:
 				should_reconnect = True
-
 			if should_reconnect:
 				self.reconnect_attempts += 1
 				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
@@ -853,7 +840,7 @@ class CloudConnection:
 			}
 			handler = message_handlers.get(message_type)
 			if handler:
-				handler(data)  # pyright: ignore[reportArgumentType]
+				handler(data)  # pyright: ignore [reportArgumentType]  # ty:ignore [invalid-argument-type]
 			else:
 				print(f"未知消息类型: {message_type}, 数据: {DisplayHelper.truncate_value(data)}")
 		except Exception as error:
@@ -1116,8 +1103,7 @@ class CloudConnection:
 		self._stop_ping()
 		close_type = "unknown_close"
 		close_desc = f"正常关闭: {close_status_code} - {close_msg}"
-
-		print(f"WebSocket连接已关闭: {close_desc}")
+		print(f"WebSocket 连接已关闭: {close_desc}")
 		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time.time(), "was_connected": was_connected})
 		if was_connected and self.auto_reconnect and not self._is_closing:
 			if self.reconnect_attempts < self.max_reconnect_attempts:
@@ -1168,29 +1154,25 @@ class CloudConnection:
 		"""清理连接资源"""
 		# 设置关闭标志
 		self._is_closing = True
-
 		# 停止批量上传定时器
 		with self._command_queue_lock:
 			if self._upload_timer:
 				self._upload_timer.cancel()
 				self._upload_timer = None
 			self._command_queue.clear()
-
 		# 停止心跳定时器
 		if self._heartbeat_timer:
 			self._heartbeat_timer.cancel()
 			self._heartbeat_timer = None
-
 		# 停止 ping 线程
 		self._stop_ping()
-
 		# 关闭 WebSocket 连接
 		if self.websocket_client:
 			try:
 				# 使用异步关闭避免阻塞
 				def close_ws() -> None:
 					with contextlib.suppress(Exception):
-						self.websocket_client.close()  # pyright: ignore[reportOptionalMemberAccess]
+						self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
 
 				# 在新线程中关闭 WebSocket
 				close_thread = threading.Thread(target=close_ws, daemon=True)
@@ -1200,24 +1182,20 @@ class CloudConnection:
 				pass
 			finally:
 				self.websocket_client = None
-
 		# 等待 WebSocket 线程结束
 		if self._websocket_thread and self._websocket_thread.is_alive():
 			# 检查不是当前线程
 			if self._websocket_thread != threading.current_thread():
 				self._websocket_thread.join(timeout=2.0)
 			self._websocket_thread = None
-
 		# 清除所有数据
 		with self._variables_lock:
 			self.private_variables.clear()
 			self.public_variables.clear()
 		with self._lists_lock:
 			self.lists.clear()
-
 		# 清除工作信息缓存
 		self._work_info = None
-
 		with self._connection_lock:
 			self.connected = False
 			self.data_ready = False
@@ -1566,7 +1544,7 @@ class CloudAPI:
 		"""建立连接并等待数据
 		Args:
 			wait_for_data: 是否等待数据加载完成
-			timeout: 超时时间(秒)
+			timeout: 超时时间 (秒)
 		Returns:
 			bool: 连接和数据加载是否成功
 		"""
@@ -1739,7 +1717,6 @@ class CloudManager:
 
 	def batch_list_operations(self, operations: list[tuple]) -> list[bool]:
 		"""批量执行列表操作
-
 		Args:
 			operations: 操作列表, 格式:
 				- 简单操作: ("pop", "list_name") 或 ("shift", "list_name") 或 ("clear", "list_name")
@@ -1753,10 +1730,8 @@ class CloudManager:
 			if not operation or len(operation) < 2:
 				results.append(False)
 				continue
-
 			op_name = operation[0]
 			list_name = operation[1]
-
 			try:
 				if op_name == "push" and len(operation) >= 3:
 					results.append(self.api.list_push(list_name, operation[2]))
@@ -1789,7 +1764,7 @@ class CloudManager:
 		Args:
 			variable_name: 变量名
 			callback: 变更回调函数
-			variable_type: 变量类型("private" 或 "public")
+			variable_type: 变量类型 ("private" 或 "public")
 		Returns:
 			bool: 订阅是否成功
 		"""
@@ -1803,7 +1778,7 @@ class CloudManager:
 		"""订阅列表操作
 		Args:
 			list_name: 列表名
-			operation: 操作类型("push", "pop" 等)
+			operation: 操作类型 ("push", "pop" 等)
 			callback: 操作回调函数
 		Returns:
 			bool: 订阅是否成功
@@ -1822,8 +1797,8 @@ def create_cloud_client(work_id: int, editor: EditorType | None = None, authoriz
 	"""快速创建云客户端
 	Args:
 		work_id: 作品 ID
-		editor: 编辑器类型(可选)
-		authorization_token: 授权令牌(可选)
+		editor: 编辑器类型 (可选)
+		authorization_token: 授权令牌 (可选)
 	Returns:
 		CloudAPI: 配置好的 API 实例
 	"""
@@ -1834,8 +1809,8 @@ def create_cloud_manager(work_id: int, editor: EditorType | None = None, authori
 	"""快速创建云管理器
 	Args:
 		work_id: 作品 ID
-		editor: 编辑器类型(可选)
-		authorization_token: 授权令牌(可选)
+		editor: 编辑器类型 (可选)
+		authorization_token: 授权令牌 (可选)
 	Returns:
 		CloudManager: 配置好的管理器实例
 	"""

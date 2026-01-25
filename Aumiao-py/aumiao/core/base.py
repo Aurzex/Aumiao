@@ -46,8 +46,6 @@ class ReportRecord(TypedDict):
 # ==============================
 # 配置类定义
 # ==============================
-
-
 @dataclass(frozen=True)
 class WebSocketConfig:
 	"""WebSocket 相关配置"""
@@ -820,7 +818,7 @@ class SourceConfig:
 
 
 # ==============================
-# 模块管理器:类型友好版本
+# 模块管理器: 类型友好版本
 # ==============================
 class ModuleManager:
 	"""管理所有模块的延迟加载和缓存"""
@@ -834,7 +832,7 @@ class ModuleManager:
 		self._module_creators[name] = creator
 
 	def get(self, name: str) -> Any:
-		"""获取模块实例(延迟加载)"""
+		"""获取模块实例 (延迟加载)"""
 		if name not in self._modules:
 			if name not in self._module_creators:
 				msg = f"模块 '{name}' 未注册"
@@ -900,12 +898,12 @@ class CoreManager:
 
 
 # ==============================
-# 基础设施协调器:类型友好主类
+# 基础设施协调器: 类型友好主类
 # ==============================
 class InfrastructureCoordinator:
 	"""
 	基础设施协调器 - 类型友好版本
-	使用明确的属性定义,确保类型检查器能识别所有属性
+	使用明确的属性定义, 确保类型检查器能识别所有属性
 	"""
 
 	def __init__(self) -> None:
@@ -919,7 +917,6 @@ class InfrastructureCoordinator:
 	def _initialize_module_registry(self) -> None:
 		"""初始化模块注册表"""
 		# API 模块
-
 		api_modules = {
 			"auth": auth.AuthManager,
 			"community_motion": community.UserAction,
@@ -965,7 +962,7 @@ class InfrastructureCoordinator:
 		return self._modules.list_loaded()
 
 	# ==============================
-	# 核心组件属性(类型明确)
+	# 核心组件属性 (类型明确)
 	# ==============================
 	@property
 	def client(self) -> CodeMaoClient:
@@ -1003,7 +1000,7 @@ class InfrastructureCoordinator:
 		return self._core.upload_history
 
 	# ==============================
-	# API 模块属性(延迟加载,类型明确)
+	# API 模块属性 (延迟加载, 类型明确)
 	# ==============================
 	@property
 	def auth(self) -> "auth_ins.AuthManager":
@@ -1091,7 +1088,7 @@ class InfrastructureCoordinator:
 		return self._modules.get("whale_obtain")
 
 	# ==============================
-	# 工具模块属性(延迟加载,类型明确)
+	# 工具模块属性 (延迟加载, 类型明确)
 	# ==============================
 	@property
 	def printer(self) -> "tool_ins.OutputHandler":
@@ -1104,33 +1101,33 @@ class InfrastructureCoordinator:
 		return self._modules.get("file")
 
 	# ==============================
-	# 动态模块访问(可选,用于访问动态注册的模块)
+	# 动态模块访问 (可选, 用于访问动态注册的模块)
 	# ==============================
 	def get_module(self, name: str) -> Any:
 		"""
-		动态获取模块(用于访问动态注册的模块)
-		这是类型安全的,因为调用者知道返回类型
+		动态获取模块 (用于访问动态注册的模块)
+		这是类型安全的, 因为调用者知道返回类型
 		"""
 		return self._modules.get(name)
 
 
 # ==============================
-# 单例包装:保持向后兼容
+# 单例包装: 保持向后兼容
 # ==============================
 @singleton
 class Union(InfrastructureCoordinator):
 	"""
-	保持原有 Union 类名,继承基础设施协调器
+	保持原有 Union 类名, 继承基础设施协调器
 	提供全局单例访问
 	"""
 
 
 # ==============================
-# 业务逻辑类(保持原样)
+# 业务逻辑类 (保持原样)
 # ==============================
 ClassUnion = Union().__class__
 # ==============================
-# 类型别名(用于类型注解)
+# 类型别名 (用于类型注解)
 # ==============================
 InfraCoordinator = Union
 """基础设施协调器的类型别名"""
@@ -1166,8 +1163,8 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 	def _print_announcements(self) -> None:
 		"""打印公告"""
 		self._print_title("公告")
-		print(f"{self.COLOR_LINK} 编程猫社区行为守则 https://shequ.codemao.cn/community/1619098{self.COLOR_RESET}")
-		print(f"{self.COLOR_LINK} 2025 编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855{self.COLOR_RESET}")
+		print(f"{self.COLOR_LINK} 编程猫社区行为守则 https://shequ.codemao.cn/community/1619098 {self.COLOR_RESET}")
+		print(f"{self.COLOR_LINK} 2025 编程猫拜年祭活动 https://shequ.codemao.cn/community/1619855 {self.COLOR_RESET}")
 
 	def _print_user_data(self) -> None:
 		"""打印用户数据"""

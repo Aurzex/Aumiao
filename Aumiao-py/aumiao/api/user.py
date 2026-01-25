@@ -21,7 +21,7 @@ class UserDataFetcher:
 	# 	)
 	# 	return response.json()
 	# BUG 2026/1/19 日测试报错 410 , 推测 api 已经弃用
-	# def fetch_user_profile(self, user_id: int) -> dict:
+	# def fetch_user_profile (self, user_id: int) -> dict:
 	# 	"""
 	# 	获取用户详细信息
 	# 	Args:
@@ -29,9 +29,8 @@ class UserDataFetcher:
 	# 	Returns:
 	# 		用户详细信息字典
 	# 	"""
-	# 	response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
+	# 	response = self._client.send_request (method="GET", endpoint=f"/api/user/info/detail/{user_id}")
 	# 	return response.json()
-
 	def fetch_user_honors(self, user_id: int) -> dict:
 		"""
 		获取用户荣誉信息
@@ -448,7 +447,7 @@ class UserDataFetcher:
 		Returns:
 			收藏作品生成器
 		"""
-		# 2026/1/19日发现api已经更新到 v2,v1可以正常使用
+		# 2026/1/19 日发现 api 已经更新到 v2,v1 可以正常使用
 		params = {
 			"user_id": user_id,
 			"offset": 0,

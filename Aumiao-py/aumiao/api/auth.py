@@ -11,9 +11,8 @@ from aumiao.utils.decorator import singleton
 
 
 # ==================== 基础数据结构和枚举 ====================
-class LoginMethod(Enum):
+class LoginMethod (Enum):
 	"""登录方法枚举"""
-
 	SIMPLE_PASSWORD = "simple_password"
 	SECURE_PASSWORD = "secure_password"
 	TOKEN = "token"
@@ -22,16 +21,14 @@ class LoginMethod(Enum):
 	ADMIN_PASSWORD = "admin_password"
 
 
-class UserRole(Enum):
+class UserRole (Enum):
 	"""用户角色枚举"""
-
 	USER = "user"
 	ADMIN = "admin"
 
 
-class AccountStatus(Enum):
+class AccountStatus (Enum):
 	"""账号状态枚举"""
-
 	JUDGEMENT = "judgement"
 	AVERAGE = "average"
 	EDU = "edu"
@@ -40,7 +37,6 @@ class AccountStatus(Enum):
 @dataclass
 class LoginCredentials:
 	"""登录凭证数据类"""
-
 	identity: str = ""
 	password: str = ""
 	token: str = ""
@@ -53,7 +49,6 @@ class LoginCredentials:
 @dataclass
 class LoginResult:
 	"""登录结果数据类"""
-
 	success: bool
 	method: LoginMethod
 	message: str
@@ -82,18 +77,17 @@ def determine_login_method(token: str | None, cookies: str | None, identity: str
 
 
 def parse_cookies(cookies_str: str) -> dict[str, str]:
-	"""解析cookies字符串"""
+	"""解析 cookies 字符串"""
 	try:
 		return dict(item.strip().split("=", 1) for item in cookies_str.split(";"))
 	except ValueError as e:
-		msg = f"Cookie格式错误: {e}"
+		msg = f"Cookie 格式错误: {e}"
 		raise ValueError(msg)  # noqa: B904
 
 
 # ==================== 认证处理器 ====================
 class AuthProcessor:
 	"""认证处理器, 负责具体的认证逻辑"""
-
 	CLIENT_SECRET = "pBlYqXbJDu"
 
 	def __init__(self, client: acquire.CodeMaoClient) -> None:
@@ -158,11 +152,10 @@ class AuthProcessor:
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
+			endpoint=f"https://api-whale.codemao.cn/admins/captcha/ {timestamp}",
 			method="GET",
 			log=False,
 		)
-
 		if response.status_code == HTTPStatus.OK.value:
 			file.CodeMaoFile().file_write(
 				path=self.captcha_img_path,
@@ -172,14 +165,12 @@ class AuthProcessor:
 			print(f"验证码已保存至: {self.captcha_img_path}")
 		else:
 			print(f"获取验证码失败, 错误代码: {response.status_code}")
-
 		return response.cookies
 
 
 # ==================== 登录处理器 ====================
 class LoginHandler:
 	"""登录处理器, 负责执行具体的登录操作"""
-
 	def __init__(self, client: acquire.CodeMaoClient, processor: AuthProcessor) -> None:
 		self.client = client
 		self.processor = processor
@@ -188,16 +179,13 @@ class LoginHandler:
 	def handle_simple_password(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
 		"""处理简单密码登录"""
 		self.client.switch_identity(token="", identity="blank")
-
 		response = self.client.send_request(
 			endpoint="/tiger/v3/web/accounts/login",
 			method="POST",
 			payload={"identity": identity, "password": password, "pid": pid},
 		)
-
 		response_data = response.json()
 		self.client.switch_identity(token=response_data["auth"]["token"], identity=status.value)
-
 		return LoginResult(success=True, method=LoginMethod.SIMPLE_PASSWORD, message="简单密码登录成功", data=response_data)
 
 	def handle_secure_password(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
@@ -205,65 +193,52 @@ class LoginHandler:
 		timestamp = fetch_current_timestamp(self.client)
 		ticket_response = self.processor.get_login_ticket(identity, timestamp, pid)
 		ticket = ticket_response["ticket"]
-
 		response = self.processor.get_login_security_info(identity, password, ticket, pid)
 		self.client.switch_identity(token=response["auth"]["token"], identity=status.value)
-
 		return LoginResult(success=True, method=LoginMethod.SECURE_PASSWORD, message="安全密码登录成功", data=response)
 
 	def handle_token(self, token: str, status: AccountStatus) -> LoginResult:
-		"""处理token登录"""
+		"""处理 token 登录"""
 		auth_details = self.processor.fetch_auth_details(token)
 		self.client.switch_identity(token=token, identity=status.value)
-
-		return LoginResult(success=True, method=LoginMethod.TOKEN, message="Token登录成功", token=token, auth_details=auth_details)
+		return LoginResult(success=True, method=LoginMethod.TOKEN, message="Token 登录成功", token=token, auth_details=auth_details)
 
 	def handle_cookies(self, cookies: str, status: AccountStatus) -> LoginResult:
-		"""处理cookies登录"""
+		"""处理 cookies 登录"""
 		cookie_dict = parse_cookies(cookies)
-
 		self.client.send_request(
 			endpoint=self.processor.setting.PARAMETER.cookie_check_url,
 			method="POST",
 			payload={},
 			headers={**self.client.headers, "cookie": cookies},
 		)
-
 		self.client.switch_identity(token=cookie_dict["authorization"], identity=status.value)
-
-		return LoginResult(success=True, method=LoginMethod.COOKIES, message="Cookie登录成功")
+		return LoginResult(success=True, method=LoginMethod.COOKIES, message="Cookie 登录成功")
 
 	def handle_admin_token(self, token: str) -> LoginResult:
-		"""处理管理员token登录"""
+		"""处理管理员 token 登录"""
 		if not token:
-			token = input("请输入Authorization Token: ")
-
+			token = input("请输入 Authorization Token:")
 		self.client.switch_identity(token=token, identity="judgement")
-
-		return LoginResult(success=True, method=LoginMethod.ADMIN_TOKEN, message="管理员Token登录成功", token=token)
+		return LoginResult(success=True, method=LoginMethod.ADMIN_TOKEN, message="管理员 Token 登录成功", token=token)
 
 	def handle_admin_password(self, username: str | None, password: str | None) -> LoginResult:
 		"""处理管理员密码登录"""
-		username_input = username or input("请输入用户名: ")
-		password_input = password or input("请输入密码: ")
-
+		username_input = username or input("请输入用户名:")
+		password_input = password or input("请输入密码:")
 		while True:
 			timestamp = self.tool.TimeUtils().current_timestamp(13)
 			print("正在获取验证码...")
 			self.processor.fetch_admin_captcha(timestamp)
-			captcha = input("请输入验证码: ")
-
+			captcha = input("请输入验证码:")
 			response = self.processor.authenticate_admin_user(username_input, password_input, timestamp, captcha)
-
 			if "token" in response:
 				self.client.switch_identity(token=response["token"], identity="judgement")
 				return LoginResult(success=True, method=LoginMethod.ADMIN_PASSWORD, message="管理员账密登录成功", token=response["token"])
-
-			print(f"登录失败: {response.get('error_msg', '未知错误')}")
-
+			print(f"登录失败: {response.get('error_msg', ' 未知错误 ')}")
 			if response.get("error_code") in {"Admin-Password-Error@Community-Admin", "Param-Invalid@Common"}:
-				username_input = input("请输入用户名: ")
-				password_input = input("请输入密码: ")
+				username_input = input("请输入用户名:")
+				password_input = input("请输入密码:")
 
 
 # ==================== 主认证管理器 ====================
@@ -273,7 +248,6 @@ class AuthManager:
 	统一认证管理器
 	支持普通用户和管理员两种角色的登录
 	"""
-
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 		self._processor = AuthProcessor(self._client)
@@ -293,24 +267,20 @@ class AuthManager:
 	) -> LoginResult:
 		"""
 		统一的登录接口
-
 		参数:
 			identity: 用户身份标识
 			password: 用户密码
-			token: 用户token
-			cookies: 用户cookies字符串
-			pid: 请求的PID
+			token: 用户 token
+			cookies: 用户 cookies 字符串
+			pid: 请求的 PID
 			status: 账号状态类型
 			role: 用户角色
 			prefer_method: 优先使用的登录方式
-
 		返回:
 			登录结果
 		"""
 		credentials = LoginCredentials(identity=identity, password=password, token=token, cookies=cookies, pid=pid, status=AccountStatus(status), role=UserRole(role))
-
 		self._current_credentials = credentials
-
 		if credentials.role == UserRole.ADMIN:
 			return self._admin_login(credentials, prefer_method)
 		return self._user_login(credentials, prefer_method)
@@ -318,7 +288,6 @@ class AuthManager:
 	def _user_login(self, credentials: LoginCredentials, prefer_method: str | None) -> LoginResult:
 		"""用户登录"""
 		method = self._get_user_login_method(credentials, prefer_method)
-
 		if method == LoginMethod.SIMPLE_PASSWORD:
 			return self._handler.handle_simple_password(credentials.identity, credentials.password, credentials.pid, credentials.status)
 		if method == LoginMethod.SECURE_PASSWORD:
@@ -333,7 +302,6 @@ class AuthManager:
 	def _admin_login(self, credentials: LoginCredentials, prefer_method: str | None) -> LoginResult:
 		"""管理员登录"""
 		method = self._get_admin_login_method(credentials, prefer_method)
-
 		if method == LoginMethod.ADMIN_TOKEN:
 			return self._handler.handle_admin_token(credentials.token)
 		if method == LoginMethod.ADMIN_PASSWORD:
@@ -346,7 +314,6 @@ class AuthManager:
 		"""获取用户登录方法"""
 		if prefer_method:
 			return LoginMethod(prefer_method)
-
 		return determine_login_method(credentials.token, credentials.cookies, credentials.identity, credentials.password)
 
 	@staticmethod
@@ -354,7 +321,6 @@ class AuthManager:
 		"""获取管理员登录方法"""
 		if prefer_method:
 			return LoginMethod(prefer_method)
-
 		return LoginMethod.ADMIN_TOKEN if credentials.token else LoginMethod.ADMIN_PASSWORD
 
 	def execute_logout(self, method: Literal["web", "app"]) -> bool:
@@ -383,7 +349,7 @@ class AuthManager:
 		return response.json()
 
 	def configure_authentication_token(self, token: str, identity: str = "judgement") -> None:
-		"""配置认证Token"""
+		"""配置认证 Token"""
 		self._client.switch_identity(token=token, identity=identity)
 
 	def restore_admin_account(self) -> None:
@@ -399,7 +365,6 @@ class AuthManager:
 			self.admin_logout()
 		else:
 			self.execute_logout("web")
-
 		self.restore_admin_account()
 		print("已终止会话并恢复管理员账号")
 
@@ -411,7 +376,6 @@ class AuthManager:
 # ==================== 云服务认证器 ====================
 class CloudAuthenticator:
 	"""云服务认证管理器"""
-
 	CLIENT_SECRET = "pBlYqXbJDu"
 
 	def __init__(self, authorization_token: str | None = None) -> None:
@@ -422,7 +386,7 @@ class CloudAuthenticator:
 
 	@staticmethod
 	def _generate_client_id(length: int = 8) -> str:
-		"""生成客户端ID"""
+		"""生成客户端 ID"""
 		chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 		return "".join(chars[randint(0, 35)] for _ in range(length))
 

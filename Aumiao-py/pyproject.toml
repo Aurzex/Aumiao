@@ -1,7 +1,13 @@
+# ==============================================================================
+# 构建系统配置
+# ==============================================================================
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# ==============================================================================
+# 项目元数据
+# ==============================================================================
 [project]
 name = "aumiao"
 version = "2.6.5"
@@ -9,6 +15,7 @@ description = "赋能编程猫社区脚本开发 - https://aumiao.aurzex.top"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 license = { text = "GNU General Public License v3.0 or later" }
+# 作者信息
 authors = [
     { name = "Aumiao Team", email = "aumiao@aurzex.top" },
     { name = "Aurzex" },
@@ -17,8 +24,11 @@ authors = [
     { name = "MoonLeaaaf" },
     { name = "Nomen" },
 ]
+# 维护者信息
 maintainers = [{ name = "Aumiao Team", email = "aumiao@aurzex.top" }]
+# 关键词
 keywords = ["script", "codemao", "aumiao", "development", "automation", "bcm"]
+# PyPI 分类器
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -31,15 +41,18 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
+# 核心依赖
 dependencies = [
-    "cryptography>=46.0.3",
-    "httpx>=0.28.1",
-    "websocket-client>=1.9.0",
+    "cryptography >= 46.0.3",
+    "httpx >= 0.28.1",
+    "websocket-client >= 1.9.0",
 ]
 
+# 可选依赖（开发环境）
 [project.optional-dependencies]
-dev = ["nuitka>=2.0.0", "pytest>=9.0.0", "black>=25.0.0", "ruff>=0.4.0"]
+dev = ["nuitka >= 2.0.0", "pytest >= 9.0.0", "black >= 25.0.0", "ruff >= 0.4.0"]
 
+# 项目相关链接
 [project.urls]
 Homepage = "https://aumiao.aurzex.top"
 Documentation = "https://docs.aumiao.aurzex.top"
@@ -48,20 +61,28 @@ Issues = "https://github.com/aurzex/aumiao/issues"
 Changelog = "https://github.com/aurzex/aumiao/releases"
 "Bug Tracker" = "https://github.com/aurzex/aumiao/issues"
 
+# 命令行入口点
 [project.scripts]
 aumiao = "aumiao.main:main"
 
+# 插件系统入口点（预留）
 [project.entry-points."aumiao.plugins"]
 
-# 为未来插件系统预留
+# 示例插件配置（注释状态）
 # example-plugin = "aumiao.plugins.example:ExamplePlugin"
+# ==============================================================================
+# Hatch 工具配置
+# ==============================================================================
 [tool.hatch.version]
 path = "aumiao/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aumiao"]
 
-# Ruff 配置
+# ==============================================================================
+# 代码质量工具配置
+# ==============================================================================
+# Ruff 代码检查配置
 [tool.ruff]
 exclude = ["**/gui.py"]
 extend-exclude = ["test"]
@@ -70,6 +91,7 @@ line-length = 180
 target-version = "py313"
 
 [tool.ruff.lint]
+# 启用的检查规则
 select = [
     "A", # 内置异常
     "AIR", # 自动导入重构
@@ -134,6 +156,7 @@ select = [
     "YTT", # Yield 类型检查
 
 ]
+# 忽略的检查规则
 ignore = [
     "ANN401", # 动态类型注解
     "B006", # 可变默认参数
@@ -162,6 +185,7 @@ ignore = [
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 preview = true
 
+# Pylint 风格配置
 [tool.ruff.lint.pylint]
 max-branches = 30
 max-locals = 20
@@ -170,6 +194,7 @@ max-positional-args = 20
 max-public-methods = 50
 max-returns = 10
 
+# Ruff 格式化配置
 [tool.ruff.format]
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
@@ -177,34 +202,33 @@ indent-style = "tab"
 line-ending = "auto"
 quote-style = "double"
 
-# Black 配置（保持与 Ruff 格式一致）
+# Black 格式化配置
 [tool.black]
 line-length = 180
 target-version = ['py312', 'py313', 'py314']
-skip-string-normalization = true # 因为 Ruff 使用双引号
+skip-string-normalization = true # 与 Ruff 保持一致（使用双引号）
 
-# MyPy 配置
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
+# ==============================================================================
+# 提交规范配置
+# ==============================================================================
+[tool.commitizen]
+version_provider = "uv"
 
-[[tool.mypy.overrides]]
-module = ["aumiao.gui.*", "test.*"]
-ignore_errors = true
+# ==============================================================================
+# 拼写检查配置
+# ==============================================================================
+[tool.typos.default]
+extend-ignore-re = [
+    "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",
+    "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
+    "(#|//)\\s*spellchecker:ignore-next-line\\n.*",
+    "(?i)#\\s*typos:ignore\\s+\\w+",
+    "(?i)//\\s*typos:ignore\\s+\\w+",
+    "(?Rm)^.*(#|//)\\s*typos:ignore$",
+]
 
-# 包包含配置
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["aumiao*"]
-exclude = ["test*", "tests*", "docs*", "examples*"]
+[tool.typos.default.extend-words]
+pacakge = "pacakge"
+
+[tool.typos.files]
+extend-exclude = ["**/gui.py"]

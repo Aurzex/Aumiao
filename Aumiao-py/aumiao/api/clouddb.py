@@ -121,7 +121,7 @@ class CoconutCloud:
 		"""
 		设置云字典键值
 		Args:
-			dict_id: 字典ID
+			dict_id: 字典 ID
 			key: 键名
 			value: 值
 		Returns:
@@ -140,7 +140,7 @@ class CoconutCloud:
 		"""
 		删除云字典键
 		Args:
-			dict_id: 字典ID
+			dict_id: 字典 ID
 			key: 键名
 		Returns:
 			操作结果
@@ -158,7 +158,7 @@ class CoconutCloud:
 		"""
 		清空云字典
 		Args:
-			dict_id: 字典ID
+			dict_id: 字典 ID
 		Returns:
 			操作结果
 		"""
@@ -173,7 +173,7 @@ class CoconutCloud:
 		"""
 		获取云字典所有键
 		Args:
-			dict_id: 字典ID
+			dict_id: 字典 ID
 		Returns:
 			键名列表
 		"""
@@ -188,7 +188,7 @@ class CoconutCloud:
 		"""
 		获取云字典值
 		Args:
-			dict_id: 字典ID
+			dict_id: 字典 ID
 			key: 键名
 		Returns:
 			键值
@@ -206,7 +206,7 @@ class CoconutCloud:
 		"""
 		查询云数据表
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 			queries: 查询条件列表
 		Returns:
 			查询结果
@@ -224,7 +224,7 @@ class CoconutCloud:
 		"""
 		更新云数据表
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 			queries: 查询条件列表
 			values: 更新值列表
 		Returns:
@@ -243,7 +243,7 @@ class CoconutCloud:
 		"""
 		插入云数据表行
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 			values: 值列表
 		Returns:
 			插入结果
@@ -261,7 +261,7 @@ class CoconutCloud:
 		"""
 		删除云数据表行
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 			queries: 查询条件列表
 		Returns:
 			删除结果
@@ -279,7 +279,7 @@ class CoconutCloud:
 		"""
 		清空云数据表
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 		Returns:
 			清空结果
 		"""
@@ -294,7 +294,7 @@ class CoconutCloud:
 		"""
 		获取云数据表行数
 		Args:
-			table_id: 表ID
+			table_id: 表 ID
 		Returns:
 			行数信息
 		"""
@@ -311,7 +311,7 @@ class CoconutCloud:
 		"""
 		获取云数据表信息
 		Args:
-			table_ids: 表ID列表
+			table_ids: 表 ID 列表
 		Returns:
 			表信息列表
 		"""
@@ -329,7 +329,7 @@ class CoconutCloud:
 		"""
 		加载作品数据
 		Args:
-			work_id: 作品ID
+			work_id: 作品 ID
 			channel: 通道 ("0": H5, "1": 社区)
 		Returns:
 			作品数据
