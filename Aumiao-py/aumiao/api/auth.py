@@ -158,7 +158,7 @@ class AuthProcessor:
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/ {timestamp}",
+			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
 			method="GET",
 			log=False,
 		)

@@ -16,6 +16,7 @@ from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
 
 coordinator = InfrastructureCoordinator()
+
 # ========================== 策略模式相关定义 ==========================
 
 
@@ -51,13 +52,13 @@ class AdsProcessStrategy(ProcessStrategy):
 
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
-				identifier = f"{item_id}.{comment['id']}:comment"
+				identifier = f"shop:{item_id}:comment:0:{comment['id']}"
 				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
 
 			# 检查回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
-					identifier = f"{item_id}.{reply['id']}:reply"
+					identifier = f"shop:{item_id}:reply:{comment['id']}:{reply['id']}"
 					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
 
 	@staticmethod
@@ -74,7 +75,7 @@ class AdsProcessStrategy(ProcessStrategy):
 		log_templates = {"ads": "广告 {type} [{title}]{parent} : {content}"}
 
 		# 区分评论/回复类型
-		log_type = "回复" if ":reply" in identifier else "评论"
+		log_type = "回复" if ":reply:" in identifier else "评论"
 		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
 
 		# 生成日志信息
@@ -116,13 +117,13 @@ class BlacklistProcessStrategy(ProcessStrategy):
 
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
-				identifier = f"{item_id}.{comment['id']}:comment"
+				identifier = f"shop:{item_id}:comment:0:{comment['id']}"
 				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
 
 			# 检查回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
-					identifier = f"{item_id}.{reply['id']}:reply"
+					identifier = f"shop:{item_id}:reply:{comment['id']}:{reply['id']}"
 					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
 
 	@staticmethod
@@ -139,7 +140,7 @@ class BlacklistProcessStrategy(ProcessStrategy):
 		log_templates = {"blacklist": "黑名单 {type} [{title}]{parent} : {nickname}"}
 
 		# 区分评论/回复类型
-		log_type = "回复" if ":reply" in identifier else "评论"
+		log_type = "回复" if ":reply:" in identifier else "评论"
 		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
 
 		# 生成日志信息
@@ -180,7 +181,11 @@ class DuplicatesProcessStrategy(ProcessStrategy):
 	def _track_comment(data: dict[str, Any], item_id: int, content_map: defaultdict[tuple, list[str]], *, is_reply: bool = False) -> None:
 		"""追踪评论内容用于重复检测"""
 		content_key = (data.get("user_id"), data.get("content", "").lower())
-		identifier = f"{item_id}.{data.get('id')}:{'reply' if is_reply else 'comment'}"
+		if is_reply:
+			parent_id = data.get("parent_id", 0) or 0
+			identifier = f"shop:{item_id}:reply:{parent_id}:{data.get('id')}"
+		else:
+			identifier = f"shop:{item_id}:comment:0:{data.get('id')}"
 		content_map[content_key].append(identifier)
 
 
@@ -313,10 +318,8 @@ class OfficialCheckProcessor(BaseProcessor):
 
 				# 这里需要实际执行动作
 				try:
-					# 使用 ReportProcessor 中的方法
-					if hasattr(self, "_whale_motion"):
-						handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
-						handle_method(report_id=record["item"]["id"], resolution=status_map["P"], admin_id=context.admin_id)
+					handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
+					handle_method(report_id=record["item"]["id"], resolution=status_map["P"], admin_id=context.admin_id)
 					context.messages.append("已自动通过官方内容")
 				except AttributeError:
 					# 如果找不到 _whale_motion, 记录警告
@@ -324,13 +327,13 @@ class OfficialCheckProcessor(BaseProcessor):
 
 
 class DetailDisplayProcessor(BaseProcessor):
-	"""详情显示处理器"""
+	"""完整详情显示处理器 - 一次性显示所有信息"""
 
 	def __init__(self, next_processor: ProcessorProtocol | None = None) -> None:
 		super().__init__(next_processor)
 
 	def _process(self, context: ProcessingContext) -> None:
-		"""显示举报详情"""
+		"""一次性显示举报完整详情"""
 		item_ndd = context.record["item"]
 		report_type = context.report_type
 		config = context.config
@@ -342,11 +345,14 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_header("=== 重新处理项目 ===")
 
 		# 显示举报详情
-		self._display_report_details(item_ndd, report_type, config)
+		self._display_full_report_details(item_ndd, report_type, config)
+
+		# 显示链接信息
+		self._display_links(item_ndd, report_type, config)
 
 	@staticmethod
-	def _display_report_details(item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
-		"""显示举报详情"""
+	def _display_full_report_details(item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
+		"""显示举报完整详情"""
 		coordinator.printer.print_header("=== 举报详情 ===")
 		coordinator.printer.print_message(f"举报 ID: {item_ndd['id']}", "INFO")
 		coordinator.printer.print_message(f"举报类型: {report_type}", "INFO")
@@ -382,17 +388,37 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_message("举报时间: 未知", "INFO")
 
 		# 帖子类型额外信息
-		if report_type in {"post", "work"}:
+		if report_type in {"forum_post", "forum_work"}:
 			coordinator.printer.print_message(f"举报线索: {item_ndd.get('description', 'UNKNOWN')}", "INFO")
+
+	@staticmethod
+	def _display_links(item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
+		"""显示相关链接"""
+		coordinator.printer.print_header("=== 相关链接 ===")
+
+		# 显示违规帖子链接
+		source_id = item_ndd[config.source_id_field]
+		if source_id != "UNKNOWN":
+			if report_type == "forum_post":
+				coordinator.printer.print_message(f"违规帖子链接: https://shequ.codemao.cn/community/{source_id}", "INFO")
+			elif report_type == "shop_comment":
+				coordinator.printer.print_message(f"商品页面链接: https://shequ.codemao.cn/shop/{source_id}", "INFO")
+			elif report_type == "forum_work":
+				coordinator.printer.print_message(f"作品页面链接: https://shequ.codemao.cn/work/{source_id}", "INFO")
+
+		# 显示违规用户链接
+		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
+		if user_id != "UNKNOWN":
+			coordinator.printer.print_message(f"违规用户链接: https://shequ.codemao.cn/user/{user_id}", "INFO")
 
 
 class ActionSelectionProcessor(BaseProcessor):
 	"""动作选择处理器"""
 
-	SOURCE_TYPE_MAP: dict[Literal["comment", "post", "discussion"], Literal["shop", "post", "discussion"]] = {  # noqa: RUF012
-		"comment": "shop",
-		"post": "post",
-		"discussion": "discussion",
+	SOURCE_TYPE_MAP: dict[Literal["shop_comment", "forum_post", "forum_discussion"], Literal["shop", "forum"]] = {  # noqa: RUF012
+		"shop_comment": "shop",
+		"forum_post": "forum",
+		"forum_discussion": "forum",
 	}
 
 	def __init__(self, fetcher: Any, next_processor: ProcessorProtocol | None = None) -> None:
@@ -405,9 +431,9 @@ class ActionSelectionProcessor(BaseProcessor):
 		_admin_id = context.admin_id
 		report_type = context.report_type
 
-		# 获取可用操作
+		# 获取可用操作(去掉C选项)
 		available_actions = self.fetcher.registry.get_available_actions(report_type)
-		action_keys = [action.key for action in available_actions]
+		action_keys = [action.key for action in available_actions if action.key != "C"]
 
 		# 操作选择循环
 		while not context.processed:
@@ -424,11 +450,7 @@ class ActionSelectionProcessor(BaseProcessor):
 				context.processed = True
 				break
 
-			# 处理辅助操作
-			if choice == "C":
-				self._show_item_details(context)
-				continue
-
+			# 处理辅助操作(去掉C选项)
 			if choice == "F":
 				config = context.config
 				item_ndd = context.record["item"]
@@ -458,38 +480,6 @@ class ActionSelectionProcessor(BaseProcessor):
 				context.processed = True
 				break
 
-	@staticmethod
-	def _show_item_details(context: ProcessingContext) -> None:
-		"""展示举报项目详细信息"""
-		item_ndd = context.record["item"]
-		report_type = context.report_type
-		config = context.config
-
-		coordinator.printer.print_header("=== 详细信息 ===")
-		post_id = item_ndd[config.source_id_field]
-		if post_id != "UNKNOWN":
-			coordinator.printer.print_message(
-				f"违规帖子链接: https://shequ.codemao.cn/community/{post_id}",
-				"INFO",
-			)
-		elif report_type == "discussion":
-			post_title = item_ndd.get("post_title", "UNKNOWN")
-			coordinator.printer.print_message(f"所属帖子标题: {post_title}", "INFO")
-			source_id = item_ndd[config.source_id_field]
-			if source_id != "UNKNOWN":
-				coordinator.printer.print_message(
-					f"所属帖子链接: https://shequ.codemao.cn/community/{source_id}",
-					"INFO",
-				)
-
-		# 违规用户链接
-		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
-		if user_id != "UNKNOWN":
-			coordinator.printer.print_message(
-				f"违规用户链接: https://shequ.codemao.cn/user/{user_id}",
-				"INFO",
-			)
-
 	def _check_violation(self, context: ProcessingContext) -> None:
 		"""检查举报内容违规"""
 		item_ndd = context.record["item"]
@@ -500,7 +490,7 @@ class ActionSelectionProcessor(BaseProcessor):
 
 		coordinator.printer.print_header("=== 开始检查违规 ===")
 		# 调整来源类型
-		adjusted_source_type: Literal["shop", "post", "discussion"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # type: ignore  # noqa: PGH003
+		adjusted_source_type: Literal["shop", "forum"] = self.SOURCE_TYPE_MAP.get(context.report_type, context.report_type)  # type: ignore  # noqa: PGH003
 		processor = ReportProcessor()
 		try:
 			processor.check_violation(
@@ -608,6 +598,7 @@ class CommentProcessor:
 		action_type: Literal["duplicates", "ads", "blacklist"],
 		params: dict[Literal["ads", "blacklist", "duplicates"], Any],
 		target_lists: defaultdict[str, list[str]],
+		source_type: Literal["shop", "forum", "work"] = "shop",  # noqa: ARG002
 	) -> None:
 		"""处理项目主入口, 根据 action_type 分发到对应处理策略"""
 		item_id = int(item["id"])
@@ -636,49 +627,38 @@ class ViolationChecker:
 	) -> None:
 		self.comment_processor = CommentProcessor()
 
-	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: int | None) -> None:
+	def check_violation(self, source_id: Any, source_type: Literal["shop", "forum", "work"], board_name: str, user_id: int | None) -> None:
 		"""检查举报内容违规"""
 		coordinator.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
-
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id:
 			coordinator.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
 			return
 
-		adjusted_type = "post" if source_type == "discussion" else source_type  # 讨论归为帖子类型
-
-		# 分析违规评论
+		adjusted_type = "forum" if source_type == "forum" else source_type
 		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
 
-		if not violations:
-			coordinator.printer.print_message("未检测到违规评论", "INFO")
+		# 检查帖子刷屏
+		spam_posts = []
+		if source_type == "forum" and user_id:
+			spam_posts = self._check_spam_posts(user_id, board_name)
+			violations.extend(spam_posts)
+
+		if not violations and not spam_posts:
+			coordinator.printer.print_message("未检测到违规评论或刷屏帖子", "INFO")
 			return
 
 		# 执行自动举报 (用学生账号)
-		self._process_auto_report(violations=violations, source_id=source_id, source_type=adjusted_type)
+		self._process_auto_report(violations=violations, source_type=adjusted_type)
 
-		# 帖子的违规检查: 重复发帖 (同一用户发布同标题帖子过多)
-		if source_type == "post" and user_id and user_id != "UNKNOWN":
-			try:
-				# 搜索同标题的帖子
-				post_results = list(coordinator.forum_obtain.search_posts_gen(title=board_name, limit=None))
-				# 筛选当前用户发布的帖子
-				user_posts = coordinator.toolkit.create_data_processor().filter_by_nested_values(
-					data=post_results,
-					id_path="user.id",
-					target_values=[user_id],
-				)
-				# 超过阈值判定为垃圾帖
-				if len(user_posts) >= coordinator.setting.PARAMETER.spam_del_max:
-					coordinator.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{board_name}】的帖子 {len(user_posts)} 次 (疑似垃圾帖)", "WARNING")
-			except Exception as e:
-				coordinator.printer.print_message(f"搜索帖子失败: {e!s}", "ERROR")
-
-	def _analyze_comment_violations(self, source_id: int, source_type: Literal["post", "work", "shop"], board_name: str) -> list[str]:
+	def _analyze_comment_violations(self, source_id: int, source_type: Literal["forum", "work", "shop"], board_name: str) -> list[str]:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
 			# 1. 获取评论详情列表
-			comments = Obtain().get_comments_detail(com_id=source_id, source=source_type, method="comments", max_limit=2000)
+			api_source_type = source_type
+			if api_source_type == "forum":
+				api_source_type = "post"
+			comments = Obtain().get_comments_detail(com_id=source_id, source=api_source_type, method="comments", max_limit=200)
 
 			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
@@ -707,6 +687,7 @@ class ViolationChecker:
 					action_type=check_type,
 					params=check_params,
 					target_lists=violation_targets,
+					source_type=source_type,
 				)
 
 			# 合并所有违规内容 (去重, 避免重复举报)
@@ -715,7 +696,37 @@ class ViolationChecker:
 			coordinator.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
 			return []
 
-	def _process_auto_report(self, violations: list[str], source_id: int, source_type: Literal["post", "work", "shop"]) -> None:
+	@staticmethod
+	def _check_spam_posts(user_id: int, title: str) -> list[str]:
+		"""检查用户是否刷屏发布相同标题的帖子"""
+		try:
+			# 搜索同标题的帖子
+			post_results = list(coordinator.forum_obtain.search_posts_gen(title=title, limit=None))
+			# 筛选当前用户发布的帖子
+			user_posts = coordinator.toolkit.create_data_processor().filter_by_nested_values(
+				data=post_results,
+				id_path="user.id",
+				target_values=[user_id],
+			)
+
+			# 超过阈值判定为刷屏
+			if len(user_posts) >= coordinator.setting.PARAMETER.spam_del_max:
+				coordinator.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{title}】的帖子 {len(user_posts)} 次 (疑似刷屏)", "WARNING")
+
+				# 生成违规标识符
+				violations = []
+				for post in user_posts:
+					post_id = post.get("id", 0)
+					if post_id:
+						violations.append(f"forum:{post_id}:post:0:{post_id}")
+
+				return violations
+		except Exception as e:
+			coordinator.printer.print_message(f"检查刷屏帖子失败: {e!s}", "ERROR")
+
+		return []
+
+	def _process_auto_report(self, violations: list[str], source_type: Literal["forum", "work", "shop"]) -> None:
 		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查是否有学生账号
 		auth_manager = ReportAuthManager()
@@ -737,13 +748,12 @@ class ViolationChecker:
 			coordinator.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
 			return
 		# 4. 来源类型映射
-		source_key_map: dict[Literal["work", "post", "shop"], Literal["work", "forum", "shop"]] = {
+		source_key_map: dict[Literal["work", "forum", "shop"], Literal["work", "forum", "shop"]] = {
 			"work": "work",
-			"post": "forum",
+			"forum": "forum",
 			"shop": "shop",
 		}
-		source_key = source_key_map[source_type]
-
+		_source_key = source_key_map[source_type]
 		coordinator.printer.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
 		success_count = 0
 		# 5. 账号管理初始化
@@ -795,9 +805,7 @@ class ViolationChecker:
 						coordinator.printer.print_message(f"账号{account_index + 1}登录成功", "SUCCESS")
 					except Exception as e:
 						coordinator.printer.print_message(f"账号{account_index + 1}登录失败: {e!s}", "ERROR")
-						raise ValueError from e
 						account_success_map[account_index] = False
-
 						# 移除失败的账号
 						available_accounts.pop(account_index)
 						if not available_accounts:
@@ -821,7 +829,7 @@ class ViolationChecker:
 					continue
 
 				# 执行举报
-				result = self._execute_single_report(violation=violation, source_id=source_id, source_key=source_key, reason_content=reason_content)
+				result = self._execute_single_report(violation=violation, reason_content=reason_content)
 				if result:
 					success_count += 1
 					# 更新账号使用计数
@@ -840,62 +848,90 @@ class ViolationChecker:
 		coordinator.printer.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
 
 	@staticmethod
-	def _execute_single_report(violation: str, source_id: int, source_key: Literal["work", "forum", "shop"], reason_content: str) -> bool:
-		"""执行单条举报"""
-		# 解析违规内容格式
-		violation_parts = violation.split(":")
-		if len(violation_parts) < 2:
-			coordinator.printer.print_message(f"违规内容格式错误: {violation}", "ERROR")
-			return False
-
-		item_id_part = violation_parts[0].split(".")
-		if len(item_id_part) < 2:
-			coordinator.printer.print_message(f"违规 ID 格式错误: {violation_parts[0]}", "ERROR")
-			return False
-
-		_, comment_id = item_id_part
-		is_reply = "reply" in violation
-
-		# 查找父评论 ID
-		parent_id, _ = coordinator.toolkit.create_string_processor().find_substrings(text=comment_id, candidates=[violation])
-		parent_id = int(parent_id) if parent_id and parent_id != "UNKNOWN" else None
-
-		# 执行举报操作
+	def _parse_violation(violation: str) -> tuple[str, int, str, int, int] | None:
+		"""解析违规标识符, 返回(信息源, 信息源id, 类型, 父ID, 内容ID)"""
 		try:
-			match source_key:
-				case "work":
-					return coordinator.work_motion.execute_report_comment(
-						work_id=source_id,
-						comment_id=int(comment_id),
-						reason=reason_content,
-					)
-				case "forum":
-					item_type = "COMMENT" if is_reply else "REPLY"  # 回复/普通评论区分
-					return coordinator.forum_motion.report_item(item_id=int(comment_id), reason_id=7, description="", item_type=item_type, return_data=False)
-				case "shop":
-					if is_reply and parent_id is not None:
-						# 回复类型: 需传入父评论 ID
-						return coordinator.shop_motion.execute_report_comment(
-							comment_id=int(comment_id),
-							reason_content=reason_content,
-							reason_id=7,
-							reporter_id=randint(10000, 199999999),  # 使用当前登录用户
-							comment_parent_id=parent_id,
-							description="",
-						)
-					# 普通评论: 无需父 ID
+			# 新格式: "信息源:信息源id:类型:父id:类型id"
+			parts = violation.split(":")
+			if len(parts) != 5:
+				return None
+
+			source = parts[0]  # shop, forum, work
+			source_id = int(parts[1])  # 信息源ID
+			violation_type = parts[2]  # post, comment, reply, work
+			parent_id = int(parts[3])  # 父ID (评论的父ID, 帖子为0)
+			content_id = int(parts[4])  # 内容ID
+		except (ValueError, IndexError):
+			return None
+		else:
+			return (source, source_id, violation_type, parent_id, content_id)
+
+	@staticmethod
+	def _execute_single_report(violation: str, reason_content: str) -> bool:
+		"""执行单条举报"""
+
+		# 1. 解析违规标识符
+		parsed = ViolationChecker._parse_violation(violation)
+		if not parsed:
+			coordinator.printer.print_message(f"无法解析违规标识符: {violation}", "ERROR")
+			return False
+
+		source, source_id, violation_type, parent_id, content_id = parsed
+
+		try:
+			# 帖子举报
+			if violation_type == "post":
+				if source != "forum":
+					coordinator.printer.print_message(f"不能在 {source} 平台举报帖子", "ERROR")
+					return False
+
+				return coordinator.forum_motion.report_post(post_id=content_id, reason_id=7, description=f"违规: {reason_content}")
+
+			# 作品举报
+			if violation_type == "work":
+				return coordinator.work_motion.execute_report_work(
+					work_id=content_id,
+					reason=reason_content,
+					describe=reason_content,
+				)
+
+			# 评论/回复举报
+			is_reply = violation_type == "reply"
+			if source == "work":
+				return coordinator.work_motion.execute_report_comment(
+					work_id=source_id,
+					comment_id=content_id,
+					reason=reason_content,
+				)
+
+			if source == "forum":
+				item_type = "REPLY" if is_reply else "COMMENT"
+				return coordinator.forum_motion.report_item(item_id=content_id, reason_id=7, description="", item_type=item_type, return_data=False)
+
+			if source == "shop":
+				# 商店评论/回复处理
+				if is_reply:
 					return coordinator.shop_motion.execute_report_comment(
-						comment_id=int(comment_id),
+						comment_id=content_id,
 						reason_content=reason_content,
 						reason_id=7,
-						reporter_id=randint(10000, 199999999),  # 使用当前登录用户
+						reporter_id=randint(10000, 199999999),
+						comment_parent_id=parent_id,
 						description="",
 					)
-		except Exception as e:
-			coordinator.printer.print_message(f"举报操作失败: {e!s}", "ERROR")
-			return False
+				return coordinator.shop_motion.execute_report_comment(
+					comment_id=content_id,
+					reason_content=reason_content,
+					reason_id=7,
+					reporter_id=randint(10000, 199999999),
+					description="",
+				)
 
-		return False
+		except Exception as e:
+			coordinator.printer.print_message(f"举报操作失败: {violation} - {e!s}", "ERROR")
+			return False
+		else:
+			return False
 
 
 class ReplyProcessor:
@@ -1185,7 +1221,6 @@ class ReportTypeRegistry:
 			"T": ActionConfig("T", "禁言 3 月", "禁言用户 3 个月", "MUTE_THREE_MONTHS"),
 			"U": ActionConfig("U", "取消发布", "取消作品发布", "UNLOAD"),
 			"P": ActionConfig("P", "通过", "通过举报, 不做处理", "PASS"),
-			"C": ActionConfig("C", "查看详情", "查看详细信息", "DETAIL"),
 			"F": ActionConfig("F", "检查违规", "检查其他违规内容", "CHECK_VIOLATION"),
 			"J": ActionConfig("J", "跳过", "跳过当前举报", "SKIP"),
 		}
@@ -1216,6 +1251,8 @@ class ReportTypeRegistry:
 	def get_action_prompt(self, report_type: str) -> str:
 		"""生成操作提示字符串"""
 		actions = self.get_available_actions(report_type)
+		# 过滤掉C选项
+		actions = [action for action in actions if action.key != "C"]
 		prompt_parts = [f"{action.key}({action.name})" for action in actions]
 		return "选择操作:" + ",".join(prompt_parts)
 
@@ -1240,11 +1277,11 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 
 	def _setup_registry(self) -> None:
 		"""初始化举报类型注册表"""
-		# 评论类型配置
+		# 商店评论类型配置
 		self.registry.register(
-			"comment",
+			"shop_comment",
 			SourceConfig(
-				name="评论举报",
+				name="商店评论举报",
 				fetch_total=lambda status: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
 				fetch_generator=lambda status: self.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_comment_report",
@@ -1260,7 +1297,6 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 					self.registry.default_actions["S"],  # 禁言 7 天
 					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
-					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
 					self.registry.default_actions["J"],  # 跳过
 				],
@@ -1268,7 +1304,7 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		)
 		# 作品类型配置
 		self.registry.register(
-			"work",
+			"forum_work",
 			SourceConfig(
 				name="作品举报",
 				fetch_total=lambda status: self.whale_obtain.fetch_work_reports_total(source_type="ALL", status=status),
@@ -1288,9 +1324,9 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 				],
 			),
 		)
-		# 帖子类型配置
+		# 论坛帖子类型配置
 		self.registry.register(
-			"post",
+			"forum_post",
 			SourceConfig(
 				name="帖子举报",
 				fetch_total=lambda status: self.whale_obtain.fetch_post_reports_total(status=status),
@@ -1307,15 +1343,14 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 					self.registry.default_actions["S"],  # 禁言 7 天
 					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
-					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
 					self.registry.default_actions["J"],  # 跳过
 				],
 			),
 		)
-		# 讨论类型配置
+		# 论坛讨论类型配置
 		self.registry.register(
-			"discussion",
+			"forum_discussion",
 			SourceConfig(
 				name="讨论举报",
 				fetch_total=lambda status: self.whale_obtain.fetch_discussion_reports_total(status=status),
@@ -1332,7 +1367,6 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 					self.registry.default_actions["S"],  # 禁言 7 天
 					self.registry.default_actions["T"],  # 禁言 3 月
 					self.registry.default_actions["P"],  # 通过
-					self.registry.default_actions["C"],  # 查看详情
 					self.registry.default_actions["F"],  # 检查违规
 					self.registry.default_actions["J"],  # 跳过
 				],
@@ -1397,10 +1431,10 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
 		"""获取所有举报类型的总数"""
 		report_configs = [
-			("comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
-			("post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
-			("discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
-			("work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
+			("shop_comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
+			("forum_post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
+			("forum_discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
+			("forum_work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
@@ -1451,9 +1485,9 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		"content_threshold": 3,
 	}
 	SOURCE_TYPE_MAP: ClassVar = {
-		"comment": "shop",
-		"post": "post",
-		"discussion": "discussion",
+		"shop_comment": "shop",
+		"forum_post": "forum",
+		"forum_discussion": "forum",
 	}
 
 	def __init__(self) -> None:
@@ -1463,8 +1497,8 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self.auth_manager = ReportAuthManager()
 		self.fetcher = ReportFetcher()
 		self.batch_manager = BatchActionManager()
-		self._violation_checker = None  # 添加下划线前缀
-		self._pipeline = None  # 添加这行: 初始化 _pipeline 属性
+		self._violation_checker = None
+		self._pipeline = None
 		self.comment_processor = CommentProcessor()
 		super().__init__()
 
@@ -1731,7 +1765,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 				return record
 		return None
 
-	def check_violation(self, source_id: Any, source_type: Literal["shop", "post", "discussion"], board_name: str, user_id: int | None) -> None:
+	def check_violation(self, source_id: Any, source_type: Literal["shop", "forum", "work"], board_name: str, user_id: int | None) -> None:
 		"""检查举报内容违规 - 委托给ViolationChecker"""
 		self.violation_checker.check_violation(source_id=source_id, source_type=source_type, board_name=board_name, user_id=user_id)
 

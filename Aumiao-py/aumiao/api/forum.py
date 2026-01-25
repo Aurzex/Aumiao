@@ -258,6 +258,14 @@ class ForumActionHandler:
 		# 返回响应数据或状态码
 		return response.json() if return_data else response.status_code == HTTPStatus.CREATED.value
 
+	@overload
+	def report_post(self, post_id: int, reason_id: Literal[1, 2, 3, 4, 5, 6, 7, 8], description: str, *, return_data: Literal[True]) -> dict: ...
+
+	@overload
+	def report_post(self, post_id: int, reason_id: Literal[1, 2, 3, 4, 5, 6, 7, 8], description: str, *, return_data: Literal[False] = False) -> bool: ...
+
+	@overload
+	def report_post(self, post_id: int, reason_id: Literal[1, 2, 3, 4, 5, 6, 7, 8], description: str, *, return_data: bool = False) -> dict | bool: ...
 	# 举报某个帖子
 	def report_post(
 		self,
