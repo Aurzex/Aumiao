@@ -16,7 +16,8 @@ from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
 
 coordinator = InfrastructureCoordinator()
-
+# 定义统一的源类型
+SourceType = Literal["shop", "forum", "work"]
 # ========================== 策略模式相关定义 ==========================
 
 
@@ -24,16 +25,32 @@ class ProcessStrategy[T: Literal["duplicates", "ads", "blacklist"]](ABC):
 	"""处理策略抽象基类"""
 
 	@abstractmethod
-	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[T, Any], target_lists: defaultdict[str, list[str]]) -> None:
+	def process(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		params: dict[T, Any],
+		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
+	) -> None:
 		"""处理评论的核心方法"""
 
 
 class AdsProcessStrategy(ProcessStrategy):
 	"""广告处理策略"""
 
-	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["ads"], Any], target_lists: defaultdict[str, list[str]]) -> None:
+	def process(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		params: dict[Literal["ads"], Any],
+		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
+	) -> None:
 		"""处理广告评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists)
+		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists, source_type=source_type)
 
 	def _process_abnormal_comments(
 		self,
@@ -43,6 +60,7 @@ class AdsProcessStrategy(ProcessStrategy):
 		action_type: str,
 		params: dict[Literal["ads"], Any],
 		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
 	) -> None:
 		"""处理异常评论: 广告"""
 		for comment in comments:
@@ -52,14 +70,22 @@ class AdsProcessStrategy(ProcessStrategy):
 
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
-				identifier = f"shop:{item_id}:comment:0:{comment['id']}"
-				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
+				identifier = f"{source_type}:{item_id}:comment:0:{comment['id']}"
+				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type, source_type=source_type)
 
 			# 检查回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
-					identifier = f"shop:{item_id}:reply:{comment['id']}:{reply['id']}"
-					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
+					identifier = f"{source_type}:{item_id}:reply:{comment['id']}:{reply['id']}"
+					self._log_and_add(
+						target_lists=target_lists,
+						data=reply,
+						identifier=identifier,
+						title=title,
+						action_type=action_type,
+						source_type=source_type,
+						parent_content=comment.get("content", ""),
+					)
 
 	@staticmethod
 	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["ads"], Any]) -> bool:
@@ -70,9 +96,17 @@ class AdsProcessStrategy(ProcessStrategy):
 		return False
 
 	@staticmethod
-	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
+	def _log_and_add(
+		target_lists: defaultdict[str, list[str]],
+		data: dict[str, Any],
+		identifier: str,
+		title: str,
+		action_type: str,
+		source_type: SourceType,
+		parent_content: str = "",
+	) -> None:
 		"""记录日志并添加标识到目标列表"""
-		log_templates = {"ads": "广告 {type} [{title}]{parent} : {content}"}
+		log_templates = {"ads": "广告 {type} [{source}]{title}{parent} : {content}"}
 
 		# 区分评论/回复类型
 		log_type = "回复" if ":reply:" in identifier else "评论"
@@ -82,7 +116,8 @@ class AdsProcessStrategy(ProcessStrategy):
 		if action_type in log_templates:
 			log_message = log_templates[action_type].format(
 				type=log_type,
-				title=title[:10],
+				source=source_type.upper(),
+				title=f"[{title[:10]}]" if title else "",
 				parent=parent_info,
 				content=data.get("content", "")[:50],
 				nickname=data.get("nickname", "未知用户"),
@@ -96,9 +131,17 @@ class AdsProcessStrategy(ProcessStrategy):
 class BlacklistProcessStrategy(ProcessStrategy):
 	"""黑名单处理策略"""
 
-	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["blacklist"], Any], target_lists: defaultdict[str, list[str]]) -> None:
+	def process(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,
+		params: dict[Literal["blacklist"], Any],
+		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
+	) -> None:
 		"""处理黑名单用户评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="blacklist", params=params, target_lists=target_lists)
+		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="blacklist", params=params, target_lists=target_lists, source_type=source_type)
 
 	def _process_abnormal_comments(
 		self,
@@ -108,6 +151,7 @@ class BlacklistProcessStrategy(ProcessStrategy):
 		action_type: str,
 		params: dict[Literal["blacklist"], Any],
 		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
 	) -> None:
 		"""处理异常评论: 黑名单"""
 		for comment in comments:
@@ -117,27 +161,47 @@ class BlacklistProcessStrategy(ProcessStrategy):
 
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
-				identifier = f"shop:{item_id}:comment:0:{comment['id']}"
-				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type)
+				identifier = f"{source_type}:{item_id}:comment:0:{comment['id']}"
+				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type, source_type=source_type)
 
 			# 检查回复
 			for reply in comment.get("replies", []):
 				if self._check_condition(reply, action_type, params):
-					identifier = f"shop:{item_id}:reply:{comment['id']}:{reply['id']}"
-					self._log_and_add(target_lists=target_lists, data=reply, identifier=identifier, title=title, action_type=action_type, parent_content=comment.get("content", ""))
+					identifier = f"{source_type}:{item_id}:reply:{comment['id']}:{reply['id']}"
+					self._log_and_add(
+						target_lists=target_lists,
+						data=reply,
+						identifier=identifier,
+						title=title,
+						action_type=action_type,
+						source_type=source_type,
+						parent_content=comment.get("content", ""),
+					)
 
 	@staticmethod
 	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["blacklist"], Any]) -> bool:
 		"""检查内容是否符合处理条件"""
 		user_id = str(data.get("user_id", ""))
 		if action_type == "blacklist":
-			return user_id in params.get("blacklist", set())
+			# 确保 blacklist 参数是 set 类型
+			blacklist_set = params.get("blacklist", set())
+			if isinstance(blacklist_set, list):
+				blacklist_set = set(blacklist_set)
+			return user_id in blacklist_set
 		return False
 
 	@staticmethod
-	def _log_and_add(target_lists: defaultdict[str, list[str]], data: dict[str, Any], identifier: str, title: str, action_type: str, parent_content: str = "") -> None:
+	def _log_and_add(
+		target_lists: defaultdict[str, list[str]],
+		data: dict[str, Any],
+		identifier: str,
+		title: str,
+		action_type: str,
+		source_type: SourceType,
+		parent_content: str = "",
+	) -> None:
 		"""记录日志并添加标识到目标列表"""
-		log_templates = {"blacklist": "黑名单 {type} [{title}]{parent} : {nickname}"}
+		log_templates = {"blacklist": "黑名单 {type} [{source}]{title}{parent} : {nickname}"}
 
 		# 区分评论/回复类型
 		log_type = "回复" if ":reply:" in identifier else "评论"
@@ -147,9 +211,9 @@ class BlacklistProcessStrategy(ProcessStrategy):
 		if action_type in log_templates:
 			log_message = log_templates[action_type].format(
 				type=log_type,
-				title=title[:10],
+				source=source_type.upper(),
+				title=f"[{title[:10]}]" if title else "",
 				parent=parent_info,
-				content=data.get("content", "")[:50],
 				nickname=data.get("nickname", "未知用户"),
 			)
 			print(log_message)
@@ -161,15 +225,23 @@ class BlacklistProcessStrategy(ProcessStrategy):
 class DuplicatesProcessStrategy(ProcessStrategy):
 	"""重复评论处理策略"""
 
-	def process(self, comments: list[dict[str, Any]], item_id: int, title: str, params: dict[Literal["duplicates"], Any], target_lists: defaultdict[str, list[str]]) -> None:  # noqa: ARG002
+	def process(
+		self,
+		comments: list[dict[str, Any]],
+		item_id: int,
+		title: str,  # noqa: ARG002
+		params: dict[Literal["duplicates"], Any],
+		target_lists: defaultdict[str, list[str]],
+		source_type: SourceType = "shop",
+	) -> None:
 		"""处理重复刷屏评论"""
 		content_map: defaultdict[tuple, list[str]] = defaultdict(list)
 
 		# 追踪所有评论和回复
 		for comment in comments:
-			self._track_comment(comment, item_id, content_map, is_reply=False)
+			self._track_comment(comment, item_id, content_map, source_type, is_reply=False)
 			for reply in comment.get("replies", []):
-				self._track_comment(reply, item_id, content_map, is_reply=True)
+				self._track_comment(reply, item_id, content_map, source_type, is_reply=True)
 
 		# 筛选出超过阈值的重复内容
 		for (user_id, content), identifiers in content_map.items():
@@ -178,14 +250,14 @@ class DuplicatesProcessStrategy(ProcessStrategy):
 				target_lists["duplicates"].extend(identifiers)
 
 	@staticmethod
-	def _track_comment(data: dict[str, Any], item_id: int, content_map: defaultdict[tuple, list[str]], *, is_reply: bool = False) -> None:
+	def _track_comment(data: dict[str, Any], item_id: int, content_map: defaultdict[tuple, list[str]], source_type: SourceType, *, is_reply: bool = False) -> None:
 		"""追踪评论内容用于重复检测"""
 		content_key = (data.get("user_id"), data.get("content", "").lower())
 		if is_reply:
 			parent_id = data.get("parent_id", 0) or 0
-			identifier = f"shop:{item_id}:reply:{parent_id}:{data.get('id')}"
+			identifier = f"{source_type}:{item_id}:reply:{parent_id}:{data.get('id')}"
 		else:
-			identifier = f"shop:{item_id}:comment:0:{data.get('id')}"
+			identifier = f"{source_type}:{item_id}:comment:0:{data.get('id')}"
 		content_map[content_key].append(identifier)
 
 
@@ -598,7 +670,7 @@ class CommentProcessor:
 		action_type: Literal["duplicates", "ads", "blacklist"],
 		params: dict[Literal["ads", "blacklist", "duplicates"], Any],
 		target_lists: defaultdict[str, list[str]],
-		source_type: Literal["shop", "forum", "work"] = "shop",  # noqa: ARG002
+		source_type: SourceType = "shop",
 	) -> None:
 		"""处理项目主入口, 根据 action_type 分发到对应处理策略"""
 		item_id = int(item["id"])
@@ -607,7 +679,14 @@ class CommentProcessor:
 
 		# 获取处理策略并执行
 		strategy = self._strategy_factory.get_strategy(action_type)
-		strategy.process(comments=comments, item_id=item_id, title=title, params=params, target_lists=target_lists)
+		strategy.process(
+			comments=comments,
+			item_id=item_id,
+			title=title,
+			params=params,
+			target_lists=target_lists,
+			source_type=source_type,  # 直接传递源类型
+		)
 
 	def register_strategy(self, action_type: str, strategy: ProcessStrategy) -> None:
 		"""注册自定义处理策略"""
@@ -622,23 +701,24 @@ class CommentProcessor:
 class ViolationChecker:
 	"""违规检查器 - 提取ReportProcessor中的违规检查逻辑"""
 
-	def __init__(
-		self,
-	) -> None:
+	def __init__(self) -> None:
 		self.comment_processor = CommentProcessor()
 
 	def check_violation(self, source_id: Any, source_type: Literal["shop", "forum", "work"], board_name: str, user_id: int | None) -> None:
 		"""检查举报内容违规"""
 		coordinator.printer.print_message(f"检查违规: source_id={source_id}, type={source_type}, board={board_name}, user={user_id}", "INFO")
+
 		source_id = int(source_id) if source_id != "UNKNOWN" and str(source_id).isdigit() else 0
 		if not source_id:
 			coordinator.printer.print_message("无效的来源 ID, 无法检查违规", "ERROR")
 			return
 
-		adjusted_type = "forum" if source_type == "forum" else source_type
-		violations = self._analyze_comment_violations(source_id=source_id, source_type=adjusted_type, board_name=board_name)
-
-		# 检查帖子刷屏
+		# 直接使用传入的 source_type
+		violations = self._analyze_comment_violations(
+			source_id=source_id,
+			source_type=source_type,  # 使用统一的源类型
+			board_name=board_name,
+		)
 		spam_posts = []
 		if source_type == "forum" and user_id:
 			spam_posts = self._check_spam_posts(user_id, board_name)
@@ -648,19 +728,25 @@ class ViolationChecker:
 			coordinator.printer.print_message("未检测到违规评论或刷屏帖子", "INFO")
 			return
 
-		# 执行自动举报 (用学生账号)
-		self._process_auto_report(violations=violations, source_type=adjusted_type)
+		# 执行自动举报
+		self._process_auto_report(violations=violations, source_type=source_type)
 
-	def _analyze_comment_violations(self, source_id: int, source_type: Literal["forum", "work", "shop"], board_name: str) -> list[str]:
+	def _analyze_comment_violations(
+		self,
+		source_id: int,
+		source_type: Literal["forum", "work", "shop"],  # 使用统一的源类型
+		board_name: str,
+	) -> list[str]:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
-			# 1. 获取评论详情列表
-			api_source_type = source_type
-			if api_source_type == "forum":
-				api_source_type = "post"
-			comments = Obtain().get_comments_detail(com_id=source_id, source=api_source_type, method="comments", max_limit=200)
+			comments = Obtain().get_comments_detail(
+				com_id=source_id,
+				source=source_type,  # 传递兼容的源类型
+				method="comments",
+				max_limit=200,
+			)
 
-			# 2. 违规检查参数 (广告关键词、黑名单、垃圾帖阈值)
+			# 2. 违规检查参数
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
 				"ads": coordinator.data.USER_DATA.ads,
 				"blacklist": coordinator.data.USER_DATA.black_room,
@@ -669,14 +755,14 @@ class ViolationChecker:
 
 			# 3. 调用评论处理器分析违规
 			class CommentCheckConfig:
-				title_key = "title"  # 标题字段名
+				title_key = "title"
 
 				@staticmethod
 				def get_comments(_processor: Callable, _item_id: int) -> list[dict]:
-					return comments  # 返回评论列表
+					return comments
 
 			config = CommentCheckConfig()
-			violation_targets: defaultdict[str, list[str]] = defaultdict(list)  # 违规内容列表
+			violation_targets: defaultdict[str, list[str]] = defaultdict(list)
 
 			# 检查广告、黑名单、重复评论
 			for check_type in ["ads", "blacklist", "duplicates"]:
@@ -687,10 +773,10 @@ class ViolationChecker:
 					action_type=check_type,
 					params=check_params,
 					target_lists=violation_targets,
-					source_type=source_type,
+					source_type=source_type,  # 传递统一的源类型
 				)
 
-			# 合并所有违规内容 (去重, 避免重复举报)
+			# 合并所有违规内容
 			return list(set(violation_targets["ads"] + violation_targets["blacklist"] + violation_targets["duplicates"]))
 		except Exception as e:
 			coordinator.printer.print_message(f"分析评论违规失败: {e!s}", "ERROR")
@@ -1136,7 +1222,7 @@ class ReplyProcessor:
 		return message_info.get("reply", "")
 
 	@staticmethod
-	def extract_target_and_parent_ids(reply_type: str, reply: dict, message_info: dict, business_id: int, source_type: Literal["work", "post", "shop"]) -> tuple[int, int]:
+	def extract_target_and_parent_ids(reply_type: str, reply: dict, message_info: dict, business_id: int, source_type: Literal["work", "forum", "shop"]) -> tuple[int, int]:
 		"""提取目标 ID 和父 ID"""
 		target_id = 0
 		parent_id = 0

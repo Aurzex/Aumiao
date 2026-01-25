@@ -286,7 +286,7 @@ class ReplyService:
 		sender_nickname = sender_info.get("nickname", "未知用户")
 		business_id = message_info.get("business_id")
 		# 确定来源类型
-		source_type = "work" if reply_type.startswith("WORK") else "post"
+		source_type = "work" if reply_type.startswith("WORK") else "forum"
 		# 提取文本内容
 		comment_text = self.processor.extract_comment_text(reply_type, message_info)
 		# 提取目标 ID
@@ -498,15 +498,15 @@ class CommunityService:
 				delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
 				title_key="work_name",
 			),
-			"post": SourceConfigSimple(
+			"forum": SourceConfigSimple(
 				get_items=lambda: coordinator.forum_obtain.fetch_my_posts_gen("created", limit=None),
-				get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "post", "comments"),
+				get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "forum", "comments"),
 				delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
 				title_key="title",
 			),
 		}
 
-	def clean_comments(self, source: Literal["work", "post"], action_type: Literal["ads", "duplicates", "blacklist"]) -> dict:
+	def clean_comments(self, source: Literal["work", "forum"], action_type: Literal["ads", "duplicates", "blacklist"]) -> dict:
 		"""
 		清理评论
 		Args:
@@ -523,7 +523,7 @@ class CommunityService:
 		}
 		target_lists = defaultdict(list)
 		for item in config.get_items():
-			self.comment_processor.process_item(item, config, action_type, params, target_lists)
+			self.comment_processor.process_item(item, config, action_type, params, target_lists, source)
 		label_map = {"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}
 		result = self._execute_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
 		return {
@@ -544,7 +544,7 @@ class CommunityService:
 			return {"success": True, "deleted_count": 0, "details": []}
 		print(f"\n 发现以下 {label}(共 {len(target_list)} 条):")
 		for item in reversed(target_list):
-			print(f"- {item.split(':')[0]}")
+			print(f"- {item}")
 		if input(f"\n 确认删除所有 {label}? (Y/N)").lower() != "y":
 			print("操作已取消")
 			return {"success": False, "deleted_count": 0, "details": []}
