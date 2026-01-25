@@ -11,8 +11,9 @@ from aumiao.utils.decorator import singleton
 
 
 # ==================== 基础数据结构和枚举 ====================
-class LoginMethod (Enum):
+class LoginMethod(Enum):
 	"""登录方法枚举"""
+
 	SIMPLE_PASSWORD = "simple_password"
 	SECURE_PASSWORD = "secure_password"
 	TOKEN = "token"
@@ -21,14 +22,16 @@ class LoginMethod (Enum):
 	ADMIN_PASSWORD = "admin_password"
 
 
-class UserRole (Enum):
+class UserRole(Enum):
 	"""用户角色枚举"""
+
 	USER = "user"
 	ADMIN = "admin"
 
 
-class AccountStatus (Enum):
+class AccountStatus(Enum):
 	"""账号状态枚举"""
+
 	JUDGEMENT = "judgement"
 	AVERAGE = "average"
 	EDU = "edu"
@@ -37,6 +40,7 @@ class AccountStatus (Enum):
 @dataclass
 class LoginCredentials:
 	"""登录凭证数据类"""
+
 	identity: str = ""
 	password: str = ""
 	token: str = ""
@@ -49,6 +53,7 @@ class LoginCredentials:
 @dataclass
 class LoginResult:
 	"""登录结果数据类"""
+
 	success: bool
 	method: LoginMethod
 	message: str
@@ -88,6 +93,7 @@ def parse_cookies(cookies_str: str) -> dict[str, str]:
 # ==================== 认证处理器 ====================
 class AuthProcessor:
 	"""认证处理器, 负责具体的认证逻辑"""
+
 	CLIENT_SECRET = "pBlYqXbJDu"
 
 	def __init__(self, client: acquire.CodeMaoClient) -> None:
@@ -171,6 +177,7 @@ class AuthProcessor:
 # ==================== 登录处理器 ====================
 class LoginHandler:
 	"""登录处理器, 负责执行具体的登录操作"""
+
 	def __init__(self, client: acquire.CodeMaoClient, processor: AuthProcessor) -> None:
 		self.client = client
 		self.processor = processor
@@ -248,6 +255,7 @@ class AuthManager:
 	统一认证管理器
 	支持普通用户和管理员两种角色的登录
 	"""
+
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 		self._processor = AuthProcessor(self._client)
@@ -376,6 +384,7 @@ class AuthManager:
 # ==================== 云服务认证器 ====================
 class CloudAuthenticator:
 	"""云服务认证管理器"""
+
 	CLIENT_SECRET = "pBlYqXbJDu"
 
 	def __init__(self, authorization_token: str | None = None) -> None:
