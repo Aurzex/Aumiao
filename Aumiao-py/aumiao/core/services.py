@@ -583,11 +583,9 @@ class CommunityService:
 				"check_keys": ["like_collection_count", "comment_count", "re_create_count", "system_count"],
 			},
 		}
-
 		if method not in method_config:
 			msg = f"不支持的方法类型: {method}"
 			raise ValueError(msg)
-
 		config = method_config[method]
 		page_size = 200
 		params = {"limit": page_size, "offset": 0}
@@ -617,15 +615,12 @@ class CommunityService:
 				if is_all_cleared(current_counts):
 					print(f"所有 {method} 消息已标记为已读")
 					return {"success": True, "method": method, "cleared_batches": cleared_batches, "message": "所有消息已标记为已读"}
-
 				if not send_batch_requests():
 					print(f"清除 {method} 消息请求失败")
 					return {"success": False, "method": method, "cleared_batches": cleared_batches, "error": "请求失败"}
-
 				cleared_batches += 1
 				params["offset"] += page_size
 				print(f"已处理第 {cleared_batches} 批消息")
-
 		except Exception as e:
 			print(f"清除红点过程中发生异常: {e}")
 			return {"success": False, "method": method, "error": str(e)}
@@ -634,7 +629,7 @@ class CommunityService:
 		"""点赞和收藏用户作品"""
 		print(f"开始处理用户 {user_id} 的作品")
 		follow_result = self.coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
-		print(f"关注用户: {'成功' if follow_result else '失败'}")
+		print(f"关注用户: {' 成功 ' if follow_result else ' 失败 '}")
 		like_count = 0
 		collect_count = 0
 		processed_count = 0
@@ -761,7 +756,6 @@ class CommunityService:
 			下载结果数据
 		"""
 		details = self.coordinator.novel_obtain.fetch_novel_details(novel_id)
-
 		if not details:
 			msg = "获取小说详情失败"
 			raise ValueError(msg)
@@ -821,8 +815,8 @@ class CommunityService:
 		work_name = info.get("work_name", info.get("name", "未知作品"))
 		print(f"作品名称: {work_name}")
 		if info.get("type") != "NEMO":
-			print(f"该作品类型为{info.get('type')}, 不能生成喵口令")
-			return {"success": False, "work_id": work_id, "work_name": work_name, "error": f"该作品类型为{info.get('type')}, 不能生成喵口令"}
+			print(f"该作品类型为 {info.get('type')}, 不能生成喵口令")
+			return {"success": False, "work_id": work_id, "work_name": work_name, "error": f"该作品类型为 {info.get('type')}, 不能生成喵口令"}
 		work_info_url = f"/creation-tools/v1/works/{work_id}/source/public"
 		work_info = self.coordinator.client.send_request(endpoint=work_info_url, method="GET").json()
 		print(work_info)
@@ -842,7 +836,6 @@ class CommunityService:
 			result = response.json()
 			miao_code = f"【喵口令】$&{result['token']}&$"
 			print(f"生成的喵口令: {miao_code}")
-
 			return {
 				"success": True,
 				"work_id": work_id,
@@ -873,7 +866,6 @@ class CommunityService:
 		if not filtered_users:
 			print(f"没有用户评论数达到或超过 {min_comments} 条")
 			return {"min_comments_threshold": min_comments, "total_users": len(comments_data), "filtered_users_count": 0, "filtered_users": []}
-
 		print(f"评论数达到 {min_comments}+ 的用户统计:")
 		print("=" * 60)
 		result_data = []
@@ -983,7 +975,7 @@ class CommunityService:
 		qualified_fans = []
 		for fan in fans:
 			if int(fan.get("total_likes", 0)) >= like_num:
-				print("\n符合条件的粉丝:")
+				print("\n 符合条件的粉丝:")
 				print(f"昵称: {fan['nickname']}")
 				print(f"ID: {fan['id']}")
 				print(f"获赞数: {fan['total_likes']}")
@@ -1013,8 +1005,8 @@ class CommunityService:
 
 	@staticmethod
 	def check_follower(follower: dict) -> tuple:
-		default_avatars = [f"https://cdn-community.codemao.cn/community_frontend/community_default_avatar/avatar_300x300_{i:02d}.jpg" for i in range(1, 9)]
-		default_descriptions = ["", "无", "这个人很懒", "什么都没写"]
+		default_avatars = [f"https://cdn-community.codemao.cn/community_frontend/community_default_avatar/avatar_300x300_ {i:02d}.jpg" for i in range(1, 9)]
+		default_descriptions = ["", " 无 ", " 这个人很懒 ", " 什么都没写 "]
 		suspicious_name_parts = ["用户", "test", "测试", "temp", "临时", "小号", "备用", "bot", "的"]
 		reasons, score = [], 0.0
 		n_works = follower.get("n_works", 0)
@@ -1046,7 +1038,6 @@ class CommunityService:
 			digit_name = nickname.isdigit() and len(nickname) >= 6
 			pattern_name = bool(any(c.isalnum() for c in nickname_lower))
 			long_non_chinese = len(nickname) > 10 and not any("一" <= ch <= "\u9fff" for ch in nickname)
-
 			if suspicious_name or digit_name or pattern_name or long_non_chinese:
 				reasons.append("可疑用户名")
 				score += 0.1
@@ -1175,7 +1166,7 @@ class CommunityService:
 		return filtered_works
 
 	def generate_online_leaderboard(self, works: list | None) -> dict:
-		"""works数据类型和 fetch_and_aggregate_works 返回的一样"""
+		"""works 数据类型和 fetch_and_aggregate_works 返回的一样"""
 
 		def _get_online_users(work_id: int, token: str) -> int:
 			"""获取作品的在线用户数"""
@@ -1201,7 +1192,7 @@ class CommunityService:
 		print("\n=== 作品在线人数排行榜 ===")
 		sorted_results = []
 		for name, count in sorted(results, key=operator.itemgetter(1), reverse=True):
-			print(f"{name}: {count}人在线")
+			print(f"{name}: {count} 人在线")
 			sorted_results.append({"work_name": name, "online_count": count})
 		return {
 			"total_works": len(sorted_results),
@@ -1333,7 +1324,6 @@ class BatchOperationService:
 
 	def _generate_account_credentials(self, cred_type: Literal["token", "password"], limit: int | None) -> bool:
 		"""生成账号凭证
-
 		Args:
 			cred_type: 凭证类型, token 或 password
 			limit: 生成凭证的数量限制, None 表示无限制
@@ -1346,12 +1336,12 @@ class BatchOperationService:
 					# 登录获取 token
 					response = self.auth_manager.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
 					credential = response.data["auth"]["token"]
-					# 只写入 token,不包含账号信息
+					# 只写入 token, 不包含账号信息
 					content = f"{credential}\n"
 					file_path = data.PathConfig.TOKEN_FILE_PATH
 				else:  # password
 					credential = password
-					# 写入账号和密码, 格式:账号:密码
+					# 写入账号和密码, 格式: 账号: 密码
 					content = f"{identity}:{password}\n"
 					file_path = data.PathConfig.PASSWORD_FILE_PATH
 				credentials.append(credential)

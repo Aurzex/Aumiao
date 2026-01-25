@@ -9,16 +9,19 @@ A powerful API collection project and toolset for CodeMao community development,
 ### 用户功能 | User Features
 
 #### 账户与认证 | Account & Authentication
+
 - **多方式登录**：支持 password（新旧格式）与 cookie 登录  
   **Multiple Login Methods**: Support for password (both old and new formats) and cookie login
 - **状态查询**：检查禁言状态和社区公约签署情况  
   **Status Query**: Check mute status and community convention signing status
 
 #### 消息管理 | Message Management
+
 - **一键清理**：支持一键清除邮箱未读消息  
   **One-click Cleanup**: Clear all unread messages in mailbox with one click
 
 #### 内容管理 | Content Management
+
 - **评论管理**：基于关键词和用户 ID 删除作品/帖子评论，自动监测并删除刷屏评论  
   **Comment Management**: Delete work/post comments based on keywords and user IDs, automatically monitor and remove spam comments
 - **智能回复**：支持关键词回复和随机回复双模式，支持表情包和多样化回复内容，内置作品解析命令，可作为 Bot 使用  
@@ -27,12 +30,14 @@ A powerful API collection project and toolset for CodeMao community development,
   **Content Pinning**: Keep content on homepage by modifying studio and novel information
 
 #### 作品处理 | Work Processing
+
 - **作品反编译**：支持 KITTEN N、KITTEN、NEMO、COCO 格式，自动识别文件类型并下载资源文件，生成可编辑的源码文件  
   **Work Decompilation**: Support for KITTEN N, KITTEN, NEMO, COCO formats, automatically identify file types and download resource files, generate editable source code files
 - **作品解析与编辑**：解析 Kitten N 和 Kitten4 作品文件，支持添加角色、变量等编辑操作，统计作品积木使用情况  
   **Work Analysis & Editing**: Parse Kitten N and Kitten4 work files, support editing operations like adding characters and variables, count work block usage
 
 #### 数据与文件操作 | Data & File Operations
+
 - **云数据管理**：支持云列表和云变量的调取、修改和创建，提供交互式界面  
   **Cloud Data Management**: Support for querying, modifying, and creating cloud lists and cloud variables with interactive interface
 - **文件上传**：支持 codemao、codegame、pgaot 平台的文件上传，支持批量操作和历史查看  
@@ -41,12 +46,14 @@ A powerful API collection project and toolset for CodeMao community development,
   **Sharing Function**: Generate sharing codes for NEMO works
 
 #### 内容获取 | Content Retrieval
+
 - **小说下载**：下载图书馆小说并自动转换 HTML 为 TXT 格式  
   **Novel Download**: Download library novels and automatically convert HTML to TXT format
 - **数据分析**：分析社区发言活跃用户，按时间筛选帖子，获取粉丝统计信息  
   **Data Analysis**: Analyze active community users, filter posts by time, obtain follower statistics
 
 #### AI 功能 | AI Features
+
 - **AI 调用**：支持 KN 编辑器 AI 调用，包含流式调用和交互式界面  
   **AI Calling**: Support KN editor AI calling, includes streaming calls and interactive interface
 - **多 Token 轮询**：优化 AI 服务使用体验  
@@ -55,12 +62,14 @@ A powerful API collection project and toolset for CodeMao community development,
 ### EDU 用户功能 | EDU User Features
 
 #### 账户管理 | Account Management
+
 - **批量账户操作**：支持 EDU 账户的批量生成和删除  
   **Batch Account Operations**: Support batch generation and deletion of EDU accounts
 - **凭证管理**：生成 token 或 password 配置文件  
   **Credential Management**: Generate token or password configuration files
 
 #### 批量操作 | Batch Operations
+
 - **批量举报**：针对作品进行批量举报操作  
   **Batch Reporting**: Perform batch reporting operations for works
 - **批量评论**：支持回帖、工作室讨论区和作品评论的批量创建  
@@ -69,6 +78,7 @@ A powerful API collection project and toolset for CodeMao community development,
 ### 风纪委员功能 | Moderator Features
 
 #### 举报处理 | Report Handling
+
 - **全类型支持**：处理 work、discussion、post、comment 所有举报类型  
   **Full Type Support**: Handle all report types including work, discussion, post, comment
 - **批量处理**：一键处理全部待处理项  
@@ -77,6 +87,7 @@ A powerful API collection project and toolset for CodeMao community development,
   **Smart Chunking**: Support chunked processing and detail viewing
 
 #### 违规检测 | Violation Detection
+
 - **自动检测**：识别评论和帖子刷屏行为  
   **Auto Detection**: Identify comment and post spamming behaviors
 - **关键词侦测**：自动检测预设违规关键词  
@@ -85,6 +96,7 @@ A powerful API collection project and toolset for CodeMao community development,
   **One-click Reporting**: Automatically report all detected violation content
 
 #### 历史应用 | History Application
+
 - **批量应用**：支持对同一违规项批量应用历史操作  
   **Batch Application**: Support batch application of historical operations for same violation
 - **操作复用**：自动参考之前的处理决策  
@@ -138,6 +150,7 @@ Download precompiled versions from the [Release page](https://github.com/aurzex/
 ## 开发者指南 | Developer Guide
 
 ### 核心模块结构
+
 - **api/** - 编程猫社区 API 接口封装，涵盖社区大部分可用 API
 - **core/** - 核心功能模块
   - **base/** - 基础 API 协调器，提供编程猫基础 API 调用
@@ -147,6 +160,7 @@ Download precompiled versions from the [Release page](https://github.com/aurzex/
 - **utils/** - 实用工具和辅助函数
 
 ### 基本用法示例
+
 ```python
 from aumiao import base, services
 
@@ -174,6 +188,7 @@ service.community.download_novel(
 ```
 
 ### 设计特性
+
 - **单例模式**：核心功能采用单例设计，优化资源使用
 - **动态导入**：模块按需加载，提升启动速度
 - **配置管理**：自动同步配置文件，无需手动保存
@@ -197,7 +212,6 @@ service.community.download_novel(
 - 代码风格与现有代码保持一致 | Code style is consistent with existing code
 - 添加必要的文档和注释 | Add necessary documentation and comments
 - 更新相关的测试用例 | Update relevant test cases
-
 
 ## 联系我们 | Contact Us
 
