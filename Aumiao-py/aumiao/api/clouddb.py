@@ -211,7 +211,7 @@ class CoconutCloud:
 		Returns:
 			查询结果
 		"""
-		data = {"querys": {"querys": queries}}
+		data = {"querys": {"querys": queries}}  # spellchecker:disable-line
 		response = self._client.send_request(
 			endpoint=f"/coconut/clouddb/runtime/{table_id}/select",
 			method="POST",
@@ -230,7 +230,7 @@ class CoconutCloud:
 		Returns:
 			更新结果
 		"""
-		data = {"querys": {"querys": queries}, "values": values}
+		data = {"querys": {"querys": queries}, "values": values}  # spellchecker:disable-line
 		response = self._client.send_request(
 			endpoint=f"/coconut/clouddb/runtime/{table_id}/update",
 			method="PUT",
@@ -266,7 +266,7 @@ class CoconutCloud:
 		Returns:
 			删除结果
 		"""
-		data = {"querys": {"querys": queries}}
+		data = {"querys": {"querys": queries}}  # spellchecker:disable-line
 		response = self._client.send_request(
 			endpoint=f"/coconut/clouddb/runtime/{table_id}/delete",
 			method="PUT",
