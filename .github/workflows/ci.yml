@@ -9,13 +9,13 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/build.yml"
-      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/build.yml"
-      - "Aumiao-py/src/**/*.py"
+      - "Aumiao-py/aumiao/**/*.py"
       - "Aumiao-py/pyproject.toml"
   workflow_dispatch:
 
@@ -36,20 +36,20 @@ jobs:
         with:
           version: "latest"
           args: "check --fix --preview --output-format=github"
-          src: "./Aumiao-py/src"
+          src: "./Aumiao-py/aumiao"
 
       - name: Run Ruff Formatter
         uses: astral-sh/ruff-action@v3
         with:
           version: "latest"
           args: "format"
-          src: "./Aumiao-py/src"
+          src: "./Aumiao-py/aumiao"
 
       - name: Upload Ruff Fixes
         uses: actions/upload-artifact@v4
         with:
           name: code-fixes
-          path: ./Aumiao-py/src
+          path: ./Aumiao-py/aumiao
           retention-days: 1
 
   spell-check:
@@ -67,13 +67,13 @@ jobs:
         uses: crate-ci/typos@v1.35.4
         with:
           config: ./Aumiao-py/pyproject.toml
-          files: ./Aumiao-py/src
+          files: ./Aumiao-py/aumiao
 
       - name: Upload Spell Fixes
         uses: actions/upload-artifact@v4
         with:
           name: spell-fixes
-          path: ./Aumiao-py/src
+          path: ./Aumiao-py/aumiao
           retention-days: 1
 
   apply-fixes:
@@ -96,7 +96,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: code-fixes
-          path: ./Aumiao-py/src
+          path: ./Aumiao-py/aumiao
           merge-multiple: true
 
       - name: Detect Modifications
