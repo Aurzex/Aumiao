@@ -479,7 +479,7 @@ jobs:
             --output-dir=../${{ env.BUILD_DIR }} `
             --output-filename=aumiao `
             --product-name="${{ env.PRODUCT_NAME }}" `
-            --product-version="$FULL_VERSION" `
+            --product-version="$FILE_VERSION" `
             --show-progress `
             --windows-console-mode=force `
             --windows-icon-from-ico="./resource/icons/favicon.ico" `
