@@ -1763,7 +1763,7 @@ class ReportFetcher(ClassUnion):  # ty:ignore[unsupported-base]
 			("shop_comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
 			("forum_post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
 			("forum_discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
-			("work_work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
+			("work_work", lambda: self.whale_obtain.fetch_work_reports_total_extra(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
