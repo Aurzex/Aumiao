@@ -50,7 +50,15 @@ class AdsProcessStrategy(ProcessStrategy):
 		source_type: SourceType = "shop",
 	) -> None:
 		"""处理广告评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="ads", params=params, target_lists=target_lists, source_type=source_type)
+		self._process_abnormal_comments(
+			comments=comments,
+			item_id=item_id,
+			title=title,
+			action_type="ads",
+			params=params,
+			target_lists=target_lists,
+			source_type=source_type,
+		)
 
 	def _process_abnormal_comments(
 		self,
@@ -71,7 +79,14 @@ class AdsProcessStrategy(ProcessStrategy):
 			# 检查主评论
 			if self._check_condition(comment, action_type, params):
 				identifier = f"{source_type}:{item_id}:comment:0:{comment['id']}"
-				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type, source_type=source_type)
+				self._log_and_add(
+					target_lists=target_lists,
+					data=comment,
+					identifier=identifier,
+					title=title,
+					action_type=action_type,
+					source_type=source_type,
+				)
 
 			# 检查回复
 			for reply in comment.get("replies", []):
@@ -141,7 +156,15 @@ class BlacklistProcessStrategy(ProcessStrategy):
 		source_type: SourceType = "shop",
 	) -> None:
 		"""处理黑名单用户评论"""
-		self._process_abnormal_comments(comments=comments, item_id=item_id, title=title, action_type="blacklist", params=params, target_lists=target_lists, source_type=source_type)
+		self._process_abnormal_comments(
+			comments=comments,
+			item_id=item_id,
+			title=title,
+			action_type="blacklist",
+			params=params,
+			target_lists=target_lists,
+			source_type=source_type,
+		)
 
 	def _process_abnormal_comments(
 		self,
@@ -361,7 +384,7 @@ class OfficialCheckProcessor(BaseProcessor):
 		"""检查是否为官方账号"""
 		config = context.config
 		item_ndd = context.record["item"]
-		user_id_str = item_ndd[f"{config.user_field}_id"]
+		user_id_str = item_ndd[f"{config.user_id_field}"]
 
 		# 尝试获取用户 ID
 		if user_id_str != "UNKNOWN" and user_id_str.isdigit():
@@ -399,89 +422,240 @@ class OfficialCheckProcessor(BaseProcessor):
 
 
 class DetailDisplayProcessor(BaseProcessor):
-	"""完整详情显示处理器 - 一次性显示所有信息"""
+	"""完整详情显示处理器 - 根据举报类型显示特定信息"""
 
 	def __init__(self, next_processor: ProcessorProtocol | None = None) -> None:
 		super().__init__(next_processor)
 
 	def _process(self, context: ProcessingContext) -> None:
-		"""一次性显示举报完整详情"""
+		"""根据举报类型显示特定信息"""
 		item_ndd = context.record["item"]
 		report_type = context.report_type
 		config = context.config
 
 		# 显示处理头信息
 		if context.is_batch_mode:
-			coordinator.printer.print_header("=== 批量处理首个项目 ===")
+			coordinator.printer.print_header(f"=== 批量处理 {config.name} ===")
 		elif context.is_reprocess_mode:
-			coordinator.printer.print_header("=== 重新处理项目 ===")
+			coordinator.printer.print_header(f"=== 重新处理 {config.name} ===")
+		else:
+			coordinator.printer.print_header(f"=== 处理 {config.name} ===")
 
-		# 显示举报详情
-		self._display_full_report_details(item_ndd, report_type, config)
+		# 根据举报类型调用不同的显示方法
+		display_methods = {
+			"work_work": self._display_work_report,
+			"shop_comment": self._display_comment_report,
+			"forum_post": self._display_forum_report,
+			"forum_discussion": self._display_discussion_report,
+		}
 
-		# 显示链接信息
-		self._display_links(item_ndd, report_type, config)
+		display_method = display_methods.get(report_type, self._display_generic_report)
+		display_method(item_ndd, config)
 
 	@staticmethod
-	def _display_full_report_details(item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
-		"""显示举报完整详情"""
-		coordinator.printer.print_header("=== 举报详情 ===")
-		coordinator.printer.print_message(f"举报 ID: {item_ndd['id']}", "INFO")
-		coordinator.printer.print_message(f"举报类型: {report_type}", "INFO")
+	def _display_work_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+		"""显示作品举报详情"""
+		coordinator.printer.print_header("=== 作品举报详情 ===")
 
-		# 显示内容
-		content = item_ndd[config.content_field]
+		base_url = "https://shequ.codemao.cn"
+
+		# 1. 作品链接
+		work_id = item_ndd.get(config.source_id_field, "UNKNOWN")
+		if work_id != "UNKNOWN":
+			work_url = f"{base_url}/work/{work_id}"
+			coordinator.printer.print_message(f"作品链接: {work_url}", "INFO")
+
+		# 2. 作者信息
+		author_nickname = item_ndd.get(config.user_nickname_field, "UNKNOWN")
+		author_id = item_ndd.get(config.user_id_field, "UNKNOWN")
+
+		coordinator.printer.print_message(f"作者昵称: {author_nickname}", "INFO")
+		if author_id != "UNKNOWN":
+			author_url = f"{base_url}/user/{author_id}"
+			coordinator.printer.print_message(f"作者链接: {author_url}", "INFO")
+
+		# 3. 作品类型
+		if config.work_type_field and config.work_type_field in item_ndd:
+			work_type = item_ndd.get(config.work_type_field, "UNKNOWN")
+			if work_type != "UNKNOWN":
+				coordinator.printer.print_message(f"作品类型: {work_type}", "INFO")
+
+		# 4. 举报时间
+		created_at = item_ndd.get(config.created_at_field, "UNKNOWN")
+		if created_at != "UNKNOWN":
+			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
+			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
+
+		# 5. 举报原因
+		reason_content = item_ndd.get(config.reason_field, "UNKNOWN")
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+
+		# 6. 举报线索
+		description = item_ndd.get(config.description_field, "UNKNOWN")
+		if description != "UNKNOWN":
+			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
+
+	@staticmethod
+	def _display_comment_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+		"""显示评论举报详情"""
+		coordinator.printer.print_header("=== 评论举报详情 ===")
+
+		base_url = "https://shequ.codemao.cn"
+
+		# 1. 举报内容
+		content = item_ndd.get(config.content_field, "UNKNOWN")
 		if content != "UNKNOWN":
-			# 使用 ReportProcessor 中的 DataConverter 方法
-			content_text = coordinator.toolkit.create_data_converter().html_to_text(content) if hasattr(coordinator.printer, "_tool") else re.sub(r"<[^>]+>", "", content)
+			content_text = coordinator.toolkit.create_data_converter().html_to_text(content)
 			coordinator.printer.print_message(f"举报内容: {content_text}", "SUCCESS")
-		else:
-			coordinator.printer.print_message("举报内容: 无内容", "SUCCESS")
 
-		# 显示板块信息
-		board_name = item_ndd.get("board_name", "UNKNOWN")
-		if board_name == "UNKNOWN" and config.source_name_field:
-			board_name = item_ndd[config.source_name_field]
-		coordinator.printer.print_message(f"所属板块: {board_name}", "INFO")
+		# 2. 被举报人信息
+		user_nickname = item_ndd.get(config.user_nickname_field, "UNKNOWN")
+		user_id = item_ndd.get(config.user_id_field, "UNKNOWN")
 
-		# 显示被举报人信息
-		user_nickname = item_ndd.get(f"{config.user_field}_nick_name", "UNKNOWN")
-		if user_nickname == "UNKNOWN":
-			user_nickname = item_ndd.get(f"{config.user_field}_nickname", "UNKNOWN")
-		coordinator.printer.print_message(f"被举报人: {user_nickname}", "INFO")
+		coordinator.printer.print_message(f"被举报人昵称: {user_nickname}", "INFO")
+		if user_id != "UNKNOWN":
+			user_url = f"{base_url}/user/{user_id}"
+			coordinator.printer.print_message(f"被举报人链接: {user_url}", "INFO")
 
-		# 显示举报原因和时间
-		coordinator.printer.print_message(f"举报原因: {item_ndd.get('reason_content', 'UNKNOWN')}", "INFO")
-		create_time = item_ndd.get("created_at", "UNKNOWN")
-		if create_time != "UNKNOWN":
-			create_time_str = coordinator.toolkit.create_time_utils().format_timestamp(create_time) if hasattr(coordinator.printer, "_tool") else str(create_time)
-			coordinator.printer.print_message(f"举报时间: {create_time_str}", "INFO")
-		else:
-			coordinator.printer.print_message("举报时间: 未知", "INFO")
+		# 3. 工作室信息
+		studio_name = item_ndd.get(config.source_name_field, "UNKNOWN")
+		studio_id = item_ndd.get(config.source_id_field, "UNKNOWN")
 
-		# 帖子类型额外信息
-		if report_type in {"forum_post", "forum_work"}:
-			coordinator.printer.print_message(f"举报线索: {item_ndd.get('description', 'UNKNOWN')}", "INFO")
+		if studio_name != "UNKNOWN":
+			coordinator.printer.print_message(f"工作室名称: {studio_name}", "INFO")
+		if studio_id != "UNKNOWN":
+			studio_url = f"{base_url}/work_shop/{studio_id}"
+			coordinator.printer.print_message(f"工作室链接: {studio_url}", "INFO")
+
+		# 4. 举报时间
+		created_at = item_ndd.get(config.created_at_field, "UNKNOWN")
+		if created_at != "UNKNOWN":
+			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
+			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
+
+		# 5. 举报原因
+		reason_content = item_ndd.get(config.reason_field, "UNKNOWN")
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
 
 	@staticmethod
-	def _display_links(item_ndd: "data.NestedDefaultDict", report_type: str, config: SourceConfig) -> None:
-		"""显示相关链接"""
-		coordinator.printer.print_header("=== 相关链接 ===")
+	def _display_forum_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+		"""显示论坛帖子举报详情"""
+		coordinator.printer.print_header("=== 论坛帖子举报详情 ===")
 
-		# 显示违规帖子链接
-		source_id = item_ndd[config.source_id_field]
-		if source_id != "UNKNOWN":
-			if report_type == "forum_post":
-				coordinator.printer.print_message(f"违规帖子链接: https://shequ.codemao.cn/community/{source_id}", "INFO")
-			elif report_type == "shop_comment":
-				coordinator.printer.print_message(f"商品页面链接: https://shequ.codemao.cn/shop/{source_id}", "INFO")
-			elif report_type == "forum_work":
-				coordinator.printer.print_message(f"作品页面链接: https://shequ.codemao.cn/work/{source_id}", "INFO")
+		base_url = "https://shequ.codemao.cn"
 
-		# 显示违规用户链接
-		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
+		# 1. 帖子链接
+		post_id = item_ndd.get(config.source_id_field, "UNKNOWN")
+		if post_id != "UNKNOWN":
+			post_url = f"{base_url}/community/{post_id}"
+			coordinator.printer.print_message(f"帖子链接: {post_url}", "INFO")
+
+		# 2. 标题
+		if config.title_field and config.title_field in item_ndd:
+			title = item_ndd.get(config.title_field, "UNKNOWN")
+			if title != "UNKNOWN":
+				coordinator.printer.print_message(f"标题: {title}", "SUCCESS")
+
+		# 3. 帖子作者信息
+		author_nickname = item_ndd.get(config.user_nickname_field, "UNKNOWN")
+		author_id = item_ndd.get(config.user_id_field, "UNKNOWN")
+
+		coordinator.printer.print_message(f"帖子作者: {author_nickname}", "INFO")
+		if author_id != "UNKNOWN":
+			author_url = f"{base_url}/user/{author_id}"
+			coordinator.printer.print_message(f"作者链接: {author_url}", "INFO")
+
+		# 4. 举报时间
+		created_at = item_ndd.get(config.created_at_field, "UNKNOWN")
+		if created_at != "UNKNOWN":
+			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
+			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
+
+		# 5. 举报原因
+		reason_content = item_ndd.get(config.reason_field, "UNKNOWN")
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+
+		# 6. 举报线索
+		description = item_ndd.get(config.description_field, "UNKNOWN")
+		if description != "UNKNOWN":
+			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
+
+	@staticmethod
+	def _display_discussion_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+		"""显示讨论举报详情"""
+		coordinator.printer.print_header("=== 讨论举报详情 ===")
+
+		base_url = "https://shequ.codemao.cn"
+
+		# 1. 被举报内容
+		content = item_ndd.get(config.content_field, "UNKNOWN")
+		if content != "UNKNOWN":
+			content_text = coordinator.toolkit.create_data_converter().html_to_text(content)
+			coordinator.printer.print_message(f"被举报内容: {content_text}", "SUCCESS")
+
+		# 2. 被举报人信息
+		user_nickname = item_ndd.get(config.user_nickname_field, "UNKNOWN")
+		user_id = item_ndd.get(config.user_id_field, "UNKNOWN")
+
+		coordinator.printer.print_message(f"被举报人昵称: {user_nickname}", "INFO")
 		if user_id != "UNKNOWN":
-			coordinator.printer.print_message(f"违规用户链接: https://shequ.codemao.cn/user/{user_id}", "INFO")
+			user_url = f"{base_url}/user/{user_id}"
+			coordinator.printer.print_message(f"被举报人链接: {user_url}", "INFO")
+
+		# 3. 帖子链接和标题
+		post_id = item_ndd.get("post_id", item_ndd.get(config.source_id_field, "UNKNOWN"))
+		if post_id != "UNKNOWN":
+			post_url = f"{base_url}/community/{post_id}"
+			coordinator.printer.print_message(f"帖子链接: {post_url}", "INFO")
+
+		if config.title_field and config.title_field in item_ndd:
+			title = item_ndd.get(config.title_field, "UNKNOWN")
+			if title != "UNKNOWN":
+				coordinator.printer.print_message(f"帖子标题: {title}", "INFO")
+
+		# 4. 分区信息
+		if config.board_name_field and config.board_name_field in item_ndd:
+			board_name = item_ndd.get(config.board_name_field, "UNKNOWN")
+			if board_name != "UNKNOWN":
+				coordinator.printer.print_message(f"分区: {board_name}", "INFO")
+
+		# 5. 举报时间
+		created_at = item_ndd.get(config.created_at_field, "UNKNOWN")
+		if created_at != "UNKNOWN":
+			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
+			created_at_str = str(created_at)
+			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
+
+		# 6. 举报原因
+		reason_content = item_ndd.get(config.reason_field, "UNKNOWN")
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+
+	@staticmethod
+	def _display_generic_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+		"""显示通用举报详情"""
+		coordinator.printer.print_header(f"=== {config.name}详情 ===")
+
+		# 显示基本字段
+		fields_to_display = [
+			(config.content_field, "内容"),
+			(config.user_nickname_field, "用户昵称"),
+			(config.reason_field, "举报原因"),
+			(config.description_field, "举报描述"),
+			(config.created_at_field, "举报时间"),
+		]
+
+		for field_key, label in fields_to_display:
+			if field_key:
+				value = item_ndd.get(field_key, "UNKNOWN")
+				if value != "UNKNOWN":
+					# 特殊处理时间字段
+					if field_key == config.created_at_field:
+						value = coordinator.toolkit.create_time_utils().format_timestamp(value)
+					coordinator.printer.print_message(f"{label}: {value}", "INFO")
 
 
 class ActionSelectionProcessor(BaseProcessor):
@@ -527,7 +701,7 @@ class ActionSelectionProcessor(BaseProcessor):
 				config = context.config
 				item_ndd = context.record["item"]
 				print(f"开始违规检查,config 类型: {type(config)}")
-				if hasattr(config, "special_check") and config.special_check:
+				if config.special_check:
 					try:
 						result = config.special_check(item_ndd)
 						if result:
@@ -558,7 +732,7 @@ class ActionSelectionProcessor(BaseProcessor):
 		config = context.config
 		source_id = item_ndd[config.source_id_field]
 		board_name = item_ndd.get("board_name", "UNKNOWN")
-		user_id = item_ndd.get(f"{config.user_field}_id", "UNKNOWN")
+		user_id = item_ndd.get(f"{config.user_id_field}", "UNKNOWN")
 
 		coordinator.printer.print_header("=== 开始检查违规 ===")
 		# 调整来源类型
@@ -743,7 +917,7 @@ class ViolationChecker:
 				com_id=source_id,
 				source=source_type,  # 传递兼容的源类型
 				method="comments",
-				max_limit=200,
+				max_limit=5000,
 			)
 
 			# 2. 违规检查参数
@@ -857,7 +1031,7 @@ class ViolationChecker:
 			try:
 				# 检查是否需要切换账号
 				usage_count = account_usage.get(account_index, 0)
-				if usage_count >= 10:
+				if usage_count >= 25:
 					# 切换到下一个账号
 					old_index = account_index
 					account_index = (account_index + 1) % len(available_accounts)
@@ -1353,7 +1527,7 @@ class ReportTypeRegistry:
 
 
 @decorator.singleton
-class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
+class ReportFetcher(ClassUnion):  # ty:ignore[unsupported-base]
 	"""举报信息获取器 - 支持分块获取和类型扩展"""
 
 	def __init__(self) -> None:
@@ -1367,15 +1541,34 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		self.registry.register(
 			"shop_comment",
 			SourceConfig(
-				name="商店评论举报",
+				name="工作室评论举报",
 				fetch_total=lambda status: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
 				fetch_generator=lambda status: self.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_comment_report",
+				# 基础字段
+				report_id_field="id",
+				reason_id_field="reason_id",
+				description_field="description",
+				status_field="status",
+				admin_id_field="admin_id",
+				admin_username_field="admin_user_name",
+				# 内容相关
 				content_field="comment_content",
-				user_field="comment_user",
+				content_type_field="comment_source",
+				content_id_field="comment_id",
+				# 用户相关
+				user_id_field="comment_user_id",
+				user_nickname_field="comment_user_nickname",
+				user_parent_id_field="comment_parent_user_id",
+				user_parent_nickname_field="comment_parent_user_nickname",
+				# 来源相关
 				source_id_field="comment_source_object_id",
 				source_name_field="comment_source_object_name",
-				item_id_field="comment_id",
+				source_type_field="comment_source",
+				source_object_id_field="comment_source_object_id",
+				source_object_name_field="comment_source_object_name",
+				# 附加信息
+				parent_id_field="comment_parent_id",
 				special_check=lambda item: item["comment_source"] == "WORK_SHOP",
 				chunk_size=100,
 				available_actions=[
@@ -1390,17 +1583,33 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		)
 		# 作品类型配置
 		self.registry.register(
-			"forum_work",
+			"work_work",
 			SourceConfig(
 				name="作品举报",
-				fetch_total=lambda status: self.whale_obtain.fetch_work_reports_total(source_type="ALL", status=status),
+				fetch_total=lambda status: self.whale_obtain.fetch_work_reports_total_extra(source_type="ALL", status=status),
 				fetch_generator=lambda status: self.whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_work_report",
+				# 基础字段
+				report_id_field="id",
+				reason_id_field="reason_id",
+				description_field="description",
+				status_field="status",
+				admin_id_field="admin_id",
+				admin_username_field="admin_username",
+				# 内容相关
 				content_field="work_name",
-				user_field="work_user_nickname",
+				content_type_field="work_type",
+				content_id_field="work_id",
+				# 用户相关
+				user_id_field="work_user_id",
+				user_nickname_field="work_user_nickname",
+				# 来源相关
 				source_id_field="work_id",
-				source_name_field=None,
-				item_id_field="work_id",
+				source_name_field="work_name",
+				source_type_field="work_type",
+				# 附加信息
+				work_type_field="work_type",
+				title_field="work_name",
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
@@ -1418,11 +1627,28 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 				fetch_total=lambda status: self.whale_obtain.fetch_post_reports_total(status=status),
 				fetch_generator=lambda status: self.whale_obtain.fetch_post_reports_gen(status=status, limit=100),
 				handle_method="execute_process_post_report",
+				# 基础字段
+				report_id_field="id",
+				reason_id_field="reason_id",
+				description_field="description",
+				status_field="status",
+				admin_id_field="admin_id",
+				admin_username_field="admin_username",
+				# 内容相关
 				content_field="post_title",
-				user_field="post_user",
+				content_type_field="board_name",
+				content_id_field="post_id",
+				# 用户相关
+				user_id_field="post_user_id",
+				user_nickname_field="post_user_nick_name",
+				# 来源相关
 				source_id_field="post_id",
-				source_name_field=None,
-				item_id_field="post_id",
+				source_name_field="board_name",
+				source_type_field="board_name",
+				# 附加信息
+				board_id_field="board_id",
+				board_name_field="board_name",
+				title_field="post_title",
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
@@ -1442,11 +1668,28 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 				fetch_total=lambda status: self.whale_obtain.fetch_discussion_reports_total(status=status),
 				fetch_generator=lambda status: self.whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
 				handle_method="execute_process_discussion_report",
+				# 基础字段
+				report_id_field="id",
+				reason_id_field="reason_id",
+				description_field="description",
+				status_field="status",
+				admin_id_field="admin_id",
+				admin_username_field="admin_username",
+				# 内容相关
 				content_field="discussion_content",
-				user_field="discussion_user",
+				content_type_field="discussion_source",
+				content_id_field="discussion_id",
+				# 用户相关
+				user_id_field="discussion_user_id",
+				user_nickname_field="discussion_user_nickname",
+				# 来源相关
 				source_id_field="post_id",
-				source_name_field=None,
-				item_id_field="discussion_id",
+				source_name_field="post_title",
+				source_type_field="discussion_source",
+				# 附加信息
+				board_id_field="board_id",
+				board_name_field="board_name",
+				title_field="post_title",
 				chunk_size=100,
 				available_actions=[
 					self.registry.default_actions["D"],  # 删除
@@ -1520,7 +1763,7 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			("shop_comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
 			("forum_post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
 			("forum_discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
-			("forum_work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
+			("work_work", lambda: self.whale_obtain.fetch_work_reports_total(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
@@ -1530,7 +1773,7 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 
 
 @decorator.singleton
-class BatchActionManager(ClassUnion):  # ty:ignore [unsupported-base]
+class BatchActionManager(ClassUnion):  # ty:ignore[unsupported-base]
 	"""批量动作管理器 - 负责管理批量处理动作和状态"""
 
 	def __init__(self) -> None:
@@ -1561,7 +1804,7 @@ class BatchActionManager(ClassUnion):  # ty:ignore [unsupported-base]
 
 # ========================== 重构后的 ReportProcessor ==========================
 @decorator.singleton
-class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
+class ReportProcessor(ClassUnion):  # ty:ignore[unsupported-base]
 	"""举报处理器 - 使用管道模式重构"""
 
 	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
@@ -1857,7 +2100,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 
 
 @decorator.singleton
-class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
+class ReportAuthManager(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		self.student_accounts: list[tuple] = []
 		self.auth_method = "grab"
@@ -1948,7 +2191,7 @@ class FileUploaderProtocol(Protocol):
 	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
 
 
-class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
+class FileProcessor(ClassUnion):  # ty:ignore[unsupported-base]
 	def __init__(self) -> None:
 		super().__init__()
 

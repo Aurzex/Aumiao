@@ -24,9 +24,21 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/works", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
 
 	def fetch_work_reports_total(
+		self,
+		source_type: Literal["KITTEN", "BOX2", "ALL"],
+		status: Literal["TOBEDONE", "DONE", "ALL"],
+		filter_type: Literal["admin_id", "work_user_id", "work_id"] | None = None,
+		target_id: int | None = None,
+	) -> dict[Literal["total", "total_pages"], int]:
+		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
+		if filter_type is not None and target_id is not None:
+			params[filter_type] = target_id
+		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params)
+
+	def fetch_work_reports_total_extra(
 		self,
 		source_type: Literal["KITTEN", "BOX2", "ALL"],
 		status: Literal["TOBEDONE", "DONE", "ALL"],

@@ -922,6 +922,7 @@ class CommunityService:
 
 	def get_admin_statistics(self) -> dict:
 		"""获取管理员统计信息"""
+		# 管理员列表作为常量提取
 		admins = [
 			{"id": 220, "name": "石榴 Grant"},
 			{"id": 222, "name": "shidang88"},
@@ -932,40 +933,51 @@ class CommunityService:
 			{"id": 227, "name": "凌风光耀 Aug"},
 			{"id": 228, "name": "奇怪的小蜜桃"},
 		]
-		print("管理员处理统计报表")
-		print("-" * 50)
 		statistics = []
+		total_comment_reports = 0
+		total_work_reports = 0
+		# 单次循环完成所有统计
 		for admin in admins:
 			admin_id: int = cast("int", admin["id"])
+			# 获取评论举报数
 			comment_count = self.coordinator.whale_obtain.fetch_comment_reports_total(
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
 				target_id=admin_id,
 			)["total"]
+			# 获取作品举报数
 			work_count = self.coordinator.whale_obtain.fetch_work_reports_total(
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
 				target_id=admin_id,
 			)["total"]
-			print(f"{admin['name']} (ID: {admin['id']}):")
-			print(f"评论举报处理数: {comment_count}")
-			print(f"作品举报处理数: {work_count}")
-			print()
+			total_count = comment_count + work_count
+			# 累加总计
+			total_comment_reports += comment_count
+			total_work_reports += work_count
 			statistics.append(
 				{
 					"admin_id": admin_id,
 					"admin_name": admin["name"],
 					"comment_reports": comment_count,
 					"work_reports": work_count,
-					"total_reports": comment_count + work_count,
+					"total_reports": total_count,
 				},
 			)
+		total_all_reports = total_comment_reports + total_work_reports
+		# 计算百分比并添加到统计数据中
+		for stat in statistics:
+			percentage = (stat["total_reports"] / total_all_reports * 100) if total_all_reports > 0 else 0.0
+			stat["percentage"] = round(percentage, 1)
+		# 按总举报数降序排序
+		statistics.sort(key=operator.itemgetter("total_reports"), reverse=True)
 		return {
 			"total_admins": len(statistics),
-			"total_comment_reports": sum(s["comment_reports"] for s in statistics),
-			"total_work_reports": sum(s["work_reports"] for s in statistics),
+			"total_comment_reports": total_comment_reports,
+			"total_work_reports": total_work_reports,
+			"total_all_reports": total_all_reports,
 			"statistics": statistics,
 		}
 
