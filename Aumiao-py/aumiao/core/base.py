@@ -799,12 +799,42 @@ class SourceConfig:
 	fetch_generator: Callable[..., Generator[dict]]
 	# 处理动作方法
 	handle_method: str
-	# 字段映射
-	content_field: str
-	user_field: str
-	source_id_field: str
-	item_id_field: str
-	source_name_field: str | None = None
+	# 基础字段映射
+	item_id_field: str = "id"  # 举报记录ID
+	report_id_field: str = "report_id"  # 举报ID
+	reason_id_field: str = "reason_id"  # 原因ID
+	reason_field: str = "reason_content"  # 原因内容
+	description_field: str = "description"  # 描述
+	status_field: str = "status"  # 状态
+	created_at_field: str = "created_at"  # 创建时间
+	updated_at_field: str = "updated_at"  # 更新时间
+	admin_id_field: str = "admin_id"  # 管理员ID
+	admin_username_field: str = "admin_username"  # 管理员用户名
+
+	# 内容相关字段映射
+	content_field: str = ""  # 内容字段
+	content_type_field: str = ""  # 内容类型字段
+	content_id_field: str = ""  # 内容ID字段
+
+	# 用户相关字段映射
+	user_id_field: str = ""  # 用户ID字段
+	user_nickname_field: str = ""  # 用户昵称字段
+	user_parent_id_field: str | None = None  # 父用户ID(针对回复)
+	user_parent_nickname_field: str | None = None  # 父用户昵称
+
+	# 来源相关字段映射
+	source_id_field: str = ""  # 来源ID
+	source_name_field: str = ""  # 来源名称
+	source_type_field: str | None = None  # 来源类型
+	source_object_id_field: str | None = None  # 来源对象ID
+	source_object_name_field: str | None = None  # 来源对象名称
+
+	# 附加信息字段映射
+	work_type_field: str | None = None  # 作品类型(针对作品)
+	board_id_field: str | None = None  # 板块ID(针对帖子)
+	board_name_field: str | None = None  # 板块名称
+	parent_id_field: str | None = None  # 父级ID(针对回复)
+	title_field: str | None = None  # 标题字段
 	# 特殊检查
 	special_check: Callable[..., bool] = field(default_factory=lambda: lambda *args, **kwargs: True)  # noqa: ARG005
 	# 分块大小
