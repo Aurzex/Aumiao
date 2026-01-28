@@ -1,9 +1,9 @@
 certifi==2025.11.12
 cffi==2.0.0
 charset-normalizer==3.4.4
-cryptography==46.0.3
+cryptography==46.0.4
 idna==3.11
-nuitka==2.8.9
+nuitka==2.8.10
 ordered-set==4.1.0
 pycparser==2.23
 requests==2.32.5
