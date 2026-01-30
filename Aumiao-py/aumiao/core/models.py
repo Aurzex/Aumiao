@@ -18,6 +18,9 @@ REPORT_BATCH_THRESHOLD: int = 15
 VALID_REPLY_TYPES: set[str] = {"WORK_COMMENT", "WORK_REPLY", "WORK_REPLY_REPLY", "POST_COMMENT", "POST_REPLY", "POST_REPLY_REPLY"}
 
 
+# ==============================
+# TypedDict 类型定义
+# ==============================
 class ReportRecord(TypedDict):
 	"""举报记录类型"""
 
@@ -30,7 +33,7 @@ class ReportRecord(TypedDict):
 
 
 # ==============================
-# 配置类定义
+# 配置类定义(dataclass)
 # ==============================
 @dataclass(frozen=True)
 class WebSocketConfig:
@@ -502,6 +505,9 @@ class BlockType(Enum):
 	SHADOW_TEXT = "shadow_text"
 
 
+# ==============================
+# 字典配置常量
+# ==============================
 # 块配置映射 - 更详细的配置
 BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 	# 事件类配置
