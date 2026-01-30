@@ -10,7 +10,7 @@ import websocket
 
 from aumiao.api import work
 from aumiao.api.auth import CloudAuthenticator
-from aumiao.core.base import (
+from aumiao.core.models import (
 	DataConfig,
 	DataType,
 	DisplayConfig,

@@ -10,9 +10,10 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Literal, cast
 
-from aumiao.core.base import VALID_REPLY_TYPES, ClassUnion, SourceConfigSimple, auth, data, decorator, toolkit
+from aumiao.core.base import ClassUnion, auth, data, decorator, toolkit
 from aumiao.core.cloudcfg import CloudAPI
 from aumiao.core.compiler import CodemaoDecompiler
+from aumiao.core.models import VALID_REPLY_TYPES, SourceConfigSimple
 from aumiao.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import CodeMaoClient, HTTPStatus

@@ -11,7 +11,8 @@ from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from aumiao.api import auth
-from aumiao.core.base import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ClassUnion, InfrastructureCoordinator, ReportRecord, SourceConfig, data, decorator
+from aumiao.core.base import ClassUnion, InfrastructureCoordinator, data, decorator
+from aumiao.core.models import MAX_SIZE_BYTES, ActionConfig, BatchGroup, ReportRecord, SourceConfig
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
 

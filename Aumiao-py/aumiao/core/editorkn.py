@@ -11,7 +11,7 @@ from html import unescape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-from aumiao.core.base import BLOCK_CONFIG, DEFAULT_PROJECT_CONFIG, BlockCategory, BlockType, ColorFormat, ConnectionType, ShadowCategory, ShadowType
+from aumiao.core.models import BLOCK_CONFIG, DEFAULT_PROJECT_CONFIG, BlockCategory, BlockType, ColorFormat, ConnectionType, ShadowCategory, ShadowType
 
 if TYPE_CHECKING:
 	from collections.abc import Callable, Generator
