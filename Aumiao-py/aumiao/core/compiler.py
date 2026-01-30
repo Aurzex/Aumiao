@@ -292,7 +292,7 @@ class InternalImplementations:
 
 		def decompile(self) -> dict[str, Any]:
 			"""反编译 NEKO 作品"""
-			print(f"🔓 开始解密 NEKO 作品: {self.work_info.id}")
+			print(f"开始解密 NEKO 作品: {self.work_info.id}")
 			# 获取作品详情以获取加密文件 URL
 			detail_url = f"{Configuration.CREATION_BASE_URL}/neko/community/player/published-work-detail/{self.work_info.id}"
 			device_auth_dict = auth.CloudAuthenticator().generate_x_device_auth()
@@ -301,7 +301,7 @@ class InternalImplementations:
 			try:
 				detail_data = self.client.send_request(endpoint=detail_url, method="GET", headers=headers).json()
 				encrypted_url = detail_data["source_urls"][0]
-				print(f"📥 获取加密文件 URL: {encrypted_url}")
+				print(f"获取加密文件 URL: {encrypted_url}")
 			except Exception as e:
 				error_msg = "获取作品详情失败"
 				raise ValueError(error_msg) from e
