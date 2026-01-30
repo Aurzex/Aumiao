@@ -920,103 +920,8 @@ class CommunityService:
 			"recent_posts": recent_posts,
 		}
 
-	def get_admin_statistics(self) -> dict:
-		"""获取管理员统计信息"""
-		# 管理员列表作为常量提取
-		admins = [
-			{"id": 220, "name": "石榴 Grant"},
-			{"id": 222, "name": "shidang88"},
-			{"id": 223, "name": "喵鱼 a"},
-			{"id": 224, "name": "沙雕的初小白"},
-			{"id": 225, "name": "旁观者 JErS"},
-			{"id": 226, "name": "宜壳乐 Cat"},
-			{"id": 227, "name": "凌风光耀 Aug"},
-			{"id": 228, "name": "奇怪的小蜜桃"},
-		]
-		statistics = []
-		total_comment_reports = 0
-		total_work_reports = 0
-		# 单次循环完成所有统计
-		for admin in admins:
-			admin_id: int = cast("int", admin["id"])
-			# 获取评论举报数
-			comment_count = self.coordinator.whale_obtain.fetch_comment_reports_total(
-				source_type="ALL",
-				status="ALL",
-				filter_type="admin_id",
-				target_id=admin_id,
-			)["total"]
-			# 获取作品举报数
-			work_count = self.coordinator.whale_obtain.fetch_work_reports_total(
-				source_type="ALL",
-				status="ALL",
-				filter_type="admin_id",
-				target_id=admin_id,
-			)["total"]
-			total_count = comment_count + work_count
-			# 累加总计
-			total_comment_reports += comment_count
-			total_work_reports += work_count
-			statistics.append(
-				{
-					"admin_id": admin_id,
-					"admin_name": admin["name"],
-					"comment_reports": comment_count,
-					"work_reports": work_count,
-					"total_reports": total_count,
-				},
-			)
-		total_all_reports = total_comment_reports + total_work_reports
-		# 计算百分比并添加到统计数据中
-		for stat in statistics:
-			percentage = (stat["total_reports"] / total_all_reports * 100) if total_all_reports > 0 else 0.0
-			stat["percentage"] = round(percentage, 1)
-		# 按总举报数降序排序
-		statistics.sort(key=operator.itemgetter("total_reports"), reverse=True)
-		return {
-			"total_admins": len(statistics),
-			"total_comment_reports": total_comment_reports,
-			"total_work_reports": total_work_reports,
-			"total_all_reports": total_all_reports,
-			"statistics": statistics,
-		}
-
-	def get_fans_statistics(self, user_id: int, like_num: int = 1000) -> dict:
-		"""获取粉丝统计信息"""
-		fans = list(self.coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id))
-		qualified_fans = []
-		for fan in fans:
-			if int(fan.get("total_likes", 0)) >= like_num:
-				print("\n 符合条件的粉丝:")
-				print(f"昵称: {fan['nickname']}")
-				print(f"ID: {fan['id']}")
-				print(f"获赞数: {fan['total_likes']}")
-				user_data = self.coordinator.user_obtain.fetch_user_honors(user_id=fan["id"])
-				if user_data:
-					print(f"粉丝数: {user_data.get('fans_total', 'N/A')}")
-					print(f"作品收藏数: {user_data.get('collected_total', 'N/A')}")
-					print(f"作者等级: {user_data.get('author_level', 'N/A')}")
-				qualified_fans.append(
-					{
-						"user_id": fan["id"],
-						"nickname": fan["nickname"],
-						"total_likes": fan.get("total_likes", 0),
-						"fans_total": user_data.get("fans_total", "N/A") if user_data else "N/A",
-						"collected_total": user_data.get("collected_total", "N/A") if user_data else "N/A",
-						"author_level": user_data.get("author_level", "N/A") if user_data else "N/A",
-						"n_works": fan.get("n_works", 0),
-					},
-				)
-		return {
-			"target_user_id": user_id,
-			"like_threshold": like_num,
-			"total_fans": len(fans),
-			"qualified_fans_count": len(qualified_fans),
-			"qualified_fans": qualified_fans,
-		}
-
 	@staticmethod
-	def check_follower(follower: dict) -> tuple:
+	def _check_follower(follower: dict) -> tuple:
 		default_avatars = [f"https://cdn-community.codemao.cn/community_frontend/community_default_avatar/avatar_300x300_ {i:02d}.jpg" for i in range(1, 9)]
 		default_descriptions = ["", " 无 ", " 这个人很懒 ", " 什么都没写 "]
 		suspicious_name_parts = ["用户", "test", "测试", "temp", "临时", "小号", "备用", "bot", "的"]
@@ -1063,7 +968,7 @@ class CommunityService:
 		followers = list(fetcher.fetch_followers_gen(user_id, limit=300))
 		suspicious, normal = [], []
 		for follower in followers:
-			is_suspicious, reasons, score = self.check_follower(follower)
+			is_suspicious, reasons, score = self._check_follower(follower)
 			info = {
 				"id": follower.get("id"),
 				"nickname": follower.get("nickname"),
