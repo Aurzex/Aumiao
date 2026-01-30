@@ -33,7 +33,7 @@ class ReportRecord(TypedDict):
 
 
 # ==============================
-# 配置类定义(dataclass)
+# 配置类定义 (dataclass)
 # ==============================
 @dataclass(frozen=True)
 class WebSocketConfig:
