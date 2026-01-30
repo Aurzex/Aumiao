@@ -246,7 +246,7 @@ class DataProcessor:
 		return NestedFilterStrategy._get_nested_safe(data, path_keys)  # noqa: SLF001
 
 	@staticmethod
-	def deduplicate(sequence: Iterable[object]) -> list[object]:
+	def deduplicate(sequence: Iterable[str | int]) -> list[str]:
 		"""保持顺序去重"""
 		seen = set()
 		result = []

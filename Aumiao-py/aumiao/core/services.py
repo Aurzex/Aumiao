@@ -494,13 +494,13 @@ class CommunityService:
 		self.source_config: dict = {
 			"work": SourceConfigSimple(
 				get_items=lambda: coordinator.user_obtain.fetch_user_works_web_gen(data.AccountData.id, limit=None),
-				get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "work", "comments"),
+				get_comments=lambda _self, _id: Obtain().get_comments(source_id=_id, source="work", method="comments"),
 				delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
 				title_key="work_name",
 			),
 			"forum": SourceConfigSimple(
 				get_items=lambda: coordinator.forum_obtain.fetch_my_posts_gen("created", limit=None),
-				get_comments=lambda _self, _id: Obtain().get_comments_detail(_id, "forum", "comments"),
+				get_comments=lambda _self, _id: Obtain().get_comments(source_id=_id, source="forum", method="comments"),
 				delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
 				title_key="title",
 			),
