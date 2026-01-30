@@ -514,15 +514,6 @@ jobs:
               }
           }
 
-          # 复制 data 目录（如果存在）
-          $dataDir = "./${{ env.PROJECT_DIR }}/data"
-          if (Test-Path $dataDir) {
-              Copy-Item -Path $dataDir -Destination "${{ env.DIST_DIR }}" -Recurse -Force
-              Write-Host "复制数据目录: $dataDir"
-          } else {
-              Write-Warning "数据目录不存在: $dataDir"
-          }
-
           # 创建版本信息文件
           $versionInfo = @{
               Version = "${{ env.FULL_VERSION }}"
