@@ -528,18 +528,40 @@ class DetailDisplayProcessor(BaseProcessor):
 		"""显示论坛帖子举报详情"""
 		coordinator.printer.print_header("=== 论坛帖子举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
-		# 1. 帖子链接
-		post_id: int = item_ndd[config.source_id_field]
-		if post_id != "UNKNOWN":
+		# 1. 帖子链接 - 修复类型检查
+		post_id_value = item_ndd[config.source_id_field]
+		# 检查帖子 ID 是否有效
+		post_id = None
+		if post_id_value != "UNKNOWN":
+			try:
+				post_id = int(post_id_value)
+			except (ValueError, TypeError):
+				post_id = None
+		if post_id:
 			post_url = f"{base_url}/community/{post_id}"
 			coordinator.printer.print_message(f"帖子链接: {post_url}", "INFO")
-		# 2. 标题及内容
-		if config.title_field and config.title_field in item_ndd:
-			title = item_ndd[config.title_field]
-			if title != "UNKNOWN":
-				coordinator.printer.print_message(f"标题: {title}", "SUCCESS")
-			details = data.NestedDefaultDict(coordinator.forum_obtain.fetch_posts_details(post_ids=post_id))
-			coordinator.printer.print_message(f"内容: {coordinator.toolkit.create_data_converter().html_to_text(details['content'])}", "SUCCESS")
+			# 在获取标题之前先获取帖子详情
+			try:
+				details = coordinator.forum_obtain.fetch_single_post_details(post_id=post_id)
+				details_ndd = data.NestedDefaultDict(details)
+				# 获取标题和内容
+				if config.title_field and config.title_field in item_ndd:
+					title = item_ndd[config.title_field]
+					if title != "UNKNOWN":
+						coordinator.printer.print_message(f"标题: {title}", "SUCCESS")
+				# 显示帖子内容
+				if "content" in details_ndd:
+					content_text = coordinator.toolkit.create_data_converter().html_to_text(details_ndd["content"])
+					# 限制内容长度,避免显示过长
+					if len(content_text) > 200:
+						content_text = content_text[:200] + "..."
+					coordinator.printer.print_message(f"内容: {content_text}", "SUCCESS")
+				else:
+					coordinator.printer.print_message("内容: 无法获取帖子内容", "WARNING")
+			except Exception as e:
+				coordinator.printer.print_message(f"获取帖子详情失败: {e!s}", "ERROR")
+		else:
+			coordinator.printer.print_message("帖子 ID: 未知", "WARNING")
 		# 3. 帖子作者信息
 		author_nickname = item_ndd[config.user_nickname_field]
 		author_id = item_ndd[config.user_id_field]
