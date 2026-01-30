@@ -27,12 +27,42 @@ from aumiao.core.models import (
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
 
+# ========================== 常量定义 ==========================
 coordinator = InfrastructureCoordinator()
-# 定义统一的源类型
+
+# ========================== 基础定义 ==========================
 SourceType = Literal["shop", "forum", "work"]
-# ========================== 策略模式相关定义 ==========================
 
 
+class ProcessingError(Exception):
+	"""处理过程中的异常"""
+
+
+@dataclass
+class ProcessingContext:
+	"""处理上下文 - 封装所有处理所需数据"""
+
+	# 核心数据
+	record: ReportRecord
+	admin_id: int
+	report_type: str
+	# 配置信息
+	config: "SourceConfig" = field(default_factory=lambda: SourceConfig())  # type: ignore  # noqa: PGH003, PLW0108
+	# 处理状态
+	processed: bool = False
+	action: str | None = None
+	skip_reason: str | None = None
+	# 处理器共享状态
+	user_id: int | None = None
+	batch_group: BatchGroup | None = None
+	is_batch_mode: bool = False
+	is_reprocess_mode: bool = False
+	# 结果信息
+	messages: list[str] = field(default_factory=list)
+	errors: list[str] = field(default_factory=list)
+
+
+# ========================== 抽象基类或协议 ==========================
 class ProcessStrategy[T: Literal["duplicates", "ads", "blacklist"]](ABC):
 	"""处理策略抽象基类"""
 
@@ -49,6 +79,45 @@ class ProcessStrategy[T: Literal["duplicates", "ads", "blacklist"]](ABC):
 		"""处理评论的核心方法"""
 
 
+class ProcessorProtocol(Protocol):
+	"""处理器协议接口"""
+
+	def process(self, context: ProcessingContext) -> None: ...
+
+
+class BaseProcessor(ABC):
+	"""处理器基类"""
+
+	def __init__(self, next_processor: ProcessorProtocol | None = None) -> None:
+		self.next_processor = next_processor
+
+	def process(self, context: ProcessingContext) -> None:
+		"""执行处理并传递给下一个处理器"""
+		try:
+			self._process(context)
+		except ProcessingError as e:
+			context.errors.append(f"{self.__class__.__name__}: {e!s}")
+			raise
+		except Exception as e:
+			context.errors.append(f"{self.__class__.__name__}: 未预期错误: {e!s}")
+			msg = f"处理器 {self.__class__.__name__} 执行失败"
+			raise ProcessingError(msg) from e
+		if self.next_processor and not context.processed:
+			self.next_processor.process(context)
+
+	@abstractmethod
+	def _process(self, context: ProcessingContext) -> None:
+		"""子类实现的处理逻辑"""
+
+
+class FileUploaderProtocol(Protocol):
+	"""定义上传器的协议接口"""
+
+	@staticmethod
+	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
+
+
+# ========================== 策略模式实现 ==========================
 class AdsProcessStrategy(ProcessStrategy):
 	"""广告处理策略"""
 
@@ -326,67 +395,7 @@ class ProcessStrategyFactory:
 		return list(self._strategies.keys())
 
 
-# ========================== 管道模式相关定义 ==========================
-class ProcessingError(Exception):
-	"""处理过程中的异常"""
-
-
-@dataclass
-class ProcessingContext:
-	"""处理上下文 - 封装所有处理所需数据"""
-
-	# 核心数据
-	record: ReportRecord
-	admin_id: int
-	report_type: str
-	# 配置信息
-	config: "SourceConfig" = field(default_factory=lambda: SourceConfig())  # type: ignore  # noqa: PGH003, PLW0108
-	# 处理状态
-	processed: bool = False
-	action: str | None = None
-	skip_reason: str | None = None
-	# 处理器共享状态
-	user_id: int | None = None
-	batch_group: BatchGroup | None = None
-	is_batch_mode: bool = False
-	is_reprocess_mode: bool = False
-	# 结果信息
-	messages: list[str] = field(default_factory=list)
-	errors: list[str] = field(default_factory=list)
-
-
-class ProcessorProtocol(Protocol):
-	"""处理器协议接口"""
-
-	def process(self, context: ProcessingContext) -> None: ...
-
-
-class BaseProcessor(ABC):
-	"""处理器基类"""
-
-	def __init__(self, next_processor: ProcessorProtocol | None = None) -> None:
-		self.next_processor = next_processor
-
-	def process(self, context: ProcessingContext) -> None:
-		"""执行处理并传递给下一个处理器"""
-		try:
-			self._process(context)
-		except ProcessingError as e:
-			context.errors.append(f"{self.__class__.__name__}: {e!s}")
-			raise
-		except Exception as e:
-			context.errors.append(f"{self.__class__.__name__}: 未预期错误: {e!s}")
-			msg = f"处理器 {self.__class__.__name__} 执行失败"
-			raise ProcessingError(msg) from e
-		if self.next_processor and not context.processed:
-			self.next_processor.process(context)
-
-	@abstractmethod
-	def _process(self, context: ProcessingContext) -> None:
-		"""子类实现的处理逻辑"""
-
-
-# ========================== 具体处理器实现 ==========================
+# ========================== 管道模式实现 ==========================
 class OfficialCheckProcessor(BaseProcessor):
 	"""官方账号检查处理器"""
 
@@ -832,7 +841,6 @@ class ProcessingPipeline:
 		return cls(official_processor, detail_processor, action_processor)
 
 
-# ========================== 处理器工厂 ==========================
 class ProcessorFactory:
 	"""处理器工厂 - 统一管理处理器的创建"""
 
@@ -842,6 +850,7 @@ class ProcessorFactory:
 		return ProcessingPipeline.create_default_pipeline(fetcher)
 
 
+# ========================== 核心功能类 ==========================
 @decorator.singleton
 class CommentProcessor:
 	"""评论处理器 - 使用策略模式优化"""
@@ -883,9 +892,8 @@ class CommentProcessor:
 		return self._strategy_factory.get_all_strategy_types()
 
 
-# ========================== 违规检查器 ==========================
 class ViolationChecker:
-	"""违规检查器 - 提取ReportProcessor中的违规检查逻辑"""
+	"""违规检查器"""
 
 	def __init__(self) -> None:
 		self.comment_processor = CommentProcessor()
@@ -1814,7 +1822,6 @@ class BatchActionManager(ClassUnion):  # ty:ignore[unsupported-base]
 		self.processed_records.clear()
 
 
-# ========================== 重构后的 ReportProcessor ==========================
 @decorator.singleton
 class ReportProcessor(ClassUnion):  # ty:ignore[unsupported-base]
 	"""举报处理器 - 使用管道模式重构"""
@@ -2194,13 +2201,6 @@ class ReportAuthManager(ClassUnion):  # ty:ignore[unsupported-base]
 			return False
 		else:
 			return True
-
-
-class FileUploaderProtocol(Protocol):
-	"""定义上传器的协议接口"""
-
-	@staticmethod
-	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
 
 
 class FileProcessor(ClassUnion):  # ty:ignore[unsupported-base]
