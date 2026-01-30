@@ -859,11 +859,11 @@ class ViolationChecker:
 	) -> list[str]:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
-			comments = Obtain().get_comments_detail(
-				com_id=source_id,
-				source=source_type,  # 传递兼容的源类型
+			comments = Obtain().get_comments(
+				source_id=source_id,
+				source=source_type,
 				method="comments",
-				max_limit=5000,
+				limit=5000,
 			)
 			# 2. 违规检查参数
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
@@ -1337,8 +1337,8 @@ class ReplyProcessor:
 				parent_id = int(message_info.get("replied_id", 0))
 			comment_ids = [
 				str(item)
-				for item in Obtain().get_comments_detail(
-					com_id=business_id,
+				for item in Obtain().get_comments(
+					source_id=business_id,
 					source=source_type,
 					method="comment_id",
 				)
