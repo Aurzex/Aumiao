@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator
 from typing import Any, ClassVar
 from urllib.parse import quote
 
-from aumiao.utils.acquire import CodeMaoWebSocketClient
+from websocket import WebSocketApp
 
 
 # ==================== 配置管理 ====================
@@ -88,14 +88,13 @@ class EventHandler:
 
 
 # ==================== WebSocket 连接管理 ====================
-# ==================== WebSocket 连接管理 ====================
 class WebSocketManager:
-	"""WebSocket 连接管理器 - 使用新的 CodeMaoWebSocketClient"""
+	"""WebSocket 连接管理器"""
 
 	def __init__(self, token: str, event_handler: EventHandler) -> None:
 		self.token = token
 		self.handler = event_handler
-		self.ws: CodeMaoWebSocketClient | None = None
+		self.ws: WebSocketApp | None = None
 		self.connected = False
 
 	def connect(self) -> bool:
@@ -104,50 +103,33 @@ class WebSocketManager:
 			self.handler.log("错误: 未提供 token")
 			return False
 		self.handler.log("连接到服务器...")
-		# 使用新的 WebSocket 客户端
-		self.ws = CodeMaoWebSocketClient(client_id=f"ai_chat_{hash(self.token) % 1000}")
-		# 设置事件处理器
-		self._setup_websocket_handlers()
-		# 构建 WebSocket URL
-		ws_url = CodeMaoConfig.build_websocket_url(self.token)
-		# 连接服务器
-		success = self.ws.connect_with_callback(
-			url=ws_url,
+		self.ws = WebSocketApp(
+			CodeMaoConfig.build_websocket_url(self.token),
 			on_message=self._on_message,
 			on_error=self._on_error,
 			on_close=self._on_close,
 			on_open=self._on_open,
-			headers=CodeMaoConfig.HEADERS,
-			ssl_options=CodeMaoConfig.SSL_OPTIONS,
+			header=CodeMaoConfig.HEADERS,
 		)
-		if success:
-			self.handler.log("连接成功")
-		else:
-			self.handler.log("连接失败")
-		return success
 
-	def _setup_websocket_handlers(self) -> None:
-		"""设置 WebSocket 事件处理器"""
-		if self.ws:
-			# 设置消息处理器
-			self.ws.set_message_handler(self._on_raw_message)
-			# 设置错误处理器
-			self.ws.set_error_handler(self._on_error_simple)
-			# 设置关闭处理器
-			self.ws.set_close_handler(self._on_close_simple)
-			# 注册事件回调
-			self.ws.on("connected", lambda data: self.handler.log(f"WebSocket 连接建立: {data.get('url')}"))
-			self.ws.on("disconnected", self._on_disconnected)
-			self.ws.on("message", lambda data: self._on_ws_message(data.get("message")))
-			self.ws.on("error", lambda data: self._on_ws_error(data.get("error")))
+		def run_websocket() -> None:
+			if self.ws:
+				self.ws.run_forever(
+					sslopt=CodeMaoConfig.SSL_OPTIONS,
+					ping_interval=CodeMaoConfig.PING_INTERVAL,
+					ping_timeout=CodeMaoConfig.PING_TIMEOUT,
+				)
 
-	def _on_raw_message(self, message: str | bytes) -> None:
-		"""原始消息处理器"""
-		if isinstance(message, bytes):
-			message = message.decode("utf-8", errors="ignore")
-		self._on_ws_message(str(message))
+		thread = threading.Thread(target=run_websocket, daemon=True)
+		thread.start()
+		# 等待连接建立
+		timeout = CodeMaoConfig.CONNECT_TIMEOUT
+		start_time = time.time()
+		while not self.connected and time.time() - start_time < timeout:
+			time.sleep(0.1)
+		return self.connected
 
-	def _on_ws_message(self, message: str) -> None:
+	def _on_message(self, _ws: object, message: str) -> None:
 		"""WebSocket 消息处理"""
 		try:
 			if message.startswith("0"):  # 连接确认
@@ -164,98 +146,39 @@ class WebSocketManager:
 			self.handler.log(f"消息处理错误: {e}")
 			self.handler.emit_event(str(e), "error")
 
-	def _on_error_simple(self, error: Exception) -> None:
-		"""WebSocket 错误处理 - 简单版本"""
+	def _on_error(self, _ws: object, error: object) -> None:
+		"""WebSocket 错误处理"""
 		error_msg = f"WebSocket 错误: {error}"
 		self.handler.log(error_msg)
 		self.handler.emit_event(error_msg, "error")
 
-	def _on_close_simple(self, close_status_code: int, close_msg: str) -> None:
-		"""WebSocket 关闭处理 - 简单版本"""
-		self.handler.log(f"连接关闭: 状态码 ={close_status_code}, 消息 ={close_msg}")
-		self.connected = False
-		self.handler.emit_event(f"连接关闭: {close_msg}", "close")
-
-	def _on_disconnected(self) -> None:
-		"""断开连接处理"""
-		self.handler.log("WebSocket 断开连接")
+	def _on_close(self, _ws: object, _close_status_code: int | None = None, _close_msg: str | None = None) -> None:
+		"""WebSocket 关闭处理"""
+		self.handler.log("连接关闭")
 		self.connected = False
 
-	def _on_ws_error(self, error: Exception) -> None:
-		"""WebSocket 错误处理"""
-		error_msg = f"WebSocket 事件错误: {error}"
-		self.handler.log(error_msg)
-		self.handler.emit_event(error_msg, "error")
-
-	# 保留原有的回调方法以兼容 WebSocketApp 模式
-	def _on_message(self, _ws: object, message: str) -> None:
-		"""兼容旧版 WebSocketApp 的消息处理"""
-		self._on_ws_message(message)
-
-	def _on_error(self, _ws: object, error: object) -> None:
-		"""兼容旧版 WebSocketApp 的错误处理"""
-		error_msg = f"WebSocketApp 错误: {error}"
-		self.handler.log(error_msg)
-		self.handler.emit_event(error_msg, "error")
-
-	def _on_close(self, _ws: object, close_status_code: int | None = None, close_msg: str | None = None) -> None:
-		"""兼容旧版 WebSocketApp 的关闭处理"""
-		status = close_status_code or 0
-		msg = close_msg or ""
-		self.handler.log(f"WebSocketApp 连接关闭: 状态码 ={status}")
-		self.connected = False
-		self.handler.emit_event(f"连接关闭: {msg}", "close")
-
-	def _on_open(self, _ws: object) -> None:
+	def _on_open(self, ws: WebSocketApp) -> None:
 		"""WebSocket 打开处理"""
 		self.handler.log("WebSocket 连接建立")
 		self.connected = True
-		# 发送连接消息
-		if self.ws:
-			self.ws.send("40")
-		# 延迟发送 join 消息
+		ws.send("40")
 
 		def send_join() -> None:
 			time.sleep(1)
-			if self.ws:
-				self.ws.send('42 ["join"]')
+			ws.send('42 ["join"]')
 
 		threading.Thread(target=send_join, daemon=True).start()
 
 	def send(self, message: str) -> None:
 		"""发送消息"""
-		if self.ws and self.ws.connected:
-			success = self.ws.send(message)
-			if not success:
-				self.handler.log("发送消息失败")
-
-	def send_reliable(self, message: str, max_retries: int = 3) -> bool:
-		"""可靠地发送消息 (带重试)"""
-		for attempt in range(max_retries):
-			if self.ws and self.ws.connected:
-				success = self.ws.send(message)
-				if success:
-					return True
-				self.handler.log(f"发送失败, 第 {attempt + 1} 次重试...")
-				time.sleep(0.5)
-		self.handler.log(f"消息发送失败, 已重试 {max_retries} 次")
-		return False
+		if self.ws and self.connected:
+			self.ws.send(message)
 
 	def close(self) -> None:
 		"""关闭连接"""
 		if self.ws:
-			self.ws.disconnect()
+			self.ws.close()
 		self.connected = False
-
-	def is_alive(self) -> bool:
-		"""检查连接是否活跃"""
-		return self.ws is not None and self.ws.connected
-
-	def ping(self) -> bool:
-		"""发送 ping 测试连接"""
-		if self.ws and self.ws.connected:
-			return self.ws.send("2")  # ping 消息
-		return False
 
 
 # ==================== AI 聊天核心实现 ====================
@@ -293,16 +216,6 @@ class CodeMaoAICore(EventHandler):
 		}
 		if handler := handlers.get(event_name):
 			handler(payload)
-
-	def reconnect(self, max_attempts: int = 3) -> bool:
-		"""重新连接到服务器"""
-		for attempt in range(max_attempts):
-			print(f"尝试重新连接 ({attempt + 1}/{max_attempts})...")
-			self.ws_manager.close()
-			time.sleep(1)
-			if self.ws_manager.connect():
-				return True
-		return False
 
 	def _handle_connect_ack(self, payload: dict[str, Any]) -> None:
 		"""处理连接确认"""
@@ -361,13 +274,9 @@ class CodeMaoAICore(EventHandler):
 
 	def send_message(self, message: str, *, include_history: bool = True) -> bool:
 		"""发送聊天消息"""
-		if not self.ws_manager.is_alive():
-			self.log("连接已断开, 尝试重新连接...")
-			if not self.reconnect():
-				self.log("错误: 重新连接失败")
-				return False
-
-		# 检查是否正在接收响应
+		if not self.ws_manager.connected:
+			self.log("错误: 未连接到服务器")
+			return False
 		if self.is_receiving_response:
 			self.log("请等待上一条回复完成...")
 			return False
@@ -388,10 +297,7 @@ class CodeMaoAICore(EventHandler):
 			"msg_channel": 0,
 		}
 		message_str = f'42 ["chat",{json.dumps(chat_data, ensure_ascii=False)}]'
-		# 使用可靠的发送方法
-		if not self.ws_manager.send_reliable(message_str):
-			self.log("消息发送失败")
-			return False
+		self.ws_manager.send(message_str)
 		self.log(f"消息已发送: {message}")
 		return True
 
