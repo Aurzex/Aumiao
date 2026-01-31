@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+import websocket
+
 from aumiao.api import work
 from aumiao.api.auth import CloudAuthenticator
 from aumiao.core.models import (
@@ -19,7 +21,6 @@ from aumiao.core.models import (
 	ValidationConfig,
 	WebSocketConfig,
 )
-from aumiao.utils.acquire import CodeMaoWebSocketClient
 
 
 # neko (KittenN) 貌似不支持查询在线人数, 而排行榜数据需要反编译后获取 work_file ["rankings"]["rankingsDict"], 之后获取 rankingId 得到的 id 通过两个 api 进行更改和获取
@@ -448,8 +449,7 @@ class CloudConnection:
 		self.public_variables: dict[str, PublicCloudVariable] = {}
 		self.reconnect_attempts = 0
 		self.reconnect_interval = DataConfig.RECONNECT_INTERVAL
-		# 使用新的 WebSocket 客户端
-		self.websocket_client: CodeMaoWebSocketClient | None = None
+		self.websocket_client: websocket.WebSocketApp | None = None
 		self.work_id = work_id
 		self._callbacks: dict[str, list[Callable[..., None]]] = {
 			"open": [],
@@ -669,46 +669,7 @@ class CloudConnection:
 			headers["Cookie"] = f"Authorization={self.authenticator.authorization_token}"
 		return headers
 
-	def _setup_websocket_handlers(self) -> None:
-		"""设置 WebSocket 事件处理器"""
-		if self.websocket_client:
-			# 设置消息处理器
-			self.websocket_client.set_message_handler(self._on_message)
-			# 设置错误处理器
-			self.websocket_client.set_error_handler(self._on_error_simple)
-			# 设置关闭处理器
-			self.websocket_client.set_close_handler(self._on_close_simple)
-
-			# 注册事件回调
-			self.websocket_client.on("connected", self._on_open)
-			self.websocket_client.on("disconnected", self._on_disconnected)
-			self.websocket_client.on("message", lambda data: self._on_ws_message(data.get("message")))
-			self.websocket_client.on("error", lambda data: self._on_ws_error(data.get("error")))
-
-	# 兼容性回调方法
-	def _compat_on_message(self, _ws: object, message: str) -> None:
-		"""兼容旧版 WebSocketApp 的消息处理"""
-		self._on_message(message)
-
-	def _compat_on_error(self, _ws: object, error: object) -> None:
-		"""兼容旧版 WebSocketApp 的错误处理"""
-		error_msg = f"WebSocketApp 错误: {error}"
-		print(error_msg)
-		self._emit_event("error", Exception(error_msg))
-
-	def _compat_on_close(self, _ws: object, close_status_code: int | None = None, close_msg: str | None = None) -> None:
-		"""兼容旧版 WebSocketApp 的关闭处理"""
-		status = close_status_code or 0
-		msg = close_msg or ""
-		print(f"WebSocketApp 连接关闭: 状态码={status}")
-		self._on_close_simple(status, msg)
-
-	def _compat_on_open(self, _ws: object) -> None:
-		"""兼容旧版 WebSocketApp 的打开处理"""
-		self._on_open({})
-
-	# 新的 WebSocket 事件处理方法
-	def _on_message(self, message: str | bytes) -> None:
+	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
 		"""WebSocket 消息处理"""
 		if self._is_closing:
 			return
@@ -745,61 +706,6 @@ class CloudConnection:
 				print(f"收到未知消息: {message_str[:50]}...")
 		except Exception as error:
 			print(f"处理消息时出错: {error}")
-
-	def _on_open(self, _data: dict[str, Any]) -> None:
-		"""WebSocket 连接打开回调"""
-		with self._connection_lock:
-			self.connected = True
-			self.reconnect_attempts = 0
-		print("✓ WebSocket 连接已建立")
-		self._emit_event("open")
-
-	def _on_disconnected(self) -> None:
-		"""WebSocket 断开连接处理"""
-		print("WebSocket 断开连接")
-		self._on_close_simple(1000, "正常断开")
-
-	def _on_ws_message(self, message: str) -> None:
-		"""WebSocket 消息处理"""
-		if isinstance(message, bytes):
-			message = message.decode("utf-8", errors="ignore")
-		self._on_message(message)
-
-	def _on_ws_error(self, error: Exception) -> None:
-		"""WebSocket 错误处理"""
-		error_msg = f"WebSocket 事件错误: {error}"
-		print(error_msg)
-		self._emit_event("error", error)
-
-	def _on_error_simple(self, error: Exception) -> None:
-		"""WebSocket 错误处理 - 简单版本"""
-		error_msg = f"WebSocket 错误: {error}"
-		print(error_msg)
-		self._emit_event("error", error)
-
-	def _on_close_simple(self, close_status_code: int, close_msg: str) -> None:
-		"""WebSocket 关闭处理 - 简单版本"""
-		with self._connection_lock:
-			was_connected = self.connected
-			self.connected = False
-			self.data_ready = False
-			self._join_sent = False
-
-		self._stop_ping()
-		close_type = "unknown_close"
-		close_desc = f"正常关闭: {close_status_code} - {close_msg}"
-		print(f"WebSocket 连接已关闭: {close_desc}")
-
-		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time.time(), "was_connected": was_connected})
-
-		if was_connected and self.auto_reconnect and not self._is_closing:
-			if self.reconnect_attempts < self.max_reconnect_attempts:
-				self.reconnect_attempts += 1
-				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
-				print(f"尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
-				threading.Timer(delay, self._safe_reconnect).start()
-			else:
-				print(f"已达到最大重连次数 ({self.max_reconnect_attempts}), 停止重连")
 
 	def _handle_handshake_message(self, message: str) -> None:
 		"""处理握手消息"""
@@ -1179,23 +1085,34 @@ class CloudConnection:
 		"""处理非法事件消息"""
 		print("检测到非法事件")
 
-	def send_message(self, message_type: SendMessageType, data: dict[str, Any] | list[Any] | str) -> None:
-		"""发送消息到云服务器"""
-		if not self.websocket_client or not self.websocket_client.connected:
-			print("错误: 连接未就绪, 无法发送消息")
-			return
-		message_content = [message_type.value, data]
-		message = f"{WebSocketConfig.EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
-		try:
-			success = self.websocket_client.send(message)
-			if success:
-				self._last_activity_time = time.time()
+	def _on_open(self, _ws: websocket.WebSocketApp) -> None:
+		"""WebSocket 连接打开回调"""
+		with self._connection_lock:
+			self.connected = True
+			self.reconnect_attempts = 0
+		print("✓ WebSocket 连接已建立")
+		self._emit_event("open")
+
+	def _on_close(self, _ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
+		"""WebSocket 连接关闭回调"""
+		with self._connection_lock:
+			was_connected = self.connected
+			self.connected = False
+			self.data_ready = False
+			self._join_sent = False
+		self._stop_ping()
+		close_type = "unknown_close"
+		close_desc = f"正常关闭: {close_status_code} - {close_msg}"
+		print(f"WebSocket 连接已关闭: {close_desc}")
+		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time.time(), "was_connected": was_connected})
+		if was_connected and self.auto_reconnect and not self._is_closing:
+			if self.reconnect_attempts < self.max_reconnect_attempts:
+				self.reconnect_attempts += 1
+				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
+				print(f"尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
+				threading.Timer(delay, self._safe_reconnect).start()
 			else:
-				print("发送消息失败")
-				self._emit_event("error", Exception("发送消息失败"))
-		except Exception as error:
-			print(f"{ErrorMessages.SEND_MESSAGE}: {error}")
-			self._emit_event("error", error)
+				print(f"已达到最大重连次数 ({self.max_reconnect_attempts}), 停止重连")
 
 	def _safe_reconnect(self) -> None:
 		"""安全重连"""
@@ -1213,6 +1130,25 @@ class CloudConnection:
 				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
 				print(f"重连失败, 下次尝试 ({self.reconnect_attempts}/{self.max_reconnect_attempts}) 等待 {delay} 秒...")
 				threading.Timer(delay, self._safe_reconnect).start()
+
+	def _on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
+		"""WebSocket 错误回调"""
+		print(f"WebSocket 错误: {error}")
+		self._emit_event("error", error)
+
+	def send_message(self, message_type: SendMessageType, data: dict[str, Any] | list[Any] | str) -> None:
+		"""发送消息到云服务器"""
+		if not self.websocket_client or not self.connected:
+			print("错误: 连接未就绪, 无法发送消息")
+			return
+		message_content = [message_type.value, data]
+		message = f"{WebSocketConfig.EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
+		try:
+			self.websocket_client.send(message)
+			self._last_activity_time = time.time()
+		except Exception as error:
+			print(f"{ErrorMessages.SEND_MESSAGE}: {error}")
+			self._emit_event("error", error)
 
 	def _cleanup_connection(self) -> None:
 		"""清理连接资源"""
@@ -1233,12 +1169,25 @@ class CloudConnection:
 		# 关闭 WebSocket 连接
 		if self.websocket_client:
 			try:
-				# 使用新的 disconnect 方法
-				self.websocket_client.disconnect()
+				# 使用异步关闭避免阻塞
+				def close_ws() -> None:
+					with contextlib.suppress(Exception):
+						self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
+
+				# 在新线程中关闭 WebSocket
+				close_thread = threading.Thread(target=close_ws, daemon=True)
+				close_thread.start()
+				close_thread.join(timeout=1.0)
 			except Exception:  # noqa: S110
 				pass
 			finally:
 				self.websocket_client = None
+		# 等待 WebSocket 线程结束
+		if self._websocket_thread and self._websocket_thread.is_alive():
+			# 检查不是当前线程
+			if self._websocket_thread != threading.current_thread():
+				self._websocket_thread.join(timeout=2.0)
+			self._websocket_thread = None
 		# 清除所有数据
 		with self._variables_lock:
 			self.private_variables.clear()
@@ -1280,36 +1229,31 @@ class CloudConnection:
 				self.private_variables.clear()
 				self.public_variables.clear()
 				self.lists.clear()
-
 			url = self._get_websocket_url()
 			headers = self._get_websocket_headers()
 			print(f"正在连接到: {url}")
-
-			# 创建新的 WebSocket 客户端
-			self.websocket_client = CodeMaoWebSocketClient(client_id=f"cloud_{self.work_id}_{int(time.time())}")
-
-			# 设置事件处理器
-			self._setup_websocket_handlers()
-
-			# 连接服务器
-			success = self.websocket_client.connect_with_callback(
-				url=url,
-				on_message=self._compat_on_message,
-				on_error=self._compat_on_error,
-				on_close=self._compat_on_close,
-				on_open=self._compat_on_open,
-				headers=headers,
-				ssl_options={"cert_reqs": 0},
+			self.websocket_client = websocket.WebSocketApp(
+				url,
+				header=headers,
+				on_open=self._on_open,
+				on_message=self._on_message,
+				on_close=self._on_close,
+				on_error=self._on_error,
 			)
 
-			if success:
-				print("✓ WebSocket 连接请求已发送")
-				# 等待连接建立
-				if not self.wait_for_connection(timeout=10):
-					print("连接超时")
-			else:
-				print("连接失败")
+			def run_websocket() -> None:
+				try:
+					if self.websocket_client:
+						self.websocket_client.run_forever(
+							ping_interval=WebSocketConfig.PING_INTERVAL,
+							ping_timeout=WebSocketConfig.PING_TIMEOUT,
+							skip_utf8_validation=True,
+						)
+				except Exception as error:
+					print(f"{ErrorMessages.WEB_SOCKET_RUN}: {error}")
 
+			self._websocket_thread = threading.Thread(target=run_websocket, daemon=True)
+			self._websocket_thread.start()
 		except Exception as error:
 			print(f"{ErrorMessages.CONNECTION}: {error}")
 			self._emit_event("error", error)
@@ -1328,7 +1272,7 @@ class CloudConnection:
 
 	def check_connection_health(self) -> bool:
 		"""检查连接健康状态"""
-		if not self.websocket_client or not self.websocket_client.connected:
+		if not self.connected:
 			return False
 		if self._last_activity_time > 0:
 			inactive_time = time.time() - self._last_activity_time
@@ -1342,7 +1286,7 @@ class CloudConnection:
 		start_time = time.time()
 		last_log_time = start_time
 		while time.time() - start_time < timeout:
-			if self.websocket_client and self.websocket_client.connected:
+			if self.connected:
 				print("✓ 连接已建立")
 				return True
 			current_time = time.time()
@@ -1380,10 +1324,6 @@ class CloudConnection:
 			try:
 				if name.isdigit():
 					return self.private_variables.get(name)
-				# 尝试按 cloud_variable_id 查找
-				for var in self.private_variables.values():
-					if var.cloud_variable_id == name:
-						return var
 			except (AttributeError, ValueError):
 				pass
 			return None
@@ -1396,10 +1336,6 @@ class CloudConnection:
 			try:
 				if name.isdigit():
 					return self.public_variables.get(name)
-				# 尝试按 cloud_variable_id 查找
-				for var in self.public_variables.values():
-					if var.cloud_variable_id == name:
-						return var
 			except (AttributeError, ValueError):
 				pass
 			return None
@@ -1412,10 +1348,6 @@ class CloudConnection:
 			try:
 				if name.isdigit():
 					return self.lists.get(name)
-				# 尝试按 cloud_variable_id 查找
-				for lst in self.lists.values():
-					if lst.cloud_variable_id == name:
-						return lst
 			except (AttributeError, ValueError):
 				pass
 			return None
@@ -1565,6 +1497,7 @@ class CloudConnection:
 			print("无云列表")
 		print(f"\n 在线用户数: {self.online_users}")
 		print("=" * 50)
+		# ==============================
 
 
 # 高级接口 (API Layer)
