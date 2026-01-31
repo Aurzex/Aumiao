@@ -1,13 +1,14 @@
-import contextlib
+from __future__ import annotations
+
+import json
+import threading
+import time
 from abc import ABC, abstractmethod
-from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
-from json import dumps
 from pathlib import Path
 from random import choice
 from time import sleep
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict
 
 import httpx
@@ -20,6 +21,9 @@ from aumiao.utils.decorator import singleton
 
 # 导入必要的模块
 if TYPE_CHECKING:
+	from collections.abc import Callable, Generator
+	from types import TracebackType
+
 	from aumiao.utils.data import SettingManager
 
 
@@ -125,27 +129,57 @@ class IHTTPClient(ABC):
 
 
 class IWebSocketClient(ABC):
-	"""WebSocket 客户端接口"""
+	"""WebSocket 客户端抽象接口"""
 
 	@abstractmethod
-	def connect(self, url: str) -> bool:
-		"""连接 WebSocket"""
+	def connect(self, url: str, headers: dict[str, str] | None = None, ssl_options: dict[str, Any] | None = None) -> bool:
+		"""连接 WebSocket 服务器"""
 
 	@abstractmethod
 	def disconnect(self) -> None:
-		"""断开连接"""
+		"""断开 WebSocket 连接"""
 
 	@abstractmethod
 	def send(self, message: str | dict[str, Any]) -> bool:
-		"""发送消息"""
+		"""发送消息到 WebSocket 服务器"""
 
 	@abstractmethod
 	def receive(self, timeout: float = 30.0) -> str | bytes | None:
-		"""接收消息"""
+		"""同步接收消息"""
+
+	@abstractmethod
+	def start_listening(self, callback: Callable[[str | bytes], None] | None = None) -> None:
+		"""开始监听消息(异步模式)"""
+
+	@abstractmethod
+	def stop_listening(self) -> None:
+		"""停止监听消息"""
 
 	@abstractmethod
 	def listen(self) -> Generator[str | bytes]:
-		"""监听消息"""
+		"""同步监听消息生成器"""
+
+	@property
+	@abstractmethod
+	def connected(self) -> bool:
+		"""是否已连接"""
+
+	@property
+	@abstractmethod
+	def connection_id(self) -> str:
+		"""连接标识符"""
+
+	@abstractmethod
+	def set_message_handler(self, handler: Callable[[str | bytes], None]) -> None:
+		"""设置消息处理器"""
+
+	@abstractmethod
+	def set_error_handler(self, handler: Callable[[Exception], None]) -> None:
+		"""设置错误处理器"""
+
+	@abstractmethod
+	def set_close_handler(self, handler: Callable[[int, str], None]) -> None:
+		"""设置关闭处理器"""
 
 
 class IFileUploader(ABC):
@@ -289,15 +323,15 @@ class BaseHTTPClient:
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
-				# print("&" * 50)
-				# print("Headers:", request_headers)
-				# print("URL:", url)
-				# print("Method:", method)
-				# print("Params:", params)
-				# print("Data:", data)
-				# print("Payload:", payload)
-				# print("Files:", files)
-				# print("&" * 50)
+				# print ("&" * 50)
+				# print ("Headers:", request_headers)
+				# print ("URL:", url)
+				# print ("Method:", method)
+				# print ("Params:", params)
+				# print ("Data:", data)
+				# print ("Payload:", payload)
+				# print ("Files:", files)
+				# print ("&" * 50)
 				response = self._execute_request(
 					method=method,
 					url=url,
@@ -484,8 +518,8 @@ class BaseHTTPClient:
 		"""构建页面请求参数"""
 		page_params = base_params.copy()
 		if pagination_method == "offset":
-			# 修正: 直接计算offset, 不从first_page_size开始
-			# 因为第一页的offset已经在base_params中设置过了(通常是0)
+			# 修正: 直接计算 offset, 不从 first_page_size 开始
+			# 因为第一页的 offset 已经在 base_params 中设置过了 (通常是 0)
 			# 所以后续页应该基于这个基础计算
 			current_offset = base_params.get(offset_key, 0)
 			page_params[offset_key] = current_offset + (page_idx * items_per_page)
@@ -698,7 +732,7 @@ class CodeMaoClient(BaseHTTPClient):
 			if identity_headers and identity_headers.get("Authorization"):
 				# 关键修复: 直接更新底层 HTTP 客户端的 headers
 				auth_header = identity_headers["Authorization"]
-				if not auth_header.startswith("Bearer "):
+				if not auth_header.startswith("Bearer"):
 					auth_header = f"Bearer {auth_header}"
 				# 强制更新到 httpx 客户端
 				self._http_client.headers["Authorization"] = auth_header
@@ -713,99 +747,293 @@ class CodeMaoClient(BaseHTTPClient):
 			print(f"切换身份失败: {e}")
 
 
+class WebSocketEventType:
+	"""WebSocket 事件类型常量"""
+
+	CONNECTED = "connected"
+	DISCONNECTED = "disconnected"
+	MESSAGE = "message"
+	ERROR = "error"
+	CLOSE = "close"
+
+
 class CodeMaoWebSocketClient(IWebSocketClient):
-	"""编程猫 WebSocket 客户端 - 修复版本"""
+	"""编程猫 WebSocket 客户端实现"""
 
-	def __init__(self) -> None:
-		self._ws_app = None
+	def __init__(self, client_id: str | None = None) -> None:
+		self._client_id = client_id or f"ws_client_{id(self)}"
+		self._ws_app: websocket.WebSocketApp | None = None
+		self._ws_connection: websocket._core.WebSocket | None = None
 		self._connected = False
-		self._message_queue = []
+		self._listening = False
+		self._listen_thread: threading.Thread | None = None
+		self._message_handler: Callable[[str | bytes], None] | None = None
+		self._error_handler: Callable[[Exception], None] | None = None
+		self._close_handler: Callable[[int, str], None] | None = None
+		self._event_handlers: dict[str, list[Callable[..., None]]] = {
+			WebSocketEventType.CONNECTED: [],
+			WebSocketEventType.DISCONNECTED: [],
+			WebSocketEventType.MESSAGE: [],
+			WebSocketEventType.ERROR: [],
+			WebSocketEventType.CLOSE: [],
+		}
+		self._lock = threading.RLock()
 
-	def connect(self, url: str) -> bool:
-		"""连接 WebSocket"""
-		try:
-			self._ws_app = websocket.create_connection(
-				url,
-				header={
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
-					"Origin": "https://kn.codemao.cn",
-					"Accept-Encoding": "gzip, deflate, br, zstd",
-					"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-					"Cache-Control": "no-cache",
-					"Pragma": "no-cache",
-				},
-				sslopt={"cert_reqs": 0},
-			)
-			self._connected = True
-			print(f"WebSocket 连接已建立: {url}")
-		except Exception as e:
-			print(f"WebSocket 连接失败: {e}")
-			self._connected = False
-			return False
-		else:
-			return True
-
-	def disconnect(self) -> None:
-		"""断开 WebSocket 连接"""
-		if self._ws_app:
-			with contextlib.suppress(Exception):
-				self._ws_app.close()
-			self._ws_app = None
-		self._connected = False
-		print("WebSocket 连接已断开")
-
-	def send(self, message: str | dict[str, Any]) -> bool:
-		"""发送 WebSocket 消息"""
-		if not self._ws_app or not self._connected:
-			print("WebSocket 未连接")
-			return False
-		try:
-			if isinstance(message, dict):
-				message = dumps(message, ensure_ascii=False)
-			self._ws_app.send(message)
-		except Exception as e:
-			print(f"发送 WebSocket 消息失败: {e}")
-			return False
-		else:
-			return True
-
-	def receive(self, timeout: float = 30.0) -> str | bytes | None:
-		"""接收 WebSocket 消息"""
-		if not self._ws_app or not self._connected:
-			return None
-		try:
-			self._ws_app.settimeout(timeout)
-			message = self._ws_app.recv()
-		except websocket.WebSocketTimeoutException:
-			print("接收 WebSocket 消息超时")
-			return None
-		except Exception as e:
-			print(f"接收 WebSocket 消息失败: {e}")
-			return None
-		else:
-			return message
-
-	def listen(self) -> Generator[str | bytes]:
-		while self._connected and self._ws_app:
-			try:
-				message = self.receive(timeout=1.0)
-				if message is not None:
-					yield message
-			except Exception:
-				break
+	@property
+	def connection_id(self) -> str:
+		return self._client_id
 
 	@property
 	def connected(self) -> bool:
-		return self._connected
+		with self._lock:
+			return self._connected
+
+	def connect(self, url: str, headers: dict[str, str] | None = None, ssl_options: dict[str, Any] | None = None) -> bool:
+		"""连接 WebSocket 服务器 - 简单连接模式"""
+		with self._lock:
+			if self._connected:
+				return True
+			try:
+				# 使用 SSL 选项
+				sslopt = ssl_options or {"cert_reqs": 0}
+				# 创建 WebSocket 连接
+				self._ws_connection = websocket.create_connection(url, header=headers, sslopt=sslopt, timeout=30.0)
+				self._connected = True
+				# 触发连接事件
+				self._emit_event(WebSocketEventType.CONNECTED, {"url": url})
+			except Exception as e:
+				self._handle_error(e)
+				return False
+			else:
+				return True
+
+	def connect_with_callback(
+		self,
+		url: str,
+		on_message: Callable[[websocket.WebSocketApp, str], None] | None = None,
+		on_error: Callable[[websocket.WebSocketApp, Exception], None] | None = None,
+		on_close: Callable[[websocket.WebSocketApp, int, str], None] | None = None,
+		on_open: Callable[[websocket.WebSocketApp], None] | None = None,
+		headers: dict[str, str] | None = None,
+		ssl_options: dict[str, Any] | None = None,
+	) -> bool:
+		"""使用回调方式连接(兼容 WebSocketApp 模式)"""
+		with self._lock:
+			if self._connected:
+				return True
+			try:
+				# SSL 选项
+				sslopt = ssl_options or {"cert_reqs": 0}
+				# 创建 WebSocketApp
+				self._ws_app = websocket.WebSocketApp(
+					url,
+					on_message=on_message or self._default_on_message,
+					on_error=on_error or self._default_on_error,
+					on_close=on_close or self._default_on_close,
+					on_open=on_open or self._default_on_open,
+					header=headers,
+				)
+				# 启动 WebSocket 线程
+
+				def run_websocket() -> None:
+					try:
+						# 确保 ws_app 不为 None
+						if self._ws_app is not None:
+							self._ws_app.run_forever(
+								sslopt=sslopt,
+								ping_interval=25,
+								ping_timeout=60,
+								skip_utf8_validation=True,
+							)
+					except Exception as e:
+						self._handle_error(e)
+
+				self._listen_thread = threading.Thread(target=run_websocket, daemon=True)
+				self._listen_thread.start()
+				# 等待连接建立
+				timeout = 10
+				start_time = time.time()
+				while not self._connected and time.time() - start_time < timeout:
+					time.sleep(0.1)
+			except Exception as e:
+				self._handle_error(e)
+				return False
+			else:
+				return self._connected
+
+	def disconnect(self) -> None:
+		"""断开 WebSocket 连接"""
+		with self._lock:
+			if not self._connected:
+				return
+			self._connected = False
+			self._listening = False
+			try:
+				if self._ws_connection:
+					self._ws_connection.close()
+					self._ws_connection = None
+				if self._ws_app:
+					self._ws_app.close()
+					self._ws_app = None
+				if self._listen_thread and self._listen_thread.is_alive():
+					self._listen_thread.join(timeout=1.0)
+			except Exception as e:
+				self._handle_error(e)
+			finally:
+				# 触发断开事件
+				self._emit_event(WebSocketEventType.DISCONNECTED)
+
+	def send(self, message: str | dict[str, Any]) -> bool:
+		"""发送消息到 WebSocket 服务器"""
+		with self._lock:
+			if not self._connected:
+				return False
+			try:
+				if isinstance(message, dict):
+					message = json.dumps(message, ensure_ascii=False)
+				if self._ws_connection:
+					self._ws_connection.send(message)
+				elif self._ws_app:
+					self._ws_app.send(message)
+				else:
+					return False
+			except Exception as e:
+				self._handle_error(e)
+				return False
+			else:
+				return True
+
+	def receive(self, timeout: float = 30.0) -> str | bytes | None:
+		"""同步接收消息"""
+		with self._lock:
+			if not self._connected or not self._ws_connection:
+				return None
+			try:
+				self._ws_connection.settimeout(timeout)
+				message = self._ws_connection.recv()
+				if message and self._message_handler:
+					self._message_handler(message)
+				self._emit_event(WebSocketEventType.MESSAGE, {"message": message})
+			except websocket.WebSocketTimeoutException:
+				return None
+			except Exception as e:
+				self._handle_error(e)
+				return None
+			else:
+				return message
+
+	def start_listening(self, callback: Callable[[str | bytes], None] | None = None) -> None:
+		"""开始监听消息(异步模式)"""
+		with self._lock:
+			if not self._connected or self._listening:
+				return
+			self._listening = True
+			if callback:
+				self._message_handler = callback
+
+			def listen_loop() -> None:
+				while self._listening and self._connected:
+					try:
+						message = self.receive(timeout=1.0)
+						if message is not None and self._message_handler:
+							self._message_handler(message)
+					except Exception:
+						break
+
+			self._listen_thread = threading.Thread(target=listen_loop, daemon=True)
+			self._listen_thread.start()
+
+	def stop_listening(self) -> None:
+		"""停止监听消息"""
+		with self._lock:
+			self._listening = False
+			if self._listen_thread and self._listen_thread.is_alive():
+				self._listen_thread.join(timeout=1.0)
+
+	def listen(self) -> Generator[str | bytes]:
+		while self._connected:
+			message = self.receive(timeout=1.0)
+			if message is not None:
+				yield message
+			time.sleep(0.01)
+
+	def set_message_handler(self, handler: Callable[[str | bytes], None]) -> None:
+		"""设置消息处理器"""
+		self._message_handler = handler
+
+	def set_error_handler(self, handler: Callable[[Exception], None]) -> None:
+		"""设置错误处理器"""
+		self._error_handler = handler
+
+	def set_close_handler(self, handler: Callable[[int, str], None]) -> None:
+		"""设置关闭处理器"""
+		self._close_handler = handler
+
+	def on(self, event_type: str, handler: Callable[..., None]) -> None:
+		"""注册事件处理器"""
+		if event_type in self._event_handlers:
+			self._event_handlers[event_type].append(handler)
+
+	def off(self, event_type: str, handler: Callable[..., None]) -> None:
+		"""移除事件处理器"""
+		if event_type in self._event_handlers and handler in self._event_handlers[event_type]:
+			self._event_handlers[event_type].remove(handler)
+
+	def _emit_event(self, event_type: str, data: dict[str, Any] | None = None) -> None:
+		"""触发事件"""
+		if event_type in self._event_handlers:
+			for handler in self._event_handlers[event_type]:
+				try:
+					if data:
+						handler(data)
+					else:
+						handler()
+				except Exception as e:
+					self._handle_error(e)
+
+	def _default_on_message(self, _ws: websocket.WebSocketApp, message: str) -> None:
+		"""默认消息处理器 - 修复未使用参数问题"""
+		# ws 参数保留以保持兼容性
+		if self._message_handler:
+			self._message_handler(message)
+		self._emit_event(WebSocketEventType.MESSAGE, {"message": message})
+
+	def _default_on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
+		"""默认错误处理器 - 修复未使用参数问题"""
+		# ws 参数保留以保持兼容性
+		self._handle_error(error)
+
+	def _default_on_close(self, _ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
+		"""默认关闭处理器 - 修复未使用参数问题"""
+		# ws 参数保留以保持兼容性
+		with self._lock:
+			self._connected = False
+		if self._close_handler:
+			self._close_handler(close_status_code, close_msg)
+		self._emit_event(WebSocketEventType.CLOSE, {"code": close_status_code, "message": close_msg})
+
+	def _default_on_open(self, _ws: websocket.WebSocketApp) -> None:
+		"""默认打开处理器 - 修复未使用参数问题"""
+		# ws 参数保留以保持兼容性
+		with self._lock:
+			self._connected = True
+		self._emit_event(WebSocketEventType.CONNECTED)
+
+	def _handle_error(self, error: Exception) -> None:
+		"""处理错误"""
+		if self._error_handler:
+			self._error_handler(error)
+		self._emit_event(WebSocketEventType.ERROR, {"error": error})
 
 	def close(self) -> None:
+		"""关闭连接(别名)"""
 		self.disconnect()
 
 	def __enter__(self) -> Self:
 		return self
 
 	def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
-		self.close()
+		self.disconnect()
 
 
 class FileUploader(IFileUploader):
