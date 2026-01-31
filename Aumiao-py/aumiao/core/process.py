@@ -117,46 +117,36 @@ class FileUploaderProtocol(Protocol):
 
 
 # ========================== 策略模式实现 ==========================
-class AdsProcessStrategy(ProcessStrategy):
-	"""广告处理策略"""
+class AbnormalProcessStrategy(ProcessStrategy, ABC):
+	"""异常处理策略基类(模板方法模式)"""
+
+	@abstractmethod
+	@staticmethod
+	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+		"""抽象方法:检查内容是否符合处理条件"""
+
+	@abstractmethod
+	@staticmethod
+	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+		"""抽象方法:格式化日志消息"""
 
 	def process(
 		self,
 		comments: list[dict[str, Any]],
 		item_id: int,
 		title: str,
-		params: dict[Literal["ads"], Any],
+		params: dict[str, Any],
 		target_lists: defaultdict[str, list[str]],
 		source_type: SourceType = "shop",
 	) -> None:
-		"""处理广告评论"""
-		self._process_abnormal_comments(
-			comments=comments,
-			item_id=item_id,
-			title=title,
-			action_type="ads",
-			params=params,
-			target_lists=target_lists,
-			source_type=source_type,
-		)
-
-	def _process_abnormal_comments(
-		self,
-		comments: list[dict[str, Any]],
-		item_id: int,
-		title: str,
-		action_type: str,
-		params: dict[Literal["ads"], Any],
-		target_lists: defaultdict[str, list[str]],
-		source_type: SourceType = "shop",
-	) -> None:
-		"""处理异常评论: 广告"""
+		"""处理异常评论的通用流程(模板方法)"""
+		action_type = self._get_action_type()
 		for comment in comments:
 			# 跳过置顶评论
 			if comment.get("is_top"):
 				continue
 			# 检查主评论
-			if self._check_condition(comment, action_type, params):
+			if self._check_condition(comment, params):
 				identifier = f"{source_type}:{item_id}:comment:0:{comment['id']}"
 				self._log_and_add(
 					target_lists=target_lists,
@@ -168,7 +158,7 @@ class AdsProcessStrategy(ProcessStrategy):
 				)
 			# 检查回复
 			for reply in comment.get("replies", []):
-				if self._check_condition(reply, action_type, params):
+				if self._check_condition(reply, params):
 					identifier = f"{source_type}:{item_id}:reply:{comment['id']}:{reply['id']}"
 					self._log_and_add(
 						target_lists=target_lists,
@@ -180,16 +170,13 @@ class AdsProcessStrategy(ProcessStrategy):
 						parent_content=comment.get("content", ""),
 					)
 
+	@abstractmethod
 	@staticmethod
-	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["ads"], Any]) -> bool:
-		"""检查内容是否符合处理条件"""
-		content = data.get("content", "").lower()
-		if action_type == "ads":
-			return any(ad in content for ad in params.get("ads", []))
-		return False
+	def _get_action_type() -> str:
+		"""获取动作类型"""
 
-	@staticmethod
 	def _log_and_add(
+		self,
 		target_lists: defaultdict[str, list[str]],
 		data: dict[str, Any],
 		identifier: str,
@@ -198,121 +185,59 @@ class AdsProcessStrategy(ProcessStrategy):
 		source_type: SourceType,
 		parent_content: str = "",
 	) -> None:
-		"""记录日志并添加标识到目标列表"""
-		log_templates = {"ads": "广告 {type} [{source}]{title}{parent} : {content}"}
+		"""记录日志并添加标识到目标列表(模板方法的钩子)"""
 		# 区分评论 / 回复类型
 		log_type = "回复" if ":reply:" in identifier else "评论"
 		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
 		# 生成日志信息
-		if action_type in log_templates:
-			log_message = log_templates[action_type].format(
-				type=log_type,
-				source=source_type.upper(),
-				title=f"[{title[:10]}]" if title else "",
-				parent=parent_info,
-				content=data.get("content", "")[:50],
-				nickname=data.get("nickname", "未知用户"),
-			)
-			print(log_message)
+		log_message = self._format_log_message(data=data, log_type=log_type, source_type=source_type.upper(), title=title[:10] if title else "", parent_info=parent_info)
+		print(log_message)
 		# 添加到目标列表
 		target_lists[action_type].append(identifier)
 
 
-class BlacklistProcessStrategy(ProcessStrategy):
+class AdsProcessStrategy(AbnormalProcessStrategy):
+	"""广告处理策略"""
+
+	@staticmethod
+	def _get_action_type() -> str:
+		return "ads"
+
+	@staticmethod
+	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+		"""检查内容是否符合广告条件"""
+		content = data.get("content", "").lower()
+		ad_keywords = params.get("ads", [])
+		return any(ad in content for ad in ad_keywords)
+
+	@staticmethod
+	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+		"""格式化广告日志消息"""
+		title_part = f"[{title}]" if title else ""
+		return f"广告 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('content', '')[:50]}"
+
+
+class BlacklistProcessStrategy(AbnormalProcessStrategy):
 	"""黑名单处理策略"""
 
-	def process(
-		self,
-		comments: list[dict[str, Any]],
-		item_id: int,
-		title: str,
-		params: dict[Literal["blacklist"], Any],
-		target_lists: defaultdict[str, list[str]],
-		source_type: SourceType = "shop",
-	) -> None:
-		"""处理黑名单用户评论"""
-		self._process_abnormal_comments(
-			comments=comments,
-			item_id=item_id,
-			title=title,
-			action_type="blacklist",
-			params=params,
-			target_lists=target_lists,
-			source_type=source_type,
-		)
-
-	def _process_abnormal_comments(
-		self,
-		comments: list[dict[str, Any]],
-		item_id: int,
-		title: str,
-		action_type: str,
-		params: dict[Literal["blacklist"], Any],
-		target_lists: defaultdict[str, list[str]],
-		source_type: SourceType = "shop",
-	) -> None:
-		"""处理异常评论: 黑名单"""
-		for comment in comments:
-			# 跳过置顶评论
-			if comment.get("is_top"):
-				continue
-			# 检查主评论
-			if self._check_condition(comment, action_type, params):
-				identifier = f"{source_type}:{item_id}:comment:0:{comment['id']}"
-				self._log_and_add(target_lists=target_lists, data=comment, identifier=identifier, title=title, action_type=action_type, source_type=source_type)
-			# 检查回复
-			for reply in comment.get("replies", []):
-				if self._check_condition(reply, action_type, params):
-					identifier = f"{source_type}:{item_id}:reply:{comment['id']}:{reply['id']}"
-					self._log_and_add(
-						target_lists=target_lists,
-						data=reply,
-						identifier=identifier,
-						title=title,
-						action_type=action_type,
-						source_type=source_type,
-						parent_content=comment.get("content", ""),
-					)
+	@staticmethod
+	def _get_action_type() -> str:
+		return "blacklist"
 
 	@staticmethod
-	def _check_condition(data: dict[str, Any], action_type: str, params: dict[Literal["blacklist"], Any]) -> bool:
-		"""检查内容是否符合处理条件"""
+	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+		"""检查用户是否在黑名单中"""
 		user_id = str(data.get("user_id", ""))
-		if action_type == "blacklist":
-			# 确保 blacklist 参数是 set 类型
-			blacklist_set = params.get("blacklist", set())
-			if isinstance(blacklist_set, list):
-				blacklist_set = set(blacklist_set)
-			return user_id in blacklist_set
-		return False
+		blacklist_set = params.get("blacklist", set())
+		if isinstance(blacklist_set, list):
+			blacklist_set = set(blacklist_set)
+		return user_id in blacklist_set
 
 	@staticmethod
-	def _log_and_add(
-		target_lists: defaultdict[str, list[str]],
-		data: dict[str, Any],
-		identifier: str,
-		title: str,
-		action_type: str,
-		source_type: SourceType,
-		parent_content: str = "",
-	) -> None:
-		"""记录日志并添加标识到目标列表"""
-		log_templates = {"blacklist": "黑名单 {type} [{source}]{title}{parent} : {nickname}"}
-		# 区分评论 / 回复类型
-		log_type = "回复" if ":reply:" in identifier else "评论"
-		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
-		# 生成日志信息
-		if action_type in log_templates:
-			log_message = log_templates[action_type].format(
-				type=log_type,
-				source=source_type.upper(),
-				title=f"[{title[:10]}]" if title else "",
-				parent=parent_info,
-				nickname=data.get("nickname", "未知用户"),
-			)
-			print(log_message)
-		# 添加到目标列表
-		target_lists[action_type].append(identifier)
+	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+		"""格式化黑名单日志消息"""
+		title_part = f"[{title}]" if title else ""
+		return f"黑名单 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('nickname', ' 未知用户 ')}"
 
 
 class DuplicatesProcessStrategy(ProcessStrategy):
@@ -552,7 +477,7 @@ class DetailDisplayProcessor(BaseProcessor):
 				# 显示帖子内容
 				if "content" in details_ndd:
 					content_text = coordinator.toolkit.create_data_converter().html_to_text(details_ndd["content"])
-					# 限制内容长度,避免显示过长
+					# 限制内容长度, 避免显示过长
 					if len(content_text) > 200:
 						content_text = content_text[:200] + "..."
 					coordinator.printer.print_message(f"内容: {content_text}", "SUCCESS")
