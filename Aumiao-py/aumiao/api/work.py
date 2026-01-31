@@ -1042,6 +1042,21 @@ class WorkDataFetcher:
 		)
 		return response.json()
 
+	def fetch_collaboration_user(self, work_id: int) -> dict:
+		"""
+		获取协作用户
+		Args:
+			work_id: 作品 ID
+		Returns:
+			协作用户字典
+		"""
+		response = self._client.send_request(
+			endpoint=f"/collaboration/user/edited/{work_id}",
+			method="GET",
+			base_url_key="creation",
+		)
+		return response.json()
+
 	def fetch_work_lineage_web(self, work_id: int) -> dict:
 		"""
 		获取 Web 端作品谱系

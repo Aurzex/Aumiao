@@ -54,13 +54,13 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		method: QueryMethod = QueryMethod.USER_ID,
 		limit: int | None = 500,
 	) -> list[str] | list[dict[str, Any]]:
-		"""执行查询的核心逻辑(内部实现)"""
+		"""执行查询的核心逻辑 (内部实现)"""
 		source_value = source.value
 		if source_value not in self._source_map:
 			msg = f"无效来源: {source_value}"
 			raise ValueError(msg)
 		method_func, id_key, user_field = self._source_map[source_value]
-		comments = method_func(**{id_key: source_id, "limit": limit})  # pyright: ignore[reportArgumentType]
+		comments = method_func(**{id_key: source_id, "limit": limit})  # pyright: ignore [reportArgumentType]
 		reply_cache: dict[int, list[dict[str, Any]]] = {}
 
 		def extract_reply_user(reply: dict[str, Any]) -> int:
@@ -137,11 +137,11 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		limit: int | None = 500,
 	) -> list[str] | list[dict[str, Any]]:
 		"""
-		获取评论数据(主公共接口)
+		获取评论数据 (主公共接口)
 		Args:
-			source: 数据来源(work/forum/shop)
-			source_id: 资源 ID(作品 ID / 帖子 ID / 商店 ID)
-			method: 查询方法(user_id/comment_id/comments)
+			source: 数据来源 (work/forum/shop)
+			source_id: 资源 ID (作品 ID / 帖子 ID / 商店 ID)
+			method: 查询方法 (user_id/comment_id/comments)
 			limit: 数量限制
 		Returns:
 			- user_id: 用户 ID 列表
@@ -190,6 +190,59 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 				break
 		return replies
 
+	def get_comment_total(self, source_type: Literal["work", "shop", "forum"], source_id: int) -> int:
+		"""
+		获取不同来源的评论总数
+		Args:
+			source_type: 来源类型 ("work", "shop", "forum")
+			source_id: 来源 ID
+		Returns:
+			int: 评论总数
+		"""
+		if source_type == "work":
+			comments_url = f"/creation-tools/v1/works/{source_id}/comments"
+			comments_response = self.client.send_request(
+				method="GET",
+				endpoint=comments_url,
+				params={"offset": 0, "limit": 15},
+				base_url_key="default",
+			).json()
+
+			if "total" in comments_response:
+				return comments_response["total"]
+
+			work_response = self.client.send_request(
+				method="GET",
+				endpoint=f"/creation-tools/v1/works/{source_id}",
+				params={},
+				base_url_key="default",
+			).json()
+
+			return work_response.get("comment_times", 0)
+		if source_type == "shop":
+			response = self.client.send_request(
+				method="GET",
+				endpoint=f"/web/discussions/{source_id}/comments",
+				params={
+					"source": "WORK_SHOP",
+					"sort": "-created_at",
+					"limit": 15,
+					"offset": 0,
+				},
+				base_url_key="default",
+			).json()
+			return response.get("total", 0) + response.get("totalReply", 0)
+		if source_type == "forum":
+			response = self.client.send_request(
+				method="GET",
+				endpoint=f"/web/forums/posts/{source_id}/details",
+				params={},
+				base_url_key="default",
+			).json()
+			return response.get("n_replies", 0) + response.get("n_comments", 0)
+		msg = f"不支持的来源类型: {source_type}"
+		raise ValueError(msg)
+
 	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
 		per_source_limit = limit // 2
 		data_sources = [
@@ -214,7 +267,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		for single_work in works:
 			# 使用新的简洁 API
 			work_comments = self.get_comments(source="work", source_id=single_work["work_id"], method="comments", limit=20)
-			# 类型断言:我们知道当 method="comments" 时返回的是 list [dict]
+			# 类型断言: 我们知道当 method="comments" 时返回的是 list [dict]
 			work_comments = cast("list [dict [str, Any]]", work_comments)
 			comments.extend(work_comments)
 		# 处理评论数据
