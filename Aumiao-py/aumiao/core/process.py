@@ -819,11 +819,14 @@ class ViolationChecker:
 	) -> list[str]:
 		"""分析评论违规内容: 广告、黑名单、重复评论"""
 		try:
+			total = Obtain().get_comment_total(source_id=source_id, source_type=source_type)
+			print(f"当前处理项共有 {total} 个评论")
+			limit = int(input("输入要获取的评论数"))
 			comments = Obtain().get_comments(
 				source_id=source_id,
 				source=source_type,
 				method="comments",
-				limit=5000,
+				limit=limit,
 			)
 			# 2. 违规检查参数
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
@@ -831,9 +834,9 @@ class ViolationChecker:
 				"blacklist": coordinator.data.USER_DATA.black_room,
 				"duplicates": coordinator.setting.PARAMETER.spam_del_max,
 			}
-			# 3. 调用评论处理器分析违规
 
 			class CommentCheckConfig:
+				# 3. 调用评论处理器分析违规
 				title_key = "title"
 
 				@staticmethod
