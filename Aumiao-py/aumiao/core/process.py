@@ -118,17 +118,17 @@ class FileUploaderProtocol(Protocol):
 
 # ========================== 策略模式实现 ==========================
 class AbnormalProcessStrategy(ProcessStrategy, ABC):
-	"""异常处理策略基类(模板方法模式)"""
+	"""异常处理策略基类 (模板方法模式)"""
 
 	@abstractmethod
 	@staticmethod
 	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
-		"""抽象方法:检查内容是否符合处理条件"""
+		"""抽象方法: 检查内容是否符合处理条件"""
 
 	@abstractmethod
 	@staticmethod
 	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
-		"""抽象方法:格式化日志消息"""
+		"""抽象方法: 格式化日志消息"""
 
 	def process(
 		self,
@@ -139,7 +139,7 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 		target_lists: defaultdict[str, list[str]],
 		source_type: SourceType = "shop",
 	) -> None:
-		"""处理异常评论的通用流程(模板方法)"""
+		"""处理异常评论的通用流程 (模板方法)"""
 		action_type = self._get_action_type()
 		for comment in comments:
 			# 跳过置顶评论
@@ -185,7 +185,7 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 		source_type: SourceType,
 		parent_content: str = "",
 	) -> None:
-		"""记录日志并添加标识到目标列表(模板方法的钩子)"""
+		"""记录日志并添加标识到目标列表 (模板方法的钩子)"""
 		# 区分评论 / 回复类型
 		log_type = "回复" if ":reply:" in identifier else "评论"
 		parent_info = f"(父内容: {parent_content[:20]}...)" if parent_content else ""
@@ -382,43 +382,41 @@ class DetailDisplayProcessor(BaseProcessor):
 		"""显示作品举报详情"""
 		coordinator.printer.print_header("=== 作品举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
-		# 1. 作品链接
-		work_id = item_ndd[config.source_id_field]
-		if work_id != "UNKNOWN":
-			work_url = f"{base_url}/work/{work_id}"
-			coordinator.printer.print_message(f"作品链接: {work_url}", "INFO")
-		# 2. 作者信息
+		# 1. 作者信息(优先显示,便于快速识别)
 		author_nickname = item_ndd[config.user_nickname_field]
 		author_id = item_ndd[config.user_id_field]
 		coordinator.printer.print_message(f"作者昵称: {author_nickname}", "INFO")
 		if author_id != "UNKNOWN":
 			author_url = f"{base_url}/user/{author_id}"
 			coordinator.printer.print_message(f"作者链接: {author_url}", "INFO")
-		# 3. 作品类型
+		# 2. 作品信息
+		work_id = item_ndd[config.source_id_field]
+		if work_id != "UNKNOWN":
+			work_url = f"{base_url}/work/{work_id}"
+			coordinator.printer.print_message(f"作品链接: {work_url}", "INFO")
 		if config.work_type_field and config.work_type_field in item_ndd:
 			work_type = item_ndd[config.work_type_field]
 			if work_type != "UNKNOWN":
 				coordinator.printer.print_message(f"作品类型: {work_type}", "INFO")
-		# 4. 举报时间
+		# 3. 举报信息
+		reason_content = item_ndd[config.reason_field]
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+		description = item_ndd[config.description_field]
+		if description != "UNKNOWN":
+			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
+		# 4. 时间信息
 		created_at = item_ndd[config.created_at_field]
 		if created_at != "UNKNOWN":
 			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
-		# 5. 举报原因
-		reason_content = item_ndd[config.reason_field]
-		if reason_content != "UNKNOWN":
-			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
-		# 6. 举报线索
-		description = item_ndd[config.description_field]
-		if description != "UNKNOWN":
-			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
 
 	@staticmethod
 	def _display_comment_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示评论举报详情"""
 		coordinator.printer.print_header("=== 评论举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
-		# 1. 举报内容
+		# 1. 被举报内容(优先显示)
 		content = item_ndd[config.content_field]
 		if content != "UNKNOWN":
 			content_text = coordinator.toolkit.create_data_converter().html_to_text(content)
@@ -430,7 +428,7 @@ class DetailDisplayProcessor(BaseProcessor):
 		if user_id != "UNKNOWN":
 			user_url = f"{base_url}/user/{user_id}"
 			coordinator.printer.print_message(f"被举报人链接: {user_url}", "INFO")
-		# 3. 工作室信息
+		# 3. 来源信息(工作室)
 		studio_name = item_ndd[config.source_name_field]
 		studio_id = item_ndd[config.source_id_field]
 		if studio_name != "UNKNOWN":
@@ -438,24 +436,30 @@ class DetailDisplayProcessor(BaseProcessor):
 		if studio_id != "UNKNOWN":
 			studio_url = f"{base_url}/work_shop/{studio_id}"
 			coordinator.printer.print_message(f"工作室链接: {studio_url}", "INFO")
-		# 4. 举报时间
+		# 4. 举报信息
+		reason_content = item_ndd[config.reason_field]
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+		# 5. 时间信息
 		created_at = item_ndd[config.created_at_field]
 		if created_at != "UNKNOWN":
 			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
-		# 5. 举报原因
-		reason_content = item_ndd[config.reason_field]
-		if reason_content != "UNKNOWN":
-			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
 
 	@staticmethod
 	def _display_forum_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示论坛帖子举报详情"""
 		coordinator.printer.print_header("=== 论坛帖子举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
-		# 1. 帖子链接 - 修复类型检查
+		# 1. 作者信息
+		author_nickname = item_ndd[config.user_nickname_field]
+		author_id = item_ndd[config.user_id_field]
+		coordinator.printer.print_message(f"帖子作者: {author_nickname}", "INFO")
+		if author_id != "UNKNOWN":
+			author_url = f"{base_url}/user/{author_id}"
+			coordinator.printer.print_message(f"作者链接: {author_url}", "INFO")
+		# 2. 帖子信息
 		post_id_value = item_ndd[config.source_id_field]
-		# 检查帖子 ID 是否有效
 		post_id = None
 		if post_id_value != "UNKNOWN":
 			try:
@@ -465,19 +469,16 @@ class DetailDisplayProcessor(BaseProcessor):
 		if post_id:
 			post_url = f"{base_url}/community/{post_id}"
 			coordinator.printer.print_message(f"帖子链接: {post_url}", "INFO")
-			# 在获取标题之前先获取帖子详情
+			# 获取并显示帖子详情
 			try:
 				details = coordinator.forum_obtain.fetch_single_post_details(post_id=post_id)
 				details_ndd = data.NestedDefaultDict(details)
-				# 获取标题和内容
 				if config.title_field and config.title_field in item_ndd:
 					title = item_ndd[config.title_field]
 					if title != "UNKNOWN":
 						coordinator.printer.print_message(f"标题: {title}", "SUCCESS")
-				# 显示帖子内容
 				if "content" in details_ndd:
 					content_text = coordinator.toolkit.create_data_converter().html_to_text(details_ndd["content"])
-					# 限制内容长度, 避免显示过长
 					if len(content_text) > 200:
 						content_text = content_text[:200] + "..."
 					coordinator.printer.print_message(f"内容: {content_text}", "SUCCESS")
@@ -487,26 +488,18 @@ class DetailDisplayProcessor(BaseProcessor):
 				coordinator.printer.print_message(f"获取帖子详情失败: {e!s}", "ERROR")
 		else:
 			coordinator.printer.print_message("帖子 ID: 未知", "WARNING")
-		# 3. 帖子作者信息
-		author_nickname = item_ndd[config.user_nickname_field]
-		author_id = item_ndd[config.user_id_field]
-		coordinator.printer.print_message(f"帖子作者: {author_nickname}", "INFO")
-		if author_id != "UNKNOWN":
-			author_url = f"{base_url}/user/{author_id}"
-			coordinator.printer.print_message(f"作者链接: {author_url}", "INFO")
-		# 4. 举报时间
+		# 3. 举报信息
+		reason_content = item_ndd[config.reason_field]
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+		description = item_ndd[config.description_field]
+		if description != "UNKNOWN":
+			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
+		# 4. 时间信息
 		created_at = item_ndd[config.created_at_field]
 		if created_at != "UNKNOWN":
 			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
-		# 5. 举报原因
-		reason_content = item_ndd[config.reason_field]
-		if reason_content != "UNKNOWN":
-			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
-		# 6. 举报线索
-		description = item_ndd[config.description_field]
-		if description != "UNKNOWN":
-			coordinator.printer.print_message(f"举报线索: {description}", "INFO")
 
 	@staticmethod
 	def _display_discussion_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
@@ -525,7 +518,7 @@ class DetailDisplayProcessor(BaseProcessor):
 		if user_id != "UNKNOWN":
 			user_url = f"{base_url}/user/{user_id}"
 			coordinator.printer.print_message(f"被举报人链接: {user_url}", "INFO")
-		# 3. 帖子链接和标题
+		# 3. 帖子信息
 		post_id = item_ndd["post_id"]
 		if post_id == "UNKNOWN":
 			post_id = item_ndd[config.source_id_field]
@@ -541,36 +534,53 @@ class DetailDisplayProcessor(BaseProcessor):
 			board_name = item_ndd[config.board_name_field]
 			if board_name != "UNKNOWN":
 				coordinator.printer.print_message(f"分区: {board_name}", "INFO")
-		# 5. 举报时间
+		# 5. 举报信息
+		reason_content = item_ndd[config.reason_field]
+		if reason_content != "UNKNOWN":
+			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
+		# 6. 时间信息
 		created_at = item_ndd[config.created_at_field]
 		if created_at != "UNKNOWN":
 			created_at_str = coordinator.toolkit.create_time_utils().format_timestamp(created_at)
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
-		# 6. 举报原因
-		reason_content = item_ndd[config.reason_field]
-		if reason_content != "UNKNOWN":
-			coordinator.printer.print_message(f"举报原因: {reason_content}", "INFO")
 
 	@staticmethod
 	def _display_generic_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示通用举报详情"""
 		coordinator.printer.print_header(f"=== {config.name} 详情 ===")
-		# 显示基本字段
-		fields_to_display = [
+		# 重新组织字段显示顺序,按逻辑分组
+		# 1. 内容相关字段
+		content_fields = [
 			(config.content_field, "内容"),
-			(config.user_nickname_field, "用户昵称"),
-			(config.reason_field, "举报原因"),
 			(config.description_field, "举报描述"),
+		]
+		# 2. 用户相关字段
+		user_fields = [
+			(config.user_nickname_field, "用户昵称"),
+			(config.user_id_field, "用户 ID"),
+		]
+		# 3. 举报信息
+		report_fields = [
+			(config.reason_field, "举报原因"),
+		]
+		# 4. 时间信息
+		time_fields = [
 			(config.created_at_field, "举报时间"),
 		]
-		for field_key, label in fields_to_display:
-			if field_key:
-				value = item_ndd[field_key]
-				if value != "UNKNOWN":
-					# 特殊处理时间字段
-					if field_key == config.created_at_field:
-						value = coordinator.toolkit.create_time_utils().format_timestamp(value)
-					coordinator.printer.print_message(f"{label}: {value}", "INFO")
+		# 分组显示
+		for label, fields in [("内容信息", content_fields), ("用户信息", user_fields), ("举报信息", report_fields), ("时间信息", time_fields)]:
+			has_data = False
+			for field_key, field_label in fields:
+				if field_key and field_key in item_ndd:
+					value = item_ndd[field_key]
+					if value != "UNKNOWN":
+						if not has_data:
+							coordinator.printer.print_message(f"【{label}】", "INFO")
+							has_data = True
+						# 特殊处理时间字段
+						if field_key == config.created_at_field:
+							value = coordinator.toolkit.create_time_utils().format_timestamp(value)
+						coordinator.printer.print_message(f"{field_label}: {value}", "INFO")
 
 
 class ActionSelectionProcessor(BaseProcessor):
