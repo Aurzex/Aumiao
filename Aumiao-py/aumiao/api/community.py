@@ -283,15 +283,6 @@ class DataFetcher:
 		params = {"limit": limit, "offset": 0}
 		return self._client.fetch_paginated_data(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/team", params=params, limit=limit)
 
-	def fetch_user_certificate_info(self, user_id: int) -> dict:
-		params = {"user_id": user_id}
-		response = self._client.send_request(
-			endpoint="https://api-wechatsbp-codemaster.codemao.cn/user/info/certificate",
-			params=params,
-			method="GET",
-		)
-		return response.json()
-
 	# 获取未读板块消息数量
 	# TODO @Aurzex: 功能待确认
 	def fetch_board_unread_count(self, board_id: int) -> dict:
