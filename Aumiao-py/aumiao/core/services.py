@@ -1362,7 +1362,8 @@ class ReportService:
 		self.printer.print_header("=== 处理结果统计 ===")
 		self.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		# 终止会话
-		self._auth_manager().terminate_session()
+		self._auth_manager().admin_logout()
+		self._auth_manager().restore_admin_account()
 		return True
 
 	def get_report_statistics(

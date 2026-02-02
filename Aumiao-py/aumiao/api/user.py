@@ -21,16 +21,29 @@ class UserDataFetcher:
 	# 	)
 	# 	return response.json()
 	# BUG 2026/1/19 日测试报错 410 , 推测 api 已经弃用
-	# def fetch_user_profile (self, user_id: int) -> dict:
-	# 	"""
-	# 	获取用户详细信息
-	# 	Args:
-	# 		user_id: 用户 ID
-	# 	Returns:
-	# 		用户详细信息字典
-	# 	"""
-	# 	response = self._client.send_request (method="GET", endpoint=f"/api/user/info/detail/{user_id}")
-	# 	return response.json()
+	# 2026/2/2日又可以了(())
+	def fetch_user_profile(self, user_id: int) -> dict:
+		"""
+		获取用户详细信息
+		Args:
+			user_id: 用户 ID
+		Returns:
+			用户详细信息字典
+		"""
+		response = self._client.send_request(method="GET", endpoint=f"/api/user/info/detail/{user_id}")
+		return response.json()
+
+	def fetch_user_tiger(self, user_id: int) -> dict:
+		"""
+		获取用户 Tiger 信息
+		Args:
+			user_id: 用户 ID
+		Returns:
+			用户 Tiger 信息字典
+		"""
+		response = self._client.send_request(method="GET", endpoint=f"/tiger/user/{user_id}")
+		return response.json()
+
 	def fetch_user_honors(self, user_id: int) -> dict:
 		"""
 		获取用户荣誉信息

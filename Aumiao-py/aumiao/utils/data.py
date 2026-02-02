@@ -95,7 +95,6 @@ class CodeMaoData:
 @dataclass
 class Parameter:
 	all_read_type: list[ReadType] = field(default_factory=list)
-	cookie_check_url: str = ""
 	log: bool = False
 	password_login_method: str = ""
 	report_work_max: int = 0
@@ -163,7 +162,6 @@ class CodemaoHistory:
 DEFAULT_SETTING_DATA = {
 	"PARAMETER": {
 		"all_read_type": ["COMMENT_REPLY", "LIKE_FORK", "SYSTEM"],
-		"cookie_check_url": "/nemo/v2/works/174408420/like",
 		"log": False,
 		"password_login_method": "token",
 		"report_work_max": 8,

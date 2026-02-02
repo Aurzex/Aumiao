@@ -16,8 +16,10 @@ class LoginMethod(Enum):
 
 	SIMPLE_PASSWORD = "simple_password"
 	SECURE_PASSWORD = "secure_password"
+	PASSWORD_V0 = "password_v0"
+	PASSWORD_V1 = "password_v1"
+	PASSWORD_V2 = "password_v2"
 	TOKEN = "token"
-	COOKIES = "cookies"
 	ADMIN_TOKEN = "admin_token"
 	ADMIN_PASSWORD = "admin_password"
 
@@ -44,7 +46,6 @@ class LoginCredentials:
 	identity: str = ""
 	password: str = ""
 	token: str = ""
-	cookies: str = ""
 	pid: str = "65edCTyg"
 	status: AccountStatus = AccountStatus.AVERAGE
 	role: UserRole = UserRole.USER
@@ -69,25 +70,14 @@ def fetch_current_timestamp(client: acquire.CodeMaoClient) -> int:
 	return response.json()["data"]
 
 
-def determine_login_method(token: str | None, cookies: str | None, identity: str | None, password: str | None) -> LoginMethod:
+def determine_login_method(token: str | None, identity: str | None, password: str | None) -> LoginMethod:
 	"""确定登录方法"""
 	if token:
 		return LoginMethod.TOKEN
-	if cookies:
-		return LoginMethod.COOKIES
 	if identity and password:
 		return LoginMethod.SECURE_PASSWORD
 	msg = "缺少必要的登录凭据"
 	raise ValueError(msg)
-
-
-def parse_cookies(cookies_str: str) -> dict[str, str]:
-	"""解析 cookies 字符串"""
-	try:
-		return dict(item.strip().split("=", 1) for item in cookies_str.split(";"))
-	except ValueError as e:
-		msg = f"Cookie 格式错误: {e}"
-		raise ValueError(msg)  # noqa: B904
 
 
 # ==================== 认证处理器 ====================
@@ -158,7 +148,7 @@ class AuthProcessor:
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
+			endpoint=f"https://api-whale.codemao.cn/admins/captcha/ {timestamp}",
 			method="GET",
 			log=False,
 		)
@@ -172,6 +162,24 @@ class AuthProcessor:
 		else:
 			print(f"获取验证码失败, 错误代码: {response.status_code}")
 		return response.cookies
+
+	def handle_password_v0(self, identity: str, password: str, pid: str = "OqMVXvXp") -> dict[str, Any]:
+		"""处理 v0 版本密码登录 (基础登录)"""
+		payload = {"identity": identity, "password": password, "pid": pid}
+		response = self.client.send_request(endpoint="/tiger/accounts/login", method="POST", payload=payload)
+		return response.json()
+
+	def handle_password_v1(self, identity: str, password: str, pid: str = "65edCTyg") -> dict[str, Any]:
+		"""处理 v1 版本密码登录 (较新的登录接口)"""
+		payload = {"identity": identity, "password": password, "pid": pid}
+		response = self.client.send_request(endpoint="/tiger/v1/accounts/login", method="POST", payload=payload)
+		return response.json()
+
+	def handle_password_v2(self, identity: str, password: str, pid: str = "65edCTyg") -> dict[str, Any]:
+		"""处理 v2 版本密码登录 (安全密码登录)"""
+		payload = {"identity": identity, "password": password, "pid": pid}
+		response = self.client.send_request(endpoint="/tiger/v2/accounts/login", method="POST", payload=payload)
+		return response.json()
 
 
 # ==================== 登录处理器 ====================
@@ -204,23 +212,42 @@ class LoginHandler:
 		self.client.switch_identity(token=response["auth"]["token"], identity=status.value)
 		return LoginResult(success=True, method=LoginMethod.SECURE_PASSWORD, message="安全密码登录成功", data=response)
 
+	def handle_password_v0(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
+		"""处理 v0 版本密码登录"""
+		self.client.switch_identity(token="", identity="blank")
+		response_data = self.processor.handle_password_v0(identity, password, pid)
+		if "token" in response_data:
+			self.client.switch_identity(token=response_data["token"], identity=status.value)
+			return LoginResult(success=True, method=LoginMethod.PASSWORD_V0, message="v0 密码登录成功", data=response_data)
+		return LoginResult(success=False, method=LoginMethod.PASSWORD_V0, message="v0 密码登录失败", data=response_data)
+
+	def handle_password_v1(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
+		"""处理 v1 版本密码登录"""
+		self.client.switch_identity(token="", identity="blank")
+		response_data = self.processor.handle_password_v1(identity, password, pid)
+		if "token" in response_data or "auth" in response_data:
+			token = response_data.get("token") or response_data.get("auth", {}).get("token", "")
+			if token:
+				self.client.switch_identity(token=token, identity=status.value)
+				return LoginResult(success=True, method=LoginMethod.PASSWORD_V1, message="v1 密码登录成功", data=response_data)
+		return LoginResult(success=False, method=LoginMethod.PASSWORD_V1, message="v1 密码登录失败", data=response_data)
+
+	def handle_password_v2(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
+		"""处理 v2 版本密码登录"""
+		self.client.switch_identity(token="", identity="blank")
+		response_data = self.processor.handle_password_v2(identity, password, pid)
+		if "token" in response_data or "auth" in response_data:
+			token = response_data.get("token") or response_data.get("auth", {}).get("token", "")
+			if token:
+				self.client.switch_identity(token=token, identity=status.value)
+				return LoginResult(success=True, method=LoginMethod.PASSWORD_V2, message="v2 密码登录成功", data=response_data)
+		return LoginResult(success=False, method=LoginMethod.PASSWORD_V2, message="v2 密码登录失败", data=response_data)
+
 	def handle_token(self, token: str, status: AccountStatus) -> LoginResult:
 		"""处理 token 登录"""
 		auth_details = self.processor.fetch_auth_details(token)
 		self.client.switch_identity(token=token, identity=status.value)
 		return LoginResult(success=True, method=LoginMethod.TOKEN, message="Token 登录成功", token=token, auth_details=auth_details)
-
-	def handle_cookies(self, cookies: str, status: AccountStatus) -> LoginResult:
-		"""处理 cookies 登录"""
-		cookie_dict = parse_cookies(cookies)
-		self.client.send_request(
-			endpoint=self.processor.setting.PARAMETER.cookie_check_url,
-			method="POST",
-			payload={},
-			headers={**self.client.headers, "cookie": cookies},
-		)
-		self.client.switch_identity(token=cookie_dict["authorization"], identity=status.value)
-		return LoginResult(success=True, method=LoginMethod.COOKIES, message="Cookie 登录成功")
 
 	def handle_admin_token(self, token: str) -> LoginResult:
 		"""处理管理员 token 登录"""
@@ -267,7 +294,6 @@ class AuthManager:
 		identity: str = "",
 		password: str = "",
 		token: str = "",
-		cookies: str = "",
 		pid: str = "65edCTyg",
 		status: Literal["judgement", "average", "edu"] = "average",
 		role: Literal["user", "admin"] = "user",
@@ -279,7 +305,6 @@ class AuthManager:
 			identity: 用户身份标识
 			password: 用户密码
 			token: 用户 token
-			cookies: 用户 cookies 字符串
 			pid: 请求的 PID
 			status: 账号状态类型
 			role: 用户角色
@@ -287,7 +312,7 @@ class AuthManager:
 		返回:
 			登录结果
 		"""
-		credentials = LoginCredentials(identity=identity, password=password, token=token, cookies=cookies, pid=pid, status=AccountStatus(status), role=UserRole(role))
+		credentials = LoginCredentials(identity=identity, password=password, token=token, pid=pid, status=AccountStatus(status), role=UserRole(role))
 		self._current_credentials = credentials
 		if credentials.role == UserRole.ADMIN:
 			return self._admin_login(credentials, prefer_method)
@@ -300,10 +325,14 @@ class AuthManager:
 			return self._handler.handle_simple_password(credentials.identity, credentials.password, credentials.pid, credentials.status)
 		if method == LoginMethod.SECURE_PASSWORD:
 			return self._handler.handle_secure_password(credentials.identity, credentials.password, credentials.pid, credentials.status)
+		if method == LoginMethod.PASSWORD_V0:
+			return self._handler.handle_password_v0(credentials.identity, credentials.password, credentials.pid, credentials.status)
+		if method == LoginMethod.PASSWORD_V1:
+			return self._handler.handle_password_v1(credentials.identity, credentials.password, credentials.pid, credentials.status)
+		if method == LoginMethod.PASSWORD_V2:
+			return self._handler.handle_password_v2(credentials.identity, credentials.password, credentials.pid, credentials.status)
 		if method == LoginMethod.TOKEN:
 			return self._handler.handle_token(credentials.token, credentials.status)
-		if method == LoginMethod.COOKIES:
-			return self._handler.handle_cookies(credentials.cookies, credentials.status)
 		msg = f"不支持的登录方式: {method}"
 		raise ValueError(msg)
 
@@ -322,7 +351,7 @@ class AuthManager:
 		"""获取用户登录方法"""
 		if prefer_method:
 			return LoginMethod(prefer_method)
-		return determine_login_method(credentials.token, credentials.cookies, credentials.identity, credentials.password)
+		return determine_login_method(credentials.token, credentials.identity, credentials.password)
 
 	@staticmethod
 	def _get_admin_login_method(credentials: LoginCredentials, prefer_method: str | None) -> LoginMethod:
@@ -331,8 +360,22 @@ class AuthManager:
 			return LoginMethod(prefer_method)
 		return LoginMethod.ADMIN_TOKEN if credentials.token else LoginMethod.ADMIN_PASSWORD
 
-	def execute_logout(self, method: Literal["web", "app"]) -> bool:
-		"""执行用户登出"""
+	def execute_logout_v0(self) -> bool:
+		"""执行 v0 版本用户登出"""
+		response = self._client.send_request(
+			endpoint="/tiger/accounts/logout",
+			method="POST",
+			payload={},
+		)
+		return response.status_code == acquire.HTTPStatus.NO_CONTENT.value
+
+	def execute_logout_v12(self, method: Literal["web", "app"] = "web") -> bool:
+		"""执行 v12 版本用户登出
+		Args:
+			method: 登出方法类型
+				"web": web 版登出接口
+				"app": app 版登出接口
+		"""
 		response = self._client.send_request(
 			endpoint=f"/tiger/v3/{method}/accounts/logout",
 			method="POST",
@@ -366,15 +409,6 @@ class AuthManager:
 			token=self._client.token.judgement,
 			identity="judgement",
 		)
-
-	def terminate_session(self, role: Literal["user", "admin"] = "user") -> None:
-		"""终止当前会话并恢复管理员账号"""
-		if role == "admin":
-			self.admin_logout()
-		else:
-			self.execute_logout("web")
-		self.restore_admin_account()
-		print("已终止会话并恢复管理员账号")
 
 	def get_current_client(self) -> acquire.CodeMaoClient:
 		"""获取当前客户端"""
