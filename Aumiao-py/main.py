@@ -331,9 +331,9 @@ def upload_files(_account_data_manager: AccountDataManager) -> None:
 def logout(account_data_manager: AccountDataManager) -> None:
 	"""用户登出"""
 	printer.print_header("账户登出")
-	method = get_enum_input("请输入方法", {"web"})
-	method = cast("Literal ['web']", method)
-	coordinator.auth.execute_logout(method)
+	method = get_enum_input("请输入方法", {"web", "app"})
+	method = cast("Literal ['web','app']", method)
+	coordinator.auth.execute_logout_v12(method=method)
 	account_data_manager.clear()
 	print(printer.color_text("已成功登出账户", "SUCCESS"))
 
