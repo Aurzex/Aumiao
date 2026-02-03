@@ -14,8 +14,6 @@ from aumiao.utils.decorator import singleton
 class LoginMethod(Enum):
 	"""登录方法枚举"""
 
-	SIMPLE_PASSWORD = "simple_password"
-	SECURE_PASSWORD = "secure_password"
 	PASSWORD_V0 = "password_v0"
 	PASSWORD_V1 = "password_v1"
 	PASSWORD_V2 = "password_v2"
@@ -75,7 +73,7 @@ def determine_login_method(token: str | None, identity: str | None, password: st
 	if token:
 		return LoginMethod.TOKEN
 	if identity and password:
-		return LoginMethod.SECURE_PASSWORD
+		return LoginMethod.PASSWORD_V2  # 默认使用 v2 登录
 	msg = "缺少必要的登录凭据"
 	raise ValueError(msg)
 
@@ -148,7 +146,7 @@ class AuthProcessor:
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/ {timestamp}",
+			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
 			method="GET",
 			log=False,
 		)
@@ -170,16 +168,21 @@ class AuthProcessor:
 		return response.json()
 
 	def handle_password_v1(self, identity: str, password: str, pid: str = "65edCTyg") -> dict[str, Any]:
-		"""处理 v1 版本密码登录 (较新的登录接口)"""
-		payload = {"identity": identity, "password": password, "pid": pid}
-		response = self.client.send_request(endpoint="/tiger/v1/accounts/login", method="POST", payload=payload)
+		"""处理 v1 版本密码登录 - 使用 /tiger/v3/web/accounts/login 登录"""
+		self.client.switch_identity(token="", identity="blank")
+		response = self.client.send_request(
+			endpoint="/tiger/v3/web/accounts/login",
+			method="POST",
+			payload={"identity": identity, "password": password, "pid": pid},
+		)
 		return response.json()
 
 	def handle_password_v2(self, identity: str, password: str, pid: str = "65edCTyg") -> dict[str, Any]:
-		"""处理 v2 版本密码登录 (安全密码登录)"""
-		payload = {"identity": identity, "password": password, "pid": pid}
-		response = self.client.send_request(endpoint="/tiger/v2/accounts/login", method="POST", payload=payload)
-		return response.json()
+		"""处理 v2 版本密码登录 - 使用 /tiger/v3/web/accounts/login/security 安全登录"""
+		timestamp = fetch_current_timestamp(self.client)
+		ticket_response = self.get_login_ticket(identity, timestamp, pid)
+		ticket = ticket_response["ticket"]
+		return self.get_login_security_info(identity, password, ticket, pid)
 
 
 # ==================== 登录处理器 ====================
@@ -190,27 +193,6 @@ class LoginHandler:
 		self.client = client
 		self.processor = processor
 		self.tool = tool
-
-	def handle_simple_password(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
-		"""处理简单密码登录"""
-		self.client.switch_identity(token="", identity="blank")
-		response = self.client.send_request(
-			endpoint="/tiger/v3/web/accounts/login",
-			method="POST",
-			payload={"identity": identity, "password": password, "pid": pid},
-		)
-		response_data = response.json()
-		self.client.switch_identity(token=response_data["auth"]["token"], identity=status.value)
-		return LoginResult(success=True, method=LoginMethod.SIMPLE_PASSWORD, message="简单密码登录成功", data=response_data)
-
-	def handle_secure_password(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
-		"""处理安全密码登录"""
-		timestamp = fetch_current_timestamp(self.client)
-		ticket_response = self.processor.get_login_ticket(identity, timestamp, pid)
-		ticket = ticket_response["ticket"]
-		response = self.processor.get_login_security_info(identity, password, ticket, pid)
-		self.client.switch_identity(token=response["auth"]["token"], identity=status.value)
-		return LoginResult(success=True, method=LoginMethod.SECURE_PASSWORD, message="安全密码登录成功", data=response)
 
 	def handle_password_v0(self, identity: str, password: str, pid: str, status: AccountStatus) -> LoginResult:
 		"""处理 v0 版本密码登录"""
@@ -225,8 +207,8 @@ class LoginHandler:
 		"""处理 v1 版本密码登录"""
 		self.client.switch_identity(token="", identity="blank")
 		response_data = self.processor.handle_password_v1(identity, password, pid)
-		if "token" in response_data or "auth" in response_data:
-			token = response_data.get("token") or response_data.get("auth", {}).get("token", "")
+		if "auth" in response_data and "token" in response_data["auth"]:
+			token = response_data["auth"]["token"]
 			if token:
 				self.client.switch_identity(token=token, identity=status.value)
 				return LoginResult(success=True, method=LoginMethod.PASSWORD_V1, message="v1 密码登录成功", data=response_data)
@@ -236,8 +218,8 @@ class LoginHandler:
 		"""处理 v2 版本密码登录"""
 		self.client.switch_identity(token="", identity="blank")
 		response_data = self.processor.handle_password_v2(identity, password, pid)
-		if "token" in response_data or "auth" in response_data:
-			token = response_data.get("token") or response_data.get("auth", {}).get("token", "")
+		if "auth" in response_data and "token" in response_data["auth"]:
+			token = response_data["auth"]["token"]
 			if token:
 				self.client.switch_identity(token=token, identity=status.value)
 				return LoginResult(success=True, method=LoginMethod.PASSWORD_V2, message="v2 密码登录成功", data=response_data)
@@ -321,10 +303,6 @@ class AuthManager:
 	def _user_login(self, credentials: LoginCredentials, prefer_method: str | None) -> LoginResult:
 		"""用户登录"""
 		method = self._get_user_login_method(credentials, prefer_method)
-		if method == LoginMethod.SIMPLE_PASSWORD:
-			return self._handler.handle_simple_password(credentials.identity, credentials.password, credentials.pid, credentials.status)
-		if method == LoginMethod.SECURE_PASSWORD:
-			return self._handler.handle_secure_password(credentials.identity, credentials.password, credentials.pid, credentials.status)
 		if method == LoginMethod.PASSWORD_V0:
 			return self._handler.handle_password_v0(credentials.identity, credentials.password, credentials.pid, credentials.status)
 		if method == LoginMethod.PASSWORD_V1:
