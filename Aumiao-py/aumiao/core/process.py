@@ -121,13 +121,11 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 	"""异常处理策略基类 (模板方法模式)"""
 
 	@abstractmethod
-	@staticmethod
-	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+	def _check_condition(self, data: dict[str, Any], params: dict[str, Any]) -> bool:
 		"""抽象方法: 检查内容是否符合处理条件"""
 
 	@abstractmethod
-	@staticmethod
-	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+	def _format_log_message(self, data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
 		"""抽象方法: 格式化日志消息"""
 
 	def process(
@@ -171,8 +169,7 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 					)
 
 	@abstractmethod
-	@staticmethod
-	def _get_action_type() -> str:
+	def _get_action_type(self) -> str:
 		"""获取动作类型"""
 
 	def _log_and_add(
@@ -199,19 +196,16 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 class AdsProcessStrategy(AbnormalProcessStrategy):
 	"""广告处理策略"""
 
-	@staticmethod
-	def _get_action_type() -> str:
+	def _get_action_type(self) -> str:  # noqa: PLR6301
 		return "ads"
 
-	@staticmethod
-	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+	def _check_condition(self, data: dict[str, Any], params: dict[str, Any]) -> bool:  # noqa: PLR6301
 		"""检查内容是否符合广告条件"""
 		content = data.get("content", "").lower()
 		ad_keywords = params.get("ads", [])
 		return any(ad in content for ad in ad_keywords)
 
-	@staticmethod
-	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+	def _format_log_message(self, data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:  # noqa: PLR6301
 		"""格式化广告日志消息"""
 		title_part = f"[{title}]" if title else ""
 		return f"广告 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('content', '')[:50]}"
@@ -220,12 +214,10 @@ class AdsProcessStrategy(AbnormalProcessStrategy):
 class BlacklistProcessStrategy(AbnormalProcessStrategy):
 	"""黑名单处理策略"""
 
-	@staticmethod
-	def _get_action_type() -> str:
+	def _get_action_type(self) -> str:  # noqa: PLR6301
 		return "blacklist"
 
-	@staticmethod
-	def _check_condition(data: dict[str, Any], params: dict[str, Any]) -> bool:
+	def _check_condition(self, data: dict[str, Any], params: dict[str, Any]) -> bool:  # noqa: PLR6301
 		"""检查用户是否在黑名单中"""
 		user_id = str(data.get("user_id", ""))
 		blacklist_set = params.get("blacklist", set())
@@ -233,8 +225,7 @@ class BlacklistProcessStrategy(AbnormalProcessStrategy):
 			blacklist_set = set(blacklist_set)
 		return user_id in blacklist_set
 
-	@staticmethod
-	def _format_log_message(data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:
+	def _format_log_message(self, data: dict[str, Any], log_type: str, source_type: str, title: str, parent_info: str) -> str:  # noqa: PLR6301
 		"""格式化黑名单日志消息"""
 		title_part = f"[{title}]" if title else ""
 		return f"黑名单 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('nickname', ' 未知用户 ')}"
