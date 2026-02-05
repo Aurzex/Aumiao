@@ -11,12 +11,7 @@ from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from aumiao.api import auth
-from aumiao.core.base import (
-	ClassUnion,
-	InfrastructureCoordinator,
-	data,
-	decorator,
-)
+from aumiao.core.base import NestedDefaultDict, coordinator
 from aumiao.core.models import (
 	MAX_SIZE_BYTES,
 	ActionConfig,
@@ -26,9 +21,9 @@ from aumiao.core.models import (
 )
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
+from aumiao.utils.data import UploadHistory
+from aumiao.utils.decorator import singleton
 
-# ========================== 常量定义 ==========================
-coordinator = InfrastructureCoordinator()
 # ========================== 基础定义 ==========================
 SourceType = Literal["shop", "forum", "work"]
 
@@ -332,7 +327,7 @@ class OfficialCheckProcessor(BaseProcessor):
 				}
 				# 这里需要实际执行动作
 				try:
-					handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
+					handle_method = getattr(coordinator.whale_motion, config.handle_method)
 					handle_method(report_id=record["item"]["id"], resolution=status_map["P"], admin_id=context.admin_id)
 					context.messages.append("已自动通过官方内容")
 				except AttributeError:
@@ -369,7 +364,7 @@ class DetailDisplayProcessor(BaseProcessor):
 		display_method(item_ndd, config)
 
 	@staticmethod
-	def _display_work_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+	def _display_work_report(item_ndd: "NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示作品举报详情"""
 		coordinator.printer.print_header("=== 作品举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
@@ -403,7 +398,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
 
 	@staticmethod
-	def _display_comment_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+	def _display_comment_report(item_ndd: "NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示评论举报详情"""
 		coordinator.printer.print_header("=== 评论举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
@@ -438,7 +433,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
 
 	@staticmethod
-	def _display_forum_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+	def _display_forum_report(item_ndd: "NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示论坛帖子举报详情"""
 		coordinator.printer.print_header("=== 论坛帖子举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
@@ -463,7 +458,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			# 获取并显示帖子详情
 			try:
 				details = coordinator.forum_obtain.fetch_single_post_details(post_id=post_id)
-				details_ndd = data.NestedDefaultDict(details)
+				details_ndd = coordinator.nested_defaultdict.__class__(details)
 				if config.title_field and config.title_field in item_ndd:
 					title = item_ndd[config.title_field]
 					if title != "UNKNOWN":
@@ -493,7 +488,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
 
 	@staticmethod
-	def _display_discussion_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+	def _display_discussion_report(item_ndd: "NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示讨论举报详情"""
 		coordinator.printer.print_header("=== 讨论举报详情 ===")
 		base_url = "https://shequ.codemao.cn"
@@ -536,7 +531,7 @@ class DetailDisplayProcessor(BaseProcessor):
 			coordinator.printer.print_message(f"举报时间: {created_at_str}", "INFO")
 
 	@staticmethod
-	def _display_generic_report(item_ndd: "data.NestedDefaultDict", config: SourceConfig) -> None:
+	def _display_generic_report(item_ndd: "NestedDefaultDict", config: SourceConfig) -> None:
 		"""显示通用举报详情"""
 		coordinator.printer.print_header(f"=== {config.name} 详情 ===")
 		# 重新组织字段显示顺序,按逻辑分组
@@ -674,7 +669,7 @@ class ActionSelectionProcessor(BaseProcessor):
 		status_map = self.fetcher.registry.get_status_mapping()
 		# 执行处理动作
 		try:
-			handle_method = getattr(InfrastructureCoordinator().whale_motion, config.handle_method)
+			handle_method = getattr(coordinator.whale_motion, config.handle_method)
 			handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=context.admin_id)
 			# 更新记录状态
 			record["processed"] = True
@@ -733,7 +728,7 @@ class ProcessorFactory:
 
 
 # ========================== 核心功能类 ==========================
-@decorator.singleton
+@singleton
 class CommentProcessor:
 	"""评论处理器 - 使用策略模式优化"""
 
@@ -821,9 +816,9 @@ class ViolationChecker:
 			)
 			# 2. 违规检查参数
 			check_params: dict[Literal["ads", "blacklist", "duplicates"], list[str] | int] = {
-				"ads": coordinator.data.USER_DATA.ads,
-				"blacklist": coordinator.data.USER_DATA.black_room,
-				"duplicates": coordinator.setting.PARAMETER.spam_del_max,
+				"ads": coordinator.data_manager.data.USER_DATA.ads,
+				"blacklist": coordinator.data_manager.data.USER_DATA.black_room,
+				"duplicates": coordinator.setting_manager.data.PARAMETER.spam_del_max,
 			}
 
 			class CommentCheckConfig:
@@ -866,7 +861,7 @@ class ViolationChecker:
 				target_values=[user_id],
 			)
 			# 超过阈值判定为刷屏
-			if len(user_posts) >= coordinator.setting.PARAMETER.spam_del_max:
+			if len(user_posts) >= coordinator.setting_manager.data.PARAMETER.spam_del_max:
 				coordinator.printer.print_message(f"警告: 用户 {user_id} 已连续发布标题为【{title}】的帖子 {len(user_posts)} 次 (疑似刷屏)", "WARNING")
 				# 生成违规标识符
 				violations = []
@@ -895,7 +890,7 @@ class ViolationChecker:
 		# 3. 获取举报原因
 		try:
 			report_reasons = coordinator.community_obtain.fetch_report_reasons()
-			report_reasons_ndd = data.NestedDefaultDict(report_reasons)
+			report_reasons_ndd = coordinator.nested_defaultdict.__class__(report_reasons)
 			reason_content = report_reasons_ndd["items"][7]["content"]
 		except (KeyError, IndexError) as e:
 			coordinator.printer.print_message(f"获取举报原因失败: {e!s}", "ERROR")
@@ -1406,8 +1401,8 @@ class ReportTypeRegistry:
 		return {action.key: action.status for action in self.default_actions.values() if action.key in {"D", "S", "T", "P"}}
 
 
-@decorator.singleton
-class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
+@singleton
+class ReportFetcher:
 	"""举报信息获取器 - 支持分块获取和类型扩展"""
 
 	def __init__(self) -> None:
@@ -1422,8 +1417,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"shop_comment",
 			SourceConfig(
 				name="工作室评论举报",
-				fetch_total=lambda status: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
-				fetch_generator=lambda status: self.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
+				fetch_total=lambda status: coordinator.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status),
+				fetch_generator=lambda status: coordinator.whale_obtain.fetch_comment_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_comment_report",
 				# 基础字段
 				report_id_field="id",
@@ -1466,8 +1461,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"work_work",
 			SourceConfig(
 				name="作品举报",
-				fetch_total=lambda status: self.whale_obtain.fetch_work_reports_total_extra(source_type="ALL", status=status),
-				fetch_generator=lambda status: self.whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
+				fetch_total=lambda status: coordinator.whale_obtain.fetch_work_reports_total_extra(source_type="ALL", status=status),
+				fetch_generator=lambda status: coordinator.whale_obtain.fetch_work_reports_gen(source_type="ALL", status=status, limit=100),
 				handle_method="execute_process_work_report",
 				# 基础字段
 				report_id_field="id",
@@ -1504,8 +1499,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"forum_post",
 			SourceConfig(
 				name="帖子举报",
-				fetch_total=lambda status: self.whale_obtain.fetch_post_reports_total(status=status),
-				fetch_generator=lambda status: self.whale_obtain.fetch_post_reports_gen(status=status, limit=100),
+				fetch_total=lambda status: coordinator.whale_obtain.fetch_post_reports_total(status=status),
+				fetch_generator=lambda status: coordinator.whale_obtain.fetch_post_reports_gen(status=status, limit=100),
 				handle_method="execute_process_post_report",
 				# 基础字段
 				report_id_field="id",
@@ -1545,8 +1540,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			"forum_discussion",
 			SourceConfig(
 				name="讨论举报",
-				fetch_total=lambda status: self.whale_obtain.fetch_discussion_reports_total(status=status),
-				fetch_generator=lambda status: self.whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
+				fetch_total=lambda status: coordinator.whale_obtain.fetch_discussion_reports_total(status=status),
+				fetch_generator=lambda status: coordinator.whale_obtain.fetch_discussion_reports_gen(status=status, limit=100),
 				handle_method="execute_process_discussion_report",
 				# 基础字段
 				report_id_field="id",
@@ -1600,7 +1595,7 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 					item_status = item.get("status", "")
 					if item_status and item_status != "TOBEDONE":
 						continue
-				item_ndd = data.NestedDefaultDict(item)
+				item_ndd = coordinator.nested_defaultdict.__class__(item)
 				# 创建举报记录
 				record = ReportRecord(
 					item=item_ndd,
@@ -1637,13 +1632,14 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 			print(f"返回最后剩余的 chunk, 大小: {len(chunk)}")
 			yield chunk
 
-	def get_total_reports(self, status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
+	@staticmethod
+	def get_total_reports(status: Literal["TOBEDONE", "DONE", "ALL"] = "TOBEDONE") -> int:
 		"""获取所有举报类型的总数"""
 		report_configs = [
-			("shop_comment", lambda: self.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
-			("forum_post", lambda: self.whale_obtain.fetch_post_reports_total(status=status)),
-			("forum_discussion", lambda: self.whale_obtain.fetch_discussion_reports_total(status=status)),
-			("work_work", lambda: self.whale_obtain.fetch_work_reports_total_extra(status=status, source_type="ALL")),
+			("shop_comment", lambda: coordinator.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
+			("forum_post", lambda:coordinator.whale_obtain.fetch_post_reports_total(status=status)),
+			("forum_discussion", lambda: coordinator.whale_obtain.fetch_discussion_reports_total(status=status)),
+			("work_work", lambda: coordinator.whale_obtain.fetch_work_reports_total_extra(status=status, source_type="ALL")),
 		]
 		total_reports = 0
 		for _report_type, total_func in report_configs:
@@ -1652,8 +1648,8 @@ class ReportFetcher(ClassUnion):  # ty:ignore [unsupported-base]
 		return total_reports
 
 
-@decorator.singleton
-class BatchActionManager(ClassUnion):  # ty:ignore [unsupported-base]
+@singleton
+class BatchActionManager:
 	"""批量动作管理器 - 负责管理批量处理动作和状态"""
 
 	def __init__(self) -> None:
@@ -1682,8 +1678,8 @@ class BatchActionManager(ClassUnion):  # ty:ignore [unsupported-base]
 		self.processed_records.clear()
 
 
-@decorator.singleton
-class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
+@singleton
+class ReportProcessor:
 	"""举报处理器 - 使用管道模式重构"""
 
 	OFFICIAL_IDS: ClassVar = {128963, 629055, 203577, 859722, 148883, 2191000, 7492052, 387963, 3649031}
@@ -1878,7 +1874,7 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			return
 		# 执行处理动作
 		status_map = self.fetcher.registry.get_status_mapping()
-		handle_method = getattr(self.whale_motion, config.handle_method)
+		handle_method = getattr(coordinator.whale_motion, config.handle_method)
 		handle_method(report_id=record["item"]["id"], resolution=status_map[action], admin_id=admin_id)
 		record["processed"] = True
 		record["action"] = action
@@ -1962,8 +1958,8 @@ class ReportProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		self.violation_checker.check_violation(source_id=source_id, source_type=source_type, board_name=board_name, user_id=user_id)
 
 
-@decorator.singleton
-class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
+@singleton
+class ReportAuthManager:
 	def __init__(self) -> None:
 		self.student_accounts: list[tuple] = []
 		self.auth_method = "grab"
@@ -1972,7 +1968,7 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 	def load_student_accounts(self) -> None:
 		"""加载学生账号: 用于自动举报, 支持实时获取 / 文件加载"""
 		# 切换到普通账号上下文 (加载学生账号需普通权限)
-		self.client.switch_identity(token=self.client.token.average, identity="average")
+		coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")
 		# 询问是否加载学生账号
 		if coordinator.printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			coordinator.printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
@@ -1992,7 +1988,7 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 				self.student_accounts = list(Obtain().switch_edu_account(limit=account_count, return_method="list"))
 				coordinator.printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
 			elif method == "load":
-				password_file_path = Path(data.PathConfig.PASSWORD_FILE_PATH)
+				password_file_path = Path(coordinator.path_config.PASSWORD_FILE_PATH)
 				if not password_file_path.exists():
 					coordinator.printer.print_message(f"密码文件不存在: {password_file_path}", "ERROR")
 					self.student_accounts = []
@@ -2032,7 +2028,7 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 			username, password = self.student_accounts.pop()
 			print(f"切换学生账号: {username}")
 			# 登录获取 token
-			self.auth.login(
+			coordinator.auth.login(
 				identity=username,
 				password=password,
 				status="edu",
@@ -2044,12 +2040,12 @@ class ReportAuthManager(ClassUnion):  # ty:ignore [unsupported-base]
 			return True
 
 
-class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
+class FileProcessor:
 	def __init__(self) -> None:
 		super().__init__()
 
+	@staticmethod
 	def handle_file_upload(
-		self,
 		file_path: Path,
 		save_path: str,
 		method: Literal["pgaot", "codemao", "codegame"],
@@ -2063,20 +2059,20 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			return None
 		# 使用重构后的统一上传接口
 		url = uploader().upload(file_path=file_path, method=method, save_path=save_path)
-		file_size_human = self.toolkit.create_data_converter().bytes_to_human(file_size)
-		history = data.UploadHistory(
+		file_size_human = coordinator.toolkit.create_data_converter().bytes_to_human(file_size)
+		history = UploadHistory(
 			file_name=file_path.name,
 			file_size=file_size_human,
 			method=method,
 			save_url=url,
-			upload_time=self.toolkit.create_time_utils().current_timestamp(),
+			upload_time=coordinator.toolkit.create_time_utils().current_timestamp(),
 		)
-		self.upload_history.data.history.append(history)
-		self.upload_history.save()
+		coordinator.history_manager.data.history.append(history)
+		coordinator.history_manager.save()
 		return url
 
+	@staticmethod
 	def handle_directory_upload(
-		self,
 		dir_path: Path,
 		save_path: str,
 		method: Literal["pgaot", "codemao", "codegame"],
@@ -2103,21 +2099,21 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 					# 使用重构后的统一上传接口
 					url = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
-					file_size_human = self.toolkit.create_data_converter().bytes_to_human(file_size)
-					history = data.UploadHistory(
+					file_size_human = coordinator.toolkit.create_data_converter().bytes_to_human(file_size)
+					history = UploadHistory(
 						file_name=str(relative_path),
 						file_size=file_size_human,
 						method=method,
 						save_url=url,
-						upload_time=self.toolkit.create_time_utils().current_timestamp(),
+						upload_time=coordinator.toolkit.create_time_utils().current_timestamp(),
 					)
-					self.upload_history.data.history.append(history)
+					coordinator.history_manager.data.history.append(history)
 					results[str(child_file)] = url
 				except Exception as e:
 					results[str(child_file)] = None
 					print(f"上传 {child_file} 失败: {e}")
 		# 保存历史记录
-		self.upload_history.save()
+		coordinator.history_manager.save()
 		return results
 
 	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
@@ -2127,7 +2123,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			limit: 每页显示记录数 (默认 10 条)
 			reverse: 是否按时间倒序显示 (最新的在前)
 		"""
-		history_list = self.upload_history.data.history
+		history_list = coordinator.history_manager.data.history
 		if not history_list:
 			coordinator.printer.print_message("暂无上传历史记录", "INFO")
 			return
@@ -2142,7 +2138,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 		def format_upload_time(upload_time: float) -> str:
 			"""格式化上传时间"""
 			if isinstance(upload_time, (int, float)):
-				return self.toolkit.create_time_utils().format_timestamp(upload_time)
+				return coordinator.toolkit.create_time_utils().format_timestamp(upload_time)
 			return str(upload_time)[:19]
 
 		def format_file_name(file_name: str) -> str:
@@ -2178,12 +2174,12 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 
 		# 定义自定义操作
 
-		def show_record_detail(record: data.UploadHistory) -> None:
+		def show_record_detail(record: UploadHistory) -> None:
 			"""显示单条记录的详细信息并验证链接"""
 			# 格式化上传时间
 			upload_time = record.upload_time
 			if isinstance(upload_time, (int, float)):
-				upload_time = self.toolkit.create_time_utils().format_timestamp(upload_time)
+				upload_time = coordinator.toolkit.create_time_utils().format_timestamp(upload_time)
 			coordinator.printer.print_header("=== 文件上传详情 ===")
 			coordinator.printer.print_message("-" * 60, "INFO")
 			coordinator.printer.print_message(f"文件名: {record.file_name}", "INFO")
@@ -2200,7 +2196,7 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			coordinator.printer.print_message("-" * 60, "INFO")
 			input("按 Enter 键返回...")
 
-		def validate_url_only(record: data.UploadHistory) -> None:
+		def validate_url_only(record: UploadHistory) -> None:
 			"""仅验证链接"""
 			is_valid = self._validate_url(record.save_url)
 			status = "有效" if is_valid else "无效"
@@ -2229,21 +2225,22 @@ class FileProcessor(ClassUnion):  # ty:ignore [unsupported-base]
 			batch_processor=batch_validate_urls,
 		)
 
-	def _validate_url(self, url: str) -> bool:
+	@staticmethod
+	def _validate_url(url: str) -> bool:
 		"""
 		验证 URL 链接是否有效
 		先使用 HEAD 请求检查, 若返回无效状态则尝试 GET 请求验证内容
 		"""
 		try:
 			# 首先尝试 HEAD 请求
-			response = self.client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
+			response = coordinator.client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
 			if response.status_code == HTTPStatus.OK.value:  # 直接使用 200 状态码
 				content_length = response.headers.get("Content-Length")
 				# 如果有 Content-Length 且大于 0, 或者没有 Content-Length 都认为是有效的
 				if not content_length or int(content_length) > 0:
 					return True
 			# HEAD 请求失败或内容长度为 0, 尝试 GET 请求
-			response = self.client.send_request(endpoint=url, method="GET", timeout=5, log=False)
+			response = coordinator.client.send_request(endpoint=url, method="GET", timeout=5, log=False)
 			if response.status_code != HTTPStatus.OK.value:
 				return False
 			# 检查响应内容是否非空

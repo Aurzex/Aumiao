@@ -6,7 +6,7 @@ from http import HTTPStatus
 from random import randint
 from typing import Any, Literal
 
-from aumiao.utils import acquire, data, file, tool
+from aumiao.utils import acquire, data, tool
 from aumiao.utils.decorator import singleton
 
 
@@ -151,7 +151,7 @@ class AuthProcessor:
 			log=False,
 		)
 		if response.status_code == HTTPStatus.OK.value:
-			file.CodeMaoFile().file_write(
+			data.CodeMaoFile().file_write(
 				path=self.captcha_img_path,
 				content=response.content,
 				method="wb",

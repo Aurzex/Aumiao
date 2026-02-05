@@ -2,7 +2,7 @@ from collections.abc import Generator
 from re import findall
 from typing import ClassVar, Literal
 
-from aumiao.utils import acquire, file
+from aumiao.utils import acquire, data
 from aumiao.utils.acquire import HTTPStatus
 from aumiao.utils.data import PathConfig
 from aumiao.utils.decorator import singleton
@@ -253,7 +253,7 @@ class RequestExtractor:
 			js_path = PathConfig().JS_DIR / f"{item['num']}.{item['hash']}.js"
 			response = self._client.send_request(endpoint=f"https://whale.codemao.cn/static/js/{item['num']}.{item['hash']}.js", method="GET", log=False)
 			if response.status_code == HTTPStatus.OK.value:
-				file.CodeMaoFile().file_write(path=js_path, content=response.content, method="wb")
+				data.CodeMaoFile().file_write(path=js_path, content=response.content, method="wb")
 			else:
 				print(f"获取 js-{item['func']} 失败!")
 

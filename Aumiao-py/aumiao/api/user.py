@@ -20,7 +20,8 @@ class UserDataFetcher:
 	# 		endpoint="/web/user/info",
 	# 	)
 	# 	return response.json()
-	# BUG 2026/1/19 日测试报错 410 , 推测 api 已经弃用
+
+	# 2026/1/19 日测试报错 410 , 推测 api 已经弃用
 	# 2026/2/2日又可以了(())
 	def fetch_user_profile(self, user_id: int) -> dict:
 		"""

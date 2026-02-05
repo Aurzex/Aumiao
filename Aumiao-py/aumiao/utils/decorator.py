@@ -1,6 +1,5 @@
 from collections.abc import Callable, Generator
 from functools import lru_cache, wraps
-from time import sleep
 
 
 def singleton(cls):  # noqa: ANN001, ANN201
@@ -14,39 +13,6 @@ def singleton(cls):  # noqa: ANN001, ANN201
 
 	wrapper.__dict__.update(cls.__dict__)
 	return wrapper
-
-
-def retry(retries: int = 3, delay: float = 1) -> Callable:
-	# 如果重试次数小于 1 或者延迟时间小于等于 0, 则抛出 ValueError 异常
-	if retries < 1 or delay <= 0:
-		msg = "Are you high, mate?"
-		raise ValueError(msg)
-	# 定义装饰器函数
-
-	def decorator(func: Callable) -> Callable:
-		# 使用 wraps 装饰器, 保留原函数的元信息
-		@wraps(func)
-		def wrapper(*args: ..., **kwargs: ...) -> ...:
-			# 循环重试
-			for i in range(1, retries + 1):
-				try:
-					# 调用原函数
-					return func(*args, **kwargs)
-				except Exception as e:
-					# 如果重试次数达到上限, 则抛出异常
-					if i == retries:
-						print(f"Error: {e!r}.")
-						print(f'"{func.__name__}()" failed after {retries} retries.')  # ty:ignore [unresolved-attribute]
-						break
-					# 否则, 打印错误信息并等待一段时间后重试
-					print(f"Error: {e!r} -> Retrying...")
-					sleep(delay)
-			# 如果重试次数达到上限, 则抛出 Error 异常
-			raise ValueError
-
-		return wrapper
-
-	return decorator
 
 
 def skip_on_error(func):  # noqa: ANN001, ANN201
@@ -75,24 +41,6 @@ def generator(chunk_size: int = 1000) -> Callable:
 		return wrapper
 
 	return decorator
-
-
-def lazy_property(func: Callable) -> ...:
-	# 定义一个属性名, 用于存储函数的返回值
-	attr_name = "_lazy_" + func.__name__  # ty:ignore [unresolved-attribute]
-	# 定义一个装饰器, 用于将函数转换为属性
-
-	@property
-	@wraps(func)
-	def wrapper(self) -> object:  # noqa: ANN001
-		# 如果属性不存在, 则调用函数并将返回值存储为属性
-		if not hasattr(self, attr_name):
-			setattr(self, attr_name, func(self))
-		# 返回属性值
-		return getattr(self, attr_name)
-
-	# 返回装饰后的函数
-	return wrapper
 
 
 def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool = False) -> Callable:
