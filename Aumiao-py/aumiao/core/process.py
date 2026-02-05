@@ -1637,7 +1637,7 @@ class ReportFetcher:
 		"""获取所有举报类型的总数"""
 		report_configs = [
 			("shop_comment", lambda: coordinator.whale_obtain.fetch_comment_reports_total(source_type="ALL", status=status)),
-			("forum_post", lambda:coordinator.whale_obtain.fetch_post_reports_total(status=status)),
+			("forum_post", lambda: coordinator.whale_obtain.fetch_post_reports_total(status=status)),
 			("forum_discussion", lambda: coordinator.whale_obtain.fetch_discussion_reports_total(status=status)),
 			("work_work", lambda: coordinator.whale_obtain.fetch_work_reports_total_extra(status=status, source_type="ALL")),
 		]

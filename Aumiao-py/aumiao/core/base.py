@@ -135,8 +135,8 @@ class InfrastructureCoordinator:
 
 	@property
 	def path_config(self) -> PathConfig:
-			"""数据"""
-			return self._core.path_config
+		"""数据"""
+		return self._core.path_config
 
 	@property
 	def setting_manager(self) -> SettingManager:

@@ -499,7 +499,7 @@ class BaseManager[T]:
 		"""重新加载数据"""
 		self._data = None
 
-	def dataclass(self) ->  type[T]:
+	def dataclass(self) -> type[T]:
 		"""获取dataclass实例"""
 		return self._data_class
 
@@ -511,36 +511,36 @@ class BaseManager[T]:
 class CodeMaoFile:
 	@staticmethod
 	def file_write(
-			path: Path,
-			content: str | bytes | dict | list[str],
-			method: str = "w",
-			encoding: str = "utf-8",
-		) -> None:
-			# 确保父目录存在
-			path.parent.mkdir(parents=True, exist_ok=True)
-			# 根据内容类型自动决定模式和编码
-			mode = method
-			kwargs = {}
-			if isinstance(content, (str, dict, list)):
-				# 文本模式需指定编码
-				kwargs["encoding"] = encoding
-				if "b" in mode:
-					# 禁止文本内容使用二进制模式
-					msg = f"文本内容不能使用二进制模式: {mode}"
-					raise ValueError(msg)
-			elif isinstance(content, bytes):
-				# 字节内容强制使用二进制模式
-				if "b" not in mode:
-					mode += "b"
-			# 打开文件并写入
-			with Path.open(path, mode, **kwargs) as f:
-				if isinstance(content, (str, bytes)):
-					f.write(content)
-				elif isinstance(content, dict):
-					json_str = json.dumps(content, ensure_ascii=False, indent=4)
-					f.write(json_str)
-				elif isinstance(content, list):
-					f.writelines(line + "\n" for line in content)
+		path: Path,
+		content: str | bytes | dict | list[str],
+		method: str = "w",
+		encoding: str = "utf-8",
+	) -> None:
+		# 确保父目录存在
+		path.parent.mkdir(parents=True, exist_ok=True)
+		# 根据内容类型自动决定模式和编码
+		mode = method
+		kwargs = {}
+		if isinstance(content, (str, dict, list)):
+			# 文本模式需指定编码
+			kwargs["encoding"] = encoding
+			if "b" in mode:
+				# 禁止文本内容使用二进制模式
+				msg = f"文本内容不能使用二进制模式: {mode}"
+				raise ValueError(msg)
+		elif isinstance(content, bytes):
+			# 字节内容强制使用二进制模式
+			if "b" not in mode:
+				mode += "b"
+		# 打开文件并写入
+		with Path.open(path, mode, **kwargs) as f:
+			if isinstance(content, (str, bytes)):
+				f.write(content)
+			elif isinstance(content, dict):
+				json_str = json.dumps(content, ensure_ascii=False, indent=4)
+				f.write(json_str)
+			elif isinstance(content, list):
+				f.writelines(line + "\n" for line in content)
 
 
 @decorator.singleton
