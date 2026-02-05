@@ -10,7 +10,6 @@ from time import sleep
 from typing import Any, ClassVar, Literal, Protocol, cast
 from urllib.parse import urlparse
 
-from aumiao.api import auth
 from aumiao.core.base import NestedDefaultDict, coordinator
 from aumiao.core.models import (
 	MAX_SIZE_BYTES,
@@ -986,7 +985,7 @@ class ViolationChecker:
 				coordinator.printer.print_message(f"[{idx}/{len(violations)}] 举报异常: {e!s}", "ERROR")
 		# 完成后恢复管理员账号
 		try:
-			auth.AuthManager().restore_admin_account()
+			coordinator.auth.restore_admin_account()
 			coordinator.printer.print_message("已恢复管理员账号", "INFO")
 		except Exception as e:
 			coordinator.printer.print_message(f"恢复管理员账号失败: {e!s}", "WARNING")
@@ -1972,7 +1971,7 @@ class ReportAuthManager:
 		# 询问是否加载学生账号
 		if coordinator.printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			coordinator.printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
-			auth.AuthManager().restore_admin_account()
+			coordinator.auth.restore_admin_account()
 			return
 		# 选择账号获取方式 (实时获取 / 文件加载)
 		method = coordinator.printer.get_valid_input(prompt="选择模式 (load. 加载文件 grab. 实时获取)", valid_options={"load", "grab"}, cast_type=str)
@@ -2017,7 +2016,7 @@ class ReportAuthManager:
 			self.student_accounts = []
 			self.student_tokens = []
 		# 恢复管理员账号上下文 (加载完成后切回管理员)
-		auth.AuthManager().restore_admin_account()
+		coordinator.auth.restore_admin_account()
 
 	def switch_to_student_account(self) -> bool:
 		"""切换到学生账号"""
