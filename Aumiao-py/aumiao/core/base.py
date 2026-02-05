@@ -4,21 +4,16 @@ from collections.abc import Callable
 from typing import Any
 
 from aumiao.api import auth, community, edu, forum, library, shop, user, whale, work
-from aumiao.api import auth as auth_ins
-from aumiao.utils import data, decorator
-from aumiao.utils import file as file_ins
-from aumiao.utils import tool as tool_ins
 from aumiao.utils.acquire import ClientFactory, CodeMaoClient
-from aumiao.utils.data import CacheManager, CodeMaoCache, CodeMaoData, CodeMaoSetting, DataManager, HistoryManager, SettingManager
+from aumiao.utils.data import CacheManager, CodeMaoFile, DataManager, HistoryManager, NestedDefaultDict, PathConfig, SettingManager
 from aumiao.utils.decorator import singleton
-from aumiao.utils.tool import ToolKitFactory
-
-toolkit = tool_ins.ToolKitFactory()
+from aumiao.utils.tool import OutputHandler, ToolKitFactory
 
 
 # ==============================
 # 模块管理器: 类型友好版本
 # ==============================
+@singleton
 class ModuleManager:
 	"""管理所有模块的延迟加载和缓存"""
 
@@ -58,47 +53,23 @@ class ModuleManager:
 # ==============================
 # 核心组件管理器
 # ==============================
+@singleton
 class CoreManager:
 	"""管理立即加载的核心组件"""
 
 	def __init__(self) -> None:
 		# 立即初始化的核心组件
 		self.client = ClientFactory().create_codemao_client()
-		self.toolkit = toolkit
+		self.toolkit = ToolKitFactory()
 		self.data_manager = DataManager()
+		self.path_config = PathConfig()
 		self.setting_manager = SettingManager()
-		self.cache_manager = CacheManager()
-		self.history_manager = HistoryManager()
-
-	@property
-	def data(self) -> CodeMaoData:
-		"""快捷访问数据"""
-		return self.data_manager.data
-
-	@property
-	def data_man(self) -> DataManager:
-		"""快捷访问数据"""
-		return self.data_manager
-
-	@property
-	def setting(self) -> CodeMaoSetting:
-		"""快捷访问设置"""
-		return self.setting_manager.data
-
-	@property
-	def cache(self) -> CodeMaoCache:
-		"""快捷访问缓存"""
-		return self.cache_manager.data
-
-	@property
-	def upload_history(self) -> HistoryManager:
-		"""快捷访问历史记录"""
-		return self.history_manager
 
 
 # ==============================
 # 基础设施协调器: 类型友好主类
 # ==============================
+@singleton
 class InfrastructureCoordinator:
 	"""
 	基础设施协调器 - 类型友好版本
@@ -134,31 +105,15 @@ class InfrastructureCoordinator:
 			"work_obtain": work.WorkDataFetcher,
 			"whale_motion": whale.ReportHandler,
 			"whale_obtain": whale.ReportFetcher,
+			"cache_manager": CacheManager,
+			"history_manager": HistoryManager,
+			"nested_defaultdict": NestedDefaultDict,
+			"file_manager": CodeMaoFile,
 			# 工具模块
-			"printer": tool_ins.OutputHandler,
-			"file": file_ins.CodeMaoFile,
+			"printer": OutputHandler,
 		}
 		for name, creator in api_modules.items():
 			self._modules.register(name, creator)
-
-	# ==============================
-	# 公共接口
-	# ==============================
-	def register_module(self, name: str, creator: Callable[[], Any]) -> None:
-		"""注册新模块"""
-		self._modules.register(name, creator)
-
-	def clear_module_cache(self, module_name: str | None = None) -> None:
-		"""清除模块缓存"""
-		self._modules.clear_cache(module_name)
-
-	def list_available_modules(self) -> list[str]:
-		"""列出所有可用模块"""
-		return self._modules.list_available()
-
-	def list_loaded_modules(self) -> list[str]:
-		"""列出已加载的模块"""
-		return self._modules.list_loaded()
 
 	# ==============================
 	# 核心组件属性 (类型明确)
@@ -174,35 +129,25 @@ class InfrastructureCoordinator:
 		return self._core.toolkit
 
 	@property
-	def data(self) -> CodeMaoData:
+	def data_manager(self) -> DataManager:
 		"""数据"""
-		return self._core.data
+		return self._core.data_manager
 
 	@property
-	def data_man(self) -> DataManager:
-		"""快捷访问数据"""
-		return self._core.data_man
+	def path_config(self) -> PathConfig:
+			"""数据"""
+			return self._core.path_config
 
 	@property
-	def setting(self) -> CodeMaoSetting:
+	def setting_manager(self) -> SettingManager:
 		"""设置"""
-		return self._core.setting
-
-	@property
-	def cache(self) -> CodeMaoCache:
-		"""缓存"""
-		return self._core.cache
-
-	@property
-	def upload_history(self) -> HistoryManager:
-		"""上传历史"""
-		return self._core.upload_history
+		return self._core.setting_manager
 
 	# ==============================
 	# API 模块属性 (延迟加载, 类型明确)
 	# ==============================
 	@property
-	def auth(self) -> "auth_ins.AuthManager":
+	def auth(self) -> "auth.AuthManager":
 		"""认证管理模块"""
 		return self._modules.get("auth")
 
@@ -286,18 +231,33 @@ class InfrastructureCoordinator:
 		"""鲸鱼报告数据获取模块"""
 		return self._modules.get("whale_obtain")
 
+	@property
+	def cache_manager(self) -> "CacheManager":
+		"""缓存"""
+		return self._modules.get("cache_manager")
+
+	@property
+	def history_manager(self) -> "HistoryManager":
+		"""上传历史"""
+		return self._modules.get("history_manager")
+
+	@property
+	def nested_defaultdict(self) -> "NestedDefaultDict":
+		"""嵌套字典"""
+		return self._modules.get("nested_defaultdict")
+
+	@property
+	def file_manager(self) -> "CodeMaoFile":
+		"""文件写入"""
+		return self._modules.get("file_manager")
+
 	# ==============================
 	# 工具模块属性 (延迟加载, 类型明确)
 	# ==============================
 	@property
-	def printer(self) -> "tool_ins.OutputHandler":
+	def printer(self) -> "OutputHandler":
 		"""打印工具模块"""
 		return self._modules.get("printer")
-
-	@property
-	def file(self) -> "file_ins.CodeMaoFile":
-		"""文件操作模块"""
-		return self._modules.get("file")
 
 	# ==============================
 	# 动态模块访问 (可选, 用于访问动态注册的模块)
@@ -310,30 +270,11 @@ class InfrastructureCoordinator:
 		return self._modules.get(name)
 
 
-# ==============================
-# 单例包装: 保持向后兼容
-# ==============================
+coordinator = InfrastructureCoordinator()
+
+
 @singleton
-class Union(InfrastructureCoordinator):
-	"""
-	保持原有 Union 类名, 继承基础设施协调器
-	提供全局单例访问
-	"""
-
-
-# ==============================
-# 业务逻辑类 (保持原样)
-# ==============================
-ClassUnion = Union().__class__
-# ==============================
-# 类型别名 (用于类型注解)
-# ==============================
-InfraCoordinator = Union
-"""基础设施协调器的类型别名"""
-
-
-@decorator.singleton
-class Index(ClassUnion):  # ty:ignore [unsupported-base]
+class Index:
 	"""首页展示类"""
 
 	# 颜色配置
@@ -350,13 +291,13 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 
 	def _print_slogan(self) -> None:
 		"""打印标语"""
-		print(f"\n {self.COLOR_SLOGAN}{self.setting.PROGRAM.SLOGAN}{self.COLOR_RESET}")
-		print(f"{self.COLOR_VERSION} 版本号: {self.setting.PROGRAM.VERSION}{self.COLOR_RESET}")
+		print(f"\n {self.COLOR_SLOGAN}{coordinator.setting_manager.data.PROGRAM.SLOGAN}{self.COLOR_RESET}")
+		print(f"{self.COLOR_VERSION} 版本号: {coordinator.setting_manager.data.PROGRAM.VERSION}{self.COLOR_RESET}")
 
 	def _print_lyric(self) -> None:
 		"""打印歌词"""
 		self._print_title("一言")
-		lyric: str = self.client.send_request(endpoint="https://lty.vc/lyric", method="GET").text
+		lyric: str = coordinator.client.send_request(endpoint="https://lty.vc/lyric", method="GET").text
 		print(f"{self.COLOR_SLOGAN}{lyric}{self.COLOR_RESET}")
 
 	def _print_announcements(self) -> None:
@@ -368,8 +309,8 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 	def _print_user_data(self) -> None:
 		"""打印用户数据"""
 		self._print_title("数据")
-		if self.data.ACCOUNT_DATA.id:
-			Tool().message_report(user_id=self.data.ACCOUNT_DATA.id)
+		if coordinator.data_manager.data.ACCOUNT_DATA.id:
+			Tool().message_report(user_id=coordinator.data_manager.data.ACCOUNT_DATA.id)
 			print(f"{self.COLOR_TITLE}{'*' * 50}{self.COLOR_RESET}\n")
 
 	def index(self) -> None:
@@ -380,18 +321,18 @@ class Index(ClassUnion):  # ty:ignore [unsupported-base]
 		self._print_user_data()
 
 
-@decorator.singleton
-class Tool(ClassUnion):  # ty:ignore [unsupported-base]
+@singleton
+class Tool:
 	"""工具类"""
 
 	def __init__(self) -> None:
 		super().__init__()
-		self._cache_manager = data.CacheManager()
 
-	def message_report(self, user_id: int) -> None:
+	@staticmethod
+	def message_report(user_id: int) -> None:
 		"""生成用户数据报告"""
-		response = self.user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp = self.community_obtain.fetch_current_timestamp_10()["data"]
+		response = coordinator.user_obtain.fetch_user_honors(user_id=user_id)
+		timestamp = coordinator.community_obtain.fetch_current_timestamp_10()["data"]
 		user_data = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -403,9 +344,9 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 			"timestamp": timestamp,
 		}
 		# 如果有缓存数据, 进行对比分析
-		if self._cache_manager.data:
-			self.toolkit.create_data_analyzer().compare_datasets(
-				before=self._cache_manager.data,
+		if coordinator.cache_manager.data:
+			coordinator.toolkit.create_data_analyzer().compare_datasets(
+				before=coordinator.cache_manager.data,
 				after=user_data,
 				metrics={
 					"fans": "粉丝",
@@ -416,4 +357,4 @@ class Tool(ClassUnion):  # ty:ignore [unsupported-base]
 				timestamp_field="timestamp",
 			)
 		# 更新缓存
-		self._cache_manager.update(user_data)
+		coordinator.cache_manager.update(user_data)

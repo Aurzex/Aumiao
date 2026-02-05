@@ -11,13 +11,13 @@ _is_compiling: bool = hasattr(sys, "_nuitka_compiled") or hasattr(sys, "frozen")
 
 # 类型检查支持
 if TYPE_CHECKING or _is_compiling:
-	from . import acquire, data, decorator, file, tool
+	from . import acquire, data, decorator, tool
 
 # 模块路径映射
-_MODULE_PATHS: Final[dict[str, str]] = {"acquire": ".utils.acquire", "data": ".utils.data", "decorator": ".utils.decorator", "file": ".utils.file", "tool": ".utils.tool"}
+_MODULE_PATHS: Final[dict[str, str]] = {"acquire": ".utils.acquire", "data": ".utils.data", "decorator": ".utils.decorator", "tool": ".utils.tool"}
 
 # 固定的导出列表
-__all__: Final[tuple[str, ...]] = ("__version__", "acquire", "data", "decorator", "file", "tool")
+__all__: Final[tuple[str, ...]] = ("__version__", "acquire", "data", "decorator", "tool")
 
 # 模块缓存
 _LOADED_MODULES: dict[str, ModuleType] = {}
@@ -50,4 +50,4 @@ def __dir__() -> list[str]:
 # 编译时确保所有模块都被引用
 if _is_compiling:
 	# 这些引用确保编译时包含所有模块
-	_ = acquire, data, decorator, file, tool
+	_ = acquire, data, decorator, tool

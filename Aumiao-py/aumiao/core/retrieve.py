@@ -6,7 +6,7 @@ from random import randint
 from time import sleep
 from typing import Any, Literal, cast, overload
 
-from aumiao.core.base import ClassUnion
+from aumiao.core.base import coordinator
 from aumiao.utils import decorator
 
 
@@ -35,15 +35,15 @@ class QueryOptions:
 
 
 @decorator.singleton
-class Obtain(ClassUnion):  # type: ignore [unsupported-base]
+class Obtain:
 	def __init__(self) -> None:
 		super().__init__()
 		self._source_map = {
-			"work": (self.work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),
-			"forum": (self.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
-			"shop": (self.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
+			"work": (coordinator.work_obtain.fetch_work_comments_gen, "work_id", "reply_user"),
+			"forum": (coordinator.forum_obtain.fetch_post_replies_gen, "post_id", "user"),
+			"shop": (coordinator.shop_obtain.fetch_workshop_discussions_gen, "shop_id", "reply_user"),
 		}
-		self._data_processor = self.toolkit.create_data_processor()
+		self._data_processor = coordinator.toolkit.create_data_processor()
 
 	# ==================== 核心查询方法 ====================
 	@decorator.lru_cache_with_reset(max_calls=3)
@@ -69,7 +69,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		def generate_replies(comment: dict[str, Any]) -> Generator[dict[str, Any]]:
 			if source_value == "forum":
 				if comment["id"] not in reply_cache:
-					reply_cache[comment["id"]] = list(self.forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
+					reply_cache[comment["id"]] = list(coordinator.forum_obtain.fetch_reply_comments_gen(reply_id=comment["id"], limit=None))
 				yield from reply_cache[comment["id"]]
 			else:
 				yield from comment.get("replies", {}).get("items", [])
@@ -153,14 +153,14 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		return self._execute_query(source=QuerySource(source), source_id=source_id, method=query_method, limit=limit)
 
 	# ==================== 保持原有方法 ====================
+	@staticmethod
 	def get_new_replies(
-		self,
 		limit: int = 0,
 		type_item: Literal["LIKE_FORK", "COMMENT_REPLY", "SYSTEM"] = "COMMENT_REPLY",
 	) -> list[dict[str, Any]]:
 		"""获取社区新回复"""
 		try:
-			message_data = self.community_obtain.fetch_message_count(method="web")
+			message_data = coordinator.community_obtain.fetch_message_count(method="web")
 			total_replies = message_data[0].get("count", 0) if message_data else 0
 		except Exception as e:
 			print(f"获取消息计数失败: {e}")
@@ -173,7 +173,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		while remaining > 0:
 			current_limit = max(5, min(remaining, 200))
 			try:
-				response = self.community_obtain.fetch_replies(
+				response = coordinator.community_obtain.fetch_replies(
 					types=type_item,
 					limit=current_limit,
 					offset=offset,
@@ -190,7 +190,8 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 				break
 		return replies
 
-	def get_comment_total(self, source_type: Literal["work", "shop", "forum"], source_id: int) -> int:
+	@staticmethod
+	def get_comment_total(source_type: Literal["work", "shop", "forum"], source_id: int) -> int:
 		"""
 		获取不同来源的评论总数
 		Args:
@@ -201,7 +202,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		"""
 		if source_type == "work":
 			comments_url = f"/creation-tools/v1/works/{source_id}/comments"
-			comments_response = self.client.send_request(
+			comments_response = coordinator.client.send_request(
 				method="GET",
 				endpoint=comments_url,
 				params={"offset": 0, "limit": 15},
@@ -211,7 +212,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 			if "total" in comments_response:
 				return comments_response["total"]
 
-			work_response = self.client.send_request(
+			work_response = coordinator.client.send_request(
 				method="GET",
 				endpoint=f"/creation-tools/v1/works/{source_id}",
 				params={},
@@ -220,7 +221,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 
 			return work_response.get("comment_times", 0)
 		if source_type == "shop":
-			response = self.client.send_request(
+			response = coordinator.client.send_request(
 				method="GET",
 				endpoint=f"/web/discussions/{source_id}/comments",
 				params={
@@ -233,7 +234,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 			).json()
 			return response.get("total", 0) + response.get("totalReply", 0)
 		if source_type == "forum":
-			response = self.client.send_request(
+			response = coordinator.client.send_request(
 				method="GET",
 				endpoint=f"/web/forums/posts/{source_id}/details",
 				params={},
@@ -243,11 +244,12 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		msg = f"不支持的来源类型: {source_type}"
 		raise ValueError(msg)
 
-	def integrate_work_data(self, limit: int) -> Generator[dict[str, Any]]:
+	@staticmethod
+	def integrate_work_data(limit: int) -> Generator[dict[str, Any]]:
 		per_source_limit = limit // 2
 		data_sources = [
-			(self.work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
-			(self.work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
+			(coordinator.work_obtain.fetch_new_works_nemo(types="original", limit=per_source_limit), "nemo"),
+			(coordinator.work_obtain.fetch_new_works_web(limit=per_source_limit), "web"),
 		]
 		field_mapping = {
 			"nemo": {"work_id": "work_id", "work_name": "work_name", "user_name": "user_name", "user_id": "user_id", "like_count": "like_count", "updated_at": "updated_at"},
@@ -289,7 +291,8 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
 		return result
 
-	def get_admin_statistics(self) -> dict:
+	@staticmethod
+	def get_admin_statistics() -> dict:
 		"""获取管理员统计信息"""
 		# 管理员列表作为常量提取
 		admins = [
@@ -309,14 +312,14 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		for admin in admins:
 			admin_id: int = cast("int", admin["id"])
 			# 获取评论举报数
-			comment_count = self.whale_obtain.fetch_comment_reports_total(
+			comment_count = coordinator.whale_obtain.fetch_comment_reports_total(
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
 				target_id=admin_id,
 			)["total"]
 			# 获取作品举报数
-			work_count = self.whale_obtain.fetch_work_reports_total(
+			work_count = coordinator.whale_obtain.fetch_work_reports_total(
 				source_type="ALL",
 				status="ALL",
 				filter_type="admin_id",
@@ -350,9 +353,10 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 			"statistics": statistics,
 		}
 
-	def get_fans_statistics(self, user_id: int, like_num: int = 1000) -> dict:
+	@staticmethod
+	def get_fans_statistics(user_id: int, like_num: int = 1000) -> dict:
 		"""获取粉丝统计信息"""
-		fans = list(self.user_obtain.fetch_followers_gen(limit=None, user_id=user_id))
+		fans = list(coordinator.user_obtain.fetch_followers_gen(limit=None, user_id=user_id))
 		qualified_fans = []
 		for fan in fans:
 			if int(fan.get("total_likes", 0)) >= like_num:
@@ -360,7 +364,7 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 				print(f"昵称: {fan['nickname']}")
 				print(f"ID: {fan['id']}")
 				print(f"获赞数: {fan['total_likes']}")
-				user_data = self.user_obtain.fetch_user_honors(user_id=fan["id"])
+				user_data = coordinator.user_obtain.fetch_user_honors(user_id=fan["id"])
 				if user_data:
 					print(f"粉丝数: {user_data.get('fans_total', 'N/A')}")
 					print(f"作品收藏数: {user_data.get('collected_total', 'N/A')}")
@@ -385,20 +389,23 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 		}
 
 	@overload
-	def switch_edu_account(self, limit: int | None, return_method: Literal["generator"]) -> Iterator[tuple[str, str]]: ...
+	@staticmethod
+	def switch_edu_account(limit: int | None, return_method: Literal["generator"]) -> Iterator[tuple[str, str]]: ...
 	@overload
-	def switch_edu_account(self, limit: int | None, return_method: Literal["list"]) -> list[tuple[str, str]]: ...
-	def switch_edu_account(self, limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[tuple[str, str]] | list[tuple[str, str]]:
+	@staticmethod
+	def switch_edu_account(limit: int | None, return_method: Literal["list"]) -> list[tuple[str, str]]: ...
+	@staticmethod
+	def switch_edu_account(limit: int | None, return_method: Literal["generator", "list"]) -> Iterator[tuple[str, str]] | list[tuple[str, str]]:
 		"""获取教育账号信息"""
 		try:
-			students = list(self.edu_obtain.fetch_class_students_gen(limit=limit))
+			students = list(coordinator.edu_obtain.fetch_class_students_gen(limit=limit))
 			if not students:
 				print("没有可用的教育账号")
 				return iter([]) if return_method == "generator" else []
-			self.client.switch_identity(token=self.client.token.average, identity="average")
+			coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")
 
 			def process_student(student: dict[str, Any]) -> tuple[str, str]:
-				return (student["username"], self.edu_motion.reset_student_password(student["id"])["password"])
+				return (student["username"], coordinator.edu_motion.reset_student_password(student["id"])["password"])
 
 			if return_method == "generator":
 
@@ -424,15 +431,15 @@ class Obtain(ClassUnion):  # type: ignore [unsupported-base]
 	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
 		"""处理教育账号的切换、登录和执行操作"""
 		try:
-			self.client.switch_identity(token=self.client.token.average, identity="average")
+			coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")
 			accounts = self.switch_edu_account(limit=limit, return_method="list")
 			for identity, password in accounts:
 				print("切换教育账号")
 				sleep(3)
-				self.auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
+				coordinator.auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
 				if action:
 					action()
 		except Exception as e:
 			print(f"教育账号处理失败: {e}")
 		finally:
-			self.client.switch_identity(token=self.client.token.average, identity="average")
+			coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")

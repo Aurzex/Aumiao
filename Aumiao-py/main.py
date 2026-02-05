@@ -7,7 +7,7 @@ from functools import partial, wraps
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
-from aumiao.core.base import Index, InfraCoordinator
+from aumiao.core.base import Index, InfrastructureCoordinator
 from aumiao.core.compiler import decompile_work
 from aumiao.core.deepser import CodeMaoTool
 from aumiao.core.process import FileProcessor
@@ -51,7 +51,7 @@ class AppConfig:
 		}
 
 
-coordinator = InfraCoordinator()
+coordinator = InfrastructureCoordinator()
 config = AppConfig()
 printer = coordinator.toolkit.create_output_handler()
 
@@ -181,7 +181,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 		},
 	}
 	account_data_manager.update(account_data)
-	coordinator.data_man.update(account_data)
+	coordinator.data_manager.update(account_data)
 	account_data_manager.token = response.data["auth"]["token"]
 	print_account_info(account_data)
 

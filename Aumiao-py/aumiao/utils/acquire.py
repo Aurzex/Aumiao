@@ -8,19 +8,17 @@ from pathlib import Path
 from random import choice
 from time import sleep
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict
+from typing import Any, Literal, Self, TypedDict
 
 import httpx
 import websocket
 from httpx import Response
 
-from aumiao.utils import data as setting
-from aumiao.utils import file, tool
+from aumiao.utils import tool
+from aumiao.utils.data import CodeMaoFile, SettingManager
 from aumiao.utils.decorator import singleton
 
-# 导入必要的模块
-if TYPE_CHECKING:
-	from aumiao.utils.data import SettingManager
+setting_manager = SettingManager()
 
 
 # ==================== 配置类 ====================
@@ -248,9 +246,8 @@ class BaseHTTPClient:
 
 	def __init__(self, config: ClientConfig) -> None:
 		self.config = config
-		self.headers = setting.SettingManager().data.PROGRAM.HEADERS.copy()
+		self.headers = setting_manager.data.PROGRAM.HEADERS.copy()
 		self._http_client = httpx.Client(headers=self.headers, timeout=config.timeout)
-		self._file_handler = file.CodeMaoFile()
 		self._data_processor = tool.DataProcessor()
 		self.log_file = Path.cwd() / "logs" / f"requests_{tool.TimeUtils().current_timestamp()}.txt"
 		self._pagination_config: PaginationConfig = {
@@ -646,7 +643,7 @@ class BaseHTTPClient:
 			f"Response: {response.text}\n"
 			f"{'=' * 50}\n\n"
 		)
-		self._file_handler.file_write(path=self.log_file, content=log_entry, method="a")
+		CodeMaoFile().file_write(path=self.log_file, content=log_entry, method="a")
 
 	def close(self) -> None:
 		"""关闭 HTTP 客户端"""
@@ -665,7 +662,6 @@ class CodeMaoClient(BaseHTTPClient):
 	"""编程猫 HTTP 客户端 - 修复版本"""
 
 	def __init__(self) -> None:
-		setting_manager: SettingManager = setting.SettingManager()
 		config = ClientConfig(log_requests=setting_manager.data.PARAMETER.log)
 		super().__init__(config)
 		# 修复: 只创建一个 IdentityManager 实例
@@ -677,7 +673,7 @@ class CodeMaoClient(BaseHTTPClient):
 	def _initialize_default_headers(self) -> None:
 		"""初始化默认请求头"""
 		# 确保初始请求头正确设置
-		default_headers = setting.SettingManager().data.PROGRAM.HEADERS.copy()
+		default_headers = setting_manager.data.PROGRAM.HEADERS.copy()
 		self.update_headers(default_headers)
 
 	def switch_identity(self, identity: str, token: str) -> None:
@@ -878,7 +874,7 @@ class FileUploader(IFileUploader):
 
 	def _upload_request(self, method: str, endpoint: str, files: dict[str, Any] | None = None, data: dict[str, Any] | None = None, timeout: float = 120.0) -> Response:
 		"""专门用于文件上传的请求方法"""
-		headers = setting.SettingManager().data.PROGRAM.HEADERS.copy()
+		headers = setting_manager.data.PROGRAM.HEADERS.copy()
 		if files:
 			headers.pop("Content-Type", None)
 			headers.pop("Content-Length", None)
