@@ -82,8 +82,8 @@ class DataFetcher:
 
 	# 获取 pc 客户端更新
 	def fetch_pc_client(self) -> dict:
-			response = self._client.send_request(endpoint="/tiger/pc_client/releases/latest", method="GET")
-			return response.json()
+		response = self._client.send_request(endpoint="/tiger/pc_client/releases/latest", method="GET")
+		return response.json()
 
 	# 获取点个猫更新
 	def fetch_pickcat_update(self) -> dict:
@@ -337,18 +337,18 @@ class DataFetcher:
 
 	# 获取旧版全部作品标签
 	def fetch_work_labels(self) -> dict:
-			response = self._client.send_request(
-					endpoint="/api/work/label/list",
-					method="GET",
-				)
-			return response.json()
+		response = self._client.send_request(
+			endpoint="/api/work/label/list",
+			method="GET",
+		)
+		return response.json()
 
 	# 获取旧版全部作品标签
 	def fetch_work_category(self) -> dict:
 		response = self._client.send_request(
-							endpoint="/api/label/list",
-							method="GET",
-						)
+			endpoint="/api/label/list",
+			method="GET",
+		)
 		return response.json()
 
 	# 获取推荐作品
