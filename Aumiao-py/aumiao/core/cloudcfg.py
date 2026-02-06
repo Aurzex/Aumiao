@@ -1,4 +1,3 @@
-import contextlib
 import json
 import threading
 import time
@@ -819,8 +818,7 @@ class CloudConnection:
 		if self._ping_thread and self._ping_thread.is_alive():
 			# 检查不是当前线程
 			if self._ping_thread != threading.current_thread():
-				with contextlib.suppress(RuntimeError):
-					self._ping_thread.join(timeout=1.0)
+				self._ping_thread.join(timeout=1.0)
 			self._ping_thread = None
 
 	def _handle_cloud_message(self, message_type: str, data: dict[str, Any] | list[Any] | str) -> None:
@@ -1171,8 +1169,7 @@ class CloudConnection:
 			try:
 				# 使用异步关闭避免阻塞
 				def close_ws() -> None:
-					with contextlib.suppress(Exception):
-						self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
+					self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
 
 				# 在新线程中关闭 WebSocket
 				close_thread = threading.Thread(target=close_ws, daemon=True)

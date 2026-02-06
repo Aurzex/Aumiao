@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import operator
 import re
 import uuid
 import xml.etree.ElementTree as ET
@@ -2528,7 +2527,7 @@ class KNProject:
 			print("\n 积木类型统计 (前 10 种):")
 			sorted_types = sorted(
 				analysis["block_type_counts"].items(),
-				key=operator.itemgetter(1),
+				key=lambda x: x[1],
 				reverse=True,
 			)[:10]
 			for block_type, count in sorted_types:

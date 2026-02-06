@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from http import HTTPStatus
 from random import randint
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from aumiao.utils import acquire, data, tool
 from aumiao.utils.decorator import singleton
@@ -13,7 +13,6 @@ from aumiao.utils.decorator import singleton
 # ==================== 基础数据结构和枚举 ====================
 class LoginMethod(Enum):
 	"""登录方法枚举"""
-
 	PASSWORD_V0 = "password_v0"
 	PASSWORD_V1 = "password_v1"
 	PASSWORD_V2 = "password_v2"
@@ -24,23 +23,28 @@ class LoginMethod(Enum):
 
 class UserRole(Enum):
 	"""用户角色枚举"""
-
 	USER = "user"
 	ADMIN = "admin"
 
 
 class AccountStatus(Enum):
 	"""账号状态枚举"""
-
 	JUDGEMENT = "judgement"
 	AVERAGE = "average"
 	EDU = "edu"
 
 
+# 类型别名定义
+StatusType = Literal["judgement", "average", "edu"]
+RoleType = Literal["user", "admin"]
+UserMethodType = Literal["password_v0", "password_v1", "password_v2", "token"]
+AdminMethodType = Literal["admin_token", "admin_password"]
+AllMethodType = Literal["password_v0", "password_v1", "password_v2", "token", "admin_token", "admin_password"]
+
+
 @dataclass
 class LoginCredentials:
 	"""登录凭证数据类"""
-
 	identity: str = ""
 	password: str = ""
 	token: str = ""
@@ -52,7 +56,6 @@ class LoginCredentials:
 @dataclass
 class LoginResult:
 	"""登录结果数据类"""
-
 	success: bool
 	method: LoginMethod
 	message: str
@@ -68,13 +71,23 @@ def fetch_current_timestamp(client: acquire.CodeMaoClient) -> int:
 	return response.json()["data"]
 
 
-def determine_login_method(token: str | None, identity: str | None, password: str | None) -> LoginMethod:
-	"""确定登录方法"""
+def determine_login_method(token: str | None, identity: str | None, password: str | None) -> UserMethodType:
+	"""确定用户登录方法"""
 	if token:
-		return LoginMethod.TOKEN
+		return "token"
 	if identity and password:
-		return LoginMethod.PASSWORD_V2  # 默认使用 v2 登录
+		return "password_v2"  # 默认使用 v2 登录
 	msg = "缺少必要的登录凭据"
+	raise ValueError(msg)
+
+
+def determine_admin_login_method(token: str | None, identity: str | None, password: str | None) -> AdminMethodType:
+	"""确定管理员登录方法"""
+	if token:
+		return "admin_token"
+	if identity or password:
+		return "admin_password"
+	msg = "缺少必要的管理员登录凭据"
 	raise ValueError(msg)
 
 
@@ -277,66 +290,170 @@ class AuthManager:
 		password: str = "",
 		token: str = "",
 		pid: str = "65edCTyg",
-		status: Literal["judgement", "average", "edu"] = "average",
-		role: Literal["user", "admin"] = "user",
-		prefer_method: str | None = None,
+		status: StatusType = "average",
+		role: RoleType = "user",
+		prefer_method: AllMethodType | None = None,
 	) -> LoginResult:
 		"""
 		统一的登录接口
+
 		参数:
 			identity: 用户身份标识
 			password: 用户密码
 			token: 用户 token
 			pid: 请求的 PID
 			status: 账号状态类型
+				- "judgement": 判定状态
+				- "average": 普通状态
+				- "edu": 教育状态
 			role: 用户角色
+				- "user": 普通用户
+				- "admin": 管理员
 			prefer_method: 优先使用的登录方式
+				- 普通用户可选: "password_v0", "password_v1", "password_v2", "token"
+				- 管理员可选: "admin_token", "admin_password"
+
 		返回:
 			登录结果
+
+		示例:
+			>>> auth = AuthManager()
+			>>> # 普通用户密码登录
+			>>> result = auth.login(identity="user@example.com", password="password", prefer_method="password_v2")
+			>>> # 普通用户token登录
+			>>> result = auth.login(token="your_token_here", prefer_method="token")
+			>>> # 管理员token登录
+			>>> result = auth.login(role="admin", token="admin_token", prefer_method="admin_token")
+			>>> # 管理员密码登录
+			>>> result = auth.login(role="admin", identity="admin_user", password="admin_pass", prefer_method="admin_password")
 		"""
-		credentials = LoginCredentials(identity=identity, password=password, token=token, pid=pid, status=AccountStatus(status), role=UserRole(role))
+		# 验证参数组合的有效性
+		self._validate_login_parameters(identity, password, token, role, prefer_method)
+
+		credentials = LoginCredentials(
+			identity=identity,
+			password=password,
+			token=token,
+			pid=pid,
+			status=AccountStatus(status),
+			role=UserRole(role),
+		)
 		self._current_credentials = credentials
+
 		if credentials.role == UserRole.ADMIN:
 			return self._admin_login(credentials, prefer_method)
 		return self._user_login(credentials, prefer_method)
 
-	def _user_login(self, credentials: LoginCredentials, prefer_method: str | None) -> LoginResult:
+	@staticmethod
+	def _validate_login_parameters(
+		identity: str,
+		password: str,
+		token: str,
+		role: RoleType,
+		prefer_method: AllMethodType | None,
+	) -> None:
+		"""验证登录参数的有效性"""
+		if prefer_method:
+			# 验证 prefer_method 与 role 的匹配性
+			user_methods: list[UserMethodType] = ["password_v0", "password_v1", "password_v2", "token"]
+			admin_methods: list[AdminMethodType] = ["admin_token", "admin_password"]
+
+			if role == "user" and prefer_method not in user_methods:
+				msg = (
+					f"用户角色不支持登录方法 '{prefer_method}',"
+					f"可用方法: {user_methods}"
+				)
+				raise ValueError(
+					msg,
+				)
+
+			if role == "admin" and prefer_method not in admin_methods:
+				msg = (
+					f"管理员角色不支持登录方法 '{prefer_method}',"
+					f"可用方法: {admin_methods}"
+				)
+				raise ValueError(
+					msg)
+			if prefer_method in {"password_v0", "password_v1", "password_v2", "admin_password"} and (not identity or not password):
+				msg = f"登录方法 '{prefer_method}' 需要提供 identity 和 password 参数"
+				raise ValueError(
+					msg,
+				)
+
+			if prefer_method in {"token", "admin_token"} and not token:
+				msg = f"登录方法 '{prefer_method}' 需要提供 token 参数"
+				raise ValueError(
+					msg,
+				)
+
+	def _user_login(self, credentials: LoginCredentials, prefer_method: AllMethodType | None) -> LoginResult:
 		"""用户登录"""
 		method = self._get_user_login_method(credentials, prefer_method)
-		if method == LoginMethod.PASSWORD_V0:
-			return self._handler.handle_password_v0(credentials.identity, credentials.password, credentials.pid, credentials.status)
-		if method == LoginMethod.PASSWORD_V1:
-			return self._handler.handle_password_v1(credentials.identity, credentials.password, credentials.pid, credentials.status)
-		if method == LoginMethod.PASSWORD_V2:
-			return self._handler.handle_password_v2(credentials.identity, credentials.password, credentials.pid, credentials.status)
-		if method == LoginMethod.TOKEN:
+
+		if method == "password_v0":
+			return self._handler.handle_password_v0(
+				credentials.identity,
+				credentials.password,
+				credentials.pid,
+				credentials.status,
+			)
+
+		if method == "password_v1":
+			return self._handler.handle_password_v1(
+				credentials.identity,
+				credentials.password,
+				credentials.pid,
+				credentials.status,
+			)
+
+		if method == "password_v2":
+			return self._handler.handle_password_v2(
+				credentials.identity,
+				credentials.password,
+				credentials.pid,
+				credentials.status,
+			)
+
+		if method == "token":
 			return self._handler.handle_token(credentials.token, credentials.status)
+
 		msg = f"不支持的登录方式: {method}"
 		raise ValueError(msg)
 
-	def _admin_login(self, credentials: LoginCredentials, prefer_method: str | None) -> LoginResult:
+	def _admin_login(self, credentials: LoginCredentials, prefer_method: AllMethodType | None) -> LoginResult:
 		"""管理员登录"""
 		method = self._get_admin_login_method(credentials, prefer_method)
-		if method == LoginMethod.ADMIN_TOKEN:
+
+		if method == "admin_token":
 			return self._handler.handle_admin_token(credentials.token)
-		if method == LoginMethod.ADMIN_PASSWORD:
+
+		if method == "admin_password":
 			return self._handler.handle_admin_password(credentials.identity, credentials.password)
+
 		msg = f"不支持的管理员登录方式: {method}"
 		raise ValueError(msg)
 
 	@staticmethod
-	def _get_user_login_method(credentials: LoginCredentials, prefer_method: str | None) -> LoginMethod:
+	def _get_user_login_method(credentials: LoginCredentials, prefer_method: AllMethodType | None) -> UserMethodType:
 		"""获取用户登录方法"""
 		if prefer_method:
-			return LoginMethod(prefer_method)
+			# 确保返回的是 UserMethodType
+			if prefer_method in {"password_v0", "password_v1", "password_v2", "token"}:
+				return cast("UserMethodType", prefer_method)
+			msg = f"'{prefer_method}' 不是有效的用户登录方法"
+			raise ValueError(msg)
 		return determine_login_method(credentials.token, credentials.identity, credentials.password)
 
 	@staticmethod
-	def _get_admin_login_method(credentials: LoginCredentials, prefer_method: str | None) -> LoginMethod:
+	def _get_admin_login_method(credentials: LoginCredentials, prefer_method: AllMethodType | None) -> AdminMethodType:
 		"""获取管理员登录方法"""
 		if prefer_method:
-			return LoginMethod(prefer_method)
-		return LoginMethod.ADMIN_TOKEN if credentials.token else LoginMethod.ADMIN_PASSWORD
+			# 确保返回的是 AdminMethodType
+			if prefer_method in {"admin_token", "admin_password"}:
+				return cast("AdminMethodType", prefer_method)
+			msg = f"'{prefer_method}' 不是有效的管理员登录方法"
+			raise ValueError(msg)
+		return determine_admin_login_method(credentials.token, credentials.identity, credentials.password)
 
 	def execute_logout_v0(self) -> bool:
 		"""执行 v0 版本用户登出"""
@@ -348,7 +465,9 @@ class AuthManager:
 		return response.status_code == acquire.HTTPStatus.NO_CONTENT.value
 
 	def execute_logout_v12(self, method: Literal["web", "app"] = "web") -> bool:
-		"""执行 v12 版本用户登出
+		"""
+		执行 v12 版本用户登出
+
 		Args:
 			method: 登出方法类型
 				"web": web 版登出接口
@@ -377,7 +496,7 @@ class AuthManager:
 		)
 		return response.json()
 
-	def configure_authentication_token(self, token: str, identity: str = "judgement") -> None:
+	def configure_authentication_token(self, token: str, identity: StatusType = "judgement") -> None:
 		"""配置认证 Token"""
 		self._client.switch_identity(token=token, identity=identity)
 
@@ -391,6 +510,10 @@ class AuthManager:
 	def get_current_client(self) -> acquire.CodeMaoClient:
 		"""获取当前客户端"""
 		return self._client
+
+	def get_current_credentials(self) -> LoginCredentials | None:
+		"""获取当前登录凭证"""
+		return self._current_credentials
 
 
 # ==================== 云服务认证器 ====================
