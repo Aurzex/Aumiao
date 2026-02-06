@@ -25,10 +25,12 @@ class UserDataFetcher:
 		return response.json()
 
 	def fetch_user_info(self, user_id: int) -> dict:
-			"""获取用户 info 信息"""
-			response = self._client.send_request(method="GET", endpoint=f"/web/api/user/info/detail/{user_id}",
-			)
-			return response.json()
+		"""获取用户 info 信息"""
+		response = self._client.send_request(
+			method="GET",
+			endpoint=f"/web/api/user/info/detail/{user_id}",
+		)
+		return response.json()
 
 	def fetch_user_honors(self, user_id: int) -> dict:
 		"""获取用户荣誉信息"""
@@ -58,17 +60,17 @@ class UserDataFetcher:
 		return response.json()
 
 	def fetch_user_studio(self, user_id: int) -> dict:
-			"""获取用户加入的工作室信息"""
-			response = self._client.send_request(endpoint=f"/web/work-shops/{user_id}/participators", method="GET")
-			return response.json()
+		"""获取用户加入的工作室信息"""
+		response = self._client.send_request(endpoint=f"/web/work-shops/{user_id}/participators", method="GET")
+		return response.json()
 
 	# 获取账户信息 (简略)
 	def get_account_info(self) -> dict:
-			response = self._client.send_request(
-				method="GET",
-				endpoint="/web/api/user/info",
-			)
-			return response.json()
+		response = self._client.send_request(
+			method="GET",
+			endpoint="/web/api/user/info",
+		)
+		return response.json()
 
 	def fetch_account_details(self) -> dict:
 		"""获取当前账号详细信息"""
@@ -175,9 +177,7 @@ class UserDataFetcher:
 	def fetch_kn_works_gen(
 		self,
 		method: Literal["published", "total"],
-		extra_params: (
-			dict[Literal["name", "limit", "offset", "status", "work_business_classify"], str | int] | None
-		) = None,
+		extra_params: (dict[Literal["name", "limit", "offset", "status", "work_business_classify"], str | int] | None) = None,
 		limit: int | None = 15,
 	) -> Generator[dict]:
 		"""获取用户 KN 作品生成器"""
@@ -306,7 +306,7 @@ class UserDataFetcher:
 		)
 
 	def fetch_published_works(self, user_id: int, types: list[Literal[1, 3, 5]], limit: int = 10) -> dict:
-		"""获取用户已发布作品	"""
+		"""获取用户已发布作品"""
 		params = {
 			"user_id": user_id,
 			"types": ",".join(map(str, types)),
