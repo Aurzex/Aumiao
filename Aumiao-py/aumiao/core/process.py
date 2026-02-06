@@ -1,8 +1,6 @@
-import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from dataclasses import dataclass, field
 from json import JSONDecodeError, loads
 from pathlib import Path
 from random import choice, randint
@@ -15,44 +13,16 @@ from aumiao.core.models import (
 	MAX_SIZE_BYTES,
 	ActionConfig,
 	BatchGroup,
+	ProcessingContext,
+	ProcessingError,
 	ReportRecord,
 	SourceConfig,
+	SourceType,
 )
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import FileUploader, HTTPStatus
 from aumiao.utils.data import UploadHistory
 from aumiao.utils.decorator import singleton
-
-# ========================== 基础定义 ==========================
-SourceType = Literal["shop", "forum", "work"]
-
-
-class ProcessingError(Exception):
-	"""处理过程中的异常"""
-
-
-@dataclass
-class ProcessingContext:
-	"""处理上下文 - 封装所有处理所需数据"""
-
-	# 核心数据
-	record: ReportRecord
-	admin_id: int
-	report_type: str
-	# 配置信息
-	config: "SourceConfig" = field(default_factory=lambda: SourceConfig())  # type: ignore  # noqa: PGH003, PLW0108
-	# 处理状态
-	processed: bool = False
-	action: str | None = None
-	skip_reason: str | None = None
-	# 处理器共享状态
-	user_id: int | None = None
-	batch_group: BatchGroup | None = None
-	is_batch_mode: bool = False
-	is_reprocess_mode: bool = False
-	# 结果信息
-	messages: list[str] = field(default_factory=list)
-	errors: list[str] = field(default_factory=list)
 
 
 # ========================== 抽象基类或协议 ==========================
@@ -535,23 +505,13 @@ class DetailDisplayProcessor(BaseProcessor):
 		coordinator.printer.print_header(f"=== {config.name} 详情 ===")
 		# 重新组织字段显示顺序,按逻辑分组
 		# 1. 内容相关字段
-		content_fields = [
-			(config.content_field, "内容"),
-			(config.description_field, "举报描述"),
-		]
+		content_fields = [(config.content_field, "内容"), (config.description_field, "举报描述")]
 		# 2. 用户相关字段
-		user_fields = [
-			(config.user_nickname_field, "用户昵称"),
-			(config.user_id_field, "用户 ID"),
-		]
+		user_fields = [(config.user_nickname_field, "用户昵称"), (config.user_id_field, "用户 ID")]
 		# 3. 举报信息
-		report_fields = [
-			(config.reason_field, "举报原因"),
-		]
+		report_fields = [(config.reason_field, "举报原因")]
 		# 4. 时间信息
-		time_fields = [
-			(config.created_at_field, "举报时间"),
-		]
+		time_fields = [(config.created_at_field, "举报时间")]
 		# 分组显示
 		for label, fields in [("内容信息", content_fields), ("用户信息", user_fields), ("举报信息", report_fields), ("时间信息", time_fields)]:
 			has_data = False
@@ -876,9 +836,9 @@ class ViolationChecker:
 	def _process_auto_report(self, violations: list[str], source_type: Literal["forum", "work", "shop"]) -> None:
 		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查是否有学生账号
-		auth_manager = ReportAuthManager()
+		auth_manager = MultiAccount()
 		# 如果没有账号, 先加载
-		if not auth_manager.student_accounts:
+		if not auth_manager.accounts:
 			coordinator.printer.print_message("未加载学生账号, 无法进行自动举报", "ERROR")
 			coordinator.printer.print_message("请在主菜单中选择 ' 加载学生账号 ' 功能", "INFO")
 			return
@@ -905,7 +865,7 @@ class ViolationChecker:
 		success_count = 0
 		# 5. 账号管理初始化
 		# 重要: 创建账号副本, 避免修改原始列表
-		available_accounts = auth_manager.student_accounts.copy()
+		available_accounts = auth_manager.accounts.copy()
 		if not available_accounts:
 			coordinator.printer.print_message("没有可用的学生账号", "ERROR")
 			return
@@ -942,7 +902,7 @@ class ViolationChecker:
 							identity=username,
 							password=password,
 							status="edu",
-							prefer_method="simple_password",
+							prefer_method="password_v1",
 						)
 						account_success_map[account_index] = True
 						coordinator.printer.print_message(f"账号 {account_index + 1} 登录成功", "SUCCESS")
@@ -1069,137 +1029,6 @@ class ViolationChecker:
 
 
 class ReplyProcessor:
-	@staticmethod
-	def send_messages_with_delay(messages: list[str], send_func: Callable, comment_type: str = "评论", delay_seconds: int = 5) -> None:
-		"""
-		发送多条消息, 每条消息间隔指定时间
-		"""
-		if not messages:
-			print("没有消息需要发送")
-			return
-		for i, message in enumerate(messages, 1):
-			print(f"\n {'-' * 20}")
-			print(f"发送 {comment_type} {i}/{len(messages)}")
-			print(f"内容长度: {len(message)}")
-			try:
-				result = send_func(message)
-				if result:
-					print(f"{comment_type} {i} 发送成功")
-				else:
-					print(f"{comment_type} {i} 发送失败")
-				# 如果不是最后一条消息, 等待间隔
-				if i < len(messages):
-					print(f"等待 {delay_seconds} 秒后发送下一条...")
-					sleep(delay_seconds)
-			except Exception as e:
-				print(f"发送 {comment_type} {i} 时发生错误: {e!s}")
-				# 发生错误时仍然等待间隔, 避免过于频繁
-				if i < len(messages):
-					sleep(delay_seconds)
-
-	@staticmethod
-	def split_long_message(message: str, max_length: int = 280) -> list[str]:
-		"""
-		分割长消息为多个不超过限制的部分
-		"""
-		if len(message) <= max_length:
-			return [message]
-		print(f"消息过长 ({len(message)} > {max_length}), 开始分割...")
-		parts = []
-		current_part = ""
-		# 按句子分割, 保持句子完整性
-		sentences = message.split("|")
-		for sentence in sentences:
-			# 如果当前句子本身就很长, 需要进一步分割
-			if len(sentence) > max_length:
-				# 按逗号分割
-				sub_sentences = sentence.split(",")
-				for sub_sentence in sub_sentences:
-					if len(current_part) + len(sub_sentence) + 3 <= max_length:
-						current_part += sub_sentence + ","
-					else:
-						if current_part:
-							parts.append(current_part.rstrip(","))
-						current_part = sub_sentence + ","
-			else:
-				# 检查添加这个句子是否会超过限制
-				separator = "|" if current_part else ""
-				if len(current_part) + len(separator) + len(sentence) <= max_length:
-					current_part += separator + sentence
-				else:
-					if current_part:
-						parts.append(current_part)
-					current_part = sentence
-		# 添加最后一部分
-		if current_part:
-			parts.append(current_part)
-		# 添加序号
-		result = []
-		total_parts = len(parts)
-		for i, part in enumerate(parts, 1):
-			numbered_part = f"[{i}/{total_parts}] {part}"
-			result.append(numbered_part)
-		print(f"分割为 {len(result)} 部分")
-		for i, part in enumerate(result, 1):
-			print(f"部分 {i}: {len(part)} 字符")
-		return result
-
-	def split_long_cdn_link(self, cdn_link: str) -> list[str]:
-		"""
-		处理长 CDN 链接, 如果太长则分割
-		"""
-		# 保护链接
-		protected_link = self._protect_cdn_link(cdn_link)
-		# 如果链接本身就很长, 可能需要分割
-		if len(protected_link) <= 280:
-			return [f"编译文件: {protected_link}"]
-		print(f"CDN 链接过长 ({len(protected_link)}), 尝试分割...")
-		# 将链接分割成多个部分
-		chunk_size = 250  # 每个部分的最大长度
-		chunks = []
-		for i in range(0, len(protected_link), chunk_size):
-			chunk = protected_link[i : i + chunk_size]
-			chunks.append(chunk)
-		result = []
-		total_chunks = len(chunks)
-		for i, chunk in enumerate(chunks, 1):
-			message = f"编译文件部分 {i}/{total_chunks}: {chunk}"
-			result.append(message)
-		return result
-
-	@staticmethod
-	def generate_work_report(work_details: dict, commands: list, *, is_author: bool) -> str:
-		"""
-		生成作品解析报告
-		"""
-		work_name = work_details.get("work_name", "未知作品")
-		author_nickname = work_details.get("user_info", {}).get("nickname", "未知作者")
-		work_id = work_details.get("id", 0)
-		view_times = work_details.get("view_times", 0)
-		praise_times = work_details.get("praise_times", 0)
-		collect_times = work_details.get("collect_times", 0)
-		# n_roles = work_details.get ("n_roles", 0)
-		# n_brick = work_details.get ("n_brick", 0)
-		# 构建报告各部分
-		parts = [
-			"作品解析报告",
-			f"作品名称: {work_name}",
-			f"作者: {author_nickname} (ID: {work_id})",
-			"数据统计:",
-			f"浏览量: {view_times}",
-			f"点赞数: {praise_times}",
-			f"收藏数: {collect_times}",
-			# f"角色数: {n_roles}",
-			# f"积木数: {n_brick}",
-		]
-		if is_author:
-			parts.append("验证: 您是该作品的作者")
-			if "compile" in commands:
-				parts.append("编译命令已接收, 正在处理...")
-		else:
-			parts.append("提示: 非作者身份, 编译功能不可用")
-		# 用分隔符连接各部分
-		return "|".join(parts)
 
 	@staticmethod
 	def _protect_cdn_link(link: str) -> str:
@@ -1210,41 +1039,6 @@ class ReplyProcessor:
 		for char in link:
 			protected += char + "\u200b\u200d"
 		return protected.rstrip("\u200b\u200d")
-
-	@staticmethod
-	def extract_work_info(comment_text: str) -> dict | None:
-		"""
-		从评论中提取作品信息
-		"""
-		# 支持的格式:@作品解析:https://shequ.codemao.cn/work/123456
-		# 或:@作品解析:123456
-		# 查找链接中的作品 ID
-		pattern = r"@作品解析:.*?(?:work/|workId=)(\d+)"
-		match = re.search(pattern, comment_text)
-		if match:
-			work_id = int(match.group(1))
-			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/ {work_id}"}
-		# 如果没有链接, 尝试直接提取数字 ID
-		pattern2 = r"@作品解析:.*?(\d+)"
-		match2 = re.search(pattern2, comment_text)
-		if match2:
-			work_id = int(match2.group(1))
-			return {"work_id": work_id, "work_url": f"https://shequ.codemao.cn/work/ {work_id}"}
-		return None
-
-	@staticmethod
-	def parse_commands(comment_text: str) -> list[str]:
-		"""
-		解析评论中的命令 (只保留解析和编译)
-		"""
-		commands = []
-		# 检测解析命令 (默认就有)
-		if "解析" in comment_text or "analyze" in comment_text.lower():
-			commands.append("analyze")
-		# 检测编译命令
-		if "编译" in comment_text or "compile" in comment_text.lower():
-			commands.append("compile")
-		return commands
 
 	# 辅助方法
 	@staticmethod
@@ -1697,7 +1491,6 @@ class ReportProcessor:
 		self.batch_config = self.DEFAULT_BATCH_CONFIG.copy()
 		self.processed_count = 0
 		self.total_report = 0
-		self.auth_manager = ReportAuthManager()
 		self.fetcher = ReportFetcher()
 		self.batch_manager = BatchActionManager()
 		self._violation_checker = None
@@ -1957,86 +1750,122 @@ class ReportProcessor:
 		self.violation_checker.check_violation(source_id=source_id, source_type=source_type, board_name=board_name, user_id=user_id)
 
 
-@singleton
-class ReportAuthManager:
-	def __init__(self) -> None:
-		self.student_accounts: list[tuple] = []
-		self.auth_method = "grab"
-		super().__init__()
+class MultiAccount:
+	"""账号管理器"""
 
-	def load_student_accounts(self) -> None:
-		"""加载学生账号: 用于自动举报, 支持实时获取 / 文件加载"""
-		# 切换到普通账号上下文 (加载学生账号需普通权限)
-		coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")
-		# 询问是否加载学生账号
-		if coordinator.printer.get_valid_input(prompt="是否加载学生账号用于自动举报? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
-			coordinator.printer.print_message("未加载学生账号, 自动举报功能不可用", "WARNING")
-			coordinator.auth.restore_admin_account()
+	def __init__(self, identity_type: Literal["judgement", "average", "edu"] = "edu") -> None:
+		self.accounts = []
+		self.identity_type: Literal["judgement", "average", "edu"] = identity_type
+
+	def load_from_file(self, file_path: Path) -> None:
+		"""从文件加载账号"""
+		path = Path(file_path)
+		if not path.exists():
+			msg = f"文件不存在: {file_path}"
+			raise FileNotFoundError(msg)
+
+		accounts = []
+		with path.open("r", encoding="utf-8") as f:
+			for num, line in enumerate(f, 1):
+				line = line.strip()  # noqa: PLW2901
+				if not line or line.startswith("#"):
+					continue
+
+				if ":" not in line:
+					print(f"第{num}行格式错误: {line}")
+					continue
+
+				username, password = line.split(":", 1)
+				username, password = username.strip(), password.strip()
+
+				if username and password:
+					accounts.append((username, password))
+
+		if not accounts:
+			msg = "文件中没有有效账号"
+			raise ValueError(msg)
+
+		self.accounts = accounts
+		print(f"加载 {len(accounts)} 个账号")
+		self._restore_default()
+
+	def load_from_api(self, count: int) -> None:
+		"""从API加载账号"""
+		if count <= 0:
+			print("数量必须大于0")
 			return
-		# 选择账号获取方式 (实时获取 / 文件加载)
-		method = coordinator.printer.get_valid_input(prompt="选择模式 (load. 加载文件 grab. 实时获取)", valid_options={"load", "grab"}, cast_type=str)
-		self.auth_method = cast("Literal ['load', 'grab']", method)
-		try:
-			if method == "grab":
-				# 实时获取学生账号 (调用 Obtain 工具)
-				account_count = coordinator.printer.get_valid_input(
-					prompt="输入获取账号数",
-					cast_type=int,
-					validator=lambda x: x >= 0,  # 确保数量非负
-				)
-				self.student_accounts = list(Obtain().switch_edu_account(limit=account_count, return_method="list"))
-				coordinator.printer.print_message(f"已实时加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
-			elif method == "load":
-				password_file_path = Path(coordinator.path_config.PASSWORD_FILE_PATH)
-				if not password_file_path.exists():
-					coordinator.printer.print_message(f"密码文件不存在: {password_file_path}", "ERROR")
-					self.student_accounts = []
-					return
-				# 读取文件内容
-				with password_file_path.open("r", encoding="utf-8") as f:
-					lines = f.readlines()
-				# 解析每行格式: {identity}:{password}
-				self.student_accounts = []
-				for line in lines:
-					line = line.strip()  # noqa: PLW2901
-					if not line or line.startswith("#"):
-						continue  # 跳过空行和注释
-					if ":" not in line:
-						coordinator.printer.print_message(f"跳过格式错误的行: {line}", "WARNING")
-						continue
-					identity, password = line.split(":", 1)
-					self.student_accounts.append((identity.strip(), password.strip()))
-				if not self.student_accounts:
-					coordinator.printer.print_message("密码文件中没有有效的账号密码", "ERROR")
-					return
-				coordinator.printer.print_message(f"已从文件加载 {len(self.student_accounts)} 个学生账号", "SUCCESS")
-		except Exception as e:
-			# 捕获所有异常 (文件不存在、接口错误等)
-			coordinator.printer.print_message(f"加载学生账号失败: {e!s}", "ERROR")
-			self.student_accounts = []
-			self.student_tokens = []
-		# 恢复管理员账号上下文 (加载完成后切回管理员)
-		coordinator.auth.restore_admin_account()
 
-	def switch_to_student_account(self) -> bool:
-		"""切换到学生账号"""
-		if not self.student_accounts:
-			return False
+		self.accounts = list(
+			Obtain().switch_edu_account(limit=count, return_method="list"),
+		)
+		print(f"从API获取 {len(self.accounts)} 个账号")
+		self._restore_default()
+
+	def execute_with_accounts(self, func: Callable[[], Any], limit: int | None = None, delay: int = 1) -> dict:
+		"""用多个账号执行函数"""
+		if not self.accounts:
+			print("没有可用账号")
+			return {"success": 0, "failed": 0, "details": []}
+		accounts = self.accounts[:limit] if limit else self.accounts
+		results = {"success": 0, "failed": 0, "details": []}
+		for i, (username, password) in enumerate(accounts, 1):
+			print(f"[{i}/{len(accounts)}] 处理: {username}")
+			try:
+				self._switch_and_run(username, password, func)
+				results["success"] += 1
+				results["details"].append({"username": username, "status": "success"})
+			except Exception as e:
+				results["failed"] += 1
+				results["details"].append({"username": username, "status": "failed", "error": str(e)})
+				print(f"失败: {e}")
+
+			if delay > 0 and i < len(accounts):
+				sleep(delay)
+
+		print(f"完成: 成功 {results['success']}, 失败 {results['failed']}")
+		self._restore_default()
+		return results
+
+	def _switch_and_run(self, username: str, password: str, func: Callable[[], Any]) -> None:
+		"""切换账号并执行"""
+		self._to_default()
+		self._login(username, password)
+		func()
+
+	@staticmethod
+	def _to_default() -> None:
+		"""切到默认身份"""
+		coordinator.client.switch_identity(
+			token=coordinator.client.token.average,
+			identity="average",
+		)
+		sleep(2)
+
+	def _login(self, username: str, password: str) -> None:
+		"""登录账号"""
+		print(f"登录: {username}")
+		coordinator.auth.login(
+			identity=username,
+			password=password,
+			status=self.identity_type,
+			prefer_method="password_v1",
+		)
+
+	@staticmethod
+	def _restore_default() -> None:
+		"""恢复默认身份"""
 		try:
-			# 账密登录方式
-			username, password = self.student_accounts.pop()
-			print(f"切换学生账号: {username}")
-			# 登录获取 token
-			coordinator.auth.login(
-				identity=username,
-				password=password,
-				status="edu",
+			coordinator.client.switch_identity(
+				token=coordinator.client.token.average,
+				identity="average",
 			)
 		except Exception as e:
-			print(f"学生账号切换失败: {e}")
-			return False
-		else:
-			return True
+			print(f"恢复失败: {e}")
+
+	def clear(self) -> None:
+		"""清空账号"""
+		self.accounts.clear()
+		print("已清空")
 
 
 class FileProcessor:

@@ -1,9 +1,7 @@
-import contextlib
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
-from json import dumps
 from pathlib import Path
 from random import choice
 from time import sleep
@@ -11,7 +9,6 @@ from types import TracebackType
 from typing import Any, Literal, Self, TypedDict
 
 import httpx
-import websocket
 from httpx import Response
 
 from aumiao.utils import tool
@@ -122,30 +119,6 @@ class IHTTPClient(ABC):
 		"""获取分页总数"""
 
 
-class IWebSocketClient(ABC):
-	"""WebSocket 客户端接口"""
-
-	@abstractmethod
-	def connect(self, url: str) -> bool:
-		"""连接 WebSocket"""
-
-	@abstractmethod
-	def disconnect(self) -> None:
-		"""断开连接"""
-
-	@abstractmethod
-	def send(self, message: str | dict[str, Any]) -> bool:
-		"""发送消息"""
-
-	@abstractmethod
-	def receive(self, timeout: float = 30.0) -> str | bytes | None:
-		"""接收消息"""
-
-	@abstractmethod
-	def listen(self) -> Generator[str | bytes]:
-		"""监听消息"""
-
-
 class IFileUploader(ABC):
 	"""文件上传器接口"""
 
@@ -197,7 +170,7 @@ class IdentityManager:
 		if token and token.strip():
 			setattr(self.tokens, self._token_map[identity], token)
 			self._current_identity = identity
-		else:
+		elif identity != "blank":
 			print(f"警告: 尝试设置空令牌到身份 {identity}")
 
 	def restore_identity(self, identity: str) -> bool:
@@ -686,122 +659,24 @@ class CodeMaoClient(BaseHTTPClient):
 		if identity not in valid_identities:
 			print(f"错误: 无效的身份类型 '{identity}', 有效身份:{valid_identities}")
 			return
-		try:
-			# 使用身份管理器切换身份
-			self.identity_manager.switch_identity(identity, token)
-			# 获取身份认证头
-			identity_headers = self.identity_manager.get_identity_headers()
-			if identity_headers and identity_headers.get("Authorization"):
-				# 关键修复: 直接更新底层 HTTP 客户端的 headers
-				auth_header = identity_headers["Authorization"]
-				if not auth_header.startswith("Bearer "):
-					auth_header = f"Bearer {auth_header}"
-				# 强制更新到 httpx 客户端
-				self._http_client.headers["Authorization"] = auth_header
-				# 同时更新实例的 headers 属性
-				if hasattr(self, "headers"):
-					self.headers["Authorization"] = auth_header
-				print(f"已切换到身份: {identity}")
-				print(f"认证头已更新: {auth_header[:30]}...")
-			else:
-				print(f"切换失败: 身份 '{identity}' 的认证头为空")
-		except Exception as e:
-			print(f"切换身份失败: {e}")
-
-
-class CodeMaoWebSocketClient(IWebSocketClient):
-	"""编程猫 WebSocket 客户端 - 修复版本"""
-
-	def __init__(self) -> None:
-		self._ws_app = None
-		self._connected = False
-		self._message_queue = []
-
-	def connect(self, url: str) -> bool:
-		"""连接 WebSocket"""
-		try:
-			self._ws_app = websocket.create_connection(
-				url,
-				header={
-					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
-					"Origin": "https://kn.codemao.cn",
-					"Accept-Encoding": "gzip, deflate, br, zstd",
-					"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-					"Cache-Control": "no-cache",
-					"Pragma": "no-cache",
-				},
-				sslopt={"cert_reqs": 0},
-			)
-			self._connected = True
-			print(f"WebSocket 连接已建立: {url}")
-		except Exception as e:
-			print(f"WebSocket 连接失败: {e}")
-			self._connected = False
-			return False
+		# 使用身份管理器切换身份
+		self.identity_manager.switch_identity(identity, token)
+		# 获取身份认证头
+		identity_headers = self.identity_manager.get_identity_headers()
+		if identity_headers and identity_headers.get("Authorization"):
+			# 关键修复: 直接更新底层 HTTP 客户端的 headers
+			auth_header = identity_headers["Authorization"]
+			if not auth_header.startswith("Bearer "):
+				auth_header = f"Bearer {auth_header}"
+			# 强制更新到 httpx 客户端
+			self._http_client.headers["Authorization"] = auth_header
+			# 同时更新实例的 headers 属性
+			if hasattr(self, "headers"):
+				self.headers["Authorization"] = auth_header
+			print(f"已切换到身份: {identity}")
+			print(f"认证头已更新: {auth_header[:30]}...")
 		else:
-			return True
-
-	def disconnect(self) -> None:
-		"""断开 WebSocket 连接"""
-		if self._ws_app:
-			with contextlib.suppress(Exception):
-				self._ws_app.close()
-			self._ws_app = None
-		self._connected = False
-		print("WebSocket 连接已断开")
-
-	def send(self, message: str | dict[str, Any]) -> bool:
-		"""发送 WebSocket 消息"""
-		if not self._ws_app or not self._connected:
-			print("WebSocket 未连接")
-			return False
-		try:
-			if isinstance(message, dict):
-				message = dumps(message, ensure_ascii=False)
-			self._ws_app.send(message)
-		except Exception as e:
-			print(f"发送 WebSocket 消息失败: {e}")
-			return False
-		else:
-			return True
-
-	def receive(self, timeout: float = 30.0) -> str | bytes | None:
-		"""接收 WebSocket 消息"""
-		if not self._ws_app or not self._connected:
-			return None
-		try:
-			self._ws_app.settimeout(timeout)
-			message = self._ws_app.recv()
-		except websocket.WebSocketTimeoutException:
-			print("接收 WebSocket 消息超时")
-			return None
-		except Exception as e:
-			print(f"接收 WebSocket 消息失败: {e}")
-			return None
-		else:
-			return message
-
-	def listen(self) -> Generator[str | bytes]:
-		while self._connected and self._ws_app:
-			try:
-				message = self.receive(timeout=1.0)
-				if message is not None:
-					yield message
-			except Exception:
-				break
-
-	@property
-	def connected(self) -> bool:
-		return self._connected
-
-	def close(self) -> None:
-		self.disconnect()
-
-	def __enter__(self) -> Self:
-		return self
-
-	def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
-		self.close()
+			print(f"切换失败: 身份 '{identity}' 的认证头为空")
 
 
 class FileUploader(IFileUploader):
@@ -953,16 +828,6 @@ class ClientFactory:
 	def create_codemao_client() -> CodeMaoClient:
 		"""创建编程猫 HTTP 客户端"""
 		return CodeMaoClient()
-
-	@staticmethod
-	def create_websocket_client() -> CodeMaoWebSocketClient:
-		"""创建 WebSocket 客户端"""
-		return CodeMaoWebSocketClient()
-
-	@staticmethod
-	def create_codemao_websocket_client() -> CodeMaoWebSocketClient:
-		"""创建编程猫 WebSocket 客户端"""
-		return CodeMaoWebSocketClient()
 
 	@staticmethod
 	def create_file_uploader() -> FileUploader:

@@ -1,9 +1,7 @@
-import operator
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from random import randint
-from time import sleep
 from typing import Any, Literal, cast, overload
 
 from aumiao.core.base import coordinator
@@ -288,7 +286,7 @@ class Obtain:
 			user_comments_map[user_id_str]["comments"].append(content)
 			user_comments_map[user_id_str]["comment_count"] += 1
 		result = list(user_comments_map.values())
-		result.sort(key=operator.itemgetter("comment_count"), reverse=True)
+		result.sort(key=lambda x: x["comment_count"], reverse=True)
 		return result
 
 	@staticmethod
@@ -344,7 +342,7 @@ class Obtain:
 			percentage = (stat["total_reports"] / total_all_reports * 100) if total_all_reports > 0 else 0.0
 			stat["percentage"] = round(percentage, 1)
 		# 按总举报数降序排序
-		statistics.sort(key=operator.itemgetter("total_reports"), reverse=True)
+		statistics.sort(key=lambda x: x["total_reports"], reverse=True)
 		return {
 			"total_admins": len(statistics),
 			"total_comment_reports": total_comment_reports,
@@ -427,19 +425,3 @@ class Obtain:
 			print(f"获取教育账号失败: {e}")
 			return iter([]) if return_method == "generator" else []
 		return iter([]) if return_method == "generator" else []
-
-	def process_edu_accounts(self, limit: int | None = None, action: Callable[[], Any] | None = None) -> None:
-		"""处理教育账号的切换、登录和执行操作"""
-		try:
-			coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")
-			accounts = self.switch_edu_account(limit=limit, return_method="list")
-			for identity, password in accounts:
-				print("切换教育账号")
-				sleep(3)
-				coordinator.auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
-				if action:
-					action()
-		except Exception as e:
-			print(f"教育账号处理失败: {e}")
-		finally:
-			coordinator.client.switch_identity(token=coordinator.client.token.average, identity="average")

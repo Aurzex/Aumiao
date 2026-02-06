@@ -1,0 +1,101 @@
+# 颜色配置
+COLOR_CONFIG: dict[BlockCategory, str] = {
+    BlockCategory.EVENT: "#FFAB19",
+    BlockCategory.CONTROL: "#FF8C1A",
+    BlockCategory.MOTION: "#4C97FF",
+    BlockCategory.APPEARANCE: "#9966FF",
+    BlockCategory.INTERACTION: "#5CB1D6",
+    BlockCategory.AUDIO: "#D65CD6",
+    BlockCategory.SENSING: "#5CB1D6",
+    BlockCategory.OPERATOR: "#40BF4A",
+    BlockCategory.VARIABLE: "#FF8C1A",
+    BlockCategory.LIST: "#FF6680",
+    BlockCategory.PROCEDURE: "#FF6680",
+    BlockCategory.PEN: "#009900",
+    BlockCategory.ANIMATION: "#9966FF",
+    BlockCategory.CAMERA: "#4C97FF",
+    BlockCategory.COGNITIVE: "#FF6680",
+    BlockCategory.AI_CHAT: "#40BF4A",
+    BlockCategory.AI_CLASSIFY: "#CF63CF",
+    BlockCategory.ONLINE: "#FFAB19",
+    BlockCategory.JUDGE: "#FF8C1A",
+    BlockCategory.MATH: "#40BF4A",
+    BlockCategory.TEXT: "#CF63CF",
+}
+
+# 字段类型到值的映射
+FIELD_TYPE_MAPPING: dict[FieldType, dict[str, Any]] = {
+    FieldType.TEXT: {
+        "default": "",
+        "validator": lambda x: isinstance(x, str),
+    },
+    FieldType.NUMBER: {
+        "default": 0,
+        "validator": lambda x: isinstance(x, (int, float)),
+    },
+    FieldType.BOOLEAN: {
+        "default": False,
+        "validator": lambda x: isinstance(x, bool),
+    },
+    FieldType.COLOR: {
+        "default": "#000000",
+        "validator": lambda x: isinstance(x, str) and (x.startswith(("#", "rgb"))),
+    },
+}
+# 块连接约束
+CONNECTION_CONSTRAINTS: dict = {
+    "output": ["input_value"],
+    "previous_statement": ["next_statement"],
+    "next_statement": ["previous_statement"],
+    "input_value": ["output"],
+}
+class FieldType(Enum):
+    """字段类型枚举"""
+    TEXT = "text"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    DROPDOWN = "dropdown"
+    COLOR = "color"
+    VARIABLE = "variable"
+    SPRITE = "sprite"
+    STYLE = "style"
+    AUDIO = "audio"
+    LIST = "list"
+    PROCEDURE = "procedure"
+    BROADCAST = "broadcast"
+    RANKING = "ranking"
+    LAYER = "layer"
+    ATTRIBUTE = "attribute"
+    EFFECT = "effect"
+    SCREEN = "screen"
+    TRANSITION = "transition"
+    KEY = "key"
+    DIRECTION = "direction"
+    COMPARISON = "comparison"
+    OPERATOR = "operator"
+    LOGIC = "logic"
+    TRIG_FUNCTION = "trig_function"
+    ROUNDING = "rounding"
+    ARITHMETIC = "arithmetic"
+    PEN_COLOR_PROPERTY = "pen_color_property"
+
+class NodeType(Enum):
+    """节点类型枚举"""
+    ELEMENT_NODE = 1
+    ATTRIBUTE_NODE = 2
+    TEXT_NODE = 3
+
+class BlockEventType(Enum):
+    """块事件类型枚举"""
+    CREATE = "create"
+    DELETE = "delete"
+    CHANGE = "change"
+    MOVE = "move"
+    DRAG_AREA_CHANGE = "drag_area_change"
+    END_DRAG = "end_drag"
+    START_DRAG = "start_drag"
+class ControllerType(Enum):
+    """控制器类型枚举"""
+    SLIDER = "SLIDER"
+    COLOR_PICKER = "COLOR_PICKER"
+    ANGLE_SCALE = "ANGLE_SCALE"

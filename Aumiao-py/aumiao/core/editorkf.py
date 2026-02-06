@@ -1,5 +1,4 @@
 import json
-import operator
 import pathlib
 import random
 import sys
@@ -692,7 +691,7 @@ class InteractiveEditor:
 			print("\n  积木类型分布 (前 10):")
 			for block_type, count in sorted(
 				analysis["block_types"].items(),
-				key=operator.itemgetter(1),
+				key=lambda x: x[1],
 				reverse=True,
 			)[:10]:
 				print(f"{block_type}: {count}")

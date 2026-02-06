@@ -1,66 +1,18 @@
 """服务类: 认证管理、文件上传、高级服务"""
-
-import contextlib
 import json
-import operator
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from dataclasses import dataclass
 from pathlib import Path
 from time import sleep
 from typing import Any, Literal, cast
 
 from aumiao.core.base import coordinator
 from aumiao.core.cloudcfg import CloudAPI
-from aumiao.core.compiler import CodemaoDecompiler
 from aumiao.core.models import VALID_REPLY_TYPES, SourceConfigSimple
-from aumiao.core.process import CommentProcessor, FileProcessor, ReplyProcessor, ReportAuthManager, ReportFetcher, ReportProcessor
+from aumiao.core.process import CommentProcessor, FileProcessor, MultiAccount, ReplyProcessor, ReportFetcher, ReportProcessor
 from aumiao.core.retrieve import Obtain
 from aumiao.utils.acquire import CodeMaoClient, HTTPStatus
 from aumiao.utils.decorator import singleton, skip_on_error
-
-
-# ==============================
-# 数据模型和辅助类
-# ==============================
-@dataclass
-class UploadResult:
-	"""文件上传结果"""
-
-	file_path: Path
-	url: str | None
-	success: bool
-	error: str | None = None
-
-
-@dataclass
-class WorkParsingRequest:
-	"""作品解析请求"""
-
-	comment_text: str
-	sender_id: int
-	sender_nickname: str
-	business_id: int
-	source_type: str
-	target_id: int
-	parent_id: int
-	reply_id: str
-	work_id: int
-	commands: list[str] | None = None
-
-	def __post_init__(self) -> None:
-		if self.commands is None:
-			self.commands = []
-
-
-@dataclass
-class AdminStatistics:
-	"""管理员统计信息"""
-
-	admin_id: int
-	admin_name: str
-	comment_reports: int
-	work_reports: int
 
 
 # ==============================
@@ -156,11 +108,11 @@ class FileUploadService:
 
 
 # ==============================
-# 作品解析和自动回复服务
+# 自动回复服务
 # ==============================
 @singleton
 class ReplyService:
-	"""作品解析服务"""
+	"""自动回复服务服务"""
 
 	def __init__(self) -> None:
 		self.processor = ReplyProcessor()
@@ -168,7 +120,7 @@ class ReplyService:
 
 	def process_replies(self, valid_reply_types: set[str] | None = None) -> bool:
 		"""
-		处理自动回复, 包含作品解析功能
+		处理自动回复
 		Args:
 			valid_reply_types: 有效的回复类型集合
 		Returns:
@@ -196,34 +148,6 @@ class ReplyService:
 				print(f"处理通知时发生错误: {e!s}")
 		print(f"\n 处理完成, 共处理 {processed_count} 条通知")
 		return processed_count > 0
-
-	def parse_work_from_comment(self, work_id: int, *, is_author: bool = False, commands: list[str] | None = None) -> tuple[str, list[str]]:
-		"""
-		解析作品并生成报告
-		Args:
-			work_id: 作品 ID
-			is_author: 是否为作者
-			commands: 附加命令
-		Returns:
-			(报告内容, CDN 链接列表)
-		"""
-		try:
-			# 获取作品详情
-			work_details = coordinator.work_obtain.fetch_work_details(work_id)
-			if not work_details:
-				return "获取作品信息失败", []
-			# 生成报告
-			report = self.processor.generate_work_report(work_details=work_details, is_author=is_author, commands=commands or [])
-			# 如果是作者且有编译命令, 编译作品
-			cdn_links = []
-			if is_author and commands and "compile" in commands:
-				cdn_link = self._compile_work(work_id, work_details)
-				if cdn_link:
-					cdn_links = self.processor.split_long_cdn_link(cdn_link)
-		except Exception as e:
-			return f"解析作品时发生错误: {e!s}", []
-		else:
-			return report, cdn_links
 
 	@staticmethod
 	def _get_formatted_replies() -> dict:
@@ -293,19 +217,7 @@ class ReplyService:
 		comment_text = self.processor.extract_comment_text(reply_type, message_info)
 		# 提取目标 ID
 		target_id, parent_id = self.processor.extract_target_and_parent_ids(reply_type, reply, message_info, business_id, source_type)
-		# 检查是否是作品解析请求
-		if "@作品解析:" in comment_text:
-			return self._handle_parsing_request(
-				comment_text=comment_text,
-				sender_id=sender_id,
-				sender_nickname=sender_nickname,
-				business_id=business_id,
-				source_type=source_type,
-				target_id=target_id,
-				parent_id=parent_id,
-				reply_id=reply_id,
-			)
-		# 普通回复处理
+		# 回复处理
 		return self._handle_normal_reply(
 			comment_text=comment_text,
 			formatted_answers=formatted_answers,
@@ -319,56 +231,6 @@ class ReplyService:
 			sender_nickname=sender_nickname,
 			sender_id=sender_id,
 		)
-
-	def _handle_parsing_request(self, **kwargs: Any) -> bool:
-		"""处理作品解析请求"""
-		try:
-			request = WorkParsingRequest(
-				comment_text=str(kwargs.get("comment_text", "")),
-				sender_id=int(kwargs.get("sender_id", 0)),
-				sender_nickname=str(kwargs.get("sender_nickname", "")),
-				business_id=int(kwargs.get("business_id", 0)),
-				source_type=str(kwargs.get("source_type", "")),
-				target_id=int(kwargs.get("target_id", 0)),
-				parent_id=int(kwargs.get("parent_id", 0)),
-				reply_id=str(kwargs.get("reply_id", "")),
-				work_id=0,  # 临时值, 将在后面设置
-			)
-		except (ValueError, TypeError):
-			return False
-		print(f"\n {'=' * 40}")
-		print(f"检测到作品解析请求 [通知 ID: {request.reply_id}]")
-		print(f"发送者: {request.sender_nickname} (ID: {request.sender_id})")
-		try:
-			# 提取作品信息
-			work_info = self.processor.extract_work_info(request.comment_text)
-			if not work_info:
-				print("未找到有效的作品链接或 ID")
-				return False
-			request.work_id = work_info["work_id"]
-			print(f"提取到作品 ID: {request.work_id}")
-			# 获取作品详情
-			work_details = coordinator.work_obtain.fetch_work_details(request.work_id)
-			if not work_details:
-				print("获取作品信息失败")
-				return False
-			# 检查作者身份
-			work_author_id = work_details.get("user_info", {}).get("id", 0)
-			is_author = str(request.sender_id) == str(work_author_id)
-			print(f"作品名称: {work_details.get('work_name', ' 未知作品 ')}")
-			print(f"作者 ID: {work_author_id}, 发送者是否为作者: {' 是 ' if is_author else ' 否 '}")
-			# 解析命令
-			request.commands = self.processor.parse_commands(request.comment_text)
-			print(f"解析到命令: {request.commands or ' 无 '}")
-			# 生成报告和链接
-			report, cdn_links = self.parse_work_from_comment(work_id=request.work_id, is_author=is_author, commands=request.commands)
-			# 发送消息
-			self._send_parsing_result(request=request, _work_details=work_details, report=report, cdn_links=cdn_links, is_author=is_author)
-		except Exception as e:
-			print(f"处理作品解析时发生错误: {e!s}")
-			return False
-		else:
-			return True
 
 	def _handle_normal_reply(self, **kwargs: Any) -> bool:
 		"""处理普通回复"""
@@ -404,52 +266,6 @@ class ReplyService:
 		print("✗ 回复失败")
 		return False
 
-	def _send_parsing_result(self, request: WorkParsingRequest, _work_details: dict, report: str, cdn_links: list[str], *, is_author: bool) -> None:
-		"""发送解析结果"""
-		# 准备所有消息
-		messages_to_send = []
-		report_parts = self.processor.split_long_message(report)
-		messages_to_send.extend(report_parts)
-		messages_to_send.extend(cdn_links)
-		print(f"总共需要发送 {len(messages_to_send)} 条消息")
-		# 发送消息
-		if is_author:
-			print("作者身份确认, 准备多位置处理")
-			# 发送作品评论
-			print(f"发送作品评论到作品 {request.work_id}:")
-			self.processor.send_messages_with_delay(
-				messages=messages_to_send,
-				send_func=lambda msg: coordinator.work_motion.create_work_comment(work_id=request.work_id, comment=msg, return_data=True),
-				comment_type="作品评论",
-			)
-			# 如果在帖子中, 也发送到帖子
-			if request.source_type == "post" and request.target_id > 0:
-				print(f"发送回复到帖子评论 {request.target_id}:")
-				self.processor.send_messages_with_delay(
-					messages=messages_to_send,
-					send_func=lambda msg: coordinator.forum_motion.create_comment_reply(
-						reply_id=request.target_id,
-						parent_id=request.parent_id,
-						content=msg,
-						return_data=True,
-					),
-					comment_type="帖子回复",
-				)
-		else:
-			print("非作者身份, 仅在帖子下回复")
-			if request.source_type == "post" and request.target_id > 0:
-				print(f"发送回复到帖子评论 {request.target_id}:")
-				self.processor.send_messages_with_delay(
-					messages=messages_to_send,
-					send_func=lambda msg: coordinator.forum_motion.create_comment_reply(
-						reply_id=request.target_id,
-						parent_id=request.parent_id,
-						content=msg,
-						return_data=True,
-					),
-					comment_type="帖子回复",
-				)
-
 	@staticmethod
 	def _send_reply(source_type: str, business_id: int, target_id: int, parent_id: int, content: str) -> bool | dict:
 		"""发送回复"""
@@ -461,24 +277,6 @@ class ReplyService:
 			parent_id=int(parent_id),  # 转换为整数
 			content=content,
 		)
-
-	def _compile_work(self, work_id: int, work_details: dict) -> str | None:
-		"""编译作品到 CDN"""
-		try:
-			print(f"编译作品 {work_id}...")
-			print(f"作品名称: {work_details.get('work_name')}")
-			print(f"积木块数: {work_details.get('n_brick')}")
-			print(f"角色数量: {work_details.get('n_roles')}")
-			if work_details.get("type", "NEMO") == "NEMO":
-				print("不支持 NEMO 作品上传到编程猫 CDN")
-				return None
-			# 解压作品文件
-			file_path = Path(CodemaoDecompiler().decompile(work_id=work_id))
-			# 上传文件到 CDN
-			return self.file_upload.upload_file(file_path=file_path, save_path="aumiao", method="codemao")
-		except Exception as e:
-			print(f"编译作品时发生错误: {e!s}")
-			return None
 
 
 # ==============================
@@ -1109,16 +907,15 @@ class CommunityService:
 		token = CodeMaoClient().token.average
 		results: list[tuple[str, int]] = []
 		for work in works:
-			with contextlib.suppress(Exception):
-				response = coordinator.work_obtain.fetch_work_details(work["work_id"])
-				work_name = response.get("work_name", response.get("name", "未知作品"))
-				if response.get("type") == "WOOD":
-					continue
-				online_count = _get_online_users(work["work_id"], token)
-				results.append((work_name, online_count))
+			response = coordinator.work_obtain.fetch_work_details(work["work_id"])
+			work_name = response.get("work_name", response.get("name", "未知作品"))
+			if response.get("type") == "WOOD":
+				continue
+			online_count = _get_online_users(work["work_id"], token)
+			results.append((work_name, online_count))
 		print("\n=== 作品在线人数排行榜 ===")
 		sorted_results = []
-		for name, count in sorted(results, key=operator.itemgetter(1), reverse=True):
+		for name, count in sorted(results, key=lambda x: x[1], reverse=True):
 			print(f"{name}: {count} 人在线")
 			sorted_results.append({"work_name": name, "online_count": count})
 		return {
@@ -1138,6 +935,7 @@ class BatchOperationService:
 
 	def __init__(self) -> None:
 		self.community_service = CommunityService()
+		self.account_manger = MultiAccount()
 
 	def batch_like(
 		self,
@@ -1167,8 +965,8 @@ class BatchOperationService:
 
 		def action() -> None:
 			self._batch_like_directly(target_list, content_type, user_id)
-
-		Obtain().process_edu_accounts(limit=limit, action=action)
+		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		self.account_manger.execute_with_accounts(limit=limit, func=action)
 
 	def _batch_like_directly(self, target_list: list, content_type: str, user_id: int | None = None) -> int:
 		"""直接批量点赞"""
@@ -1262,7 +1060,7 @@ class BatchOperationService:
 			for identity, password in accounts:
 				if cred_type == "token":
 					# 登录获取 token
-					response = coordinator.auth.login(identity=identity, password=password, status="edu", prefer_method="simple_password")
+					response = coordinator.auth.login(identity=identity, password=password, status="edu", prefer_method="password_v1")
 					credential = response.data["auth"]["token"]
 					# 只写入 token, 不包含账号信息
 					content = f"{credential}\n"
@@ -1286,8 +1084,7 @@ class BatchOperationService:
 		else:
 			return True
 
-	@staticmethod
-	def batch_report_work(work_id: int, reason: str = "违法违规") -> None:
+	def batch_report_work(self, work_id: int, reason: str = "违法违规") -> None:
 		"""
 		批量举报作品
 		Args:
@@ -1299,7 +1096,11 @@ class BatchOperationService:
 			举报数量
 		"""
 		hidden_border = 10
-		Obtain().process_edu_accounts(limit=hidden_border, action=lambda: coordinator.work_motion.execute_report_work(describe="", reason=reason, work_id=work_id))
+		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		self.account_manger.execute_with_accounts(
+			limit=hidden_border,
+			func=lambda: coordinator.work_motion.execute_report_work(describe="", reason=reason, work_id=work_id),
+		)
 
 	@staticmethod
 	def create_comment(target_id: int, content: str, source_type: Literal["work", "shop", "post"]) -> bool:
@@ -1336,7 +1137,7 @@ class ReportService:
 	"""举报处理服务"""
 
 	def __init__(self) -> None:
-		self.report_manager = ReportAuthManager()
+		self.report_manager = MultiAccount()
 		self.report_processor = ReportProcessor()
 		self.report_fetcher = ReportFetcher()
 		self.processed_count = 0
@@ -1352,7 +1153,7 @@ class ReportService:
 		"""
 		coordinator.printer.print_header("=== 举报处理系统 ===")
 		# 加载学生账号
-		self.report_manager.load_student_accounts()
+		self.report_manager.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
 		# 主处理循环
 		while True:
 			self.total_reports = self.report_fetcher.get_total_reports(status="TOBEDONE")
@@ -1414,7 +1215,7 @@ class ServiceManager:
 
 	@property
 	def reply(self) -> ReplyService:
-		"""作品解析服务"""
+		"""自动回复服务"""
 		if "reply_service" not in self._services:
 			self._services["reply_service"] = ReplyService()
 		return self._services["reply_service"]
