@@ -80,6 +80,11 @@ class DataFetcher:
 		response = self._client.send_request(endpoint=url, method="GET")
 		return response.json()
 
+	# 获取 pc 客户端更新
+	def fetch_pc_client(self) -> dict:
+			response = self._client.send_request(endpoint="/tiger/pc_client/releases/latest", method="GET")
+			return response.json()
+
 	# 获取点个猫更新
 	def fetch_pickcat_update(self) -> dict:
 		response = self._client.send_request(endpoint="https://update.codemao.cn/updatev2/appsdk", method="GET")
@@ -329,6 +334,43 @@ class DataFetcher:
 			params=params,
 			limit=limit,
 		)
+
+	# 获取旧版全部作品标签
+	def fetch_work_labels(self) -> dict:
+			response = self._client.send_request(
+					endpoint="/api/work/label/list",
+					method="GET",
+				)
+			return response.json()
+
+	# 获取旧版全部作品标签
+	def fetch_work_category(self) -> dict:
+		response = self._client.send_request(
+							endpoint="/api/label/list",
+							method="GET",
+						)
+		return response.json()
+
+	# 获取推荐作品
+	def fetch_recommended_ide_works(self, types: str, page_number: int = 1, amount_items: int = 24) -> dict:
+		params = {"type": types, "page_number": page_number, "amount_items": amount_items}
+		response = self._client.send_request(
+			endpoint="/tiger/work/ide/recommended",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	# 获取素材推荐
+	# 素材 category_id 1为背景,4为音乐,8为角色
+	def fetch_material_recommend(self, category_id: int, limit: int = 15, offset: int = 0) -> dict:
+		params = {"category_id": category_id, "limit": limit, "offset": offset}
+		response = self._client.send_request(
+			endpoint="/tiger/material/recommend",
+			method="GET",
+			params=params,
+		)
+		return response.json()
 
 
 @singleton
