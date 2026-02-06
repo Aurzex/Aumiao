@@ -1,4 +1,5 @@
 """服务类: 认证管理、文件上传、高级服务"""
+
 import json
 from collections import defaultdict
 from collections.abc import Callable, Generator
@@ -965,6 +966,7 @@ class BatchOperationService:
 
 		def action() -> None:
 			self._batch_like_directly(target_list, content_type, user_id)
+
 		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
 		self.account_manger.execute_with_accounts(limit=limit, func=action)
 

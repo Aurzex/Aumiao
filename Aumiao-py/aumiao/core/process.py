@@ -1029,7 +1029,6 @@ class ViolationChecker:
 
 
 class ReplyProcessor:
-
 	@staticmethod
 	def _protect_cdn_link(link: str) -> str:
 		"""

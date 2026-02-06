@@ -13,6 +13,7 @@ from aumiao.utils.decorator import singleton
 # ==================== 基础数据结构和枚举 ====================
 class LoginMethod(Enum):
 	"""登录方法枚举"""
+
 	PASSWORD_V0 = "password_v0"
 	PASSWORD_V1 = "password_v1"
 	PASSWORD_V2 = "password_v2"
@@ -23,12 +24,14 @@ class LoginMethod(Enum):
 
 class UserRole(Enum):
 	"""用户角色枚举"""
+
 	USER = "user"
 	ADMIN = "admin"
 
 
 class AccountStatus(Enum):
 	"""账号状态枚举"""
+
 	JUDGEMENT = "judgement"
 	AVERAGE = "average"
 	EDU = "edu"
@@ -45,6 +48,7 @@ AllMethodType = Literal["password_v0", "password_v1", "password_v2", "token", "a
 @dataclass
 class LoginCredentials:
 	"""登录凭证数据类"""
+
 	identity: str = ""
 	password: str = ""
 	token: str = ""
@@ -56,6 +60,7 @@ class LoginCredentials:
 @dataclass
 class LoginResult:
 	"""登录结果数据类"""
+
 	success: bool
 	method: LoginMethod
 	message: str
@@ -359,21 +364,14 @@ class AuthManager:
 			admin_methods: list[AdminMethodType] = ["admin_token", "admin_password"]
 
 			if role == "user" and prefer_method not in user_methods:
-				msg = (
-					f"用户角色不支持登录方法 '{prefer_method}',"
-					f"可用方法: {user_methods}"
-				)
+				msg = f"用户角色不支持登录方法 '{prefer_method}',可用方法: {user_methods}"
 				raise ValueError(
 					msg,
 				)
 
 			if role == "admin" and prefer_method not in admin_methods:
-				msg = (
-					f"管理员角色不支持登录方法 '{prefer_method}',"
-					f"可用方法: {admin_methods}"
-				)
-				raise ValueError(
-					msg)
+				msg = f"管理员角色不支持登录方法 '{prefer_method}',可用方法: {admin_methods}"
+				raise ValueError(msg)
 			if prefer_method in {"password_v0", "password_v1", "password_v2", "admin_password"} and (not identity or not password):
 				msg = f"登录方法 '{prefer_method}' 需要提供 identity 和 password 参数"
 				raise ValueError(
