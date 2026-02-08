@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from html import unescape
 from json import dump, load
 from pathlib import Path
-from re import match as matchs
+from re import match as matches
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID, uuid4
 from xml.etree import ElementTree as ET
@@ -39,7 +39,7 @@ class TypeChecker:
 			hex_part = color_str[1:]
 			return len(hex_part) in {3, 4, 6, 8} and all(c in "0123456789ABCDEFabcdef" for c in hex_part)
 		if color_str.startswith("rgba ("):
-			match = matchs(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
+			match = matches(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
 					r, g, b, a = match.groups()
@@ -54,7 +54,7 @@ class TypeChecker:
 				except (ValueError, TypeError):
 					return False
 		if color_str.startswith("rgb ("):
-			match = matchs(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
+			match = matches(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
 					r, g, b = match.groups()
@@ -942,7 +942,7 @@ class Color:
 				self.a = int(hex_str[6:8], 16) / 255.0
 				return True
 		elif color_str.startswith("rgba ("):
-			match = matchs(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
+			match = matches(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
 					self.r = int(match.group(1))
@@ -954,7 +954,7 @@ class Color:
 				else:
 					return True
 		elif color_str.startswith("rgb ("):
-			match = matchs(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
+			match = matches(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
 					self.r = int(match.group(1))
