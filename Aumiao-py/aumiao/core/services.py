@@ -1062,7 +1062,7 @@ class BatchOperationService:
 			for identity, password in accounts:
 				if cred_type == "token":
 					# 登录获取 token
-					response = coordinator.auth.login(identity=identity, password=password, status="edu", prefer_method="password_v1")
+					response = coordinator.auth_manager.login(identity=identity, password=password, status="edu", prefer_method="password_v1")
 					credential = response.data["auth"]["token"]
 					# 只写入 token, 不包含账号信息
 					content = f"{credential}\n"
@@ -1139,7 +1139,6 @@ class ReportService:
 	"""举报处理服务"""
 
 	def __init__(self) -> None:
-		self.report_manager = MultiAccount()
 		self.report_processor = ReportProcessor()
 		self.report_fetcher = ReportFetcher()
 		self.processed_count = 0
@@ -1154,8 +1153,7 @@ class ReportService:
 			是否成功
 		"""
 		coordinator.printer.print_header("=== 举报处理系统 ===")
-		# 加载学生账号
-		self.report_manager.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		print(Obtain().get_admin_statistics())
 		# 主处理循环
 		while True:
 			self.total_reports = self.report_fetcher.get_total_reports(status="TOBEDONE")
@@ -1176,8 +1174,8 @@ class ReportService:
 		coordinator.printer.print_header("=== 处理结果统计 ===")
 		coordinator.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		# 终止会话
-		coordinator.auth.admin_logout()
-		coordinator.auth.restore_admin_account()
+		coordinator.auth_manager.admin_logout()
+		coordinator.auth_manager.restore_admin_account()
 		return True
 
 	@staticmethod

@@ -259,6 +259,7 @@ class BaseHTTPClient:
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
+				# sleep(0.5)
 				# print("&" * 50)
 				# print("Headers:", request_headers)
 				# print("URL:", url)
