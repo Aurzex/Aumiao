@@ -157,6 +157,7 @@ class AbnormalProcessStrategy(ProcessStrategy, ABC):
 		target_lists[action_type].append(identifier)
 
 
+@singleton
 class AdsProcessStrategy(AbnormalProcessStrategy):
 	"""广告处理策略"""
 
@@ -175,6 +176,7 @@ class AdsProcessStrategy(AbnormalProcessStrategy):
 		return f"广告 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('content', '')[:50]}"
 
 
+@singleton
 class BlacklistProcessStrategy(AbnormalProcessStrategy):
 	"""黑名单处理策略"""
 
@@ -195,6 +197,7 @@ class BlacklistProcessStrategy(AbnormalProcessStrategy):
 		return f"黑名单 {log_type} [{source_type}]{title_part}{parent_info} : {data.get('nickname', ' 未知用户 ')}"
 
 
+@singleton
 class DuplicatesProcessStrategy(ProcessStrategy):
 	"""重复评论处理策略"""
 
@@ -232,6 +235,7 @@ class DuplicatesProcessStrategy(ProcessStrategy):
 		content_map[content_key].append(identifier)
 
 
+@singleton
 class ProcessStrategyFactory:
 	"""处理策略工厂"""
 
@@ -263,6 +267,7 @@ class ProcessStrategyFactory:
 
 
 # ========================== 管道模式实现 ==========================
+@singleton
 class OfficialCheckProcessor(BaseProcessor):
 	"""官方账号检查处理器"""
 
@@ -304,6 +309,7 @@ class OfficialCheckProcessor(BaseProcessor):
 					context.messages.append("警告: 无法执行官方内容自动通过操作")
 
 
+@singleton
 class DetailDisplayProcessor(BaseProcessor):
 	"""完整详情显示处理器 - 根据举报类型显示特定信息"""
 
@@ -528,6 +534,7 @@ class DetailDisplayProcessor(BaseProcessor):
 						coordinator.printer.print_message(f"{field_label}: {value}", "INFO")
 
 
+@singleton
 class ActionSelectionProcessor(BaseProcessor):
 	"""动作选择处理器"""
 
@@ -727,6 +734,7 @@ class CommentProcessor:
 		return self._strategy_factory.get_all_strategy_types()
 
 
+@singleton
 class ViolationChecker:
 	"""违规检查器"""
 
@@ -766,7 +774,7 @@ class ViolationChecker:
 		try:
 			total = Obtain().get_comment_total(source_id=source_id, source_type=source_type)
 			print(f"当前处理项共有 {total} 个评论")
-			limit = int(input("输入要获取的评论数"))
+			limit = int(input("输入要获取的评论数: "))
 			comments = Obtain().get_comments(
 				source_id=source_id,
 				source=source_type,
@@ -837,11 +845,12 @@ class ViolationChecker:
 		"""处理自动举报: 用学生账号批量举报违规评论"""
 		# 1. 检查是否有学生账号
 		auth_manager = MultiAccount()
+		auth_manager.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
 		# 如果没有账号, 先加载
-		if not auth_manager.accounts:
-			coordinator.printer.print_message("未加载学生账号, 无法进行自动举报", "ERROR")
-			coordinator.printer.print_message("请在主菜单中选择 ' 加载学生账号 ' 功能", "INFO")
-			return
+		# if not auth_manager.accounts:
+		# 	coordinator.printer.print_message("未加载学生账号, 无法进行自动举报", "ERROR")
+		# 	coordinator.printer.print_message("请在主菜单中选择 ' 加载学生账号 ' 功能", "INFO")
+		# 	return
 		# 2. 询问是否执行自动举报
 		if coordinator.printer.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			coordinator.printer.print_message("自动举报操作已取消", "INFO")
@@ -898,7 +907,7 @@ class ViolationChecker:
 					username, password = available_accounts[account_index]
 					print(username, password)
 					try:
-						coordinator.auth.login(
+						coordinator.auth_manager.login(
 							identity=username,
 							password=password,
 							status="edu",
@@ -918,17 +927,6 @@ class ViolationChecker:
 						if account_index >= len(available_accounts):
 							account_index = 0
 						continue
-				# 获取当前学生账号的 reporter_id
-				try:
-					# 需要重新获取用户信息以获取当前账号的 ID
-					user_info = coordinator.user_obtain.fetch_account_details()
-					reporter_id = user_info.get("id", 0)
-					if not reporter_id:
-						coordinator.printer.print_message("无法获取当前账号 ID, 跳过", "WARNING")
-						continue
-				except Exception as e:
-					coordinator.printer.print_message(f"获取账号信息失败: {e!s}", "WARNING")
-					continue
 				# 执行举报
 				result = self._execute_single_report(violation=violation, reason_content=reason_content)
 				if result:
@@ -945,7 +943,7 @@ class ViolationChecker:
 				coordinator.printer.print_message(f"[{idx}/{len(violations)}] 举报异常: {e!s}", "ERROR")
 		# 完成后恢复管理员账号
 		try:
-			coordinator.auth.restore_admin_account()
+			coordinator.auth_manager.restore_admin_account()
 			coordinator.printer.print_message("已恢复管理员账号", "INFO")
 		except Exception as e:
 			coordinator.printer.print_message(f"恢复管理员账号失败: {e!s}", "WARNING")
@@ -1028,6 +1026,7 @@ class ViolationChecker:
 			return False
 
 
+@singleton
 class ReplyProcessor:
 	@staticmethod
 	def _protect_cdn_link(link: str) -> str:
@@ -1133,6 +1132,7 @@ class ReplyProcessor:
 		print(f"选择回复: 【{chosen}】")
 
 
+@singleton
 class ReportTypeRegistry:
 	"""举报类型注册表 - 集中管理所有举报类型的配置"""
 
@@ -1391,7 +1391,7 @@ class ReportFetcher:
 				# 创建举报记录
 				record = ReportRecord(
 					item=item_ndd,
-					report_type=report_type,  # pyright: ignore [reportArgumentType]
+					report_type=report_type,  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-argument-type]
 					item_id=str(item_ndd[config.item_id_field]),
 					content=item_ndd[config.content_field],
 					processed=False,
@@ -1749,6 +1749,7 @@ class ReportProcessor:
 		self.violation_checker.check_violation(source_id=source_id, source_type=source_type, board_name=board_name, user_id=user_id)
 
 
+@singleton
 class MultiAccount:
 	"""账号管理器"""
 
@@ -1843,7 +1844,7 @@ class MultiAccount:
 	def _login(self, username: str, password: str) -> None:
 		"""登录账号"""
 		print(f"登录: {username}")
-		coordinator.auth.login(
+		coordinator.auth_manager.login(
 			identity=username,
 			password=password,
 			status=self.identity_type,
@@ -1867,6 +1868,7 @@ class MultiAccount:
 		print("已清空")
 
 
+@singleton
 class FileProcessor:
 	def __init__(self) -> None:
 		super().__init__()

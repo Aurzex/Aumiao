@@ -147,7 +147,7 @@ class InfrastructureCoordinator:
 	# API 模块属性 (延迟加载, 类型明确)
 	# ==============================
 	@property
-	def auth(self) -> "auth.AuthManager":
+	def auth_manager(self) -> "auth.AuthManager":
 		"""认证管理模块"""
 		return self._modules.get("auth")
 

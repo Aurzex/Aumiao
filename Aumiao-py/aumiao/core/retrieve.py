@@ -58,7 +58,7 @@ class Obtain:
 			msg = f"无效来源: {source_value}"
 			raise ValueError(msg)
 		method_func, id_key, user_field = self._source_map[source_value]
-		comments = method_func(**{id_key: source_id, "limit": limit})  # pyright: ignore [reportArgumentType]
+		comments = method_func(**{id_key: source_id, "limit": limit})  # pyright: ignore [reportArgumentType]  # ty:ignore[invalid-argument-type]
 		reply_cache: dict[int, list[dict[str, Any]]] = {}
 
 		def extract_reply_user(reply: dict[str, Any]) -> int:
@@ -267,8 +267,6 @@ class Obtain:
 		for single_work in works:
 			# 使用新的简洁 API
 			work_comments = self.get_comments(source="work", source_id=single_work["work_id"], method="comments", limit=20)
-			# 类型断言: 我们知道当 method="comments" 时返回的是 list [dict]
-			work_comments = cast("list [dict [str, Any]]", work_comments)
 			comments.extend(work_comments)
 		# 处理评论数据
 		filtered_comments = self._data_processor.filter_fields(data=comments, include=["user_id", "content", "nickname"])

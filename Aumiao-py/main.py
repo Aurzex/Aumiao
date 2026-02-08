@@ -167,7 +167,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("用户登录")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	response = coordinator.auth.login(identity=identity, password=password)
+	response = coordinator.auth_manager.login(identity=identity, password=password)
 	data_ = coordinator.user_obtain.fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {
@@ -251,8 +251,8 @@ def handle_report(_account_data_manager: AccountDataManager) -> None:
 	printer.print_header("处理举报")
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
-	coordinator.auth.login(identity=identity, password=password, role="admin")
-	judgment_data = coordinator.auth.fetch_admin_dashboard_data()
+	coordinator.auth_manager.login(identity=identity, password=password, role="admin")
+	judgment_data = coordinator.auth_manager.fetch_admin_dashboard_data()
 	print(printer.color_text(f"登录成功! 欢迎 {judgment_data['admin']['username']}", "SUCCESS"))
 	admin_id: int = judgment_data["admin"]["id"]
 	services.report.process_reports(admin_id=admin_id)
@@ -333,7 +333,7 @@ def logout(account_data_manager: AccountDataManager) -> None:
 	printer.print_header("账户登出")
 	method = get_enum_input("请输入方法", {"web", "app"})
 	method = cast("Literal ['web','app']", method)
-	coordinator.auth.execute_logout_v12(method=method)
+	coordinator.auth_manager.execute_logout_v12(method=method)
 	account_data_manager.clear()
 	print(printer.color_text("已成功登出账户", "SUCCESS"))
 
