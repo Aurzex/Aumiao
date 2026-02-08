@@ -1,6 +1,3 @@
-# ==============================
-# 导入和类型定义
-# ==============================
 from collections import namedtuple
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import json
-import re
-import uuid
-import xml.etree.ElementTree as ET
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from html import unescape
+from json import dump, load
 from pathlib import Path
+from re import match as matchs
 from typing import TYPE_CHECKING, Any, TypeVar, cast
+from uuid import UUID, uuid4
+from xml.etree import ElementTree as ET
 
 from aumiao.core.models import (
 	BLOCK_CONFIG,
@@ -39,7 +39,7 @@ class TypeChecker:
 			hex_part = color_str[1:]
 			return len(hex_part) in {3, 4, 6, 8} and all(c in "0123456789ABCDEFabcdef" for c in hex_part)
 		if color_str.startswith("rgba ("):
-			match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
+			match = matchs(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
 					r, g, b, a = match.groups()
@@ -54,7 +54,7 @@ class TypeChecker:
 				except (ValueError, TypeError):
 					return False
 		if color_str.startswith("rgb ("):
-			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
+			match = matchs(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
 					r, g, b = match.groups()
@@ -92,7 +92,7 @@ class TypeChecker:
 	def is_valid_uuid(value: str) -> bool:
 		"""检查是否为有效 UUID"""
 		try:
-			uuid.UUID(value)
+			UUID(value)
 		except (ValueError, TypeError, AttributeError):
 			return False
 		else:
@@ -173,7 +173,7 @@ class JSONConverter:
 		"""确保对象是有效 UUID"""
 		if isinstance(obj, str) and TypeChecker.is_valid_uuid(obj):
 			return obj
-		return default or str(uuid.uuid4())
+		return default or str(uuid4())
 
 
 class ConstraintManager:
@@ -261,7 +261,7 @@ class XMLParser:
 		if element.tag in {"block", "shadow"}:
 			result["type"] = element.get("type", "")
 			result["is_shadow"] = element.tag == "shadow"
-			result["id"] = element.get("id", str(uuid.uuid4()))
+			result["id"] = element.get("id", str(uuid4()))
 		# 解析字段
 		fields = {}
 		field_constraints = {}
@@ -942,7 +942,7 @@ class Color:
 				self.a = int(hex_str[6:8], 16) / 255.0
 				return True
 		elif color_str.startswith("rgba ("):
-			match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
+			match = matchs(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", color_str)
 			if match:
 				try:
 					self.r = int(match.group(1))
@@ -954,7 +954,7 @@ class Color:
 				else:
 					return True
 		elif color_str.startswith("rgb ("):
-			match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
+			match = matchs(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color_str)
 			if match:
 				try:
 					self.r = int(match.group(1))
@@ -1056,7 +1056,7 @@ class CommentJson:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 
 	def to_dict(self) -> dict[str, Any]:
 		"""转换为字典"""
@@ -1080,7 +1080,7 @@ class CommentJson:
 	def from_dict(cls, data: dict[str, Any]) -> CommentJson:
 		"""从字典创建"""
 		return cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			text=JSONConverter.ensure_str(data.get("text")),
 			parent_id=data.get("parent_id"),
 			pinned=JSONConverter.ensure_bool(data.get("pinned", False)),
@@ -1234,7 +1234,7 @@ class Block:
 	"""KN 积木结构 - 匹配实际 JSON 数据结构"""
 
 	# 基础标识属性
-	id: str = field(default_factory=lambda: str(uuid.uuid4()))
+	id: str = field(default_factory=lambda: str(uuid4()))
 	type: str = ""
 	is_shadow: bool = False
 	# 显示与控制属性
@@ -1272,7 +1272,7 @@ class Block:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 		# 根据类型设置默认属性
 		config = BLOCK_CONFIG.get(BlockType(self.type), {})
 		if config:
@@ -1385,7 +1385,7 @@ class Block:
 			return cls._create_procedure_block(data, block_type)
 		# 创建普通积木
 		block = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			type=block_type,
 			is_shadow=JSONConverter.ensure_bool(data.get("is_shadow", False)),
 			comment=data.get("comment"),
@@ -1595,7 +1595,7 @@ class Procedure:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 
 	def to_dict(self) -> dict[str, Any]:
 		"""转换为字典"""
@@ -1613,7 +1613,7 @@ class Procedure:
 	def from_dict(cls, data: dict[str, Any]) -> Procedure:
 		"""从字典创建过程"""
 		proc = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			name=JSONConverter.ensure_str(data.get("name")),
 			type=JSONConverter.ensure_str(data.get("type", "NORMAL")),
 			params=JSONConverter.ensure_list(data.get("params")),
@@ -1644,7 +1644,7 @@ class Procedure:
 class ShadowBlock:
 	"""影子积木 (完整版)"""
 
-	id: str = field(default_factory=lambda: str(uuid.uuid4()))
+	id: str = field(default_factory=lambda: str(uuid4()))
 	type: str = ""
 	shadow_type: ShadowType = ShadowType.REGULAR
 	category: ShadowCategory = ShadowCategory.DEFAULT_VALUE
@@ -1676,7 +1676,7 @@ class ShadowBlock:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 		# 根据影子类型设置属性
 		if self.shadow_type == ShadowType.EMPTY:
 			self.editable = False
@@ -1732,7 +1732,7 @@ class ShadowBlock:
 			except ValueError:
 				connection_type = None
 		return cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			type=JSONConverter.ensure_str(data.get("type")),
 			shadow_type=ShadowType(data.get("shadow_type", "regular")),
 			category=ShadowCategory(data.get("category", "default_value")),
@@ -1772,7 +1772,7 @@ class KNProjectParser:
 		"""递归收集嵌套结构中的所有块"""
 		if not isinstance(data, dict) or "type" not in data:
 			return
-		block_id = data.get("id", str(uuid.uuid4()))
+		block_id = data.get("id", str(uuid4()))
 		# 保存原始数据
 		if block_id not in all_blocks_flat:
 			all_blocks_flat[block_id] = data
@@ -1848,7 +1848,7 @@ class Actor:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 
 	def to_dict(self) -> dict[str, Any]:
 		"""转换为字典"""
@@ -1871,7 +1871,7 @@ class Actor:
 	def from_dict(cls, data: dict[str, Any]) -> Actor:
 		"""从字典创建角色"""
 		actor = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			name=JSONConverter.ensure_str(data.get("name")),
 			position=JSONConverter.ensure_dict(data.get("position", {"x": 0.0, "y": 0.0})),
 			scale=JSONConverter.ensure_float(data.get("scale", 100.0)),
@@ -1929,7 +1929,7 @@ class Scene:
 	def __post_init__(self) -> None:
 		"""初始化后处理"""
 		if not self.id:
-			self.id = str(uuid.uuid4())
+			self.id = str(uuid4())
 
 	def to_dict(self) -> dict[str, Any]:
 		"""转换为字典"""
@@ -1952,7 +1952,7 @@ class Scene:
 	def from_dict(cls, data: dict[str, Any]) -> Scene:
 		"""从字典创建场景"""
 		scene = cls(
-			id=JSONConverter.ensure_str(data.get("id"), str(uuid.uuid4())),
+			id=JSONConverter.ensure_str(data.get("id"), str(uuid4())),
 			name=JSONConverter.ensure_str(data.get("name")),
 			screen_name=JSONConverter.ensure_str(data.get("screenName", "屏幕")),
 			styles=JSONConverter.ensure_list(data.get("styles")),
@@ -2221,7 +2221,7 @@ class KNProject:
 			msg = f"文件不存在: {filepath}"
 			raise FileNotFoundError(msg)
 		with filepath.open("r", encoding="utf-8") as f:
-			data = json.load(f)
+			data = load(f)
 		project = cls.load_from_dict(data)
 		project.filepath = filepath
 		project.project_folder = filepath.parent
@@ -2242,7 +2242,7 @@ class KNProject:
 			filepath = filepath.with_suffix(".bcmkn")
 		data = self.to_dict()
 		with filepath.open("w", encoding="utf-8") as f:
-			json.dump(data, f, ensure_ascii=False, indent=2)
+			dump(data, f, ensure_ascii=False, indent=2)
 		print(f"项目已保存: {filepath}")
 
 	def to_dict(self) -> dict[str, Any]:
@@ -2286,7 +2286,7 @@ class KNProject:
 		scenes_elem = root.find("scenes")
 		if scenes_elem is not None:
 			for scene_elem in scenes_elem.findall("scene"):
-				scene_id = scene_elem.get("id", str(uuid.uuid4()))
+				scene_id = scene_elem.get("id", str(uuid4()))
 				scene_name = scene_elem.get("name", "场景")
 				scene = Scene(id=scene_id, name=scene_name)
 				# 解析场景的积木
@@ -2306,7 +2306,7 @@ class KNProject:
 		actors_elem = root.find("actors")
 		if actors_elem is not None:
 			for actor_elem in actors_elem.findall("actor"):
-				actor_id = actor_elem.get("id", str(uuid.uuid4()))
+				actor_id = actor_elem.get("id", str(uuid4()))
 				actor_name = actor_elem.get("name", "角色")
 				actor = Actor(id=actor_id, name=actor_name)
 				# 解析角色的积木
@@ -2357,7 +2357,7 @@ class KNProject:
 
 	def add_actor(self, name: str, position: dict[str, float] | None = None, **kwargs: Any) -> str:
 		"""添加角色"""
-		actor_id = str(uuid.uuid4())
+		actor_id = str(uuid4())
 		if position is None:
 			position = {"x": 0.0, "y": 0.0}
 		actor = Actor(id=actor_id, name=name, position=position, **kwargs)
@@ -2366,7 +2366,7 @@ class KNProject:
 
 	def add_scene(self, name: str, screen_name: str = "屏幕", **kwargs: Any) -> str:
 		"""添加场景"""
-		scene_id = str(uuid.uuid4())
+		scene_id = str(uuid4())
 		scene = Scene(id=scene_id, name=name, screen_name=screen_name, **kwargs)
 		self.scenes[scene_id] = scene
 		self.sort_list.append(scene_id)
@@ -2376,14 +2376,14 @@ class KNProject:
 
 	def add_variable(self, name: str, value: Any = 0, *, is_global: bool = True) -> str:
 		"""添加变量"""
-		var_id = str(uuid.uuid4())
+		var_id = str(uuid4())
 		variable = {"id": var_id, "name": name, "value": value, "isGlobal": is_global}
 		self.variables[var_id] = variable
 		return var_id
 
 	def add_audio(self, name: str, audio_url: str = "", volume: int = 100) -> str:
 		"""添加音频"""
-		audio_id = str(uuid.uuid4())
+		audio_id = str(uuid4())
 		audio = {
 			"id": audio_id,
 			"name": name,
@@ -2395,14 +2395,14 @@ class KNProject:
 
 	def add_style(self, name: str) -> str:
 		"""添加样式"""
-		style_id = str(uuid.uuid4())
+		style_id = str(uuid4())
 		style = {"id": style_id, "name": name}
 		self.styles[style_id] = style
 		return style_id
 
 	def add_procedure(self, name: str, params: list[dict[str, Any]] | None = None) -> str:
 		"""添加自定义函数"""
-		proc_id = str(uuid.uuid4())
+		proc_id = str(uuid4())
 		if params is None:
 			params = []
 		proc = Procedure(id=proc_id, name=name, params=params)
@@ -2707,7 +2707,7 @@ class KNEditor:
 		if formats.lower() == "json":
 			data = self.project.to_dict()
 			with Path(filepath).open("w", encoding="utf-8") as f:
-				json.dump(data, f, ensure_ascii=False, indent=indent)
+				dump(data, f, ensure_ascii=False, indent=indent)
 			print(f"项目已导出为 JSON: {filepath}")
 		elif formats.lower() == "xml":
 			self.export_to_xml_file(filepath)

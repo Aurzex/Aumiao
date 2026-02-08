@@ -1,5 +1,3 @@
-"""基础定义和核心 InfrastructureCoordinator 类"""
-
 from collections.abc import Callable
 from typing import Any
 

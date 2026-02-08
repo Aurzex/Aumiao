@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import html
-import json
-import random
-import re
-import time
 from abc import ABC, abstractmethod
+from base64 import b64decode
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict, dataclass, fields, is_dataclass
 from functools import lru_cache
+from hashlib import sha256
 from html import unescape
+from json import loads
+from random import choice, randint, random
+from re import DOTALL, IGNORECASE, Match, findall, sub
+from time import localtime, strftime, time
 from types import GeneratorType
 from typing import Any, ClassVar, Final, Literal, TypeVar, cast
 
@@ -304,45 +303,43 @@ class DataConverter:
 			r"\[right\](.*?)\[/right\]": r'<div style="text-align:right;">\1</div>',
 		}
 		for pattern, replacement in replacements.items():
-			result = re.sub(pattern, replacement, result, flags=re.DOTALL)
+			result = sub(pattern, replacement, result, flags=DOTALL)
 		# 带参数的标签
 		# 字体大小
-		result = re.sub(
+		result = sub(
 			r"\[font_size=(\d+)\](.*?)\[/font_size\]",
 			r'<span style="font-size:\1px;">\2</span>',
 			result,
-			flags=re.DOTALL,
+			flags=DOTALL,
 		)
 		# 颜色
 
-		def _expand_color(match: re.Match) -> str:
+		def _expand_color(match: Match) -> str:
 			color = match.group(1)
 			content = match.group(2)
 			if len(color) == 3:
 				color = color[0] * 2 + color[1] * 2 + color[2] * 2
 			return f'<span style="color:#{color};">{content}</span>'
 
-		result = re.sub(
+		result = sub(
 			r"\[color=#?([0-9a-fA-F]{3,6})\](.*?)\[/color\]",
 			_expand_color,
 			result,
-			flags=re.DOTALL,
+			flags=DOTALL,
 		)
 		# 链接
-		result = re.sub(
+		result = sub(
 			r"\[url=(.+?)\](.+?)\[/url\]",
 			r'<a href="\1" target="_blank">\2</a>',
 			result,
-			flags=re.DOTALL,
+			flags=DOTALL,
 		)
 		# 图片
-		result = re.sub(
+		result = sub(
 			r"\[image=(.+?)\]",
 			r'<img src="\1" alt="image" style="max-width:100%;height:auto;">',
 			result,
 		)
-		# 转义 HTML
-		result = html.escape(result)
 		# 还原 HTML 标签
 		tag_replacements = {
 			"&lt;strong&gt;": "<strong>",
@@ -391,32 +388,32 @@ class DataConverter:
 	) -> str:
 		"""将 HTML 转换为可配置的纯文本"""
 
-		def replace_img(match: re.Match) -> str:
+		def replace_img(match: Match) -> str:
 			src = next((g for g in match.groups()[1:] if g), "")
 			return img_format.format(src=unescape(src)) if src else img_format.format(src="")
 
 		# 处理段落和 div 块
-		blocks = re.findall(r"<(?:div|p)\b [^>]*>(.*?)</(?:div|p)>", html_content, flags=re.DOTALL | re.IGNORECASE)
+		blocks = findall(r"<(?:div|p)\b [^>]*>(.*?)</(?:div|p)>", html_content, flags=DOTALL | IGNORECASE)
 		if not blocks:
 			blocks = [html_content]
 		processed = []
 		for block in blocks:
 			# 图片处理
 			if replace_images:
-				block = re.sub(  # noqa: PLW2901
+				block = sub(  # noqa: PLW2901
 					r'<img\b [^>]*?src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))[^>]*>',
 					replace_img,
 					block,
-					flags=re.IGNORECASE,
+					flags=IGNORECASE,
 				)
 			# 移除 span 标签但保留内容
-			block = re.sub(r"<span [^>]*>|</span>", "", block)  # noqa: PLW2901
+			block = sub(r"<span [^>]*>|</span>", "", block)  # noqa: PLW2901
 			# 转换 HTML 实体
 			if unescape_entities:
 				block = unescape(block)  # noqa: PLW2901
 				block = block.replace("&nbsp;", " ")  # noqa: PLW2901
 			# 移除其他 HTML 标签但保留内容
-			text = re.sub(r"<[^>]+>", "", block)
+			text = sub(r"<[^>]+>", "", block)
 			# 处理换行
 			if not keep_line_breaks:
 				text = text.replace("\n", " ")
@@ -424,7 +421,7 @@ class DataConverter:
 		# 构建结果
 		result = "\n\n".join(processed)
 		if merge_empty_lines:
-			result = re.sub(r"\n {3,}", "\n\n", result)
+			result = sub(r"\n {3,}", "\n\n", result)
 		return result.strip()
 
 	@staticmethod
@@ -476,13 +473,13 @@ class TimeUtils:
 		if length not in {10, 13}:
 			msg = f"Invalid timestamp length: {length}. Valid options are 10 or 13"
 			raise ValueError(msg)
-		ts = time.time()
+		ts = time()
 		return int(ts * 1000) if length == 13 else int(ts)
 
 	@staticmethod
 	def format_timestamp(ts: float | None = None) -> str:
 		"""格式化时间戳为字符串"""
-		return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+		return strftime("%Y-%m-%d %H:%M:%S", localtime(ts))
 
 
 # ========== 数据分析器 ==========
@@ -546,12 +543,12 @@ class EduDataGenerator:
 
 		class_names = []
 		for _ in range(num_classes):
-			grade = random.randint(grade_range[0], grade_range[1])
+			grade = randint(grade_range[0], grade_range[1])
 			grade_str = f"{number_to_chinese(grade)} 年级"
-			class_num = random.choice(["A", "B", "C", "D"]) if use_letters and random.random() < LETTER_PROBABILITY else str(random.randint(1, 20))
+			class_num = choice(["A", "B", "C", "D"]) if use_letters and random() < LETTER_PROBABILITY else str(randint(1, 20))
 			specialty = ""
-			if add_specialty and random.random() < SPECIALTY_PROBABILITY:
-				specialty = random.choice(cls._SPECIALTIES)
+			if add_specialty and random() < SPECIALTY_PROBABILITY:
+				specialty = choice(cls._SPECIALTIES)
 			class_name = f"{grade_str}{class_num}{specialty} 班"
 			class_names.append(class_name)
 		return class_names
@@ -565,14 +562,14 @@ class EduDataGenerator:
 		"""生成随机学生姓名"""
 		names = []
 		for _ in range(num_students):
-			surname = random.choice(cls._SURNAMES)
-			current_gender = gender or random.choice(["male", "female"])
-			first_name = random.choice(cls._MALE_NAMES) if current_gender == "male" else random.choice(cls._FEMALE_NAMES)
+			surname = choice(cls._SURNAMES)
+			current_gender = gender or choice(["male", "female"])
+			first_name = choice(cls._MALE_NAMES) if current_gender == "male" else choice(cls._FEMALE_NAMES)
 			# 添加后缀
-			if random.random() < NAME_SUFFIX_PROBABILITY:
-				suffix = random.choice(["儿", "然", "轩", "瑶", "豪", "菲"])
+			if random() < NAME_SUFFIX_PROBABILITY:
+				suffix = choice(["儿", "然", "轩", "瑶", "豪", "菲"])
 				if current_gender == "male" and suffix in {"儿", "瑶", "菲"}:
-					suffix = random.choice(["然", "轩", "豪"])
+					suffix = choice(["然", "轩", "豪"])
 				first_name += suffix
 			names.append(f"{surname}{first_name}")
 		return names
@@ -591,7 +588,7 @@ class Crypto:
 		"""计算 SHA256 哈希"""
 		if isinstance(data, str):
 			data = data.encode()
-		return hashlib.sha256(data).hexdigest()
+		return sha256(data).hexdigest()
 
 	@staticmethod
 	def reverse_string(s: str) -> str:
@@ -602,7 +599,7 @@ class Crypto:
 	def base64_to_bytes(base64_str: str) -> bytes:
 		"""Base64 解码"""
 		try:
-			return base64.b64decode(base64_str)
+			return b64decode(base64_str)
 		except Exception as e:
 			msg = f"Base64 解码错误: {e}"
 			raise ValueError(msg) from e
@@ -639,7 +636,7 @@ class Crypto:
 		key = self.generate_aes_key()
 		raw_bytes = self.decrypt_aes_gcm(cipher_text, key, iv)
 		text_content = raw_bytes.decode("utf-8", errors="ignore")
-		return json.loads(text_content)
+		return loads(text_content)
 
 
 # ========== 输出处理器 ==========

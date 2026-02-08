@@ -8,8 +8,7 @@ from time import sleep
 from types import TracebackType
 from typing import Any, Literal, Self, TypedDict
 
-import httpx
-from httpx import Response
+from httpx import Client, ConnectError, HTTPStatusError, Response, TimeoutException
 
 from aumiao.utils import tool
 from aumiao.utils.data import CodeMaoFile, SettingManager
@@ -220,7 +219,7 @@ class BaseHTTPClient:
 	def __init__(self, config: ClientConfig) -> None:
 		self.config = config
 		self.headers = setting_manager.data.PROGRAM.HEADERS.copy()
-		self._http_client = httpx.Client(headers=self.headers, timeout=config.timeout)
+		self._http_client = Client(headers=self.headers, timeout=config.timeout)
 		self._data_processor = tool.DataProcessor()
 		self.log_file = Path.cwd() / "logs" / f"requests_{tool.TimeUtils().current_timestamp()}.txt"
 		self._pagination_config: PaginationConfig = {
@@ -282,11 +281,11 @@ class BaseHTTPClient:
 				if log_enabled:
 					self._log_request(response)
 				response.raise_for_status()
-			except httpx.HTTPStatusError as e:
+			except HTTPStatusError as e:
 				if attempt == retries - 1:
 					return e.response
 				self._handle_retry(e, attempt)
-			except (httpx.ConnectError, httpx.TimeoutException) as e:
+			except (ConnectError, TimeoutException) as e:
 				if attempt == retries - 1:
 					raise
 				self._handle_retry(e, attempt)
@@ -691,7 +690,7 @@ class FileUploader(IFileUploader):
 			"codemao": self._upload_codemao,
 		}
 		# 为文件上传创建独立 session 避免影响主会话
-		self._upload_session = httpx.Client()
+		self._upload_session = Client()
 
 	@staticmethod
 	def generate_id(length: int = 20) -> str:

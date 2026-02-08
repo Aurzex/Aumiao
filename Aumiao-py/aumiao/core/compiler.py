@@ -1,8 +1,8 @@
-import json
-import random
-import xml.etree.ElementTree as ET
+from json import JSONDecodeError, dump, dumps, loads
 from pathlib import Path
+from random import choice
 from typing import Any, ClassVar
+from xml.etree import ElementTree as ET
 
 from aumiao.api import auth
 from aumiao.utils import acquire
@@ -112,9 +112,9 @@ class InternalImplementations:
 				for i in range(len(text) - 1, -1, -1):
 					if text[i] in "}]":
 						try:
-							json.loads(text[: i + 1])
+							loads(text[: i + 1])
 							return i + 1
-						except json.JSONDecodeError:
+						except JSONDecodeError:
 							continue
 			return len(text)
 
@@ -127,13 +127,13 @@ class InternalImplementations:
 				text_content = text_content[:valid_end]
 			# 尝试解析 JSON
 			try:
-				return json.loads(text_content)
-			except json.JSONDecodeError:
+				return loads(text_content)
+			except JSONDecodeError:
 				# 尝试修复常见的 JSON 问题
 				repaired_content = self._repair_json(text_content)
 				try:
-					return json.loads(repaired_content)
-				except json.JSONDecodeError as decode_error:
+					return loads(repaired_content)
+				except JSONDecodeError as decode_error:
 					error_msg = "JSON 解析失败, 数据可能已损坏"
 					raise ValueError(error_msg) from decode_error
 
@@ -210,7 +210,7 @@ class InternalImplementations:
 		def write_json(path: str | Path, data: Any) -> None:
 			"""写入 JSON 文件"""
 			with Path(path).open("w", encoding="utf-8") as f:
-				json.dump(data, f, ensure_ascii=False, indent=2)
+				dump(data, f, ensure_ascii=False, indent=2)
 
 		@staticmethod
 		def write_binary(path: str | Path, data: bytes) -> None:
@@ -252,7 +252,7 @@ class InternalImplementations:
 		def generate_id(length: int = 20) -> str:
 			"""生成随机 ID"""
 			chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-			return "".join(random.choice(chars) for _ in range(length))
+			return "".join(choice(chars) for _ in range(length))
 
 		def create(self, shadow_type: str, block_id: str | None = None, text: str | None = None) -> str:
 			"""创建阴影积木"""
@@ -296,7 +296,7 @@ class InternalImplementations:
 			# 获取作品详情以获取加密文件 URL
 			detail_url = f"{Configuration.CREATION_BASE_URL}/neko/community/player/published-work-detail/{self.work_info.id}"
 			device_auth_dict = auth.CloudAuthenticator().generate_x_device_auth()
-			device_auth_json = json.dumps(device_auth_dict)
+			device_auth_json = dumps(device_auth_dict)
 			headers = {"x-creation-tools-device-auth": device_auth_json}
 			try:
 				detail_data = self.client.send_request(endpoint=detail_url, method="GET", headers=headers).json()

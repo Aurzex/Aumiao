@@ -1,10 +1,9 @@
-import logging
-import platform
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial, wraps
 from pathlib import Path
+from platform import system
+from sys import exit as exits
 from typing import Any, Literal, TypeVar, cast
 
 from aumiao.core.base import Index, InfrastructureCoordinator
@@ -15,7 +14,6 @@ from aumiao.core.services import services
 
 # 常量定义
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,33 +64,14 @@ class MenuOption:
 	visible: bool = True
 
 
-def setup_logging() -> None:
-	"""配置日志系统 - 优化配置"""
-	logging.basicConfig(
-		filename=config.LOG_FILE,
-		level=getattr(logging, config.LOG_LEVEL),
-		format=config.LOG_FORMAT,
-		encoding="utf-8",
-	)
-	# 可选: 添加控制台日志输出
-	console_handler = logging.StreamHandler()
-	console_handler.setLevel(logging.ERROR)
-	formatter = logging.Formatter(config.LOG_FORMAT)
-	console_handler.setFormatter(formatter)
-	logger = logging.getLogger()
-	logger.addHandler(console_handler)
-
-
 def enable_vt_mode() -> None:
 	"""启用 Windows 虚拟终端模式"""
-	if platform.system() == "Windows":
+	if system() == "Windows":
 		from ctypes import windll  # noqa: PLC0415
-
 		try:
 			kernel32 = windll.kernel32
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 		except OSError:
-			logger.exception("启用 VT 模式失败")
 			print(printer.color_text("警告: 无法启用虚拟终端模式, 颜色显示可能不正常", "ERROR"))
 
 
@@ -106,7 +85,6 @@ def handle_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 		except ValueError as ve:
 			print(printer.color_text(f"输入错误: {ve}", "ERROR"))
 		except Exception as e:
-			logger.exception("%s 执行失败", func.__name__)  # ty:ignore [unresolved-attribute]
 			print(printer.color_text(f"操作失败: {e}", "ERROR"))
 
 	return wrapper
@@ -380,7 +358,7 @@ def handle_hidden_features(_account_data_manager: AccountDataManager) -> None:
 def exit_program(_account_data_manager: AccountDataManager) -> None:
 	"""退出程序"""
 	print(printer.color_text("感谢使用, 再见!", "SUCCESS"))
-	sys.exit(0)
+	exits(0)
 
 
 class MenuSystem:
@@ -462,7 +440,6 @@ def handle_keyboard_interrupt() -> None:
 
 def handle_unexpected_error() -> None:
 	"""处理未预期错误"""
-	logger.error("程序发生未处理异常")
 	print(f"\n {printer.color_text(' 程序发生错误 ', 'ERROR')}")
 
 
@@ -489,7 +466,6 @@ def run_main_loop(menu_system: MenuSystem) -> None:
 def main() -> None:
 	"""主程序入口 - 优化流程控制"""
 	enable_vt_mode()
-	setup_logging()
 	Index().index()
 	account_data_manager = AccountDataManager()
 	menu_system = MenuSystem(account_data_manager)
