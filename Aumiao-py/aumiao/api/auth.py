@@ -1,9 +1,9 @@
-import hashlib
-import time
 from dataclasses import dataclass, field
 from enum import Enum
+from hashlib import sha256
 from http import HTTPStatus
 from random import randint
+from time import time
 from typing import Any, Literal, cast
 
 from aumiao.utils import acquire, data, tool
@@ -536,13 +536,13 @@ class CloudAuthenticator:
 		"""获取校准后的时间戳"""
 		if self.time_difference == 0:
 			server_time = fetch_current_timestamp(self._client)
-			local_time = int(time.time())
+			local_time = int(time())
 			self.time_difference = local_time - server_time
-		return int(time.time()) - self.time_difference
+		return int(time()) - self.time_difference
 
 	def generate_x_device_auth(self) -> dict[str, str | int]:
 		"""生成设备认证信息"""
 		timestamp = self.get_calibrated_timestamp()
 		sign_str = f"{self.CLIENT_SECRET}{timestamp}{self.client_id}"
-		sign = hashlib.sha256(sign_str.encode()).hexdigest().upper()
+		sign = sha256(sign_str.encode()).hexdigest().upper()
 		return {"sign": sign, "timestamp": timestamp, "client_id": self.client_id}

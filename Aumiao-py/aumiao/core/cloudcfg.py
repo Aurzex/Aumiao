@@ -1,11 +1,11 @@
-import json
-import threading
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from json import JSONDecodeError, dumps, loads
+from threading import Lock, RLock, Thread, Timer, current_thread
+from time import sleep, time
 from typing import Any, Protocol, cast
 
-import websocket
+from websocket import WebSocketApp
 
 from aumiao.api import work
 from aumiao.api.auth import CloudAuthenticator
@@ -437,7 +437,7 @@ class CloudConnection:
 	"""云连接核心类"""
 
 	def __init__(self, work_id: int, editor: EditorType | None = None, authorization_token: str | None = None) -> None:
-		self._ping_thread: threading.Thread | None = None
+		self._ping_thread: Thread | None = None
 		self.authenticator = CloudAuthenticator(authorization_token)
 		self.auto_reconnect = True
 		self.connected = False
@@ -448,7 +448,7 @@ class CloudConnection:
 		self.public_variables: dict[str, PublicCloudVariable] = {}
 		self.reconnect_attempts = 0
 		self.reconnect_interval = DataConfig.RECONNECT_INTERVAL
-		self.websocket_client: websocket.WebSocketApp | None = None
+		self.websocket_client: WebSocketApp | None = None
 		self.work_id = work_id
 		self._callbacks: dict[str, list[Callable[..., None]]] = {
 			"open": [],
@@ -460,18 +460,18 @@ class CloudConnection:
 			"ranking_received": [],
 			"server_close": [],
 		}
-		self._connection_lock = threading.RLock()
+		self._connection_lock = RLock()
 		self._is_closing = False
 		self._join_sent = False
 		self._last_activity_time = 0.0
-		self._lists_lock = threading.RLock()
+		self._lists_lock = RLock()
 		self._pending_ranking_requests: list[PrivateCloudVariable] = []
-		self._pending_requests_lock = threading.Lock()
+		self._pending_requests_lock = Lock()
 		self._ping_active = False
 		self._ping_interval = 0
 		self._ping_timeout = 0
-		self._variables_lock = threading.RLock()
-		self._websocket_thread: threading.Thread | None = None
+		self._variables_lock = RLock()
+		self._websocket_thread: Thread | None = None
 		self._work_info: WorkInfo | None = None
 		self.data_ready = False
 		self.online_users = 0
@@ -479,10 +479,10 @@ class CloudConnection:
 		self._last_pong_time: float = 0.0
 		self._ping_interval: int = DataConfig.PING_INTERVAL_MS
 		self._ping_timeout: int = DataConfig.PING_TIMEOUT_MS
-		self._heartbeat_timer: threading.Timer | None = None
+		self._heartbeat_timer: Timer | None = None
 		self._command_queue: list[Command] = []  # 使用命令对象队列
-		self._command_queue_lock = threading.RLock()
-		self._upload_timer: threading.Timer | None = None
+		self._command_queue_lock = RLock()
+		self._upload_timer: Timer | None = None
 		self._upload_interval: float = 0.1
 
 	def _queue_variable_command(self, command_type: str, data: dict[str, Any]) -> None:
@@ -500,7 +500,7 @@ class CloudConnection:
 		with self._command_queue_lock:
 			self._command_queue.append(command)
 			if self._upload_timer is None:
-				self._upload_timer = threading.Timer(self._upload_interval, self._upload_batch)
+				self._upload_timer = Timer(self._upload_interval, self._upload_batch)
 				self._upload_timer.daemon = True
 				self._upload_timer.start()
 
@@ -556,7 +556,7 @@ class CloudConnection:
 			with self._command_queue_lock:
 				self._upload_timer = None
 				if self._command_queue and not self._upload_timer:
-					self._upload_timer = threading.Timer(self._upload_interval, self._upload_batch)
+					self._upload_timer = Timer(self._upload_interval, self._upload_batch)
 					self._upload_timer.daemon = True
 					self._upload_timer.start()
 
@@ -663,16 +663,16 @@ class CloudConnection:
 		"""获取 WebSocket 请求头"""
 		headers: dict[str, str] = {}
 		device_auth = self.authenticator.generate_x_device_auth()
-		headers["X-Creation-Tools-Device-Auth"] = json.dumps(device_auth)
+		headers["X-Creation-Tools-Device-Auth"] = dumps(device_auth)
 		if self.authenticator.authorization_token:
 			headers["Cookie"] = f"Authorization={self.authenticator.authorization_token}"
 		return headers
 
-	def _on_message(self, _ws: websocket.WebSocketApp, message: str | bytes) -> None:
+	def _on_message(self, _ws: WebSocketApp, message: str | bytes) -> None:
 		"""WebSocket 消息处理"""
 		if self._is_closing:
 			return
-		self._last_activity_time = time.time()
+		self._last_activity_time = time()
 		try:
 			if isinstance(message, bytes):
 				try:
@@ -693,7 +693,7 @@ class CloudConnection:
 				return
 			if message_str.startswith(WebSocketConfig.SERVER_CLOSED_MESSAGE):
 				# 服务器关闭请求在单独线程中处理
-				threading.Thread(target=self._handle_server_close_request, daemon=True).start()
+				Thread(target=self._handle_server_close_request, daemon=True).start()
 				return
 			if message_str.startswith(WebSocketConfig.EVENT_MESSAGE_PREFIX):
 				self._handle_event_message(message_str)
@@ -709,7 +709,7 @@ class CloudConnection:
 	def _handle_handshake_message(self, message: str) -> None:
 		"""处理握手消息"""
 		try:
-			handshake_data = json.loads(message[1:])
+			handshake_data = loads(message[1:])
 			self._ping_interval = handshake_data.get("pingInterval", 25000)
 			self._ping_timeout = handshake_data.get("pingTimeout", 60000)
 			print(f"✓ 握手成功, ping 间隔: {self._ping_interval} ms, ping 超时: {self._ping_timeout} ms")
@@ -728,7 +728,7 @@ class CloudConnection:
 		self._emit_event("open")
 		if not self._join_sent:
 			self._join_sent = True
-			threading.Timer(0.5, self._send_join_message).start()
+			Timer(0.5, self._send_join_message).start()
 
 	def _handle_event_message(self, message: str) -> None:
 		"""处理事件消息"""
@@ -736,19 +736,19 @@ class CloudConnection:
 			return
 		try:
 			data_str = message[WebSocketConfig.MESSAGE_TYPE_LENGTH :]
-			data_list = json.loads(data_str)
+			data_list = loads(data_str)
 			if isinstance(data_list, list) and len(data_list) >= 2:
 				message_type = data_list[0]
 				message_data = data_list[1]
 				print(f"处理云消息: {message_type}, 数据: {DisplayHelper.truncate_value(message_data)}")
 				if isinstance(message_data, str):
 					try:
-						parsed_data = json.loads(message_data)
+						parsed_data = loads(message_data)
 						message_data = parsed_data
-					except json.JSONDecodeError:
+					except JSONDecodeError:
 						print(f"警告: 无法解析消息数据为 JSON: {message_data[:100]}...")
 				self._handle_cloud_message(message_type, message_data)
-		except json.JSONDecodeError as error:
+		except JSONDecodeError as error:
 			print(f"{ErrorMessages.JSON_PARSE}: {error}, 数据: {DisplayHelper.truncate_value(message)}")
 		except Exception as error:
 			print(f"处理事件消息时发生未知错误: {error}")
@@ -761,7 +761,7 @@ class CloudConnection:
 			return
 		# 发送服务器关闭事件
 		server_close_reason = "服务器主动要求关闭连接"
-		self._emit_event("server_close", {"type": "server_close", "reason": server_close_reason, "timestamp": time.time(), "code": 1000})
+		self._emit_event("server_close", {"type": "server_close", "reason": server_close_reason, "timestamp": time(), "code": 1000})
 		# 设置关闭标志
 		self._is_closing = True
 		# 在单独的线程中执行清理和重连, 避免阻塞当前消息处理线程
@@ -777,13 +777,13 @@ class CloudConnection:
 				self.reconnect_attempts += 1
 				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
 				print(f"服务器要求关闭, 尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
-				time.sleep(delay)
+				sleep(delay)
 				self._safe_reconnect()
 			else:
 				print("服务器关闭连接, 重连已禁用或已达最大重试次数")
 
 		# 在新线程中执行清理和重连
-		cleanup_thread = threading.Thread(target=cleanup_and_reconnect, daemon=True)
+		cleanup_thread = Thread(target=cleanup_and_reconnect, daemon=True)
 		cleanup_thread.start()
 
 	def _send_join_message(self) -> None:
@@ -801,7 +801,7 @@ class CloudConnection:
 
 		def ping_task() -> None:
 			while self._ping_active and self.connected:
-				time.sleep(interval / 1000)
+				sleep(interval / 1000)
 				if self._ping_active and self.connected and self.websocket_client:
 					try:
 						self.websocket_client.send(WebSocketConfig.PING_MESSAGE)
@@ -809,7 +809,7 @@ class CloudConnection:
 						print(f"{ErrorMessages.PING_SEND}: {error}")
 						break
 
-		self._ping_thread = threading.Thread(target=ping_task, daemon=True)
+		self._ping_thread = Thread(target=ping_task, daemon=True)
 		self._ping_thread.start()
 
 	def _stop_ping(self) -> None:
@@ -817,7 +817,7 @@ class CloudConnection:
 		self._ping_active = False
 		if self._ping_thread and self._ping_thread.is_alive():
 			# 检查不是当前线程
-			if self._ping_thread != threading.current_thread():
+			if self._ping_thread != current_thread():
 				self._ping_thread.join(timeout=1.0)
 			self._ping_thread = None
 
@@ -855,8 +855,8 @@ class CloudConnection:
 		print(f"收到完整数据: {DisplayHelper.truncate_value(data)}")
 		if isinstance(data, str):
 			try:
-				data = json.loads(data)
-			except json.JSONDecodeError as e:
+				data = loads(data)
+			except JSONDecodeError as e:
 				print(f"数据解析失败: {e}")
 				return
 		if not isinstance(data, list):
@@ -1083,7 +1083,7 @@ class CloudConnection:
 		"""处理非法事件消息"""
 		print("检测到非法事件")
 
-	def _on_open(self, _ws: websocket.WebSocketApp) -> None:
+	def _on_open(self, _ws: WebSocketApp) -> None:
 		"""WebSocket 连接打开回调"""
 		with self._connection_lock:
 			self.connected = True
@@ -1091,7 +1091,7 @@ class CloudConnection:
 		print("✓ WebSocket 连接已建立")
 		self._emit_event("open")
 
-	def _on_close(self, _ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
+	def _on_close(self, _ws: WebSocketApp, close_status_code: int, close_msg: str) -> None:
 		"""WebSocket 连接关闭回调"""
 		with self._connection_lock:
 			was_connected = self.connected
@@ -1102,13 +1102,13 @@ class CloudConnection:
 		close_type = "unknown_close"
 		close_desc = f"正常关闭: {close_status_code} - {close_msg}"
 		print(f"WebSocket 连接已关闭: {close_desc}")
-		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time.time(), "was_connected": was_connected})
+		self._emit_event("close", {"type": close_type, "code": close_status_code, "reason": close_msg, "timestamp": time(), "was_connected": was_connected})
 		if was_connected and self.auto_reconnect and not self._is_closing:
 			if self.reconnect_attempts < self.max_reconnect_attempts:
 				self.reconnect_attempts += 1
 				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
 				print(f"尝试重新连接 ({self.reconnect_attempts}/{self.max_reconnect_attempts}), 等待 {delay} 秒...")
-				threading.Timer(delay, self._safe_reconnect).start()
+				Timer(delay, self._safe_reconnect).start()
 			else:
 				print(f"已达到最大重连次数 ({self.max_reconnect_attempts}), 停止重连")
 
@@ -1127,9 +1127,9 @@ class CloudConnection:
 				self.reconnect_attempts += 1
 				delay = min(self.reconnect_interval * (2 ** (self.reconnect_attempts - 1)), 300)
 				print(f"重连失败, 下次尝试 ({self.reconnect_attempts}/{self.max_reconnect_attempts}) 等待 {delay} 秒...")
-				threading.Timer(delay, self._safe_reconnect).start()
+				Timer(delay, self._safe_reconnect).start()
 
-	def _on_error(self, _ws: websocket.WebSocketApp, error: Exception) -> None:
+	def _on_error(self, _ws: WebSocketApp, error: Exception) -> None:
 		"""WebSocket 错误回调"""
 		print(f"WebSocket 错误: {error}")
 		self._emit_event("error", error)
@@ -1140,10 +1140,10 @@ class CloudConnection:
 			print("错误: 连接未就绪, 无法发送消息")
 			return
 		message_content = [message_type.value, data]
-		message = f"{WebSocketConfig.EVENT_MESSAGE_PREFIX}{json.dumps(message_content)}"
+		message = f"{WebSocketConfig.EVENT_MESSAGE_PREFIX}{dumps(message_content)}"
 		try:
 			self.websocket_client.send(message)
-			self._last_activity_time = time.time()
+			self._last_activity_time = time()
 		except Exception as error:
 			print(f"{ErrorMessages.SEND_MESSAGE}: {error}")
 			self._emit_event("error", error)
@@ -1172,7 +1172,7 @@ class CloudConnection:
 					self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
 
 				# 在新线程中关闭 WebSocket
-				close_thread = threading.Thread(target=close_ws, daemon=True)
+				close_thread = Thread(target=close_ws, daemon=True)
 				close_thread.start()
 				close_thread.join(timeout=1.0)
 			except Exception:  # noqa: S110
@@ -1182,7 +1182,7 @@ class CloudConnection:
 		# 等待 WebSocket 线程结束
 		if self._websocket_thread and self._websocket_thread.is_alive():
 			# 检查不是当前线程
-			if self._websocket_thread != threading.current_thread():
+			if self._websocket_thread != current_thread():
 				self._websocket_thread.join(timeout=2.0)
 			self._websocket_thread = None
 		# 清除所有数据
@@ -1229,7 +1229,7 @@ class CloudConnection:
 			url = self._get_websocket_url()
 			headers = self._get_websocket_headers()
 			print(f"正在连接到: {url}")
-			self.websocket_client = websocket.WebSocketApp(
+			self.websocket_client = WebSocketApp(
 				url,
 				header=headers,
 				on_open=self._on_open,
@@ -1249,7 +1249,7 @@ class CloudConnection:
 				except Exception as error:
 					print(f"{ErrorMessages.WEB_SOCKET_RUN}: {error}")
 
-			self._websocket_thread = threading.Thread(target=run_websocket, daemon=True)
+			self._websocket_thread = Thread(target=run_websocket, daemon=True)
 			self._websocket_thread.start()
 		except Exception as error:
 			print(f"{ErrorMessages.CONNECTION}: {error}")
@@ -1272,7 +1272,7 @@ class CloudConnection:
 		if not self.connected:
 			return False
 		if self._last_activity_time > 0:
-			inactive_time = time.time() - self._last_activity_time
+			inactive_time = time() - self._last_activity_time
 			if inactive_time > DataConfig.MAX_INACTIVITY_TIME:
 				print(f"连接空闲超时: {inactive_time:.1f} 秒")
 				return False
@@ -1280,35 +1280,35 @@ class CloudConnection:
 
 	def wait_for_connection(self, timeout: int = 30) -> bool:
 		"""等待连接建立"""
-		start_time = time.time()
+		start_time = time()
 		last_log_time = start_time
-		while time.time() - start_time < timeout:
+		while time() - start_time < timeout:
 			if self.connected:
 				print("✓ 连接已建立")
 				return True
-			current_time = time.time()
+			current_time = time()
 			if current_time - last_log_time >= 3:
 				elapsed = current_time - start_time
 				print(f"等待连接中... 已等待 {elapsed:.1f} 秒")
 				last_log_time = current_time
-			time.sleep(0.1)
+			sleep(0.1)
 		print(f"连接超时, 等待 {timeout} 秒后仍未建立连接")
 		return False
 
 	def wait_for_data(self, timeout: int = DataConfig.DATA_TIMEOUT) -> bool:
 		"""等待数据加载完成"""
-		start_time = time.time()
+		start_time = time()
 		last_log_time = start_time
-		while time.time() - start_time < timeout:
+		while time() - start_time < timeout:
 			if self.data_ready:
 				print("✓ 数据加载完成!")
 				return True
-			current_time = time.time()
+			current_time = time()
 			if current_time - last_log_time >= 5:
 				elapsed = current_time - start_time
 				print(f"等待数据中... 已等待 {elapsed:.1f} 秒, 连接状态: {self.connected}")
 				last_log_time = current_time
-			time.sleep(0.1)
+			sleep(0.1)
 		print(f"数据加载超时, 等待 {timeout} 秒后仍未收到数据")
 		print(f"最终状态 - 连接: {self.connected}, 数据就绪: {self.data_ready}")
 		return False

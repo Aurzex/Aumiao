@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 from collections import UserDict
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass, replace
+from json import JSONDecodeError, dump, dumps, load
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, get_args, get_origin, get_type_hints
 
@@ -384,7 +384,7 @@ class JsonFileHandler:
 					return instance
 				return data_class()
 			with path.open(encoding="utf-8") as f:
-				data = json.load(f)
+				data = load(f)
 			# 预处理 Literal 类型字段
 			field_types = get_type_hints(data_class)
 			for field_name, field_type in field_types.items():
@@ -393,7 +393,7 @@ class JsonFileHandler:
 					if data[field_name] not in valid_values:
 						data[field_name] = valid_values[0] if valid_values else None
 			return DataClassConverter.dict_to_dataclass(data_class, data)
-		except (json.JSONDecodeError, ValueError) as e:
+		except (JSONDecodeError, ValueError) as e:
 			print(f"Error loading {path.name}: {e}")
 			print("使用默认值...")
 			return data_class()
@@ -411,7 +411,7 @@ class JsonFileHandler:
 		try:
 			serialized = asdict(data)
 			with temp_file.open("w", encoding="utf-8") as f:
-				json.dump(serialized, f, ensure_ascii=False, indent=4, separators=(",", ":"))
+				dump(serialized, f, ensure_ascii=False, indent=4, separators=(",", ":"))
 			temp_file.replace(path)
 			print(f"文件 {path.name} 已保存")
 		except Exception as e:
@@ -537,7 +537,7 @@ class CodeMaoFile:
 			if isinstance(content, (str, bytes)):
 				f.write(content)
 			elif isinstance(content, dict):
-				json_str = json.dumps(content, ensure_ascii=False, indent=4)
+				json_str = dumps(content, ensure_ascii=False, indent=4)
 				f.write(json_str)
 			elif isinstance(content, list):
 				f.writelines(line + "\n" for line in content)

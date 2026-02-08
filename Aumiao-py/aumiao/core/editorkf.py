@@ -1,12 +1,11 @@
-import json
-import pathlib
-import random
-import sys
-import time
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, cast
+from json import JSONDecodeError, dump, load
+from pathlib import Path
+from random import choice
+from time import strftime
+from typing import Any
+from uuid import uuid4
 
 
 class EntityType(Enum):
@@ -39,13 +38,13 @@ class IDGenerator:
 	@staticmethod
 	def generate_uuid() -> str:
 		"""生成 UUID"""
-		return str(uuid.uuid4())
+		return str(uuid4())
 
 	@staticmethod
 	def generate_id(length: int = 20) -> str:
 		"""生成随机 ID (兼容旧格式)"""
 		chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		return "".join(random.choice(chars) for _ in range(length))
+		return "".join(choice(chars) for _ in range(length))
 
 	@staticmethod
 	def generate_short_id() -> str:
@@ -504,8 +503,8 @@ class WorkEditor:
 
 	def save_work(self, filepath: str) -> None:
 		"""保存作品文件"""
-		with pathlib.Path(filepath).open("w", encoding="utf-8") as f:
-			json.dump(self.work_data, f, ensure_ascii=False, indent=2)
+		with Path(filepath).open("w", encoding="utf-8") as f:
+			dump(self.work_data, f, ensure_ascii=False, indent=2)
 		print(f"作品已保存到: {filepath}")
 
 
@@ -600,13 +599,13 @@ class InteractiveEditor:
 	def load_work(self) -> None:
 		"""加载作品文件"""
 		filepath = input("请输入作品文件路径:").strip()
-		path = pathlib.Path(filepath)
+		path = Path(filepath)
 		if not path.exists():
 			print(f"错误: 文件不存在 - {filepath}")
 			return
 		try:
 			with path.open(encoding="utf-8") as f:
-				self.work_data = json.load(f)
+				self.work_data = load(f)
 			if self.work_data:
 				self.work_parser = WorkParser(self.work_data)
 				self.work_parser.parse()
@@ -614,7 +613,7 @@ class InteractiveEditor:
 				print(f"作品文件加载成功: {filepath}")
 				print(f"项目名称: {self.work_data.get('project_name', ' 未知 ')}")
 				print(f"应用版本: {self.work_data.get('application_version', ' 未知 ')}")
-		except json.JSONDecodeError as e:
+		except JSONDecodeError as e:
 			print(f"JSON 解析失败: {e}")
 		except Exception as e:
 			print(f"加载失败: {e}")
@@ -865,13 +864,13 @@ class InteractiveEditor:
 		theatre["actors"][new_actor["id"]] = new_actor
 		# 添加到解析器
 		actor_entity = Entity(
-			id=cast("str", new_actor["id"]),
+			id=new_actor["id"],
 			name=name,
 			entity_type=EntityType.ACTOR,
 			data=new_actor,
 		)
-		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore [reportArgumentType]  # ty:ignore [invalid-assignment]
-		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore [reportArgumentType]  # ty:ignore [invalid-assignment]
+		self.work_parser.entities[new_actor["id"]] = actor_entity  # pyright: ignore [reportArgumentType]
+		self.work_parser.id_maps["actors"][new_actor["id"]] = new_actor["id"]  # pyright: ignore [reportArgumentType]
 		print(f"演员 {name} 添加成功")
 
 	def add_variable(self) -> None:
@@ -955,7 +954,7 @@ class InteractiveEditor:
 			return
 		filepath = input("请输入保存路径 (直接回车使用默认路径):").strip()
 		if not filepath:
-			timestamp = time.strftime("%Y%m%d_%H%M%S")
+			timestamp = strftime("%Y%m%d_%H%M%S")
 			filepath = f"work_modified_{timestamp}.json"
 		self.work_editor.save_work(filepath)
 
@@ -963,33 +962,7 @@ class InteractiveEditor:
 def main() -> None:
 	"""主函数"""
 	editor = InteractiveEditor()
-	# 检查是否有命令行参数
-	if len(sys.argv) > 1:
-		# 直接加载文件
-		filepath = sys.argv[1]
-		path = pathlib.Path(filepath)
-		if not path.exists():
-			print(f"错误: 文件不存在 - {filepath}")
-			return
-		try:
-			with path.open(encoding="utf-8") as f:
-				work_data = json.load(f)
-			editor.work_data = work_data
-			editor.work_parser = WorkParser(work_data)
-			editor.work_parser.parse()
-			editor.work_editor = WorkEditor(editor.work_parser)
-			print(f"已加载作品文件: {filepath}")
-			print(f"项目名称: {work_data.get('project_name', ' 未知 ')}")
-		except json.JSONDecodeError as e:
-			print(f"JSON 解析失败: {e}")
-			return
-		except Exception as e:
-			print(f"加载失败: {e}")
-			return
-		editor.run()
-	else:
-		# 运行交互式编辑器
-		editor.run()
+	editor.run()
 
 
 if __name__ == "__main__":

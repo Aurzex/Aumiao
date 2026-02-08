@@ -1,8 +1,6 @@
-"""服务类: 认证管理、文件上传、高级服务"""
-
-import json
 from collections import defaultdict
 from collections.abc import Callable, Generator
+from json import dump
 from pathlib import Path
 from time import sleep
 from typing import Any, Literal, cast
@@ -579,7 +577,7 @@ class CommunityService:
 		# 保存小说信息
 		info_file = novel_dir / "info.json"
 		with Path(info_file).open("w", encoding="utf-8") as f:
-			json.dump(info, f, ensure_ascii=False, indent=2)
+			dump(info, f, ensure_ascii=False, indent=2)
 		# 下载章节
 		chapters = details["data"]["sectionList"]
 		downloaded_chapters = []
