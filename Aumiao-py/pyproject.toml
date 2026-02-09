@@ -1,20 +1,15 @@
-# ==============================================================================
-# 构建系统配置
-# ==============================================================================
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# ==============================================================================
-# 项目元数据
-# ==============================================================================
 [project]
 name = "aumiao"
 version = "2.6.5"
 description = "赋能编程猫社区脚本开发 - https://aumiao.aurzex.top"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
-license = { text = "GNU General Public License v3.0 or later" }
+requires-python = ">=3.14"
+license = { text = "GNU Affero General Public License v3 or later" }
+
 # 作者信息
 authors = [
     { name = "Aumiao Team", email = "aumiao@aurzex.top" },
@@ -24,33 +19,37 @@ authors = [
     { name = "MoonLeaaaf" },
     { name = "Nomen" },
 ]
+
 # 维护者信息
 maintainers = [{ name = "Aumiao Team", email = "aumiao@aurzex.top" }]
+
 # 关键词
 keywords = ["script", "codemao", "aumiao", "development", "automation", "bcm"]
+
 # PyPI 分类器
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
+
 # 核心依赖
 dependencies = [
-    "cryptography >= 46.0.3",
-    "httpx >= 0.28.1",
-    "websocket-client >= 1.9.0",
+    "cryptography",
+    "httpx",
+    "websocket-client",
 ]
 
 # 可选依赖（开发环境）
 [project.optional-dependencies]
-dev = ["nuitka >= 2.0.0", "pytest >= 9.0.0", "black >= 25.0.0", "ruff >= 0.4.0"]
+dev = ["nuitka", "ruff"]
 
 # 项目相关链接
 [project.urls]
@@ -65,23 +64,12 @@ Changelog = "https://github.com/aurzex/aumiao/releases"
 [project.scripts]
 aumiao = "aumiao.main:main"
 
-# 插件系统入口点（预留）
-[project.entry-points."aumiao.plugins"]
-
-# 示例插件配置（注释状态）
-# example-plugin = "aumiao.plugins.example:ExamplePlugin"
-# ==============================================================================
-# Hatch 工具配置
-# ==============================================================================
 [tool.hatch.version]
 path = "aumiao/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aumiao"]
 
-# ==============================================================================
-# 代码质量工具配置
-# ==============================================================================
 # Ruff 代码检查配置
 [tool.ruff]
 exclude = ["**/gui.py"]
@@ -93,108 +81,103 @@ target-version = "py313"
 [tool.ruff.lint]
 # 启用的检查规则
 select = [
-    "A", # 内置异常
-    "AIR", # 自动导入重构
-    "ANN", # 类型注解
-    "ARG", # 参数检查
+    "A",    # 内置异常
+    "AIR",  # 自动导入重构
+    "ANN",  # 类型注解
+    "ARG",  # 参数检查
     "ASYNC", # 异步相关
-    "B", # 代码错误
-    "BLE", # 盲捕获异常
-    "C", # 代码复杂度
-    "C4", # 代码复杂度扩展
-    "C90", # McCabe 复杂度
-    "COM", # 逗号相关
-    "CPY", # 类型检查器
-    "DJ", # Django 相关
-    "DOC", # 文档字符串
-    "DTZ", # 日期时间时区
-    "E", # 错误
-    "EM", # 异常消息
-    "ERA", # 无意义操作
-    "EXE", # 可执行文件检查
-    "F", # 格式相关
-    "FA", # 未来注解
+    "B",    # 代码错误
+    "BLE",  # 盲捕获异常
+    "C",    # 代码复杂度
+    "C4",   # 代码复杂度扩展
+    "C90",  # McCabe 复杂度
+    "COM",  # 逗号相关
+    "CPY",  # 类型检查器
+    "DJ",   # Django 相关
+    "DOC",  # 文档字符串
+    "DTZ",  # 日期时间时区
+    "E",    # 错误
+    "EM",   # 异常消息
+    "ERA",  # 无意义操作
+    "EXE",  # 可执行文件检查
+    "F",    # 格式相关
+    "FA",   # 未来注解
     "FAST", # 快速API检查
-    "FBT", # 布尔陷阱
-    "FIX", # 自动修复
-    "FLY", # Flynt (f-string 转换)
+    "FBT",  # 布尔陷阱
+    "FIX",  # 自动修复
+    "FLY",  # Flynt (f-string 转换)
     "FURB", # 代码重构
-    "G", # Gutenberg (Tornado)
-    "I", # import 排序
-    "ICN", # import 约定
-    "INP", # Numpy 索引
-    "INT", # 类型推断
-    "ISC", # 隐式字符串连接
-    "LOG", # 日志相关
-    "N", # 命名约定
-    "NPY", # Numpy 实践
-    "PD", # Pandas 实践
+    "G",    # Gutenberg (Tornado)
+    "I",    # import 排序
+    "ICN",  # import 约定
+    "INP",  # Numpy 索引
+    "INT",  # 类型推断
+    "ISC",  # 隐式字符串连接
+    "LOG",  # 日志相关
+    "N",    # 命名约定
+    "NPY",  # Numpy 实践
+    "PD",   # Pandas 实践
     "PERF", # 性能相关
-    "PGH", # PGH 特定规则
-    "PIE", # PIE (Python Idiosyncrasies)
-    "PL", # Pylint
-    "PT", # Pytest
-    "PTH", # 路径处理
-    "PYI", # .pyi 文件检查
-    "Q", # 引号相关
-    "R", # 重构
-    "RET", # 返回语句
-    "RSE", # 提升异常
-    "RUF", # Ruff 特定规则
-    "S", # 安全
-    "SIM", # 简化
-    "SLF", # self 参数检查
+    "PGH",  # PGH 特定规则
+    "PIE",  # PIE (Python Idiosyncrasies)
+    "PL",   # Pylint
+    "PT",   # Pytest
+    "PTH",  # 路径处理
+    "PYI",  # .pyi 文件检查
+    "Q",    # 引号相关
+    "R",    # 重构
+    "RET",  # 返回语句
+    "RSE",  # 提升异常
+    "RUF",  # Ruff 特定规则
+    "S",    # 安全
+    "SIM",  # 简化
+    "SLF",  # self 参数检查
     "SLOT", # __slots__
-    "T10", # T10 (TensorFlow)
-    "T20", # T20 (TensorFlow)
-    "TC", # 类型检查
-    "TD", # 待办事项
-    "TID", # 整理导入
-    "TRY", # try 语句
-    "UP", # 升级规则
-    "W", # 警告
-    "YTT", # Yield 类型检查
-
+    "T10",  # T10 (TensorFlow)
+    "T20",  # T20 (TensorFlow)
+    "TC",   # 类型检查
+    "TD",   # 待办事项
+    "TID",  # 整理导入
+    "TRY",  # try 语句
+    "UP",   # 升级规则
+    "W",    # 警告
+    "YTT",  # Yield 类型检查
 ]
+
 # 忽略的检查规则
 ignore = [
     "ANN401", # 动态类型注解
-    "B006", # 可变默认参数
+    "B006",   # 可变默认参数
     "BLE001", # 盲捕获异常
-    "C901", # 函数过于复杂
+    "C901",   # 函数过于复杂
     "COM812",
     "CPY001", # 类型检查器
     "DOC201", # 文档字符串格式
     "DOC501", # 文档字符串返回类型
-    "E731", # lambda 赋值
+    "E731",   # lambda 赋值
     "ERA001", # 无意义比较
     "FIX002", # 自动修复相关
     "FURB118",
-    "PLR0913", # 过多参数
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0914",
     "PLR0915",
+    "PLR0917",
     "PLR2004", # 魔术值比较
     "S105",
-    "S311", # 伪随机数生成
-    "S314", # 非加密随机数
-    "S405", # XML 解析
-    "T201", # print 调试
-    "TD002", # TODO 无作者
-    "TD003", # TODO 无日期
-    "W191", # 制表符缩进
+    "S311",   # 伪随机数生成
+    "S314",   # 非加密随机数
+    "S405",   # XML 解析
+    "T201",   # print 调试
+    "TD002",  # TODO 无作者
+    "TD003",  # TODO 无日期
+    "W191",   # 制表符缩进
     "RUF067", # Ruff 特定规则
-
 ]
+
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 preview = true
-
-# Pylint 风格配置
-[tool.ruff.lint.pylint]
-max-branches = 30
-max-locals = 20
-max-nested-blocks = 15
-max-positional-args = 20
-max-public-methods = 50
-max-returns = 10
 
 # Ruff 格式化配置
 [tool.ruff.format]
@@ -204,21 +187,6 @@ indent-style = "tab"
 line-ending = "auto"
 quote-style = "double"
 
-# Black 格式化配置
-[tool.black]
-line-length = 180
-target-version = ['py312', 'py313', 'py314']
-skip-string-normalization = true # 与 Ruff 保持一致（使用双引号）
-
-# ==============================================================================
-# 提交规范配置
-# ==============================================================================
-[tool.commitizen]
-version_provider = "uv"
-
-# ==============================================================================
-# 拼写检查配置
-# ==============================================================================
 [tool.typos.default]
 extend-ignore-re = [
     "(?Rm)^.*(#|//)\\s*spellchecker:disable-line$",
@@ -234,3 +202,7 @@ pacakge = "pacakge"
 
 [tool.typos.files]
 extend-exclude = ["**/gui.py"]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true
