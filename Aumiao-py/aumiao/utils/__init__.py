@@ -4,7 +4,7 @@ from sys import argv
 from types import ModuleType
 from typing import TYPE_CHECKING, Final
 
-__version__: Final[str] = "2.6.5"
+__version__: Final[str] = "2.7.0"
 
 # 编译环境检测
 _is_compiling: bool = hasattr(sys, "_nuitka_compiled") or hasattr(sys, "frozen") or any("nuitka" in arg.lower() for arg in argv)
