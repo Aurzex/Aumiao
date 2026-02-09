@@ -874,7 +874,7 @@ class CloudConnection:
 
 	def _create_data_item(self, item: dict[str, Any]) -> None:
 		"""创建数据项"""
-		try:  # noqa: PLR1702
+		try:
 			cloud_variable_id = item.get("cvid")
 			name = item.get("name")
 			value = item.get("value")

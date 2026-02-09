@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aumiao"
-version = "2.6.5"
+version = "2.7.0"
 description = "赋能编程猫社区脚本开发 - https://aumiao.aurzex.top"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -165,6 +165,7 @@ ignore = [
     "PLR0914",
     "PLR0915",
     "PLR0917",
+    "PLR1702",
     "PLR2004", # 魔术值比较
     "S105",
     "S311",   # 伪随机数生成
