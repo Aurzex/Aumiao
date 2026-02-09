@@ -1,6 +1,5 @@
 from collections import defaultdict
 from collections.abc import Callable, Generator
-from json import dump
 from pathlib import Path
 from time import sleep
 from typing import Any, Literal, cast
@@ -312,7 +311,7 @@ class CommunityService:
 		Returns:
 			清理结果数据
 		"""
-		config = self.source_config[source]
+		config: SourceConfigSimple = cast("SourceConfigSimple", self.source_config[source])
 		params: dict[Literal["ads", "blacklist", "duplicates"], Any] = {
 			"ads": coordinator.data_manager.data.USER_DATA.ads,
 			"blacklist": coordinator.data_manager.data.USER_DATA.black_room,
@@ -322,7 +321,7 @@ class CommunityService:
 		for item in config.get_items():
 			self.comment_processor.process_item(item, config, action_type, params, target_lists, source)
 		label_map = {"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}
-		result = self._execute_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
+		result = self._execute_comment_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
 		return {
 			"success": result["success"],
 			"action_type": action_type,
@@ -334,7 +333,7 @@ class CommunityService:
 
 	@staticmethod
 	@skip_on_error
-	def _execute_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> dict:
+	def _execute_comment_deletion(target_list: list, delete_handler: Callable[[int, int, bool], bool], label: str) -> dict:
 		"""执行删除操作"""
 		if not target_list:
 			print(f"未发现 {label}")
@@ -369,7 +368,7 @@ class CommunityService:
 		Returns:
 			清除结果数据
 		"""
-		method_config = {
+		method_config: dict = {
 			"web": {
 				"endpoint": "/web/message-record",
 				"message_types": coordinator.setting_manager.data.PARAMETER.all_read_type,
@@ -424,7 +423,7 @@ class CommunityService:
 			return {"success": False, "method": method, "error": str(e)}
 
 	@staticmethod
-	def like_and_collect_works(user_id: int, works_list: list[dict] | Generator[dict]) -> dict:
+	def like_collect_follow_user(user_id: int, works_list: list[dict] | Generator[dict]) -> dict:
 		"""点赞和收藏用户作品"""
 		print(f"开始处理用户 {user_id} 的作品")
 		follow_result = coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
@@ -455,8 +454,8 @@ class CommunityService:
 		}
 
 	@staticmethod
-	def toggle_novel_favorites(novel_list: list[dict]) -> dict:
-		"""切换小说收藏状态"""
+	def collect_novels(novel_list: list[dict]) -> dict:
+		"""收藏小说"""
 		print(f"开始处理 {len(novel_list)} 部小说")
 		toggled_count = 0
 		failed_ids = []
@@ -466,10 +465,10 @@ class CommunityService:
 				result = coordinator.novel_motion.execute_toggle_novel_favorite(novel_id)
 				if result:
 					toggled_count += 1
-					print(f"小说 {novel_id} 收藏状态切换成功")
+					print(f"小说 {novel_id} 收藏成功")
 				else:
 					failed_ids.append(novel_id)
-					print(f"小说 {novel_id} 收藏状态切换失败")
+					print(f"小说 {novel_id} 收藏失败")
 		print(f"处理完成: 成功 {toggled_count}/{len(novel_list)}")
 		return {
 			"success": toggled_count > 0,
@@ -477,6 +476,32 @@ class CommunityService:
 			"total_novels": len(novel_list),
 			"failed_ids": failed_ids,
 		}
+
+	@staticmethod
+	def create_comment(target_id: int, content: str, source_type: Literal["work", "shop", "post"]) -> bool:
+		"""
+		创建评论 / 回复
+		Args:
+			target_id: 目标 ID
+			content: 评论内容
+			source_type: 来源类型
+		Returns:
+			是否成功
+		"""
+		try:
+			if source_type == "post":
+				result = coordinator.forum_motion.create_post_reply(post_id=target_id, content=content)
+			elif source_type == "shop":
+				result = coordinator.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
+			elif source_type == "work":
+				result = coordinator.work_motion.create_work_comment(work_id=target_id, comment=content)
+			else:
+				msg = f"不支持的来源类型: {source_type}"
+				raise ValueError(msg)  # noqa: TRY301
+			return bool(result)
+		except Exception as e:
+			print(f"创建评论失败: {e!s}")
+			return False
 
 	@staticmethod
 	def update_workshop_details(workshop_id: int | None = None) -> dict:
@@ -573,11 +598,8 @@ class CommunityService:
 		if output_dir is None:
 			output_dir = coordinator.path_config.FICTION_FILE_PATH
 		novel_dir = output_dir / f"{info['title']}-{info['nickname']}"
-		novel_dir.mkdir(parents=True, exist_ok=True)
-		# 保存小说信息
 		info_file = novel_dir / "info.json"
-		with Path(info_file).open("w", encoding="utf-8") as f:
-			dump(info, f, ensure_ascii=False, indent=2)
+		coordinator.file_manager.file_write(path=info_file, content=info)
 		# 下载章节
 		chapters = details["data"]["sectionList"]
 		downloaded_chapters = []
@@ -689,122 +711,6 @@ class CommunityService:
 			"total_users": len(comments_data),
 			"filtered_users_count": len(filtered_users),
 			"filtered_users": result_data,
-		}
-
-	@staticmethod
-	def find_recent_posts(timeline: int) -> dict:
-		"""
-		查找近期帖子
-		Args:
-			timeline: 时间戳, 查找此时间之后的帖子
-		Returns:
-			帖子查找结果
-		"""
-		print(f"正在查找发布时间在 {coordinator.toolkit.create_time_utils().format_timestamp(timeline)} 之后的帖子")
-		post_list = coordinator.forum_obtain.fetch_hot_posts_ids()["items"][0:19]
-		posts_details = coordinator.forum_obtain.fetch_posts_details(post_ids=post_list)["items"]
-		recent_posts = []
-		for post in posts_details:
-			create_time = post["created_at"]
-			if create_time > timeline:
-				recent_posts.append(
-					{
-						"post_id": post["id"],
-						"title": post["title"],
-						"created_at": create_time,
-						"created_at_formatted": coordinator.toolkit.create_time_utils().format_timestamp(create_time),
-						"author_id": post.get("user_id"),
-						"author_nickname": post.get("nickname", ""),
-					},
-				)
-				print(f"帖子 {post['title']}-ID {post['id']}- 发布于 {coordinator.toolkit.create_time_utils().format_timestamp(create_time)}")
-		return {
-			"timeline": timeline,
-			"timeline_formatted": coordinator.toolkit.create_time_utils().format_timestamp(timeline),
-			"searched_posts": len(posts_details),
-			"recent_posts_count": len(recent_posts),
-			"recent_posts": recent_posts,
-		}
-
-	@staticmethod
-	def _check_follower(follower: dict) -> tuple:
-		default_avatars = [f"https://cdn-community.codemao.cn/community_frontend/community_default_avatar/avatar_300x300_ {i:02d}.jpg" for i in range(1, 9)]
-		default_descriptions = ["", " 无 ", " 这个人很懒 ", " 什么都没写 "]
-		suspicious_name_parts = ["用户", "test", "测试", "temp", "临时", "小号", "备用", "bot", "的"]
-		reasons, score = [], 0.0
-		n_works = follower.get("n_works", 0)
-		total_likes = follower.get("total_likes", 0)
-		if n_works == 0:
-			reasons.append("零作品")
-			score += 0.3
-		if total_likes == 0:
-			reasons.append("零点赞")
-			score += 0.3
-		if n_works == 0 and total_likes == 0:
-			reasons.append("零作品零点赞")
-			score += 0.2
-		# 头像检查
-		avatar = follower.get("avatar_url", "")
-		if not avatar or avatar in default_avatars or "default_avatar" in avatar:
-			reasons.append("默认头像")
-			score += 0.2
-		# 描述检查
-		desc = follower.get("description", "").strip()
-		if not desc or desc in default_descriptions:
-			reasons.append("空描述")
-			score += 0.1
-		# 用户名检查
-		nickname = follower.get("nickname", "")
-		if nickname:
-			nickname_lower = nickname.lower()
-			suspicious_name = any(part in nickname_lower for part in suspicious_name_parts)
-			digit_name = nickname.isdigit() and len(nickname) >= 6
-			pattern_name = bool(any(c.isalnum() for c in nickname_lower))
-			long_non_chinese = len(nickname) > 10 and not any("一" <= ch <= "\u9fff" for ch in nickname)
-			if suspicious_name or digit_name or pattern_name or long_non_chinese:
-				reasons.append("可疑用户名")
-				score += 0.1
-		score = min(score, 1.0)
-		return score >= 0.5 or len(reasons) >= 2, reasons, score
-
-	def analyze_user_followers(self, user_id: int) -> dict:
-		"""分析用户的所有粉丝"""
-		fetcher = coordinator.user_obtain
-		user_info = fetcher.fetch_user_honors(user_id)
-		followers = list(fetcher.fetch_followers_gen(user_id, limit=300))
-		suspicious, normal = [], []
-		for follower in followers:
-			is_suspicious, reasons, score = self._check_follower(follower)
-			info = {
-				"id": follower.get("id"),
-				"nickname": follower.get("nickname"),
-				"avatar_url": follower.get("avatar_url"),
-				"n_works": follower.get("n_works", 0),
-				"total_likes": follower.get("total_likes", 0),
-				"description": follower.get("description", ""),
-				"suspicious": is_suspicious,
-				"reasons": reasons,
-				"score": score,
-			}
-			suspicious.append(info) if is_suspicious else normal.append(info)
-		total = len(followers)
-		suspicious_count = len(suspicious)
-		suspicious_percentage = (suspicious_count / total * 100) if total > 0 else 0
-		return {
-			"target_user": {
-				"id": user_id,
-				"nickname": user_info.get("nickname"),
-				"fans_total": user_info.get("fans_total", 0),
-				"attention_total": user_info.get("attention_total", 0),
-			},
-			"statistics": {
-				"total_followers": total,
-				"suspicious_count": suspicious_count,
-				"suspicious_percentage": round(suspicious_percentage, 2),
-				"normal_count": len(normal),
-			},
-			"suspicious_followers": suspicious,
-			"normal_followers": normal,
 		}
 
 	@staticmethod
@@ -936,50 +842,6 @@ class BatchOperationService:
 		self.community_service = CommunityService()
 		self.account_manger = MultiAccount()
 
-	def batch_like(
-		self,
-		user_id: int | None = None,
-		content_type: Literal["work", "novel"] = "work",
-		content_list: list | None = None,
-		limit: int | None = None,
-	) -> None:
-		"""
-		批量点赞内容
-		Args:
-			user_id: 用户 ID (仅当 content_type="work" 且 content_list 为 None 时有效)
-			content_type: 内容类型 work = 作品 novel = 小说
-			content_list: 内容列表, 如果为 None 则自动获取
-			limit: 执行次数, 如果为 None 则使用全部 edu 账户
-		"""
-		# 获取内容列表
-		if content_list:
-			target_list = content_list
-		elif content_type == "work" and user_id:
-			target_list = list(coordinator.user_obtain.fetch_user_works_web_gen(user_id, limit=None))
-		elif content_type == "novel":
-			target_list = coordinator.novel_obtain.fetch_my_novels()
-		else:
-			msg = "必须提供 content_list 或 user_id"
-			raise ValueError(msg)
-
-		def action() -> None:
-			self._batch_like_directly(target_list, content_type, user_id)
-
-		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
-		self.account_manger.execute_with_accounts(limit=limit, func=action)
-
-	def _batch_like_directly(self, target_list: list, content_type: str, user_id: int | None = None) -> int:
-		"""直接批量点赞"""
-		count = 0
-		if content_type == "work" and user_id:
-			self.community_service.like_and_collect_works(user_id, target_list)
-			count = len(target_list)
-		elif content_type == "novel":
-			self.community_service.toggle_novel_favorites(target_list)
-			count = len(target_list)
-		print(f"已处理 {count} 个 {content_type}")
-		return count
-
 	def manage_edu_accounts(self, action: Literal["create", "delete", "token", "password"], limit: int | None = None) -> bool:
 		"""
 		管理教育账号
@@ -1090,8 +952,6 @@ class BatchOperationService:
 		Args:
 			work_id: 作品 ID
 			reason: 举报原因
-			use_edu_accounts: 是否使用教育账号
-			account_limit: 账号数量限制
 		Returns:
 			举报数量
 		"""
@@ -1102,31 +962,79 @@ class BatchOperationService:
 			func=lambda: coordinator.work_motion.execute_report_work(describe="", reason=reason, work_id=work_id),
 		)
 
-	@staticmethod
-	def create_comment(target_id: int, content: str, source_type: Literal["work", "shop", "post"]) -> bool:
+	def batch_like(
+		self,
+		user_id: int | None = None,
+		content_type: Literal["work", "novel"] = "work",
+		content_list: list | None = None,
+		edu_limit: int | None = None,
+	) -> None:
 		"""
-		创建评论 / 回复
+		批量点赞内容
+		Args:
+			user_id: 用户 ID (仅当 content_type="work" 且 content_list 为 None 时有效)
+			content_type: 内容类型 work = 作品 novel = 小说
+			content_list: 内容列表, 如果为 None 则自动获取
+			edu_limit: 执行次数, 如果为 None 则使用全部 edu 账户
+		"""
+		# 获取内容列表
+		if content_list:
+			target_list = content_list
+		elif content_type == "work" and user_id:
+			target_list = list(coordinator.user_obtain.fetch_user_works_web_gen(user_id, limit=None))
+		elif content_type == "novel":
+			target_list = coordinator.novel_obtain.fetch_my_novels()
+		else:
+			msg = "必须提供 content_list 或 user_id"
+			raise ValueError(msg)
+
+		def action() -> None:
+			count = 0
+			if content_type == "work" and user_id:
+				self.community_service.like_collect_follow_user(user_id, target_list)
+				count = len(target_list)
+			elif content_type == "novel":
+				self.community_service.collect_novels(target_list)
+				count = len(target_list)
+			print(f"已处理 {count} 个 {content_type}")
+
+		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		self.account_manger.execute_with_accounts(limit=edu_limit, func=action)
+
+	def batch_comment(self, target_id: int, source_type: Literal["work", "shop", "post"], content: str, times: int = 1, edu_limit: int | None = None) -> None:
+		"""
+		批量评论内容
 		Args:
 			target_id: 目标 ID
-			content: 评论内容
 			source_type: 来源类型
-		Returns:
-			是否成功
+			content: 评论内容
 		"""
-		try:
-			if source_type == "post":
-				result = coordinator.forum_motion.create_post_reply(post_id=target_id, content=content)
-			elif source_type == "shop":
-				result = coordinator.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
-			elif source_type == "work":
-				result = coordinator.work_motion.create_work_comment(work_id=target_id, comment=content)
+
+		def action() -> None:
+			for _ in range(times):
+				success = CommunityService.create_comment(target_id=target_id, content=content, source_type=source_type)
+				if success:
+					print(f"评论成功 on {source_type} ID {target_id}")
+				else:
+					print(f"评论失败 on {source_type} ID {target_id}")
+
+		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		self.account_manger.execute_with_accounts(func=action, limit=edu_limit)
+
+	def batch_signature(self) -> None:
+		"""
+		批量签订社区友好条约
+		"""
+
+		def action() -> None:
+			result = coordinator.community_motion.execute_sign_agreement()
+			if result:
+				print("成功签订社区友好条约")
 			else:
-				msg = f"不支持的来源类型: {source_type}"
-				raise ValueError(msg)  # noqa: TRY301
-			return bool(result)
-		except Exception as e:
-			print(f"创建评论失败: {e!s}")
-			return False
+				print("签订社区友好条约失败")
+
+		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
+		self.account_manger.execute_with_accounts(func=action)
 
 
 # ==============================
@@ -1244,8 +1152,5 @@ class ServiceManager:
 		self._services.clear()
 
 
-# ==============================
-# 全局实例和别名
-# ==============================
 # 全局服务管理器实例
 services = ServiceManager()

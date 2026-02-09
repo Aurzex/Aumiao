@@ -68,6 +68,7 @@ def enable_vt_mode() -> None:
 	"""启用 Windows 虚拟终端模式"""
 	if system() == "Windows":
 		from ctypes import windll  # noqa: PLC0415
+
 		try:
 			kernel32 = windll.kernel32
 			kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
