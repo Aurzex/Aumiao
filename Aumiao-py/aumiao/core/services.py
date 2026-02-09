@@ -796,7 +796,8 @@ class CommunityService:
 		return filtered_works
 
 	def generate_online_leaderboard(self, works: list | None) -> dict:
-		"""works 数据类型和 fetch_and_aggregate_works 返回的一样"""
+		"""作品在线人数排行榜"""
+		# works 数据类型和 fetch_and_aggregate_works 返回的一样
 
 		def _get_online_users(work_id: int, token: str) -> int:
 			"""获取作品的在线用户数"""
