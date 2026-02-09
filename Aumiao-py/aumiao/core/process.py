@@ -879,7 +879,6 @@ class ViolationChecker:
 					# 重要修改: 直接使用账号进行登录, 而不是调用 switch_to_student_account
 					# 因为 switch_to_student_account 会从列表中 pop 账号
 					username, password = available_accounts[account_index]
-					print(username, password)
 					try:
 						coordinator.auth_manager.login(
 							identity=username,
