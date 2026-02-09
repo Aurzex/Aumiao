@@ -85,7 +85,7 @@ class InfrastructureCoordinator:
 	def _initialize_module_registry(self) -> None:
 		"""初始化模块注册表"""
 		# API 模块
-		api_modules = {
+		api_modules: dict = {
 			"auth": auth.AuthManager,
 			"community_motion": community.UserAction,
 			"community_obtain": community.DataFetcher,
@@ -329,9 +329,9 @@ class Tool:
 	@staticmethod
 	def message_report(user_id: int) -> None:
 		"""生成用户数据报告"""
-		response = coordinator.user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp = coordinator.community_obtain.fetch_current_timestamp_10()["data"]
-		user_data = {
+		response: dict = coordinator.user_obtain.fetch_user_honors(user_id=user_id)
+		timestamp: int = coordinator.community_obtain.fetch_current_timestamp_10()["data"]
+		user_data: dict = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
 			"level": response["author_level"],

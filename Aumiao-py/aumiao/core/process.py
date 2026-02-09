@@ -967,11 +967,10 @@ class ViolationChecker:
 		else:
 			return (source, source_id, violation_type, parent_id, content_id)
 
-	@staticmethod
-	def _execute_single_report(violation: str, reason_content: str) -> bool:
+	def _execute_single_report(self, violation: str, reason_content: str) -> bool:
 		"""执行单条举报"""
 		# 1. 解析违规标识符
-		parsed = ViolationChecker._parse_violation(violation)
+		parsed = self._parse_violation(violation)
 		if not parsed:
 			coordinator.printer.print_message(f"无法解析违规标识符: {violation}", "ERROR")
 			return False
@@ -982,7 +981,12 @@ class ViolationChecker:
 				if source != "forum":
 					coordinator.printer.print_message(f"不能在 {source} 平台举报帖子", "ERROR")
 					return False
-				return coordinator.forum_motion.report_post(post_id=content_id, reason_id=7, description=f"违规: {reason_content}")
+				description = f"违规: {reason_content}"
+				return coordinator.forum_motion.report_post(
+					post_id=content_id,
+					reason_id=7,
+					description=description,
+				)
 			# 作品举报
 			if violation_type == "work":
 				return coordinator.work_motion.execute_report_work(
@@ -990,35 +994,49 @@ class ViolationChecker:
 					reason=reason_content,
 					describe=reason_content,
 				)
-			# 评论 / 回复举报
-			is_reply = violation_type == "reply"
-			if source == "work":
-				return coordinator.work_motion.execute_report_comment(
-					work_id=source_id,
-					comment_id=content_id,
-					reason=reason_content,
-				)
-			if source == "forum":
-				item_type = "REPLY" if is_reply else "COMMENT"
-				return coordinator.forum_motion.report_item(item_id=content_id, reason_id=7, description="", item_type=item_type, return_data=False)
-			if source == "shop":
-				# 商店评论 / 回复处理
-				if is_reply:
+			# 评论/回复举报
+			if violation_type in {"comment", "reply"}:
+				is_reply = violation_type == "reply"
+				# 作品评论/回复
+				if source == "work":
+					return coordinator.work_motion.execute_report_comment(
+						work_id=source_id,
+						comment_id=content_id,
+						reason=reason_content,
+					)
+				# 论坛评论/回复
+				if source == "forum":
+					item_type = "REPLY" if is_reply else "COMMENT"
+					return coordinator.forum_motion.report_item(
+						item_id=content_id,
+						reason_id=7,
+						description="",
+						item_type=item_type,
+						return_data=False,
+					)
+				# 商店评论/回复
+				if source == "shop":
+					# 回复的举报需要传递父评论ID
+					if is_reply:
+						reporter_id = randint(10000, 199999999)
+						return coordinator.shop_motion.execute_report_comment(
+							comment_id=content_id,
+							reason_content=reason_content,
+							reason_id=7,
+							reporter_id=reporter_id,
+							comment_parent_id=parent_id,
+							description="",
+						)
+					# 普通评论举报
+					reporter_id = randint(10000, 199999999)
 					return coordinator.shop_motion.execute_report_comment(
 						comment_id=content_id,
 						reason_content=reason_content,
 						reason_id=7,
-						reporter_id=randint(10000, 199999999),
-						comment_parent_id=parent_id,
+						reporter_id=reporter_id,
 						description="",
 					)
-				return coordinator.shop_motion.execute_report_comment(
-					comment_id=content_id,
-					reason_content=reason_content,
-					reason_id=7,
-					reporter_id=randint(10000, 199999999),
-					description="",
-				)
+			coordinator.printer.print_message(f"未知的违规类型: {violation_type}", "ERROR")
 		except Exception as e:
 			coordinator.printer.print_message(f"举报操作失败: {violation} - {e!s}", "ERROR")
 			return False
