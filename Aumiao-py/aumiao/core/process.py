@@ -25,7 +25,7 @@ from aumiao.utils.data import UploadHistory
 from aumiao.utils.decorator import singleton
 
 
-# ========================== 抽象基类或协议 ==========================
+# 抽象基类或协议
 class ProcessStrategy[T: Literal["duplicates", "ads", "blacklist"]](ABC):
 	"""处理策略抽象基类"""
 
@@ -80,7 +80,7 @@ class FileUploaderProtocol(Protocol):
 	def upload(file_path: Path, method: Literal["pgaot", "codemao", "codegame"], save_path: str) -> str: ...
 
 
-# ========================== 策略模式实现 ==========================
+# 策略模式实现
 class AbnormalProcessStrategy(ProcessStrategy, ABC):
 	"""异常处理策略基类 (模板方法模式)"""
 
@@ -266,7 +266,7 @@ class ProcessStrategyFactory:
 		return list(self._strategies.keys())
 
 
-# ========================== 管道模式实现 ==========================
+# 管道模式实现
 @singleton
 class OfficialCheckProcessor(BaseProcessor):
 	"""官方账号检查处理器"""
@@ -667,7 +667,7 @@ class ProcessorFactory:
 		return ProcessingPipeline.create_default_pipeline(fetcher)
 
 
-# ========================== 核心功能类 ==========================
+# 核心功能类
 @singleton
 class CommentProcessor:
 	"""评论处理器 - 使用策略模式优化"""

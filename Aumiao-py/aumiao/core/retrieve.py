@@ -43,7 +43,7 @@ class Obtain:
 		}
 		self._data_processor = coordinator.toolkit.create_data_processor()
 
-	# ==================== 核心查询方法 ====================
+	# 核心查询方法
 	@decorator.lru_cache_with_reset(max_calls=3)
 	def _execute_query(
 		self,
@@ -120,7 +120,7 @@ class Obtain:
 			raise ValueError(msg)
 		return method_handlers[method]()
 
-	# ==================== 公共 API 接口 ====================
+	# 公共 API 接口
 	@overload
 	def get_comments(self, source: Literal["work", "forum", "shop"], source_id: int, method: Literal["user_id"] = ..., limit: int | None = ...) -> list[str]: ...
 	@overload
@@ -150,7 +150,7 @@ class Obtain:
 		query_method = QueryMethod(method)
 		return self._execute_query(source=QuerySource(source), source_id=source_id, method=query_method, limit=limit)
 
-	# ==================== 保持原有方法 ====================
+	# 保持原有方法
 	@staticmethod
 	def get_new_replies(
 		limit: int = 0,

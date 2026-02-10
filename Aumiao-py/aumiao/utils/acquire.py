@@ -17,7 +17,7 @@ from aumiao.utils.decorator import singleton
 setting_manager = SettingManager()
 
 
-# ==================== 配置类 ====================
+# 配置类
 @dataclass
 class ClientConfig:
 	"""客户端配置 - 重构版本"""
@@ -65,12 +65,12 @@ class PaginationConfig(TypedDict, total=False):
 	response_offset_key: str
 
 
-# ==================== 类型定义 ====================
+# 类型定义
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD"]
 FetchMethod = Literal["GET", "POST"]
 
 
-# ==================== 接口定义 ====================
+# 接口定义
 class IHTTPClient(ABC):
 	"""HTTP 客户端接口"""
 
@@ -126,7 +126,7 @@ class IFileUploader(ABC):
 		"""上传文件"""
 
 
-# ==================== 身份管理器 ====================
+# 身份管理器
 @dataclass
 class Token:
 	"""Token 管理"""
@@ -209,7 +209,7 @@ class IdentityManager:
 		return self._current_identity
 
 
-# ==================== 基础实现 ====================
+# 基础实现
 class BaseHTTPClient:
 	"""基础 HTTP 客户端 - 优化版"""
 
@@ -629,7 +629,7 @@ class BaseHTTPClient:
 		self.close()
 
 
-# ==================== 具体实现 ====================
+# 具体实现
 @singleton
 class CodeMaoClient(BaseHTTPClient):
 	"""编程猫 HTTP 客户端 - 修复版本"""
@@ -814,7 +814,7 @@ class FileUploader(IFileUploader):
 		self._upload_session.close()
 
 
-# ==================== 工厂类 ====================
+# 工厂类
 class ClientFactory:
 	"""客户端工厂"""
 

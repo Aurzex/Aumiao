@@ -13,9 +13,7 @@ from aumiao.utils.acquire import CodeMaoClient, HTTPStatus
 from aumiao.utils.decorator import singleton, skip_on_error
 
 
-# ==============================
 # 文件上传服务
-# ==============================
 @singleton
 class FileUploadService:
 	"""文件上传服务"""
@@ -105,9 +103,7 @@ class FileUploadService:
 			print(f"方法 {method} 已弃用, 可能导致上传失败")
 
 
-# ==============================
 # 自动回复服务
-# ==============================
 @singleton
 class ReplyService:
 	"""自动回复服务服务"""
@@ -277,9 +273,7 @@ class ReplyService:
 		)
 
 
-# ==============================
 # 社区动作服务
-# ==============================
 @singleton
 class CommunityService:
 	"""社区动作服务"""
@@ -832,9 +826,7 @@ class CommunityService:
 		}
 
 
-# ==============================
 # 批量操作服务
-# ==============================
 @singleton
 class BatchOperationService:
 	"""批量操作服务"""
@@ -1038,9 +1030,7 @@ class BatchOperationService:
 		self.account_manger.execute_with_accounts(func=action)
 
 
-# ==============================
 # 举报处理服务
-# ==============================
 @singleton
 class ReportService:
 	"""举报处理服务"""
@@ -1103,9 +1093,7 @@ class ReportService:
 		return {"comment_reports": comment_stats, "work_reports": work_stats, "total": comment_stats.get("total", 0) + work_stats.get("total", 0)}
 
 
-# ==============================
-# 服务管理器 (统一入口)
-# ==============================
+# 服务管理器
 @singleton
 class ServiceManager:
 	"""服务管理器, 提供统一的服务访问入口"""

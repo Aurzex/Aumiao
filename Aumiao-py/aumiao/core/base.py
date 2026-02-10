@@ -8,9 +8,7 @@ from aumiao.utils.decorator import singleton
 from aumiao.utils.tool import OutputHandler, ToolKitFactory
 
 
-# ==============================
-# 模块管理器: 类型友好版本
-# ==============================
+# 模块管理器
 @singleton
 class ModuleManager:
 	"""管理所有模块的延迟加载和缓存"""
@@ -48,9 +46,7 @@ class ModuleManager:
 		return list(self._modules.keys())
 
 
-# ==============================
 # 核心组件管理器
-# ==============================
 @singleton
 class CoreManager:
 	"""管理立即加载的核心组件"""
@@ -64,9 +60,7 @@ class CoreManager:
 		self.setting_manager = SettingManager()
 
 
-# ==============================
-# 基础设施协调器: 类型友好主类
-# ==============================
+# 基础设施协调器
 @singleton
 class InfrastructureCoordinator:
 	"""
@@ -113,9 +107,7 @@ class InfrastructureCoordinator:
 		for name, creator in api_modules.items():
 			self._modules.register(name, creator)
 
-	# ==============================
-	# 核心组件属性 (类型明确)
-	# ==============================
+	# 核心组件属性
 	@property
 	def client(self) -> CodeMaoClient:
 		"""核心客户端"""
@@ -141,9 +133,7 @@ class InfrastructureCoordinator:
 		"""设置"""
 		return self._core.setting_manager
 
-	# ==============================
-	# API 模块属性 (延迟加载, 类型明确)
-	# ==============================
+	# API 模块属性
 	@property
 	def auth_manager(self) -> "auth.AuthManager":
 		"""认证管理模块"""
@@ -249,17 +239,13 @@ class InfrastructureCoordinator:
 		"""文件写入"""
 		return self._modules.get("file_manager")
 
-	# ==============================
-	# 工具模块属性 (延迟加载, 类型明确)
-	# ==============================
+	# 工具模块属性
 	@property
 	def printer(self) -> "OutputHandler":
 		"""打印工具模块"""
 		return self._modules.get("printer")
 
-	# ==============================
-	# 动态模块访问 (可选, 用于访问动态注册的模块)
-	# ==============================
+	# 动态模块访问
 	def get_module(self, name: str) -> Any:
 		"""
 		动态获取模块 (用于访问动态注册的模块)

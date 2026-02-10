@@ -10,7 +10,7 @@ from aumiao.utils import acquire, data, tool
 from aumiao.utils.decorator import singleton
 
 
-# ==================== 基础数据结构和枚举 ====================
+# 基础数据结构和枚举
 class LoginMethod(Enum):
 	"""登录方法枚举"""
 
@@ -69,7 +69,7 @@ class LoginResult:
 	auth_details: dict[str, Any] | None = None
 
 
-# ==================== 辅助函数 ====================
+# 辅助函数
 def fetch_current_timestamp(client: acquire.CodeMaoClient) -> int:
 	"""获取当前服务器时间戳"""
 	response = client.send_request(endpoint="/coconut/clouddb/currentTime", method="GET")
@@ -96,7 +96,7 @@ def determine_admin_login_method(token: str | None, identity: str | None, passwo
 	raise ValueError(msg)
 
 
-# ==================== 认证处理器 ====================
+# 认证处理器
 class AuthProcessor:
 	"""认证处理器, 负责具体的认证逻辑"""
 
@@ -203,7 +203,7 @@ class AuthProcessor:
 		return self.get_login_security_info(identity, password, ticket, pid)
 
 
-# ==================== 登录处理器 ====================
+# 登录处理器
 class LoginHandler:
 	"""登录处理器, 负责执行具体的登录操作"""
 
@@ -275,7 +275,7 @@ class LoginHandler:
 				password_input = input("请输入密码:")
 
 
-# ==================== 主认证管理器 ====================
+# 主认证管理器
 @singleton
 class AuthManager:
 	"""
@@ -514,7 +514,7 @@ class AuthManager:
 		return self._current_credentials
 
 
-# ==================== 云服务认证器 ====================
+# 云服务认证器
 class CloudAuthenticator:
 	"""云服务认证管理器"""
 
