@@ -13,7 +13,7 @@
   "license": "MIT",
   "types": "./src/types/index.d.ts",
   "dependencies": {
-    "@sequelize/sqlite3": "^7.0.0-alpha.47",
+    "@sequelize/sqlite3": "^7.0.0-alpha.48",
     "@types/sequelize": "^6.12.0",
     "chalk": "^5.6.2",
     "commander": "^12.1.0",
