@@ -42,8 +42,8 @@ classifiers = [
 
 # 核心依赖
 dependencies = [
-    "cryptography",
-    "httpx",
+    "pycryptodome",
+    "requests",
     "websocket-client",
 ]
 

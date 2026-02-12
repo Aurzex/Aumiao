@@ -5,7 +5,6 @@ from base64 import b64decode
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict, dataclass, is_dataclass
 from functools import lru_cache
-from hashlib import sha256
 from html import unescape
 from json import loads
 from random import choice, randint, random
@@ -14,8 +13,8 @@ from time import localtime, strftime, time
 from types import GeneratorType
 from typing import Any, ClassVar, Final, Literal, TypeVar, cast
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from Crypto.Cipher import AES  # noqa: S413
+from Crypto.Hash import SHA256  # noqa: S413
 
 from aumiao.utils.decorator import singleton
 
@@ -29,9 +28,6 @@ CLASS_NUM_LIMIT: Final[int] = 12
 LETTER_PROBABILITY: Final[float] = 0.3
 SPECIALTY_PROBABILITY: Final[float] = 0.4
 NAME_SUFFIX_PROBABILITY: Final[float] = 0.2
-MIN_DATA_LENGTH: Final[int] = 13
-MIN_CHOICE_LENGTH: Final[int] = 2
-AES_IV_LENGTH: Final[int] = 12
 
 
 # ========== 颜色配置管理器 ==========
@@ -588,7 +584,9 @@ class Crypto:
 		"""计算 SHA256 哈希"""
 		if isinstance(data, str):
 			data = data.encode()
-		return sha256(data).hexdigest()
+		h = SHA256.new()
+		h.update(data)
+		return h.hexdigest()
 
 	@staticmethod
 	def reverse_string(s: str) -> str:
@@ -606,16 +604,17 @@ class Crypto:
 
 	def generate_aes_key(self) -> bytes:
 		"""生成 AES 密钥"""
-		digest = hashes.Hash(hashes.SHA256())
-		digest.update(self.default_salt)
-		return digest.finalize()
+		# 直接使用 SHA256 哈希, 保持与原方法完全一致
+		h = SHA256.new()
+		h.update(self.default_salt)
+		return h.digest()  # 返回 bytes, 不是 hex
 
 	@staticmethod
 	def decrypt_aes_gcm(encrypted_data: bytes, key: bytes, iv: bytes) -> bytes:
 		"""AES-GCM 解密"""
 		try:
-			aesgcm = AESGCM(key)
-			return aesgcm.decrypt(iv, encrypted_data, None)
+			cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+			return cipher.decrypt(encrypted_data)
 		except Exception as e:
 			msg = f"AES 解密错误: {e}"
 			raise ValueError(msg) from e
@@ -627,11 +626,11 @@ class Crypto:
 		# Base64 解码
 		decoded_data = self.base64_to_bytes(reversed_data)
 		# 分离 IV 和密文
-		if len(decoded_data) < MIN_DATA_LENGTH:
+		if len(decoded_data) < 13:
 			msg = "数据太短, 无法分离 IV 和密文"
 			raise ValueError(msg)
-		iv = decoded_data[:AES_IV_LENGTH]
-		cipher_text = decoded_data[AES_IV_LENGTH:]
+		iv = decoded_data[:12]
+		cipher_text = decoded_data[12:]
 		# 生成密钥并解密
 		key = self.generate_aes_key()
 		raw_bytes = self.decrypt_aes_gcm(cipher_text, key, iv)
