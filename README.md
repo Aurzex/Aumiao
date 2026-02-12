@@ -9,7 +9,6 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
 [![PyPI Version](https://img.shields.io/pypi/v/aumiao.svg)](https://pypi.org/project/aumiao/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/aumiao.svg)](https://pypi.org/project/aumiao/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
 
 一个为编程猫社区开发的 API 收集项目和工具集合，旨在赋能脚本开发并提升社区管理效率。
 
