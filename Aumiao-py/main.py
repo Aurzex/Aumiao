@@ -9,7 +9,6 @@ from typing import Any, Literal, TypeVar, cast
 from aumiao.core.base import Index, InfrastructureCoordinator
 from aumiao.core.compiler import decompile_work
 from aumiao.core.deepser import CodeMaoTool
-from aumiao.core.process import FileProcessor
 from aumiao.core.services import services
 
 T = TypeVar("T")
@@ -39,10 +38,9 @@ class AppConfig:
 			"07": ("处理举报", True, True),
 			"08": ("下载小说", False, True),
 			"09": ("上传文件", True, True),
-			"10": ("上传历史", False, True),
-			"11": ("编译作品", False, True),
-			"12": ("生成口令", True, True),
-			"13": ("助手对话", True, True),
+			"10": ("编译作品", False, True),
+			"11": ("生成口令", True, True),
+			"12": ("助手对话", True, True),
 			"00": ("退出系统", False, True),
 			"1106": ("隐藏功能", True, False),
 		}
@@ -269,14 +267,6 @@ def generate_nemo_code(_account_data_manager: AccountDataManager) -> None:
 
 
 @handle_errors
-def print_history(_account_data_manager: AccountDataManager) -> None:
-	"""上传历史"""
-	printer.print_header("上传历史")
-	FileProcessor().print_upload_history()
-	print(printer.color_text("查看完成", "SUCCESS"))
-
-
-@handle_errors
 @require_login
 def upload_files(_account_data_manager: AccountDataManager) -> None:
 	"""上传文件"""
@@ -380,10 +370,9 @@ class MenuSystem:
 			"07": handle_report,
 			"08": download_fiction,
 			"09": upload_files,
-			"10": print_history,
-			"11": decompile_works,
-			"12": generate_nemo_code,
-			"13": interactive_chat,
+			"10": decompile_works,
+			"11": generate_nemo_code,
+			"12": interactive_chat,
 			"00": exit_program,
 			"1106": handle_hidden_features,
 		}

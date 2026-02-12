@@ -6,7 +6,6 @@ from pathlib import Path
 from random import choice, randint
 from time import sleep
 from typing import Any, ClassVar, Literal, Protocol, cast
-from urllib.parse import urlparse
 
 from aumiao.core.base import NestedDefaultDict, coordinator
 from aumiao.core.models import (
@@ -20,7 +19,7 @@ from aumiao.core.models import (
 	SourceType,
 )
 from aumiao.core.retrieve import Obtain
-from aumiao.utils.acquire import FileUploader, HTTPStatus
+from aumiao.utils.acquire import FileUploader
 from aumiao.utils.data import UploadHistory
 from aumiao.utils.decorator import singleton
 
@@ -1935,136 +1934,3 @@ class FileProcessor:
 		# 保存历史记录
 		coordinator.history_manager.save()
 		return results
-
-	def print_upload_history(self, limit: int = 10, *, reverse: bool = True) -> None:
-		"""
-		打印上传历史记录 (使用通用数据查看器)
-		Args:
-			limit: 每页显示记录数 (默认 10 条)
-			reverse: 是否按时间倒序显示 (最新的在前)
-		"""
-		history_list = coordinator.history_manager.data.history
-		if not history_list:
-			coordinator.printer.print_message("暂无上传历史记录", "INFO")
-			return
-		# 排序历史记录
-		sorted_history = sorted(
-			history_list,
-			key=lambda x: x.upload_time,
-			reverse=reverse,
-		)
-		# 定义字段格式化函数
-
-		def format_upload_time(upload_time: float) -> str:
-			"""格式化上传时间"""
-			if isinstance(upload_time, (int, float)):
-				return coordinator.toolkit.create_time_utils().format_timestamp(upload_time)
-			return str(upload_time)[:19]
-
-		def format_file_name(file_name: str) -> str:
-			"""格式化文件名"""
-			return file_name.replace("\\", "/")
-
-		def format_url_display(save_url: str) -> str:
-			"""格式化 URL 显示"""
-			url = save_url.replace("\\", "/")
-			parsed_url = urlparse(url)
-			host = parsed_url.hostname
-			if host == "static.codemao.cn":
-				cn_index = url.find(".cn")
-				simplified_url = url[cn_index + 3 :].split("?")[0] if cn_index != -1 else url.split("/")[-1].split("?")[0]
-				return f"[static]{simplified_url}"
-			if host and (host == "cdn-community.bcmcdn.com" or host.endswith(".cdn-community.bcmcdn.com")):
-				com_index = url.find(".com")
-				simplified_url = url[com_index + 4 :].split("?")[0] if com_index != -1 else url.split("/")[-1].split("?")[0]
-				return f"[cdn]{simplified_url}"
-			simplified_url = url[:30] + "..." if len(url) > 30 else url
-			return f"[other]{simplified_url}"
-
-		# 批量验证链接函数
-
-		def batch_validate_urls(history_items: list) -> dict[int, str]:
-			"""批量验证链接状态"""
-			results = {}
-			for idx, record in enumerate(history_items):
-				is_valid = self._validate_url(record.save_url)
-				status = "有效" if is_valid else "✗无效"
-				results[idx] = status
-			return results
-
-		# 定义自定义操作
-
-		def show_record_detail(record: UploadHistory) -> None:
-			"""显示单条记录的详细信息并验证链接"""
-			# 格式化上传时间
-			upload_time = record.upload_time
-			if isinstance(upload_time, (int, float)):
-				upload_time = coordinator.toolkit.create_time_utils().format_timestamp(upload_time)
-			coordinator.printer.print_header("=== 文件上传详情 ===")
-			coordinator.printer.print_message("-" * 60, "INFO")
-			coordinator.printer.print_message(f"文件名: {record.file_name}", "INFO")
-			coordinator.printer.print_message(f"文件大小: {record.file_size}", "INFO")
-			coordinator.printer.print_message(f"上传方式: {record.method}", "INFO")
-			coordinator.printer.print_message(f"上传时间: {upload_time}", "INFO")
-			coordinator.printer.print_message(f"完整 URL: {record.save_url}", "INFO")
-			# 验证链接有效性
-			is_valid = self._validate_url(record.save_url)
-			status = "有效" if is_valid else "无效"
-			coordinator.printer.print_message(f"链接状态: {status}", "INFO")
-			if record.save_url.startswith("http"):
-				coordinator.printer.print_message("提示: 复制上方 URL 到浏览器可直接访问或下载", "INFO")
-			coordinator.printer.print_message("-" * 60, "INFO")
-			input("按 Enter 键返回...")
-
-		def validate_url_only(record: UploadHistory) -> None:
-			"""仅验证链接"""
-			is_valid = self._validate_url(record.save_url)
-			status = "有效" if is_valid else "无效"
-			coordinator.printer.print_message(f"链接 '{record.save_url}' 状态: {status}", "INFO")
-			input("按 Enter 键返回...")
-
-		custom_operations = {
-			"查看详情": show_record_detail,
-			"验证链接": validate_url_only,
-		}
-		# 使用通用数据查看器
-		viewer = coordinator.toolkit.create_data_viewer(coordinator.printer)
-		viewer.display_data(
-			data_class=type(sorted_history[0]),
-			data_list=sorted_history,
-			page_size=limit,
-			display_fields=["file_name", "upload_time", "save_url"],
-			custom_operations=custom_operations,
-			title="上传历史记录",
-			id_field="file_name",
-			field_formatters={
-				"upload_time": format_upload_time,
-				"file_name": format_file_name,
-				"save_url": format_url_display,
-			},
-			batch_processor=batch_validate_urls,
-		)
-
-	@staticmethod
-	def _validate_url(url: str) -> bool:
-		"""
-		验证 URL 链接是否有效
-		先使用 HEAD 请求检查, 若返回无效状态则尝试 GET 请求验证内容
-		"""
-		try:
-			# 首先尝试 HEAD 请求
-			response = coordinator.client.send_request(endpoint=url, method="HEAD", timeout=5, log=False)
-			if response.status_code == HTTPStatus.OK.value:  # 直接使用 200 状态码
-				content_length = response.headers.get("Content-Length")
-				# 如果有 Content-Length 且大于 0, 或者没有 Content-Length 都认为是有效的
-				if not content_length or int(content_length) > 0:
-					return True
-			# HEAD 请求失败或内容长度为 0, 尝试 GET 请求
-			response = coordinator.client.send_request(endpoint=url, method="GET", timeout=5, log=False)
-			if response.status_code != HTTPStatus.OK.value:
-				return False
-			# 检查响应内容是否非空
-			content = response.content
-			return len(content) > 0 if content else False
-		except Exception:
-			return False
