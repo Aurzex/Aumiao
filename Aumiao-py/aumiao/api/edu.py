@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Literal
 
-from httpx import Response
+from requests.models import Response
 
 from aumiao.utils import acquire, tool
 from aumiao.utils.acquire import HTTPStatus
