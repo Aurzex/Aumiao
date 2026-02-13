@@ -361,6 +361,20 @@ class DataFetcher:
 		)
 		return response.json()
 
+	# https://api.codemao.cn/tiger/work/list/all?page=1&per_page=24&type=1&order_by=update_time
+	# https://api.codemao.cn/tiger/work/list/all?page=1&per_page=24&type=3,5&order_by=update_time
+	# https://api.codemao.cn/tiger/work/list/all?page=1&per_page=24&type=3,5&order_by=view_times
+	# https://api.codemao.cn/tiger/work/list/all?page=1&per_page=24&type=1&order_by=view_times
+	# 1为作品,35为代码岛
+	def fetch_recommended_works_all(self, types: str, page_number: int = 1, amount_items: int = 24, order_by: Literal["update_time", "view_times"] = "update_time") -> dict:
+		params = {"type": types, "page": page_number, "per_page": amount_items, "order_by": order_by}
+		response = self._client.send_request(
+			endpoint="/tiger/work/list/all",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
 	# 获取素材推荐
 	# 素材 category_id 1为背景,4为音乐,8为角色
 	def fetch_material_recommend(self, category_id: int, limit: int = 15, offset: int = 0) -> dict:
