@@ -1391,6 +1391,20 @@ class WorkDataFetcher:
 		)
 		return response.json()
 
+	def fetch_work_activity(self, work_id: int) -> dict:
+		"""
+		获取作品参加的活动信息
+		Args:
+			work_id: 作品ID
+		Returns:
+			作品活动信息字典
+		"""
+		response = self._client.send_request(
+			endpoint=f"/web/works/activity/info/{work_id}",
+			method="GET"
+		)
+		return response.json()
+
 
 @singleton
 class NekoAIServices:

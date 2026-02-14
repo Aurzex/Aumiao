@@ -12,9 +12,8 @@ from aumiao.utils import acquire
 from aumiao.utils.data import PathConfig
 from aumiao.utils.tool import Crypto
 
+
 # ============ 配置管理 ============
-
-
 @dataclass(frozen=True)
 class DecompilerConfig:
 	"""反编译器配置 - 不可变值对象"""
@@ -61,12 +60,11 @@ class DecompilerConfig:
 	# 作品类型映射
 	file_extensions: dict[str, str] = field(default_factory=lambda: {
 		"KITTEN2": ".bcm", "KITTEN3": ".bcm", "KITTEN4": ".bcm4",
-		"COCO": ".json", "NEKO": ".json", "NEMO": ""
+		"COCO": ".json", "NEKO": ".json", "NEMO": "", "WOOD": ""
 	})
 
 
 # ============ 作品类型枚举 ============
-
 class WorkType(Enum):
 	"""作品类型枚举"""
 	KITTEN2 = "KITTEN2"
@@ -75,6 +73,7 @@ class WorkType(Enum):
 	COCO = "COCO"
 	NEKO = "NEKO"
 	NEMO = "NEMO"
+	WOOD = "WOOD"
 
 	@property
 	def is_kitten(self) -> bool:
@@ -92,19 +91,21 @@ class WorkType(Enum):
 	def is_coco(self) -> bool:
 		return self == WorkType.COCO
 
+	@property
+	def is_wood(self) -> bool:
+		return self == WorkType.WOOD
+
 
 # ============ 作品信息值对象 ============
-
 @dataclass(frozen=True)
 class WorkInfo:
 	"""作品信息 - 不可变值对象"""
 	id: int
 	name: str
 	type: WorkType
-	version: str = "0.16.2"
+	version: str = ""
 	user_id: int = 0
 	preview_url: str = ""
-	source_urls: tuple[str, ...] = field(default_factory=tuple)
 
 	@classmethod
 	def from_api_response(cls, data: dict[str, Any], _config: DecompilerConfig) -> "WorkInfo":
@@ -122,7 +123,6 @@ class WorkInfo:
 			version=data.get("bcm_version", "0.16.2"),
 			user_id=data.get("user_id", 0),
 			preview_url=data.get("preview", ""),
-			source_urls=tuple(data.get("source_urls", data.get("work_urls", [])))
 		)
 
 	@property
@@ -132,7 +132,6 @@ class WorkInfo:
 
 
 # ============ 文件操作服务 ============
-
 class FileService:
 	"""文件操作服务"""
 
@@ -185,7 +184,6 @@ class IdGenerator:
 
 
 # ============ 加密解密服务 ============
-
 class CryptoService:
 	"""加密解密服务"""
 
@@ -300,7 +298,6 @@ class BCMKNDecryptor:
 
 
 # ============ 阴影积木构建器 ============
-
 class ShadowBuilder:
 	"""阴影积木构建器 - 建造者模式"""
 
@@ -372,7 +369,6 @@ class CodeMaoHttpClient:
 
 
 # ============ 反编译器上下文 ============
-
 @dataclass
 class DecompilerContext:
 	"""反编译器上下文"""
@@ -385,7 +381,6 @@ class DecompilerContext:
 
 
 # ============ 反编译器基类 ============
-
 class BaseDecompiler(ABC):
 	"""反编译器抽象基类 - 模板方法模式"""
 
@@ -398,22 +393,20 @@ class BaseDecompiler(ABC):
 
 	def save_result(self, result: dict[str, Any] | str, output_dir: str | Path | None = None) -> str:
 		"""保存反编译结果"""
-		if self.context.work_info.type.is_nemo:
+		if self.context.work_info.type.is_nemo or self.context.work_info.type.is_wood:
 			if isinstance(result, str):
 				return result
-			msg = "Nemo作品应该返回字符串路径"
+			msg = "Nemo与Wood作品应该返回字符串路径"
 			raise TypeError(msg)
 
 		output_path = Path(output_dir) if output_dir else self.context.config.default_output_dir
 		self.context.file_service.ensure_dir(output_path)
-
 		filename = self.context.file_service.safe_filename(
 			self.context.work_info.name,
 			self.context.work_info.id,
 			self.context.work_info.file_extension.lstrip(".")
 		)
 		filepath = output_path / filename
-
 		if isinstance(result, dict):
 			self.context.file_service.write_json(filepath, result)
 		else:
@@ -424,7 +417,6 @@ class BaseDecompiler(ABC):
 
 
 # ============ NEKO反编译器 ============
-
 class NekoDecompiler(BaseDecompiler):
 	"""NEKO作品反编译器"""
 
@@ -447,7 +439,6 @@ class NekoDecompiler(BaseDecompiler):
 
 
 # ============ NEMO作品资源管理器 ============
-
 class NemoResourceManager:
 	"""NEMO作品资源管理器"""
 
@@ -534,22 +525,23 @@ class NemoResourceManager:
 					print(f"资源下载失败 {image_url}: {e}")
 
 
+# ============ NEMO反编译器 ============
 class NemoDecompiler(BaseDecompiler):
 	"""NEMO作品反编译器"""
 
 	def decompile(self) -> str:
 		"""反编译NEMO作品为文件夹结构"""
 		work_id = self.context.work_info.id
-		work_dir = Path(f"nemo_work_{work_id}")
-		# 创建资源管理器
+		folder_name = self.context.file_service.safe_filename(
+			self.context.work_info.name, work_id, ""
+		)
+		base_dir = self.context.config.default_output_dir
+		work_dir = base_dir / folder_name
 		resource_manager = NemoResourceManager(self.context, work_dir)
-		# 获取作品源信息
 		source_info = self.context.http_client.get_json(
 			f"{self.context.config.base_url}/creation-tools/v1/works/{work_id}/source/public"
 		)
-		# 下载BCM数据
 		bcm_data = self.context.http_client.get_json(source_info["work_urls"][0])
-		# 创建目录结构并保存文件
 		resource_manager.create_directories(work_id)
 		resource_manager.save_core_files(work_id, bcm_data, source_info)
 		resource_manager.download_resources(bcm_data)
@@ -559,7 +551,6 @@ class NemoDecompiler(BaseDecompiler):
 
 
 # ============ 积木反编译上下文 ============
-
 @dataclass
 class BlockContext:
 	"""积木反编译上下文"""
@@ -571,7 +562,6 @@ class BlockContext:
 
 
 # ============ 积木反编译器基类 ============
-
 class BlockDecompiler(ABC):
 	"""积木反编译器基类 - 策略模式"""
 
@@ -711,7 +701,6 @@ class BlockDecompiler(ABC):
 
 
 # ============ 具体积木反编译器 ============
-
 class IfBlockDecompiler(BlockDecompiler):
 	"""条件积木反编译器"""
 
@@ -868,9 +857,8 @@ class DefaultBlockDecompiler(BlockDecompiler):
 		"""使用基类的默认实现"""
 		return super().decompile()
 
+
 # ============ KITTEN作品反编译器 ============
-
-
 class KittenDecompiler(BaseDecompiler):
 	"""KITTEN作品反编译器"""
 
@@ -879,52 +867,38 @@ class KittenDecompiler(BaseDecompiler):
 		# 获取编译数据
 		compiled_data = self._fetch_compiled_data()
 		work = compiled_data.copy()
-
 		# 创建阴影构建器
 		shadow_builder = ShadowBuilder(self.context.config, self.context.id_generator)
-
 		# 存储函数定义
 		functions: dict[str, Any] = {}
-
 		# 反编译所有角色
 		actors = []
 		for actor_compiled in work["compile_result"]:
 			actor_info = self._get_actor_info(work, actor_compiled["id"])
 			context = BlockContext(actor_info, functions, shadow_builder)
 			actors.append((actor_compiled, context))
-
 		# 第一遍: 收集函数定义
 		for actor_compiled, _context in actors:
 			functions.update(dict(actor_compiled["procedures"].items()))
-
 		# 第二遍: 反编译函数定义
 		block_factory = BlockDecompilerFactory(self.context.config)
 		for name, func_data in functions.items():
 			context = BlockContext({}, functions, shadow_builder)
 			functions[name] = block_factory.create(func_data, context).decompile()
-
 		# 第三遍: 反编译角色积木
 		for actor_compiled, context in actors:
 			self._decompile_actor_blocks(actor_compiled, context, block_factory)
-
 		# 更新作品信息
 		self._update_work_info(work)
-
 		# 清理数据
 		self._clean_work_data(work)
-
 		return work
 
 	def _fetch_compiled_data(self) -> dict[str, Any]:
 		"""获取编译数据"""
 		work_id = self.context.work_info.id
-
-		if self.context.work_info.type.is_kitten:
-			url = f"{self.context.config.creation_base_url}/kitten/r2/work/player/load/{work_id}"
-			compiled_url = self.context.http_client.get_json(url)["source_urls"][0]
-		else:
-			compiled_url = self.context.work_info.source_urls[0]
-
+		url = f"{self.context.config.creation_base_url}/kitten/r2/work/player/load/{work_id}"
+		compiled_url = self.context.http_client.get_json(url)["source_urls"][0]
 		return self.context.http_client.get_json(compiled_url)
 
 	@staticmethod
@@ -982,7 +956,6 @@ class KittenDecompiler(BaseDecompiler):
 
 
 # ============ COCO作品反编译器 ============
-
 class CocoDecompiler(BaseDecompiler):
 	"""COCO作品反编译器"""
 
@@ -1017,25 +990,19 @@ class CocoDataReorganizer:
 		work["title"] = self.context.work_info.name
 		work["screens"] = {}
 		work["screenIds"] = []
-
 		# 处理屏幕
 		self._process_screens(work)
-
 		# 处理积木
 		self._process_blocks(work)
-
 		# 处理资源
 		self._process_resources(work)
-
 		# 处理变量
 		self._process_variables(work)
-
 		# 处理全局部件
 		work["globalWidgets"] = work["widgetMap"]
 		work["globalWidgetIds"] = list(work["widgetMap"].keys())
 		work["sourceId"] = ""
 		work["sourceTag"] = 1
-
 		# 清理数据
 		self._clean_data(work)
 
@@ -1138,14 +1105,141 @@ class CocoDataReorganizer:
 			work.pop(key, None)
 
 
-# ============ 反编译器工厂 ============
+# ============ WOOD作品资源管理器 ============
+class WoodResourceManager:
+	"""WOOD作品资源管理器"""
 
+	def __init__(self, context: DecompilerContext, work_dir: Path) -> None:
+		self.context = context
+		self.work_dir = work_dir
+		self.dirs: dict[str, Path] = {}
+
+	def create_directories(self) -> dict[str, Path]:
+		"""创建目录结构"""
+		self.dirs = {
+			"root": self.context.file_service.ensure_dir(self.work_dir),
+			"images": self.context.file_service.ensure_dir(self.work_dir / "images")
+		}
+		return self.dirs
+
+	def save_work_files(self, work_data: dict[str, Any]) -> None:
+		"""保存作品文件"""
+		# 保存作品信息元数据
+		self._save_work_info(work_data)
+		# 保存代码文件
+		self._save_code_files(work_data)
+		# 下载并保存图片资源
+		self._download_images(work_data)
+
+	def _save_work_info(self, work_data: dict[str, Any]) -> None:
+		"""保存作品信息"""
+		work_info = {
+			"id": work_data["work_id"],
+			"name": work_data["work_name"],
+			"type": "WOOD",
+			"language_type": work_data.get("language_type", 3),  # 3 表示Python
+			"run_mode": work_data.get("run_mode", 0),
+			"code_visible": work_data.get("code_visible", True),
+			"addition": work_data.get("addition", {})
+		}
+		self.context.file_service.write_json(self.dirs["root"] / "work_info.json", work_info)
+
+	def _save_code_files(self, work_data: dict[str, Any]) -> None:
+		"""保存代码文件"""
+		for file_info in work_data.get("content", []):
+			if file_info["file_type"] == 2 and file_info["file_name"].endswith(".py"):
+				code_content = file_info.get("source", "")
+				file_path = self.dirs["root"] / file_info["file_name"]
+				file_path.write_text(code_content, encoding="utf-8")
+
+	@staticmethod
+	def _extract_filename_from_url(url: str) -> str:
+		"""
+		从URL中提取文件名
+		"""
+		# 查找最后一个 '/' 之后的部分
+		last_slash = url.rfind("/")
+		filename_part = url[last_slash + 1:] if last_slash != -1 else url
+		# 移除URL参数(?后面的部分)
+		question_mark = filename_part.find("?")
+		if question_mark != -1:
+			filename_part = filename_part[:question_mark]
+		# 移除锚点(#后面的部分)
+		hash_mark = filename_part.find("#")
+		if hash_mark != -1:
+			filename_part = filename_part[:hash_mark]
+		# 如果提取到的部分为空,使用默认名称
+		if not filename_part:
+			return ""
+
+		return filename_part
+
+	def _get_file_extension(self, url: str) -> str:
+		"""
+		从URL中获取文件扩展名
+		"""
+		filename = self._extract_filename_from_url(url)
+		last_dot = filename.rfind(".")
+		if last_dot != -1:
+			return filename[last_dot:]
+		return ""
+
+	def _download_images(self, work_data: dict[str, Any]) -> None:
+		"""下载图片资源"""
+		for file_info in work_data.get("content", []):
+			if file_info["file_type"] == 3 and file_info.get("url"):  # 图片文件
+				image_url = file_info["url"]
+				try:
+					image_data = self.context.http_client.get_binary(image_url)
+					file_name = file_info.get("file_name", "")
+					if not file_name:
+						file_name = self._extract_filename_from_url(image_url)
+					if not file_name:
+						file_name = "image.png"
+					file_path = self.dirs["images"] / file_name
+					self.context.file_service.write_binary(file_path, image_data)
+
+				except Exception as e:
+					print(f"图片下载失败 {image_url}: {e}")
+
+
+# ============ WOOD反编译器 ============
+class WoodDecompiler(BaseDecompiler):
+	"""WOOD作品反编译器"""
+
+	def decompile(self) -> str:
+		"""
+		反编译WOOD作品为文件夹结构
+		"""
+		work_id = self.context.work_info.id
+		folder_name = self.context.file_service.safe_filename(
+			self.context.work_info.name, work_id, ""
+		)
+		base_dir = self.context.config.default_output_dir
+		work_dir = base_dir / folder_name
+		try:
+			# 获取作品发布数据
+			publish_url = f"{self.context.config.creation_base_url}/wood/work/{work_id}/publish?channel_type=0"
+			work_data = self.context.http_client.get_json(publish_url)
+			# 创建资源管理器
+			resource_manager = WoodResourceManager(self.context, work_dir)
+			# 创建目录结构并保存文件
+			resource_manager.create_directories()
+			resource_manager.save_work_files(work_data)
+			return str(work_dir)
+		except Exception as e:
+			print(f"反编译失败: {e}")
+			raise
+
+
+# ============ 反编译器工厂 ============
 class DecompilerFactory:
 	"""反编译器工厂"""
 
 	_decompilers: ClassVar[dict[WorkType, type[BaseDecompiler]]] = {
 		WorkType.NEKO: NekoDecompiler,
 		WorkType.NEMO: NemoDecompiler,
+		WorkType.WOOD: WoodDecompiler,
 		WorkType.KITTEN2: KittenDecompiler,
 		WorkType.KITTEN3: KittenDecompiler,
 		WorkType.KITTEN4: KittenDecompiler,
@@ -1168,7 +1262,6 @@ class DecompilerFactory:
 
 
 # ============ 主接口 ============
-
 class CodemaoDecompiler:
 	"""编程猫作品反编译器主接口"""
 
@@ -1218,7 +1311,6 @@ class CodemaoDecompiler:
 
 
 # ============ 向后兼容接口 ============
-
 def decompile_work(work_id: int, output_dir: str | Path | None = None) -> str:
 	"""
 	反编译作品 (向后兼容)
