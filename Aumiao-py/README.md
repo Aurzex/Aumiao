@@ -232,7 +232,7 @@ A powerful API collection project and toolset for CodeMao community development,
 
 ### 环境要求 | Requirements
 
-- Python 3.13 或更高版本 | Python 3.13 or higher
+- Python 3.14 或更高版本 | Python 3.14 or higher
 
 ### 安装方式 | Installation Methods
 
