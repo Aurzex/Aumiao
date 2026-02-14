@@ -60,7 +60,7 @@ class DecompilerConfig:
 	# 作品类型映射
 	file_extensions: dict[str, str] = field(default_factory=lambda: {
 		"KITTEN2": ".bcm", "KITTEN3": ".bcm", "KITTEN4": ".bcm4",
-		"COCO": ".json", "NEKO": ".json", "NEMO": "", "WOOD": ""
+		"COCO": ".json", "NEKO": ".bcmkn", "NEMO": "", "WOOD": ""
 	})
 
 
