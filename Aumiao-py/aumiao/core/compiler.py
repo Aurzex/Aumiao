@@ -170,13 +170,13 @@ class FileService:
 # ============ ID生成器 ============
 class IdGenerator:
 	"""ID生成器 - 单例模式"""
-	_instance: ClassVar[Self | None] = None
+	_instance = None
 	CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	def __new__(cls) -> Self:
 		if cls._instance is None:
 			cls._instance = super().__new__(cls)
-		return cls._instance  # ty:ignore[invalid-return-type]
+		return cls._instance
 
 	def generate(self, length: int = 20) -> str:
 		"""生成随机ID"""

@@ -1159,7 +1159,7 @@ class CloudConnection:
 			try:
 				# 使用异步关闭避免阻塞
 				def close_ws() -> None:
-					self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore [possibly-missing-attribute]
+					self.websocket_client.close()  # pyright: ignore [reportOptionalMemberAccess]  # ty:ignore[unresolved-attribute]
 
 				# 在新线程中关闭 WebSocket
 				close_thread = Thread(target=close_ws, daemon=True)

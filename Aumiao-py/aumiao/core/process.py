@@ -1916,7 +1916,7 @@ class FileProcessor:
 					relative_path = child_file.relative_to(dir_path)
 					child_save_path = str(Path(save_path) / relative_path.parent)
 					# 使用重构后的统一上传接口
-					url = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
+					url: str = uploader().upload(file_path=child_file, method=method, save_path=child_save_path)
 					# 记录上传历史
 					file_size_human = coordinator.toolkit.create_data_converter().bytes_to_human(file_size)
 					history = UploadHistory(
