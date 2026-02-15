@@ -17,6 +17,7 @@ from aumiao.utils.tool import Crypto
 @dataclass(frozen=True)
 class DecompilerConfig:
 	"""反编译器配置 - 不可变值对象"""
+
 	# API配置
 	base_url: str = "https://api.codemao.cn"
 	creation_base_url: str = "https://api-creation.codemao.cn"
@@ -28,45 +29,82 @@ class DecompilerConfig:
 
 	# 工具箱分类顺序
 	toolbox_categories: tuple[str, ...] = (
-		"action", "advanced", "ai", "ai_game", "ai_lab", "appearance",
-		"arduino", "audio", "camera", "cloud_list", "cloud_variable",
-		"cognitive", "control", "data", "event", "micro_bit", "midi_music",
-		"mobile_control", "operator", "pen", "physic", "physics2", "procedure",
-		"sensing", "video", "wee_make", "wood"
+		"action",
+		"advanced",
+		"ai",
+		"ai_game",
+		"ai_lab",
+		"appearance",
+		"arduino",
+		"audio",
+		"camera",
+		"cloud_list",
+		"cloud_variable",
+		"cognitive",
+		"control",
+		"data",
+		"event",
+		"micro_bit",
+		"midi_music",
+		"mobile_control",
+		"operator",
+		"pen",
+		"physic",
+		"physics2",
+		"procedure",
+		"sensing",
+		"video",
+		"wee_make",
+		"wood",
 	)
 
 	# 阴影积木类型
-	shadow_types: frozenset[str] = field(default_factory=lambda: frozenset({
-		"broadcast_input", "controller_shadow", "default_value", "get_audios",
-		"get_current_costume", "get_current_scene", "get_sensing_current_scene",
-		"get_whole_audios", "lists_get", "logic_empty", "math_number", "text"
-	}))
+	shadow_types: frozenset[str] = field(
+		default_factory=lambda: frozenset(
+			{
+				"broadcast_input",
+				"controller_shadow",
+				"default_value",
+				"get_audios",
+				"get_current_costume",
+				"get_current_scene",
+				"get_sensing_current_scene",
+				"get_whole_audios",
+				"lists_get",
+				"logic_empty",
+				"math_number",
+				"text",
+			}
+		)
+	)
 
 	# 阴影积木字段配置
-	shadow_fields: dict[str, dict[str, str]] = field(default_factory=lambda: {
-		"math_number": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
-		"controller_shadow": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,false"},
-		"text": {"name": "TEXT", "text": ""},
-		"lists_get": {"name": "VAR", "text": "?"},
-		"broadcast_input": {"name": "MESSAGE", "text": "Hi"},
-		"get_audios": {"name": "sound_id", "text": "?"},
-		"get_whole_audios": {"name": "sound_id", "text": "all"},
-		"get_current_costume": {"name": "style_id", "text": ""},
-		"default_value": {"name": "TEXT", "text": "0", "has_been_edited": "false"},
-		"get_current_scene": {"name": "scene", "text": ""},
-		"get_sensing_current_scene": {"name": "scene", "text": ""}
-	})
+	shadow_fields: dict[str, dict[str, str]] = field(
+		default_factory=lambda: {
+			"math_number": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,", "allow_text": "true"},
+			"controller_shadow": {"name": "NUM", "text": "0", "constraints": "-Infinity,Infinity,0,false"},
+			"text": {"name": "TEXT", "text": ""},
+			"lists_get": {"name": "VAR", "text": "?"},
+			"broadcast_input": {"name": "MESSAGE", "text": "Hi"},
+			"get_audios": {"name": "sound_id", "text": "?"},
+			"get_whole_audios": {"name": "sound_id", "text": "all"},
+			"get_current_costume": {"name": "style_id", "text": ""},
+			"default_value": {"name": "TEXT", "text": "0", "has_been_edited": "false"},
+			"get_current_scene": {"name": "scene", "text": ""},
+			"get_sensing_current_scene": {"name": "scene", "text": ""},
+		}
+	)
 
 	# 作品类型映射
-	file_extensions: dict[str, str] = field(default_factory=lambda: {
-		"KITTEN2": ".bcm", "KITTEN3": ".bcm", "KITTEN4": ".bcm4",
-		"COCO": ".json", "NEKO": ".bcmkn", "NEMO": "", "WOOD": ""
-	})
+	file_extensions: dict[str, str] = field(
+		default_factory=lambda: {"KITTEN2": ".bcm", "KITTEN3": ".bcm", "KITTEN4": ".bcm4", "COCO": ".json", "NEKO": ".bcmkn", "NEMO": "", "WOOD": ""}
+	)
 
 
 # ============ 作品类型枚举 ============
 class WorkType(Enum):
 	"""作品类型枚举"""
+
 	KITTEN2 = "KITTEN2"
 	KITTEN3 = "KITTEN3"
 	KITTEN4 = "KITTEN4"
@@ -100,6 +138,7 @@ class WorkType(Enum):
 @dataclass(frozen=True)
 class WorkInfo:
 	"""作品信息 - 不可变值对象"""
+
 	id: int
 	name: str
 	type: WorkType
@@ -170,6 +209,7 @@ class FileService:
 # ============ ID生成器 ============
 class IdGenerator:
 	"""ID生成器 - 单例模式"""
+
 	_instance = None
 	CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -276,7 +316,7 @@ class BCMKNDecryptor:
 			for i in range(len(text) - 1, -1, -1):
 				if text[i] in "}]":
 					try:
-						loads(text[:i + 1])
+						loads(text[: i + 1])
 						return i + 1
 					except JSONDecodeError:
 						continue
@@ -293,7 +333,7 @@ class BCMKNDecryptor:
 			last_bracket = text.rfind("]")
 			last_valid = max(last_brace, last_bracket)
 			if last_valid > 0:
-				text = text[:last_valid + 1]
+				text = text[: last_valid + 1]
 		return text
 
 
@@ -334,8 +374,10 @@ class ShadowBuilder:
 
 # ============ HTTP客户端协议 ============
 
+
 class HttpClient(Protocol):
 	"""HTTP客户端协议"""
+
 	def get_json(self, url: str, **kwargs: Any) -> dict[str, Any]:
 		"""获取JSON数据"""
 		...
@@ -372,6 +414,7 @@ class CodeMaoHttpClient:
 @dataclass
 class DecompilerContext:
 	"""反编译器上下文"""
+
 	work_info: WorkInfo
 	http_client: HttpClient
 	file_service: FileService
@@ -401,11 +444,7 @@ class BaseDecompiler(ABC):
 
 		output_path = Path(output_dir) if output_dir else self.context.config.default_output_dir
 		self.context.file_service.ensure_dir(output_path)
-		filename = self.context.file_service.safe_filename(
-			self.context.work_info.name,
-			self.context.work_info.id,
-			self.context.work_info.file_extension.lstrip(".")
-		)
+		filename = self.context.file_service.safe_filename(self.context.work_info.name, self.context.work_info.id, self.context.work_info.file_extension.lstrip("."))
 		filepath = output_path / filename
 		if isinstance(result, dict):
 			self.context.file_service.write_json(filepath, result)
@@ -452,7 +491,7 @@ class NemoResourceManager:
 		self.dirs = {
 			"material": self.context.file_service.ensure_dir(self.work_dir / "user_material"),
 			"works": self.context.file_service.ensure_dir(self.work_dir / "user_works" / str(work_id)),
-			"record": self.context.file_service.ensure_dir(self.work_dir / "user_works" / str(work_id) / "record")
+			"record": self.context.file_service.ensure_dir(self.work_dir / "user_works" / str(work_id) / "record"),
 		}
 		return self.dirs
 
@@ -481,10 +520,7 @@ class NemoResourceManager:
 		styles = bcm_data.get("styles", {}).get("styles_dict", {})
 		for style_id, style_data in styles.items():
 			if image_url := style_data.get("url"):
-				user_images["user_img_dict"][style_id] = {
-					"id": style_id,
-					"path": f"user_material/{Crypto.sha256(image_url)}.webp"
-				}
+				user_images["user_img_dict"][style_id] = {"id": style_id, "path": f"user_material/{Crypto.sha256(image_url)}.webp"}
 		return user_images
 
 	@staticmethod
@@ -509,7 +545,7 @@ class NemoResourceManager:
 			"template_id": 0,
 			"term_id": 0,
 			"type": 0,
-			"upload_status": {"work_id": work_id, "have_uploaded": 2}
+			"upload_status": {"work_id": work_id, "have_uploaded": 2},
 		}
 
 	def download_resources(self, bcm_data: dict[str, Any]) -> None:
@@ -532,15 +568,11 @@ class NemoDecompiler(BaseDecompiler):
 	def decompile(self) -> str:
 		"""反编译NEMO作品为文件夹结构"""
 		work_id = self.context.work_info.id
-		folder_name = self.context.file_service.safe_filename(
-			self.context.work_info.name, work_id, ""
-		)
+		folder_name = self.context.file_service.safe_filename(self.context.work_info.name, work_id, "")
 		base_dir = self.context.config.default_output_dir
 		work_dir = base_dir / folder_name
 		resource_manager = NemoResourceManager(self.context, work_dir)
-		source_info = self.context.http_client.get_json(
-			f"{self.context.config.base_url}/creation-tools/v1/works/{work_id}/source/public"
-		)
+		source_info = self.context.http_client.get_json(f"{self.context.config.base_url}/creation-tools/v1/works/{work_id}/source/public")
 		bcm_data = self.context.http_client.get_json(source_info["work_urls"][0])
 		resource_manager.create_directories(work_id)
 		resource_manager.save_core_files(work_id, bcm_data, source_info)
@@ -554,6 +586,7 @@ class NemoDecompiler(BaseDecompiler):
 @dataclass
 class BlockContext:
 	"""积木反编译上下文"""
+
 	actor_data: dict[str, Any]
 	functions: dict[str, Any]
 	shadow_builder: ShadowBuilder
@@ -594,26 +627,28 @@ class BlockDecompiler(ABC):
 		is_shadow = self.type in self.config.shadow_types
 		is_output = is_shadow or self.type in self.OUTPUT_BLOCK_TYPES
 
-		self.block.update({
-			"id": self.id,
-			"type": self.type,
-			"location": [0, 0],
-			"is_shadow": is_shadow,
-			"is_output": is_output,
-			"collapsed": False,
-			"disabled": False,
-			"deletable": True,
-			"movable": True,
-			"editable": True,
-			"visible": "visible",
-			"shadows": self.shadows,
-			"fields": self.fields,
-			"field_constraints": {},
-			"field_extra_attr": {},
-			"comment": None,
-			"mutation": "",
-			"parent_id": None
-		})
+		self.block.update(
+			{
+				"id": self.id,
+				"type": self.type,
+				"location": [0, 0],
+				"is_shadow": is_shadow,
+				"is_output": is_output,
+				"collapsed": False,
+				"disabled": False,
+				"deletable": True,
+				"movable": True,
+				"editable": True,
+				"visible": "visible",
+				"shadows": self.shadows,
+				"fields": self.fields,
+				"field_constraints": {},
+				"field_extra_attr": {},
+				"comment": None,
+				"mutation": "",
+				"parent_id": None,
+			}
+		)
 
 		self.context.blocks[self.id] = self.block
 		self.context.connections[self.id] = self.connection
@@ -633,11 +668,7 @@ class BlockDecompiler(ABC):
 					child_block = self._decompile_block(child)
 					child_block["parent_id"] = self.id
 					input_name = self._get_child_input_name(i)
-					self.connection[child_block["id"]] = {
-						"type": "input",
-						"input_type": "statement",
-						"input_name": input_name
-					}
+					self.connection[child_block["id"]] = {"type": "input", "input_type": "statement", "input_name": input_name}
 					self.shadows[input_name] = ""
 
 	def _get_child_input_name(self, index: int) -> str:  # noqa: ARG002, PLR6301
@@ -653,15 +684,9 @@ class BlockDecompiler(ABC):
 				input_name = f"IF{i}"
 
 				if condition_block["type"] != "logic_empty":
-					self.connection[condition_block["id"]] = {
-						"type": "input",
-						"input_type": "value",
-						"input_name": input_name
-					}
+					self.connection[condition_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
 
-				self.shadows[input_name] = self.context.shadow_builder.create(
-					"logic_empty", condition_block["id"]
-				)
+				self.shadows[input_name] = self.context.shadow_builder.create("logic_empty", condition_block["id"])
 
 	def _process_params(self) -> None:
 		"""处理参数"""
@@ -679,19 +704,13 @@ class BlockDecompiler(ABC):
 		if param_block["type"] in self.config.shadow_types:
 			# 纯阴影积木
 			field_value = next(iter(param_block["fields"].values()), "")
-			self.shadows[name] = self.context.shadow_builder.create(
-				param_block["type"], param_block["id"], field_value
-			)
+			self.shadows[name] = self.context.shadow_builder.create(param_block["type"], param_block["id"], field_value)
 		else:
 			# 嵌入其他积木
 			shadow_type = "logic_empty" if name in {"condition", "BOOL"} else "math_number"
 			self.shadows[name] = self.context.shadow_builder.create(shadow_type)
 
-		self.connection[param_block["id"]] = {
-			"type": "input",
-			"input_type": "value",
-			"input_name": name
-		}
+		self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": name}
 
 	def _decompile_block(self, compiled: dict[str, Any]) -> dict[str, Any]:
 		"""反编译子积木"""
@@ -755,22 +774,17 @@ class FunctionDefDecompiler(BlockDecompiler):
 			# 参数默认值积木
 			self.shadows[input_name] = self.context.shadow_builder.create("math_number")
 
-			param_block = self._decompile_block({
-				"id": self.context.shadow_builder.id_generator.generate(),
-				"kind": "domain_block",
-				"type": "procedures_2_stable_parameter",
-				"params": {
-					"param_name": param_name,
-					"param_default_value": ""
+			param_block = self._decompile_block(
+				{
+					"id": self.context.shadow_builder.id_generator.generate(),
+					"kind": "domain_block",
+					"type": "procedures_2_stable_parameter",
+					"params": {"param_name": param_name, "param_default_value": ""},
 				}
-			})
+			)
 			param_block["parent_id"] = self.block["id"]
 
-			self.connection[param_block["id"]] = {
-				"type": "input",
-				"input_type": "value",
-				"input_name": input_name
-			}
+			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": input_name}
 
 		self.block["mutation"] = ET.tostring(mutation, encoding="unicode")
 		return self.block
@@ -803,19 +817,13 @@ class FunctionCallDecompiler(BlockDecompiler):
 		for i, (param_name, param_value) in enumerate(self.compiled["params"].items()):
 			param_block = self._decompile_block(param_value)
 
-			self.shadows[f"ARG {i}"] = self.context.shadow_builder.create(
-				"default_value", param_block["id"]
-			)
+			self.shadows[f"ARG {i}"] = self.context.shadow_builder.create("default_value", param_block["id"])
 
 			param_elem = ET.SubElement(mutation, "procedures_2_parameter_shadow")
 			param_elem.set("name", param_name)
 			param_elem.set("value", "0")
 
-			self.connection[param_block["id"]] = {
-				"type": "input",
-				"input_type": "value",
-				"input_name": f"ARG {i}"
-			}
+			self.connection[param_block["id"]] = {"type": "input", "input_type": "value", "input_name": f"ARG {i}"}
 
 		self.block["mutation"] = ET.tostring(mutation, encoding="unicode")
 		return self.block
@@ -831,7 +839,7 @@ class BlockDecompilerFactory:
 		"text_join": TextJoinDecompiler,
 		"procedures_2_defnoreturn": FunctionDefDecompiler,
 		"procedures_2_callnoreturn": FunctionCallDecompiler,
-		"procedures_2_callreturn": FunctionCallDecompiler
+		"procedures_2_callreturn": FunctionCallDecompiler,
 	}
 
 	def __init__(self, config: DecompilerConfig) -> None:
@@ -920,18 +928,14 @@ class KittenDecompiler(BaseDecompiler):
 			"type": "sprite",
 			"visible": True,
 			"x": 0,
-			"y": 0
+			"y": 0,
 		}
 
 	@staticmethod
 	def _decompile_actor_blocks(actor_compiled: dict[str, Any], context: BlockContext, block_factory: BlockDecompilerFactory) -> None:
 		"""反编译角色积木"""
 		# 初始化角色积木数据
-		context.actor_data["block_data_json"] = {
-			"blocks": context.blocks,
-			"connections": context.connections,
-			"comments": {}
-		}
+		context.actor_data["block_data_json"] = {"blocks": context.blocks, "connections": context.connections, "comments": {}}
 
 		# 反编译所有积木
 		for block_data in actor_compiled["compiled_block_map"].values():
@@ -939,14 +943,16 @@ class KittenDecompiler(BaseDecompiler):
 
 	def _update_work_info(self, work: dict[str, Any]) -> None:
 		"""更新作品信息"""
-		work.update({
-			"hidden_toolbox": {"toolbox": [], "blocks": []},
-			"work_source_label": 0,
-			"sample_id": "",
-			"project_name": self.context.work_info.name,
-			"toolbox_order": list(self.context.config.toolbox_categories),
-			"last_toolbox_order": list(self.context.config.toolbox_categories)
-		})
+		work.update(
+			{
+				"hidden_toolbox": {"toolbox": [], "blocks": []},
+				"work_source_label": 0,
+				"sample_id": "",
+				"project_name": self.context.work_info.name,
+				"toolbox_order": list(self.context.config.toolbox_categories),
+				"last_toolbox_order": list(self.context.config.toolbox_categories),
+			}
+		)
 
 	@staticmethod
 	def _clean_work_data(work: dict[str, Any]) -> None:
@@ -1012,13 +1018,7 @@ class CocoDataReorganizer:
 		for screen in work["screenList"]:
 			screen_id = screen["id"]
 			screen["snapshot"] = ""
-			screen.update({
-				"primitiveVariables": [],
-				"arrayVariables": [],
-				"objectVariables": [],
-				"broadcasts": ["Hi"],
-				"widgets": {}
-			})
+			screen.update({"primitiveVariables": [], "arrayVariables": [], "objectVariables": [], "broadcasts": ["Hi"], "widgets": {}})
 
 			work["screens"][screen_id] = screen
 			work["screenIds"].append(screen_id)
@@ -1033,21 +1033,12 @@ class CocoDataReorganizer:
 		"""处理积木"""
 		work["blockly"] = {}
 		for screen_id, blocks in work["blockJsonMap"].items():
-			work["blockly"][screen_id] = {
-				"screenId": screen_id,
-				"workspaceJson": blocks,
-				"workspaceOffset": {"x": 0, "y": 0}
-			}
+			work["blockly"][screen_id] = {"screenId": screen_id, "workspaceJson": blocks, "workspaceOffset": {"x": 0, "y": 0}}
 
 	@staticmethod
 	def _process_resources(work: dict[str, Any]) -> None:
 		"""处理资源文件"""
-		resource_maps = [
-			("imageFileMap", "imageFileList"),
-			("soundFileMap", "soundFileList"),
-			("iconFileMap", "iconFileList"),
-			("fontFileMap", "fontFileList")
-		]
+		resource_maps = [("imageFileMap", "imageFileList"), ("soundFileMap", "soundFileList"), ("iconFileMap", "iconFileList"), ("fontFileMap", "fontFileList")]
 
 		for map_name, list_name in resource_maps:
 			if map_name in work:
@@ -1057,37 +1048,18 @@ class CocoDataReorganizer:
 	def _process_variables(work: dict[str, Any]) -> None:
 		"""处理变量"""
 		counters = {"var": 0, "list": 0, "dict": 0}
-		variable_lists = {
-			"globalVariableList": [],
-			"globalArrayList": [],
-			"globalObjectList": []
-		}
+		variable_lists = {"globalVariableList": [], "globalArrayList": [], "globalObjectList": []}
 
 		for var_id, value in work["variableMap"].items():
 			if isinstance(value, list):
 				counters["list"] += 1
-				variable_lists["globalArrayList"].append({
-					"id": var_id,
-					"name": f"列表{counters['list']}",
-					"defaultValue": value,
-					"value": value
-				})
+				variable_lists["globalArrayList"].append({"id": var_id, "name": f"列表{counters['list']}", "defaultValue": value, "value": value})
 			elif isinstance(value, dict):
 				counters["dict"] += 1
-				variable_lists["globalObjectList"].append({
-					"id": var_id,
-					"name": f"字典{counters['dict']}",
-					"defaultValue": value,
-					"value": value
-				})
+				variable_lists["globalObjectList"].append({"id": var_id, "name": f"字典{counters['dict']}", "defaultValue": value, "value": value})
 			else:
 				counters["var"] += 1
-				variable_lists["globalVariableList"].append({
-					"id": var_id,
-					"name": f"变量{counters['var']}",
-					"defaultValue": value,
-					"value": value
-				})
+				variable_lists["globalVariableList"].append({"id": var_id, "name": f"变量{counters['var']}", "defaultValue": value, "value": value})
 
 		work.update(variable_lists)
 
@@ -1095,10 +1067,19 @@ class CocoDataReorganizer:
 	def _clean_data(work: dict[str, Any]) -> None:
 		"""清理数据"""
 		remove_keys = [
-			"apiToken", "blockCode", "blockJsonMap", "fontFileMap",
-			"gridMap", "iconFileMap", "id", "imageFileMap",
-			"initialScreenId", "screenList", "soundFileMap",
-			"variableMap", "widgetMap"
+			"apiToken",
+			"blockCode",
+			"blockJsonMap",
+			"fontFileMap",
+			"gridMap",
+			"iconFileMap",
+			"id",
+			"imageFileMap",
+			"initialScreenId",
+			"screenList",
+			"soundFileMap",
+			"variableMap",
+			"widgetMap",
 		]
 
 		for key in remove_keys:
@@ -1116,10 +1097,7 @@ class WoodResourceManager:
 
 	def create_directories(self) -> dict[str, Path]:
 		"""创建目录结构"""
-		self.dirs = {
-			"root": self.context.file_service.ensure_dir(self.work_dir),
-			"images": self.context.file_service.ensure_dir(self.work_dir / "images")
-		}
+		self.dirs = {"root": self.context.file_service.ensure_dir(self.work_dir), "images": self.context.file_service.ensure_dir(self.work_dir / "images")}
 		return self.dirs
 
 	def save_work_files(self, work_data: dict[str, Any]) -> None:
@@ -1140,7 +1118,7 @@ class WoodResourceManager:
 			"language_type": work_data.get("language_type", 3),  # 3 表示Python
 			"run_mode": work_data.get("run_mode", 0),
 			"code_visible": work_data.get("code_visible", True),
-			"addition": work_data.get("addition", {})
+			"addition": work_data.get("addition", {}),
 		}
 		self.context.file_service.write_json(self.dirs["root"] / "work_info.json", work_info)
 
@@ -1159,7 +1137,7 @@ class WoodResourceManager:
 		"""
 		# 查找最后一个 '/' 之后的部分
 		last_slash = url.rfind("/")
-		filename_part = url[last_slash + 1:] if last_slash != -1 else url
+		filename_part = url[last_slash + 1 :] if last_slash != -1 else url
 		# 移除URL参数(?后面的部分)
 		question_mark = filename_part.find("?")
 		if question_mark != -1:
@@ -1212,9 +1190,7 @@ class WoodDecompiler(BaseDecompiler):
 		反编译WOOD作品为文件夹结构
 		"""
 		work_id = self.context.work_info.id
-		folder_name = self.context.file_service.safe_filename(
-			self.context.work_info.name, work_id, ""
-		)
+		folder_name = self.context.file_service.safe_filename(self.context.work_info.name, work_id, "")
 		base_dir = self.context.config.default_output_dir
 		work_dir = base_dir / folder_name
 		try:
@@ -1243,7 +1219,7 @@ class DecompilerFactory:
 		WorkType.KITTEN2: KittenDecompiler,
 		WorkType.KITTEN3: KittenDecompiler,
 		WorkType.KITTEN4: KittenDecompiler,
-		WorkType.COCO: CocoDecompiler
+		WorkType.COCO: CocoDecompiler,
 	}
 
 	@classmethod
@@ -1295,12 +1271,7 @@ class CodemaoDecompiler:
 		file_service = FileService(self.config)
 		crypto_service = CryptoService(self.config.crypto_salt) if work_info.type.is_neko else None
 		return DecompilerContext(
-			work_info=work_info,
-			http_client=http_client,
-			file_service=file_service,
-			id_generator=self.id_generator,
-			config=self.config,
-			crypto_service=crypto_service
+			work_info=work_info, http_client=http_client, file_service=file_service, id_generator=self.id_generator, config=self.config, crypto_service=crypto_service
 		)
 
 	def _fetch_work_info(self, http_client: HttpClient, work_id: int) -> WorkInfo:

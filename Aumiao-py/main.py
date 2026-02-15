@@ -144,7 +144,7 @@ def login(account_data_manager: AccountDataManager) -> None:
 	identity = printer.prompt_input("请输入用户名")
 	password = printer.prompt_input("请输入密码")
 	response = coordinator.auth_manager.login(identity=identity, password=password)
-	data_ = coordinator.user_obtain.fetch_account_details()
+	data_ = coordinator.user_data_fetcher.fetch_account_details()
 	account_data = {
 		"ACCOUNT_DATA": {
 			"identity": identity,

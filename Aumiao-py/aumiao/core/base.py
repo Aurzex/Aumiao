@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from aumiao.api import auth, community, edu, forum, library, shop, user, whale, work
+from aumiao.api import auth, clouddb, codegame, community, edu, forum, library, pickduck, shop, user, whale, work
 from aumiao.utils.acquire import ClientFactory, CodeMaoClient
 from aumiao.utils.data import CacheManager, CodeMaoFile, DataManager, HistoryManager, NestedDefaultDict, PathConfig, SettingManager
 from aumiao.utils.decorator import singleton
@@ -78,35 +78,73 @@ class InfrastructureCoordinator:
 
 	def _initialize_module_registry(self) -> None:
 		"""初始化模块注册表"""
-		# API 模块
-		api_modules: dict = {
-			"auth": auth.AuthManager,
-			"comment_motion": work.CommentOperations,
-			"community_motion": community.UserAction,
-			"community_obtain": community.DataFetcher,
-			"edu_motion": edu.UserAction,
-			"edu_obtain": edu.DataFetcher,
-			"forum_motion": forum.ForumActionHandler,
-			"forum_obtain": forum.ForumDataFetcher,
-			"novel_motion": library.NovelActionHandler,
-			"novel_obtain": library.NovelDataFetcher,
-			"shop_motion": shop.WorkshopActionHandler,
-			"shop_obtain": shop.WorkshopDataFetcher,
-			"user_motion": user.UserManager,
-			"user_obtain": user.UserDataFetcher,
-			"work_motion": work.BaseWorkOperations,
-			"work_obtain": work.WorkDataFetcher,
-			"whale_motion": whale.ReportHandler,
-			"whale_obtain": whale.ReportFetcher,
-			"cache_manager": CacheManager,
-			"history_manager": HistoryManager,
-			"nested_defaultdict": NestedDefaultDict,
-			"file_manager": CodeMaoFile,
-			# 工具模块
-			"printer": OutputHandler,
-		}
-		for name, creator in api_modules.items():
-			self._modules.register(name, creator)
+		# 认证模块
+		self._modules.register("auth_manager", auth.AuthManager)
+		self._modules.register("cloud_authenticator", auth.CloudAuthenticator)
+
+		# 云数据库模块
+		self._modules.register("ranking_manager", clouddb.Ranking)
+		self._modules.register("coconut_cloud_database", clouddb.CoconutCloud)
+
+		# 代码游戏模块
+		self._modules.register("oversea_data_client", codegame.OverseaDataClient)
+		self._modules.register("user_action_handler", codegame.UserActionHandler)
+
+		# 社区模块
+		self._modules.register("community_data_fetcher", community.DataFetcher)
+		self._modules.register("community_action_handler", community.UserAction)
+
+		# 教育模块
+		self._modules.register("education_action_handler", edu.UserAction)
+		self._modules.register("education_data_fetcher", edu.DataFetcher)
+
+		# 论坛模块
+		self._modules.register("forum_data_fetcher", forum.ForumDataFetcher)
+		self._modules.register("forum_action_handler", forum.ForumActionHandler)
+
+		# 图书馆模块
+		self._modules.register("cartoon_data_fetcher", library.CartoonDataFetcher)
+		self._modules.register("novel_data_fetcher", library.NovelDataFetcher)
+		self._modules.register("novel_action_handler", library.NovelActionHandler)
+		self._modules.register("book_data_fetcher", library.BookDataFetcher)
+		self._modules.register("book_action_handler", library.BookActionHandler)
+
+		# Pickduck模块
+		self._modules.register("cookie_manager", pickduck.CookieManager)
+
+		# 工坊模块
+		self._modules.register("workshop_data_fetcher", shop.WorkshopDataFetcher)
+		self._modules.register("workshop_action_handler", shop.WorkshopActionHandler)
+
+		# 用户模块
+		self._modules.register("user_data_fetcher", user.UserDataFetcher)
+		self._modules.register("user_manager", user.UserManager)
+
+		# 鲸鱼模块
+		self._modules.register("report_data_fetcher", whale.ReportFetcher)
+		self._modules.register("report_action_handler", whale.ReportHandler)
+
+		# 作品模块
+		self._modules.register("base_work_operations", work.BaseWorkOperations)
+		self._modules.register("comment_operations", work.CommentOperations)
+		self._modules.register("kitten_work_manager", work.KittenWorkManager)
+		self._modules.register("neko_work_manager", work.NekoWorkManager)
+		self._modules.register("wood_work_manager", work.WoodWorkManager)
+		self._modules.register("coco_work_manager", work.CocoWorkManager)
+		self._modules.register("collaboration_manager", work.CollaborationManager)
+		self._modules.register("ai_services", work.AIServices)
+		self._modules.register("teaching_plan_manager", work.TeachingPlanManager)
+		self._modules.register("image_classify_manager", work.ImageClassifyManager)
+		self._modules.register("package_manager", work.PackageManager)
+		self._modules.register("sample_manager", work.SampleManager)
+		self._modules.register("work_data_fetcher", work.WorkDataFetcher)
+
+		# 工具模块
+		self._modules.register("cache_manager_tool", CacheManager)
+		self._modules.register("history_manager_tool", HistoryManager)
+		self._modules.register("nested_defaultdict_tool", NestedDefaultDict)
+		self._modules.register("file_manager_tool", CodeMaoFile)
+		self._modules.register("output_handler_tool", OutputHandler)
 
 	# 核心组件属性
 	@property
@@ -121,135 +159,241 @@ class InfrastructureCoordinator:
 
 	@property
 	def data_manager(self) -> DataManager:
-		"""数据"""
+		"""数据管理器"""
 		return self._core.data_manager
 
 	@property
 	def path_config(self) -> PathConfig:
-		"""数据"""
+		"""路径配置管理器"""
 		return self._core.path_config
 
 	@property
 	def setting_manager(self) -> SettingManager:
-		"""设置"""
+		"""设置管理器"""
 		return self._core.setting_manager
 
-	# API 模块属性
+	# 认证模块属性
 	@property
 	def auth_manager(self) -> "auth.AuthManager":
 		"""认证管理模块"""
-		return self._modules.get("auth")
+		return self._modules.get("auth_manager")
 
 	@property
-	def community_motion(self) -> "community.UserAction":
-		"""社区动作模块"""
-		return self._modules.get("community_motion")
+	def cloud_authenticator(self) -> "auth.CloudAuthenticator":
+		"""云认证模块"""
+		return self._modules.get("cloud_authenticator")
+
+	# 云数据库模块属性
+	@property
+	def ranking_manager(self) -> "clouddb.Ranking":
+		"""排行榜管理模块"""
+		return self._modules.get("ranking_manager")
 
 	@property
-	def community_obtain(self) -> "community.DataFetcher":
+	def coconut_cloud_database(self) -> "clouddb.CoconutCloud":
+		"""椰子云数据库模块"""
+		return self._modules.get("coconut_cloud_database")
+
+	# 代码游戏模块属性
+	@property
+	def oversea_data_client(self) -> "codegame.OverseaDataClient":
+		"""海外数据客户端模块"""
+		return self._modules.get("oversea_data_client")
+
+	@property
+	def user_action_handler(self) -> "codegame.UserActionHandler":
+		"""用户动作处理模块"""
+		return self._modules.get("user_action_handler")
+
+	# 社区模块属性
+	@property
+	def community_data_fetcher(self) -> "community.DataFetcher":
 		"""社区数据获取模块"""
-		return self._modules.get("community_obtain")
+		return self._modules.get("community_data_fetcher")
 
 	@property
-	def edu_motion(self) -> "edu.UserAction":
-		"""教育动作模块"""
-		return self._modules.get("edu_motion")
+	def community_action_handler(self) -> "community.UserAction":
+		"""社区动作处理模块"""
+		return self._modules.get("community_action_handler")
+
+	# 教育模块属性
+	@property
+	def education_action_handler(self) -> "edu.UserAction":
+		"""教育动作处理模块"""
+		return self._modules.get("education_action_handler")
 
 	@property
-	def edu_obtain(self) -> "edu.DataFetcher":
+	def education_data_fetcher(self) -> "edu.DataFetcher":
 		"""教育数据获取模块"""
-		return self._modules.get("edu_obtain")
+		return self._modules.get("education_data_fetcher")
 
+	# 论坛模块属性
 	@property
-	def forum_motion(self) -> "forum.ForumActionHandler":
-		"""论坛动作模块"""
-		return self._modules.get("forum_motion")
-
-	@property
-	def forum_obtain(self) -> "forum.ForumDataFetcher":
+	def forum_data_fetcher(self) -> "forum.ForumDataFetcher":
 		"""论坛数据获取模块"""
-		return self._modules.get("forum_obtain")
+		return self._modules.get("forum_data_fetcher")
 
 	@property
-	def novel_motion(self) -> "library.NovelActionHandler":
-		"""小说动作模块"""
-		return self._modules.get("novel_motion")
+	def forum_action_handler(self) -> "forum.ForumActionHandler":
+		"""论坛动作处理模块"""
+		return self._modules.get("forum_action_handler")
+
+	# 图书馆模块属性
+	@property
+	def cartoon_data_fetcher(self) -> "library.CartoonDataFetcher":
+		"""漫画数据获取模块"""
+		return self._modules.get("cartoon_data_fetcher")
 
 	@property
-	def novel_obtain(self) -> "library.NovelDataFetcher":
+	def novel_data_fetcher(self) -> "library.NovelDataFetcher":
 		"""小说数据获取模块"""
-		return self._modules.get("novel_obtain")
+		return self._modules.get("novel_data_fetcher")
 
 	@property
-	def shop_motion(self) -> "shop.WorkshopActionHandler":
-		"""商店动作模块"""
-		return self._modules.get("shop_motion")
+	def novel_action_handler(self) -> "library.NovelActionHandler":
+		"""小说动作处理模块"""
+		return self._modules.get("novel_action_handler")
 
 	@property
-	def shop_obtain(self) -> "shop.WorkshopDataFetcher":
-		"""商店数据获取模块"""
-		return self._modules.get("shop_obtain")
+	def book_data_fetcher(self) -> "library.BookDataFetcher":
+		"""书籍数据获取模块"""
+		return self._modules.get("book_data_fetcher")
 
 	@property
-	def user_motion(self) -> "user.UserManager":
-		"""用户动作模块"""
-		return self._modules.get("user_motion")
+	def book_action_handler(self) -> "library.BookActionHandler":
+		"""书籍动作处理模块"""
+		return self._modules.get("book_action_handler")
+
+	# Pickduck模块属性
+	@property
+	def cookie_manager(self) -> "pickduck.CookieManager":
+		"""Cookie管理模块"""
+		return self._modules.get("cookie_manager")
+
+	# 工坊模块属性
+	@property
+	def workshop_data_fetcher(self) -> "shop.WorkshopDataFetcher":
+		"""工坊数据获取模块"""
+		return self._modules.get("workshop_data_fetcher")
 
 	@property
-	def user_obtain(self) -> "user.UserDataFetcher":
+	def workshop_action_handler(self) -> "shop.WorkshopActionHandler":
+		"""工坊动作处理模块"""
+		return self._modules.get("workshop_action_handler")
+
+	# 用户模块属性
+	@property
+	def user_data_fetcher(self) -> "user.UserDataFetcher":
 		"""用户数据获取模块"""
-		return self._modules.get("user_obtain")
+		return self._modules.get("user_data_fetcher")
 
 	@property
-	def work_motion(self) -> "work.BaseWorkOperations":
-		"""作品动作模块"""
-		return self._modules.get("work_motion")
+	def user_manager(self) -> "user.UserManager":
+		"""用户管理模块"""
+		return self._modules.get("user_manager")
+
+	# 鲸鱼模块属性
+	@property
+	def report_data_fetcher(self) -> "whale.ReportFetcher":
+		"""报告数据获取模块"""
+		return self._modules.get("report_data_fetcher")
 
 	@property
-	def comment_motion(self) -> "work.CommentOperations":
-		"""作品评论动作模块"""
-		return self._modules.get("comment_motion")
+	def report_action_handler(self) -> "whale.ReportHandler":
+		"""报告动作处理模块"""
+		return self._modules.get("report_action_handler")
+
+	# 作品模块属性
+	@property
+	def base_work_operations(self) -> "work.BaseWorkOperations":
+		"""基础作品操作模块"""
+		return self._modules.get("base_work_operations")
 
 	@property
-	def work_obtain(self) -> "work.WorkDataFetcher":
+	def comment_operations(self) -> "work.CommentOperations":
+		"""评论操作模块"""
+		return self._modules.get("comment_operations")
+
+	@property
+	def kitten_work_manager(self) -> "work.KittenWorkManager":
+		"""Kitten作品管理模块"""
+		return self._modules.get("kitten_work_manager")
+
+	@property
+	def neko_work_manager(self) -> "work.NekoWorkManager":
+		"""Neko作品管理模块"""
+		return self._modules.get("neko_work_manager")
+
+	@property
+	def wood_work_manager(self) -> "work.WoodWorkManager":
+		"""Wood作品管理模块"""
+		return self._modules.get("wood_work_manager")
+
+	@property
+	def coco_work_manager(self) -> "work.CocoWorkManager":
+		"""Coco作品管理模块"""
+		return self._modules.get("coco_work_manager")
+
+	@property
+	def collaboration_manager(self) -> "work.CollaborationManager":
+		"""协作管理模块"""
+		return self._modules.get("collaboration_manager")
+
+	@property
+	def ai_services(self) -> "work.AIServices":
+		"""AI服务模块"""
+		return self._modules.get("ai_services")
+
+	@property
+	def teaching_plan_manager(self) -> "work.TeachingPlanManager":
+		"""教学计划管理模块"""
+		return self._modules.get("teaching_plan_manager")
+
+	@property
+	def image_classify_manager(self) -> "work.ImageClassifyManager":
+		"""图像分类管理模块"""
+		return self._modules.get("image_classify_manager")
+
+	@property
+	def package_manager(self) -> "work.PackageManager":
+		"""包管理模块"""
+		return self._modules.get("package_manager")
+
+	@property
+	def sample_manager(self) -> "work.SampleManager":
+		"""示例管理模块"""
+		return self._modules.get("sample_manager")
+
+	@property
+	def work_data_fetcher(self) -> "work.WorkDataFetcher":
 		"""作品数据获取模块"""
-		return self._modules.get("work_obtain")
-
-	@property
-	def whale_motion(self) -> "whale.ReportHandler":
-		"""鲸鱼报告动作模块"""
-		return self._modules.get("whale_motion")
-
-	@property
-	def whale_obtain(self) -> "whale.ReportFetcher":
-		"""鲸鱼报告数据获取模块"""
-		return self._modules.get("whale_obtain")
-
-	@property
-	def cache_manager(self) -> "CacheManager":
-		"""缓存"""
-		return self._modules.get("cache_manager")
-
-	@property
-	def history_manager(self) -> "HistoryManager":
-		"""上传历史"""
-		return self._modules.get("history_manager")
-
-	@property
-	def nested_defaultdict(self) -> "NestedDefaultDict":
-		"""嵌套字典"""
-		return self._modules.get("nested_defaultdict")
-
-	@property
-	def file_manager(self) -> "CodeMaoFile":
-		"""文件写入"""
-		return self._modules.get("file_manager")
+		return self._modules.get("work_data_fetcher")
 
 	# 工具模块属性
 	@property
-	def printer(self) -> "OutputHandler":
-		"""打印工具模块"""
-		return self._modules.get("printer")
+	def cache_manager_tool(self) -> "CacheManager":
+		"""缓存管理工具模块"""
+		return self._modules.get("cache_manager_tool")
+
+	@property
+	def history_manager_tool(self) -> "HistoryManager":
+		"""历史管理工具模块"""
+		return self._modules.get("history_manager_tool")
+
+	@property
+	def nested_defaultdict_tool(self) -> "NestedDefaultDict":
+		"""嵌套字典工具模块"""
+		return self._modules.get("nested_defaultdict_tool")
+
+	@property
+	def file_manager_tool(self) -> "CodeMaoFile":
+		"""文件管理工具模块"""
+		return self._modules.get("file_manager_tool")
+
+	@property
+	def output_handler_tool(self) -> "OutputHandler":
+		"""输出处理工具模块"""
+		return self._modules.get("output_handler_tool")
 
 	# 动态模块访问
 	def get_module(self, name: str) -> Any:
@@ -321,8 +465,8 @@ class Tool:
 	@staticmethod
 	def message_report(user_id: int) -> None:
 		"""生成用户数据报告"""
-		response: dict = coordinator.user_obtain.fetch_user_honors(user_id=user_id)
-		timestamp: int = coordinator.community_obtain.fetch_current_timestamp_10()["data"]
+		response: dict = coordinator.user_data_fetcher.fetch_user_honors(user_id=user_id)
+		timestamp: int = coordinator.community_data_fetcher.fetch_current_timestamp_10()["data"]
 		user_data: dict = {
 			"user_id": response["user_id"],
 			"nickname": response["nickname"],
@@ -334,9 +478,9 @@ class Tool:
 			"timestamp": timestamp,
 		}
 		# 如果有缓存数据, 进行对比分析
-		if coordinator.cache_manager.data:
+		if coordinator.cache_manager_tool.data:
 			coordinator.toolkit.create_data_analyzer().compare_datasets(
-				before=coordinator.cache_manager.data,
+				before=coordinator.cache_manager_tool.data,
 				after=user_data,
 				metrics={
 					"fans": "粉丝",
@@ -347,4 +491,4 @@ class Tool:
 				timestamp_field="timestamp",
 			)
 		# 更新缓存
-		coordinator.cache_manager.update(user_data)
+		coordinator.cache_manager_tool.update(user_data)

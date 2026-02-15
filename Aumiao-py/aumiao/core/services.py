@@ -264,9 +264,9 @@ class ReplyService:
 	def _send_reply(source_type: str, business_id: int, target_id: int, parent_id: int, content: str) -> bool | dict:
 		"""发送回复"""
 		if source_type == "work":
-			return coordinator.comment_motion.create_comment_reply(work_id=business_id, comment_id=target_id, parent_id=parent_id, comment=content)
+			return coordinator.comment_operations.create_comment_reply(work_id=business_id, comment_id=target_id, parent_id=parent_id, comment=content)
 		# 修复类型错误: 确保参数是整数类型
-		return coordinator.forum_motion.create_comment_reply(
+		return coordinator.forum_action_handler.create_comment_reply(
 			reply_id=int(target_id),  # 转换为整数
 			parent_id=int(parent_id),  # 转换为整数
 			content=content,
@@ -283,15 +283,15 @@ class CommunityService:
 		self.reply_service = ReplyService()
 		self.source_config: dict = {
 			"work": SourceConfigSimple(
-				get_items=lambda: coordinator.user_obtain.fetch_user_works_web_gen(coordinator.data_manager.data.ACCOUNT_DATA.id, limit=None),
+				get_items=lambda: coordinator.user_data_fetcher.fetch_user_works_web_gen(coordinator.data_manager.data.ACCOUNT_DATA.id, limit=None),
 				get_comments=lambda _self, _id: Obtain().get_comments(source_id=_id, source="work", method="comments"),
-				delete=lambda self, _item_id, comment_id, is_reply: self._work_motion.delete_comment(comment_id, "comments" if is_reply else "replies"),
+				delete=lambda self, _item_id, comment_id, is_reply: self._base_work_operations.delete_comment(comment_id, "comments" if is_reply else "replies"),
 				title_key="work_name",
 			),
 			"forum": SourceConfigSimple(
-				get_items=lambda: coordinator.forum_obtain.fetch_my_posts_gen("created", limit=None),
+				get_items=lambda: coordinator.forum_data_fetcher.fetch_my_posts_gen("created", limit=None),
 				get_comments=lambda _self, _id: Obtain().get_comments(source_id=_id, source="forum", method="comments"),
-				delete=lambda self, _item_id, comment_id, is_reply: self._forum_motion.delete_item(comment_id, "comments" if is_reply else "replies"),
+				delete=lambda self, _item_id, comment_id, is_reply: self._forum_action_handler.delete_item(comment_id, "comments" if is_reply else "replies"),
 				title_key="title",
 			),
 		}
@@ -402,7 +402,7 @@ class CommunityService:
 		try:
 			cleared_batches = 0
 			while True:
-				current_counts = coordinator.community_obtain.fetch_message_count(method)
+				current_counts = coordinator.community_data_fetcher.fetch_message_count(method)
 				if is_all_cleared(current_counts):
 					print(f"所有 {method} 消息已标记为已读")
 					return {"success": True, "method": method, "cleared_batches": cleared_batches, "message": "所有消息已标记为已读"}
@@ -420,7 +420,7 @@ class CommunityService:
 	def like_collect_follow_user(user_id: int, works_list: list[dict] | Generator[dict]) -> dict:
 		"""点赞和收藏用户作品"""
 		print(f"开始处理用户 {user_id} 的作品")
-		follow_result = coordinator.work_motion.execute_toggle_follow(user_id=int(user_id))
+		follow_result = coordinator.base_work_operations.execute_toggle_follow(user_id=int(user_id))
 		print(f"关注用户: {' 成功 ' if follow_result else ' 失败 '}")
 		like_count = 0
 		collect_count = 0
@@ -429,8 +429,8 @@ class CommunityService:
 			work_id = item.get("id")
 			if isinstance(work_id, int):
 				processed_count += 1
-				like_result = coordinator.work_motion.execute_toggle_like(work_id=work_id)
-				collect_result = coordinator.work_motion.execute_toggle_collection(work_id=work_id)
+				like_result = coordinator.base_work_operations.execute_toggle_like(work_id=work_id)
+				collect_result = coordinator.base_work_operations.execute_toggle_collection(work_id=work_id)
 				if like_result:
 					like_count += 1
 					print(f"作品 {work_id} 点赞成功")
@@ -456,7 +456,7 @@ class CommunityService:
 		for item in novel_list:
 			novel_id = item.get("id")
 			if isinstance(novel_id, int):
-				result = coordinator.novel_motion.execute_toggle_novel_favorite(novel_id)
+				result = coordinator.novel_action_handler.execute_toggle_novel_favorite(novel_id)
 				if result:
 					toggled_count += 1
 					print(f"小说 {novel_id} 收藏成功")
@@ -484,11 +484,11 @@ class CommunityService:
 		"""
 		try:
 			if source_type == "post":
-				result = coordinator.forum_motion.create_post_reply(post_id=target_id, content=content)
+				result = coordinator.forum_action_handler.create_post_reply(post_id=target_id, content=content)
 			elif source_type == "shop":
-				result = coordinator.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
+				result = coordinator.workshop_action_handler.create_comment(workshop_id=target_id, content=content, rich_content=content)
 			elif source_type == "work":
-				result = coordinator.comment_motion.create_work_comment(work_id=target_id, comment=content)
+				result = coordinator.comment_operations.create_work_comment(work_id=target_id, comment=content)
 			else:
 				msg = f"不支持的来源类型: {source_type}"
 				raise ValueError(msg)  # noqa: TRY301
@@ -501,19 +501,19 @@ class CommunityService:
 	def update_workshop_details(workshop_id: int | None = None) -> dict:
 		"""更新工作室详情"""
 		if workshop_id is None:
-			detail = coordinator.shop_obtain.fetch_workshop_details_list()
+			detail = coordinator.workshop_data_fetcher.fetch_workshop_details_list()
 			workshop_id = detail.get("id")
 			print(f"自动获取工作室 ID: {workshop_id}")
 		if workshop_id is None:
 			print("未找到工作室 ID")
 			return {"success": False, "error": "未找到工作室 ID"}
 		workshop_id_str = str(workshop_id)
-		workshop_detail = coordinator.shop_obtain.fetch_workshop_details(workshop_id_str)
+		workshop_detail = coordinator.workshop_data_fetcher.fetch_workshop_details(workshop_id_str)
 		if not workshop_detail:
 			print("获取工作室详情失败")
 			return {"success": False, "error": "获取工作室详情失败", "workshop_id": workshop_id}
 		print(f"正在更新工作室: {workshop_detail['name']}")
-		result = coordinator.shop_motion.update_workshop_details(
+		result = coordinator.workshop_action_handler.update_workshop_details(
 			description=workshop_detail["description"],
 			workshop_id=workshop_id_str,
 			name=workshop_detail["name"],
@@ -534,7 +534,7 @@ class CommunityService:
 	def publish_novel_chapter(novel_id: int, chapter_index: int = 0) -> dict:
 		"""发布小说章节"""
 		print(f"开始发布小说 {novel_id} 的第 {chapter_index} 章")
-		novel_detail = coordinator.novel_obtain.fetch_novel_details(novel_id=novel_id)
+		novel_detail = coordinator.novel_data_fetcher.fetch_novel_details(novel_id=novel_id)
 		if not novel_detail:
 			print("获取小说详情失败")
 			return {"success": False, "error": "获取小说详情失败", "novel_id": novel_id}
@@ -548,7 +548,7 @@ class CommunityService:
 		chapter_id = chapters[chapter_index]["id"]
 		chapter_title = chapters[chapter_index]["title"]
 		print(f"准备发布章节: {chapter_title} (ID: {chapter_id})")
-		result = coordinator.novel_motion.publish_chapter(chapter_id)
+		result = coordinator.novel_action_handler.publish_chapter(chapter_id)
 		if result:
 			print(f"章节发布成功: {chapter_title}")
 		else:
@@ -565,7 +565,7 @@ class CommunityService:
 	@staticmethod
 	def get_account_status() -> dict:
 		"""获取账户状态"""
-		status = coordinator.user_obtain.fetch_account_details()
+		status = coordinator.user_data_fetcher.fetch_account_details()
 		return {"muted": status["voice_forbidden"], "agreement_signed": status["has_signed"]}
 
 	@staticmethod
@@ -578,7 +578,7 @@ class CommunityService:
 		Returns:
 			下载结果数据
 		"""
-		details = coordinator.novel_obtain.fetch_novel_details(novel_id)
+		details = coordinator.novel_data_fetcher.fetch_novel_details(novel_id)
 		if not details:
 			msg = "获取小说详情失败"
 			raise ValueError(msg)
@@ -593,7 +593,7 @@ class CommunityService:
 			output_dir = coordinator.path_config.FICTION_FILE_PATH
 		novel_dir = output_dir / f"{info['title']}-{info['nickname']}"
 		info_file = novel_dir / "info.json"
-		coordinator.file_manager.file_write(path=info_file, content=info)
+		coordinator.file_manager_tool.file_write(path=info_file, content=info)
 		# 下载章节
 		chapters = details["data"]["sectionList"]
 		downloaded_chapters = []
@@ -601,10 +601,10 @@ class CommunityService:
 			section_id = section["id"]
 			section_title = section["title"]
 			section_path = novel_dir / f"{i:03d}_{section_title}.txt"
-			content_data = coordinator.novel_obtain.fetch_chapter_details(chapter_id=section_id)
+			content_data = coordinator.novel_data_fetcher.fetch_chapter_details(chapter_id=section_id)
 			content = content_data["data"]["section"]["content"]
 			formatted_content = coordinator.toolkit.create_data_converter().html_to_text(content, merge_empty_lines=True)
-			coordinator.file_manager.file_write(path=section_path, content=formatted_content)
+			coordinator.file_manager_tool.file_write(path=section_path, content=formatted_content)
 			downloaded_chapters.append({"index": i, "title": section_title, "id": section_id, "path": str(section_path)})
 			print(f"已下载章节: {section_title}")
 		print(f"小说已保存到: {novel_dir}")
@@ -713,7 +713,7 @@ class CommunityService:
 		filtered_works = []
 		seen_ids = set()
 		# 处理第一个数据源
-		works1 = coordinator.work_obtain.fetch_themed_works_web(limit=50)
+		works1 = coordinator.work_data_fetcher.fetch_themed_works_web(limit=50)
 		if works1 and "items" in works1:
 			for item in works1["items"]:
 				work_id = item.get("work_id")
@@ -730,7 +730,7 @@ class CommunityService:
 						},
 					)
 		# 处理第二个数据源
-		works2 = coordinator.work_obtain.fetch_all_subject_works(limit=50)
+		works2 = coordinator.work_data_fetcher.fetch_all_subject_works(limit=50)
 		if works2 and "items" in works2:
 			for subject in works2["items"]:
 				if "subject_works" in subject:
@@ -749,7 +749,7 @@ class CommunityService:
 								},
 							)
 		# 处理第三个数据源
-		works3 = coordinator.work_obtain.fetch_nemo_discover()
+		works3 = coordinator.work_data_fetcher.fetch_nemo_discover()
 		if works3:
 			# 处理主推荐列表
 			if "recommend_work_list" in works3:
@@ -807,7 +807,7 @@ class CommunityService:
 		token = CodeMaoClient().token.average
 		results: list[tuple[str, int]] = []
 		for work in works:
-			response = coordinator.work_obtain.fetch_work_details(work["work_id"])
+			response = coordinator.work_data_fetcher.fetch_work_details(work["work_id"])
 			work_name = response.get("work_name", response.get("name", "未知作品"))
 			if response.get("type") == "WOOD":
 				continue
@@ -844,7 +844,7 @@ class BatchOperationService:
 		Returns:
 			是否成功
 		"""
-		total = coordinator.edu_obtain.fetch_class_students_total()
+		total = coordinator.education_data_fetcher.fetch_class_students_total()
 		print(f"可支配学生账号数: {total['total']}")
 		if action == "delete":
 			return self._delete_edu_accounts(limit)
@@ -859,10 +859,10 @@ class BatchOperationService:
 	def _delete_edu_accounts(limit: int | None) -> bool:
 		"""删除教育账号"""
 		try:
-			students = coordinator.edu_obtain.fetch_class_students_gen(limit=limit)
+			students = coordinator.education_data_fetcher.fetch_class_students_gen(limit=limit)
 			deleted_count = 0
 			for student in students:
-				coordinator.edu_motion.delete_student_from_class(stu_id=student["id"])
+				coordinator.education_action_handler.delete_student_from_class(stu_id=student["id"])
 				deleted_count += 1
 				print(f"已删除学生: {student.get('name', 'Unknown')}")
 			print(f"共删除 {deleted_count} 个学生账号")
@@ -885,14 +885,14 @@ class BatchOperationService:
 			created_count = 0
 			for class_idx in range(class_count):
 				# 创建班级
-				class_result = coordinator.edu_motion.create_class(name=class_names[class_idx])
+				class_result = coordinator.education_action_handler.create_class(name=class_names[class_idx])
 				class_id = class_result["id"]
 				print(f"创建班级: {class_names[class_idx]} (ID: {class_id})")
 				# 添加学生
 				start = class_idx * class_capacity
 				end = min(start + class_capacity, student_limit)
 				batch_names = student_names[start:end]
-				coordinator.edu_motion.add_students_to_class(name=batch_names, class_id=class_id)
+				coordinator.education_action_handler.add_students_to_class(name=batch_names, class_id=class_id)
 				created_count += len(batch_names)
 				print(f"添加了 {len(batch_names)} 名学生到班级")
 			print(f"共创建 {created_count} 个学生账号")
@@ -927,7 +927,7 @@ class BatchOperationService:
 					file_path = coordinator.path_config.PASSWORD_FILE_PATH
 				credentials.append(credential)
 				# 写入文件
-				coordinator.file_manager.file_write(
+				coordinator.file_manager_tool.file_write(
 					path=file_path,
 					content=content,
 					method="a",  # 追加模式
@@ -952,7 +952,7 @@ class BatchOperationService:
 		self.account_manger.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
 		self.account_manger.execute_with_accounts(
 			limit=hidden_border,
-			func=lambda: coordinator.work_motion.execute_report_work(describe="", reason=reason, work_id=work_id),
+			func=lambda: coordinator.base_work_operations.execute_report_work(describe="", reason=reason, work_id=work_id),
 		)
 
 	def batch_like(
@@ -974,9 +974,9 @@ class BatchOperationService:
 		if content_list:
 			target_list = content_list
 		elif content_type == "work" and user_id:
-			target_list = list(coordinator.user_obtain.fetch_user_works_web_gen(user_id, limit=None))
+			target_list = list(coordinator.user_data_fetcher.fetch_user_works_web_gen(user_id, limit=None))
 		elif content_type == "novel":
-			target_list = coordinator.novel_obtain.fetch_my_novels()
+			target_list = coordinator.novel_data_fetcher.fetch_my_novels()
 		else:
 			msg = "必须提供 content_list 或 user_id"
 			raise ValueError(msg)
@@ -1020,7 +1020,7 @@ class BatchOperationService:
 		"""
 
 		def action() -> None:
-			result = coordinator.community_motion.execute_sign_agreement()
+			result = coordinator.community_action_handler.execute_sign_agreement()
 			if result:
 				print("成功签订社区友好条约")
 			else:
@@ -1049,27 +1049,27 @@ class ReportService:
 		Returns:
 			是否成功
 		"""
-		coordinator.printer.print_header("=== 举报处理系统 ===")
+		coordinator.output_handler_tool.print_header("=== 举报处理系统 ===")
 		print(Obtain().get_admin_statistics())
 		# 主处理循环
 		while True:
 			self.total_reports = self.report_fetcher.get_total_reports(status="TOBEDONE")
 			if self.total_reports == 0:
-				coordinator.printer.print_message("当前没有待处理的举报", "INFO")
+				coordinator.output_handler_tool.print_message("当前没有待处理的举报", "INFO")
 				break
-			coordinator.printer.print_message(f"发现 {self.total_reports} 条待处理举报", "INFO")
+			coordinator.output_handler_tool.print_message(f"发现 {self.total_reports} 条待处理举报", "INFO")
 			# 处理举报
 			batch_processed = self.report_processor.process_all_reports(admin_id)
 			self.processed_count += batch_processed
-			coordinator.printer.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
+			coordinator.output_handler_tool.print_message(f"本次处理完成: {batch_processed} 条举报", "SUCCESS")
 			# 询问是否继续
-			continue_choice = coordinator.printer.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper()
+			continue_choice = coordinator.output_handler_tool.get_valid_input(prompt="是否继续检查新举报? (Y/N)", valid_options={"Y", "N"}).upper()
 			if continue_choice != "Y":
 				break
-			coordinator.printer.print_message("重新获取新举报...", "INFO")
+			coordinator.output_handler_tool.print_message("重新获取新举报...", "INFO")
 		# 显示统计结果
-		coordinator.printer.print_header("=== 处理结果统计 ===")
-		coordinator.printer.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
+		coordinator.output_handler_tool.print_header("=== 处理结果统计 ===")
+		coordinator.output_handler_tool.print_message(f"本次会话共处理 {self.processed_count} 条举报", "SUCCESS")
 		# 终止会话
 		coordinator.auth_manager.admin_logout()
 		coordinator.auth_manager.restore_admin_account()
@@ -1088,8 +1088,8 @@ class ReportService:
 		Returns:
 			统计信息
 		"""
-		comment_stats = coordinator.whale_obtain.fetch_comment_reports_total(source_type=source_type, status=status)
-		work_stats = coordinator.whale_obtain.fetch_work_reports_total(source_type=source_type, status=status)
+		comment_stats = coordinator.report_data_fetcher.fetch_comment_reports_total(source_type=source_type, status=status)
+		work_stats = coordinator.report_data_fetcher.fetch_work_reports_total(source_type=source_type, status=status)
 		return {"comment_reports": comment_stats, "work_reports": work_stats, "total": comment_stats.get("total", 0) + work_stats.get("total", 0)}
 
 

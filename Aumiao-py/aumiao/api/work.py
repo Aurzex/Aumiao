@@ -987,10 +987,7 @@ class WorkDataFetcher:
 
 	def fetch_work_activity(self, work_id: int) -> dict:
 		"""获取作品参加的活动信息"""
-		response = self._client.send_request(
-			endpoint=f"/web/works/activity/info/{work_id}",
-			method="GET"
-		)
+		response = self._client.send_request(endpoint=f"/web/works/activity/info/{work_id}", method="GET")
 		return response.json()
 
 	def check_user_operation_status(self, work_id: int) -> dict:
@@ -1024,29 +1021,17 @@ class WorkDataFetcher:
 
 	def fetch_kitten_source_code(self, work_id: int) -> dict:
 		"""获取 kitten 作品源代码"""
-		response = self._client.send_request(
-			endpoint=f"/kitten/work/ide/load/{work_id}",
-			method="GET",
-			base_url_key="creation"
-		)
+		response = self._client.send_request(endpoint=f"/kitten/work/ide/load/{work_id}", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_kitten_player_code(self, work_id: int) -> dict:
 		"""获取 游玩端 kitten 作品代码"""
-		response = self._client.send_request(
-			endpoint=f"/kitten/r2/work/player/load/{work_id}",
-			method="GET",
-			base_url_key="creation"
-		)
+		response = self._client.send_request(endpoint=f"/kitten/r2/work/player/load/{work_id}", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_coco_player_code(self, work_id: int) -> dict:
 		"""获取 游玩端 coco 作品代码"""
-		response = self._client.send_request(
-			endpoint=f"/coconut/web/work/{work_id}/load",
-			method="GET",
-			base_url_key="creation"
-		)
+		response = self._client.send_request(endpoint=f"/coconut/web/work/{work_id}/load", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_kn_work_versions(self, work_id: int) -> dict:

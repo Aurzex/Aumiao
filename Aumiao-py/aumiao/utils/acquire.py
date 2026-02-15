@@ -322,13 +322,7 @@ class BaseHTTPClient:
 		timeout: float,
 	) -> Response:
 		"""执行 HTTP 请求"""
-		request_args: dict[str, Any] = {
-			"method": method.upper(),
-			"url": url,
-			"params": params,
-			"headers": headers,
-			"timeout": timeout
-		}
+		request_args: dict[str, Any] = {"method": method.upper(), "url": url, "params": params, "headers": headers, "timeout": timeout}
 
 		if files:
 			request_args.update({"data": data, "files": files})
@@ -614,14 +608,7 @@ class BaseHTTPClient:
 
 	def _log_request(self, response: Response) -> None:
 		"""记录请求日志"""
-		log_entry = (
-			f"[{tool.TimeUtils().format_timestamp()}]\n"
-			f"Method: {response.request.method}\n"  # ty:ignore[possibly-missing-attribute]
-			f"URL: {response.request.url}\n"  # ty:ignore[possibly-missing-attribute]
-			f"Status: {response.status_code}\n"
-			f"Response: {response.text}\n"
-			f"{'=' * 50}\n\n"
-		)
+		log_entry = f"[{tool.TimeUtils().format_timestamp()}]\nURL: {response.url}\nStatus: {response.status_code}\nResponse: {response.text}\n{'=' * 50}\n\n"
 		CodeMaoFile().file_write(path=self.log_file, content=log_entry, method="a")
 
 	def close(self) -> None:
