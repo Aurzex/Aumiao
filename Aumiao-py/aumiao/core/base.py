@@ -81,6 +81,7 @@ class InfrastructureCoordinator:
 		# API 模块
 		api_modules: dict = {
 			"auth": auth.AuthManager,
+			"comment_motion": work.CommentOperations,
 			"community_motion": community.UserAction,
 			"community_obtain": community.DataFetcher,
 			"edu_motion": edu.UserAction,
@@ -93,7 +94,7 @@ class InfrastructureCoordinator:
 			"shop_obtain": shop.WorkshopDataFetcher,
 			"user_motion": user.UserManager,
 			"user_obtain": user.UserDataFetcher,
-			"work_motion": work.BaseWorkManager,
+			"work_motion": work.BaseWorkOperations,
 			"work_obtain": work.WorkDataFetcher,
 			"whale_motion": whale.ReportHandler,
 			"whale_obtain": whale.ReportFetcher,
@@ -200,9 +201,14 @@ class InfrastructureCoordinator:
 		return self._modules.get("user_obtain")
 
 	@property
-	def work_motion(self) -> "work.BaseWorkManager":
+	def work_motion(self) -> "work.BaseWorkOperations":
 		"""作品动作模块"""
 		return self._modules.get("work_motion")
+
+	@property
+	def comment_motion(self) -> "work.CommentOperations":
+		"""作品评论动作模块"""
+		return self._modules.get("comment_motion")
 
 	@property
 	def work_obtain(self) -> "work.WorkDataFetcher":

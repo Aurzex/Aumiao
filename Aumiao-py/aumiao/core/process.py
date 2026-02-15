@@ -971,7 +971,7 @@ class ViolationChecker:
 				is_reply = violation_type == "reply"
 				# 作品评论/回复
 				if source == "work":
-					return coordinator.work_motion.execute_report_comment(
+					return coordinator.comment_motion.execute_report_comment(
 						work_id=source_id,
 						comment_id=content_id,
 						reason=reason_content,

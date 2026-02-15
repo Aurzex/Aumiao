@@ -264,7 +264,7 @@ class ReplyService:
 	def _send_reply(source_type: str, business_id: int, target_id: int, parent_id: int, content: str) -> bool | dict:
 		"""发送回复"""
 		if source_type == "work":
-			return coordinator.work_motion.create_comment_reply(work_id=business_id, comment_id=target_id, parent_id=parent_id, comment=content)
+			return coordinator.comment_motion.create_comment_reply(work_id=business_id, comment_id=target_id, parent_id=parent_id, comment=content)
 		# 修复类型错误: 确保参数是整数类型
 		return coordinator.forum_motion.create_comment_reply(
 			reply_id=int(target_id),  # 转换为整数
@@ -488,7 +488,7 @@ class CommunityService:
 			elif source_type == "shop":
 				result = coordinator.shop_motion.create_comment(workshop_id=target_id, content=content, rich_content=content)
 			elif source_type == "work":
-				result = coordinator.work_motion.create_work_comment(work_id=target_id, comment=content)
+				result = coordinator.comment_motion.create_work_comment(work_id=target_id, comment=content)
 			else:
 				msg = f"不支持的来源类型: {source_type}"
 				raise ValueError(msg)  # noqa: TRY301
