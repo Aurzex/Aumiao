@@ -568,33 +568,89 @@ class CocoWorkManager:
 
 	def fetch_coco_primary_courses(self) -> dict:
 		"""获取 Coco 平台的主要课程列表"""
-		response = self._client.send_request(
-			endpoint="https://api-creation.codemao.cn/coconut/primary-course/list",
-			method="GET",
-		)
+		response = self._client.send_request(endpoint="/coconut/primary-course/list", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_custom_widgets(self, limit: int | None = 100) -> Generator[dict]:
-		"""获取 Coconut 平台的自定义控件列表"""
+		"""获取 Coco 的自定义控件列表"""
 		params = {"current_page": 1, "page_size": 100}
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/coconut/web/widget/list",
+			endpoint="/coconut/web/widget/list",
 			params=params,
 			total_key="data.total",
 			data_key="data.items",
 			pagination_method="page",
 			limit=limit,
 			config={"amount_key": "page_size", "offset_key": "current_page"},
+			base_url_key="creation",
 		)
 
 	def fetch_demo_courses(self) -> dict:
-		"""获取 Coconut 平台的示范教程列表"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/coconut/sample/list", method="GET")
+		"""获取 Coco 的示范教程列表"""
+		response = self._client.send_request(
+			endpoint="/coconut/sample/list",
+			method="GET",
+			base_url_key="creation",
+		)
 		return response.json()
 
 	def fetch_whitelisted_works(self) -> dict:
-		"""获取 Coconut 平台的白名单作品链接"""
-		response = self._client.send_request(endpoint="https://static.codemao.cn/coco/whitelist.json", method="GET")
+		"""获取 Coco 的白名单作品链接"""
+		# response = self._client.send_request(endpoint="https://static.codemao.cn/coco/whitelist.json", method="GET")
+		response = self._client.send_request(endpoint="static.bcmcdn.com/coco/whitelist.json", method="GET")
+		return response.json()
+
+	def fetch_web_wight(self, page: int = 1, page_size: int = 100) -> dict:
+		"""获取 Coco 的 web 控件"""
+		params = {"current_page": page, "page_size": page_size}
+		response = self._client.send_request(
+			endpoint="/coconut/web/user/widget/list",
+			method="GET",
+			params=params,
+			base_url_key="creation",
+		)
+		return response.json()
+
+	def execute_update_coco_work(
+		self,
+		work_id: int,
+		work_name: str,
+		bcm_url: str,
+		preview_url: str,
+		archive_version: str = "0.1.0",
+		save_type: int = 1,
+	) -> dict:
+		"""更新 Coco 作品"""
+		data = {
+			"id": work_id,
+			"name": work_name,
+			"preview_url": preview_url,
+			"bcm_url": bcm_url,
+			"archive_version": archive_version,
+			"save_type": save_type,
+		}
+		response = self._client.send_request(endpoint="/coconut/web/work", method="PUT", data=data, base_url_key="creation")
+		return response.json()
+
+	def execute_publish_coco_work(
+		self,
+		work_id: int,
+		work_name: str,
+		bcmc_url: str,
+		cover_url: str,
+		description: str,
+		operation: str,
+	) -> dict:
+		"""发布 Coco 作品"""
+		data = {
+			"name": work_name,
+			"description": description,
+			"operation": operation,
+			"cover_url": cover_url,
+			"bcmc_url": bcmc_url,
+			"player_url": f"https://coco.codemao.cn/editor/player/{work_id}?channel=community",
+		}
+		response = self._client.send_request(endpoint=f"/coconut/web/work/{work_id}/publish", method="PUT", data=data, base_url_key="creation")
 		return response.json()
 
 
@@ -606,19 +662,31 @@ class CollaborationManager:
 	def __init__(self) -> None:
 		self._client = acquire.CodeMaoClient()
 
-	def manage_collaboration_code(self, work_id: int, method: Literal["GET", "DELETE"] = "GET") -> dict:
-		"""获取或删除协作邀请码"""
+	def fetch_kitten_collaboration_code(self, work_id: int, method: Literal["GET", "DELETE"] = "GET") -> dict:
+		"""获取或删除 Kitten 协作邀请码"""
 		response = self._client.send_request(
 			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/collaborator/code/{work_id}",
 			method=method,
 		)
 		return response.json()
 
-	def fetch_collaborators_gen(self, work_id: int, limit: int | None = 100) -> Generator[dict]:
+	def fetch_coco_collaboration_code(self, work_id: int, permission: Literal["edit", "view"]) -> dict:
+		"""获取 Coco 协作邀请码"""
+		permission_code = 1 if permission == "edit" else 2
+		params = {"edit_permission": permission_code}
+		response = self._client.send_request(
+			endpoint=f"https://socketcoll.codemao.cn/coll/coco/collaborator/code/{work_id}",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	def fetch_collaborators_gen(self, work_type: Literal["coco", "kitten"], work_id: int, limit: int | None = 100) -> Generator[dict]:
 		"""获取协作者列表生成器"""
 		params = {"current_page": 1, "page_size": 100}
+		# coco 抓包的时候发现 work_id 也在 params 中出现,但是不影响数据获取, 故省略
 		return self._client.fetch_paginated_data(
-			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/collaborator/{work_id}",
+			endpoint=f"https://socketcoll.codemao.cn/coll/{work_type}/collaborator/{work_id}",
 			params=params,
 			total_key="data.total",
 			data_key="data.items",
@@ -645,14 +713,27 @@ class CollaborationManager:
 		)
 		return response.json()
 
-	def execute_enable_collaboration(self, work_id: int) -> bool:
-		"""启用作品协作功能"""
+	def execute_enable_kitten_collaboration(self, work_id: int, work_type: Literal["kitten", "coco"]) -> bool:
+		"""启用 Kitten/Coco 作品协作功能"""
 		response = self._client.send_request(
-			endpoint=f"https://socketcoll.codemao.cn/coll/kitten/{work_id}",
+			endpoint=f"https://socketcoll.codemao.cn/coll/{work_type}/{work_id}",
 			method="POST",
 			payload={},
 		)
 		return response.status_code == HTTPStatus.OK.value
+
+	def fetch_collaboration_coco_works_gen(self, limit: int = 40) -> Generator:
+		"""获取协作的 Coco 作品"""
+		params = {"current_page": 1, "page_size": 40}
+		return self._client.fetch_paginated_data(
+			endpoint="https://socketcoll.codemao.cn/coll/coco/coll_works",
+			params=params,
+			total_key="data.total",
+			data_key="data.items",
+			pagination_method="page",
+			config={"amount_key": "page_size", "offset_key": "current_page"},
+			limit=limit,
+		)
 
 
 # ==================== AI 服务类 ====================
@@ -933,6 +1014,15 @@ class WorkDataFetcher:
 		)
 		return response.json()
 
+	def fetch_coco_work_info(self, work_id: int) -> dict:
+		"""获取 Coco 作品信息"""
+		response = self._client.send_request(
+			endpoint=f"/coconut/web/work/{work_id}/info",
+			method="GET",
+			base_url_key="creation",
+		)
+		return response.json()
+
 	def fetch_kn_publish_status(self, work_id: int) -> dict:
 		"""获取 KN 作品发布状态"""
 		response = self._client.send_request(
@@ -1027,6 +1117,11 @@ class WorkDataFetcher:
 	def fetch_kitten_player_code(self, work_id: int) -> dict:
 		"""获取 游玩端 kitten 作品代码"""
 		response = self._client.send_request(endpoint=f"/kitten/r2/work/player/load/{work_id}", method="GET", base_url_key="creation")
+		return response.json()
+
+	def fetch_coco_source_code(self, work_id: int) -> dict:
+		"""获取 coco 作品源代码"""
+		response = self._client.send_request(endpoint=f"/coconut/web/work/{work_id}/content", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_coco_player_code(self, work_id: int) -> dict:

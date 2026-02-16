@@ -155,18 +155,20 @@ class AuthProcessor:
 		"""管理员用户认证"""
 		payload = {"username": username, "password": password, "key": key, "code": code}
 		response = self.client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/login",
+			endpoint="/admins/login",
 			method="POST",
 			payload=payload,
+			base_url_key="whale",
 		)
 		return response.json()
 
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
+			endpoint=f"/admins/captcha/{timestamp}",
 			method="GET",
 			log=False,
+			base_url_key="whale",
 		)
 		if response.status_code == HTTPStatus.OK.value:
 			data.CodeMaoFile().file_write(
@@ -481,16 +483,18 @@ class AuthManager:
 	def admin_logout(self) -> bool:
 		"""管理员登出"""
 		response = self._client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/logout",
+			endpoint="/admins/logout",
 			method="DELETE",
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def fetch_admin_dashboard_data(self) -> dict[str, Any]:
 		"""获取用户仪表板数据"""
 		response = self._client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/info",
+			endpoint="/admins/info",
 			method="GET",
+			base_url_key="whale",
 		)
 		return response.json()
 

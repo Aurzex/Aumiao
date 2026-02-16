@@ -342,3 +342,143 @@ class CoconutCloud:
 			base_url_key="creation",
 		)
 		return response.json()
+
+
+@singleton
+class CoconutCloudAdmin:
+    """云数据库管理接口"""
+
+    def __init__(self) -> None:
+        self._client = acquire.CodeMaoClient()
+
+    def list_user_databases(self, db_type: int | None = None) -> dict:
+        """
+        获取用户云数据库列表
+        Args:
+            db_type: 数据库类型 (1: 字典, 2: 数据表, 其他: 全部)
+        Returns:
+            数据库列表
+        """
+        params = {}
+        if db_type is not None:
+            params["type"] = db_type
+
+        response = self._client.send_request(
+            endpoint="/coconut/clouddb/user/list",
+            method="GET",
+            params=params,
+            base_url_key="creation",
+        )
+        return response.json()
+
+    def list_user_databases_detail(self, db_type: int | None = None) -> dict:
+        """
+        获取用户云数据库详细信息列表
+        Args:
+            db_type: 数据库类型 (1: 字典, 2: 数据表)
+        Returns:
+            数据库详细信息列表
+        """
+        params = {}
+        if db_type is not None:
+            params["type"] = db_type
+
+        response = self._client.send_request(
+            endpoint="/coconut/clouddb/user/list/detail",
+            method="GET",
+            params=params,
+            base_url_key="creation",
+        )
+        return response.json()
+
+    def list_work_dicts(self, work_id: int) -> dict:
+        """
+        获取作品关联的云字典列表
+        Args:
+            work_id: 作品 ID
+        Returns:
+            云字典列表
+        """
+        params = {"work_id": work_id}
+        response = self._client.send_request(
+            endpoint="/coconut/webdb/admin/dict",
+            method="GET",
+            params=params,
+            base_url_key="creation",
+        )
+        return response.json()
+
+    def list_work_dicts_by_type(self, dict_type: int) -> dict:
+        """
+        按类型获取云字典列表
+        Args:
+            dict_type: 字典类型 (1: ???)
+        Returns:
+            云字典列表
+        """
+        params = {"type": dict_type}
+        response = self._client.send_request(
+            endpoint="/coconut/webdb/admin/dict",
+            method="GET",
+            params=params,
+            base_url_key="creation",
+        )
+        return response.json()
+
+    def get_dict_entries(
+        self,
+        dict_id: int,
+        work_id: int,
+        offset: int = 1,
+        limit: int = 500
+    ) -> dict:
+        """
+        获取云字典条目列表(分页)
+        Args:
+            dict_id: 字典 ID
+            work_id: 作品 ID
+            offset: 偏移量(从1开始)
+            limit: 每页数量(默认500)
+        Returns:
+            字典条目列表
+        """
+        params = {
+            "work_id": work_id,
+            "offset": offset,
+            "limit": limit
+        }
+        response = self._client.send_request(
+            endpoint=f"/coconut/webdb/admin/dict/{dict_id}",
+            method="GET",
+            params=params,
+            base_url_key="creation",
+        )
+        return response.json()
+
+    def migrate_dict(
+        self,
+        db_id: str,
+        from_env: int = 2,
+        to_env: int = 1
+    ) -> dict:
+        """
+        迁移云字典环境
+        Args:
+            db_id: 数据库 ID
+            from_env: 源环境 (2: 开发环境?)
+            to_env: 目标环境 (1: 生产环境?)
+        Returns:
+            迁移结果
+        """
+        data = {
+            "db_id": db_id,
+            "from_env": from_env,
+            "to_env": to_env
+        }
+        response = self._client.send_request(
+            endpoint="/coconut/webdb/admin/dict/migrate",
+            method="PUT",
+            payload=data,
+            base_url_key="creation",
+        )
+        return response.json()

@@ -181,11 +181,11 @@ class UserDataFetcher:
 		limit: int | None = 15,
 	) -> Generator[dict]:
 		"""获取用户 KN 作品生成器"""
-		url = "https://api-creation.codemao.cn/neko/works/list/user/published" if method == "published" else "https://api-creation.codemao.cn/neko/works/v2/list/user"
+		url = "/neko/works/list/user/published" if method == "published" else "/neko/works/v2/list/user"
 		params = {"offset": 0, "limit": 15}
 		params = cast("dict", params)
 		params.update(extra_params or {})
-		return self._client.fetch_paginated_data(endpoint=url, params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint=url, params=params, limit=limit, base_url_key="creation")
 
 	def fetch_kitten_works_gen(
 		self,
@@ -203,9 +203,10 @@ class UserDataFetcher:
 			"published_status": status,
 		}
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/kitten/common/work/list2",
+			endpoint="/kitten/common/work/list2",
 			params=params,
 			limit=limit,
+			base_url_key="creation",
 		)
 
 	def fetch_nemo_works_gen(self, status: Literal["PUBLISHED", "UNPUBLISHED", "all"], limit: int | None = 30) -> Generator[dict]:
@@ -233,9 +234,10 @@ class UserDataFetcher:
 			"published_status": status,
 		}
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/wood/comm/work/list",
+			endpoint="/wood/comm/work/list",
 			params=params,
 			limit=limit,
+			base_url_key="creation",
 		)
 
 	def fetch_box_works_gen(self, status: Literal["all", "PUBLISHED", "UNPUBLISHED"], work_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
@@ -247,9 +249,10 @@ class UserDataFetcher:
 			"published_status": status,
 		}
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/box/v2/work/list",
+			endpoint="/box/v2/work/list",
 			params=params,
 			limit=limit,
+			base_url_key="creation",
 		)
 
 	def fetch_fanfics_gen(self, fiction_status: Literal["SHOW"] = "SHOW", limit: int | None = 30) -> Generator[dict]:
@@ -261,21 +264,29 @@ class UserDataFetcher:
 			limit=limit,
 		)
 
-	def fetch_coco_works_gen(self, status: int = 1, *, published: bool = True, limit: int | None = 30) -> Generator[dict]:
+	def fetch_coco_works_gen(self, status: int = 1, *, published: bool | None = True, limit: int | None = 30) -> Generator[dict]:
 		"""获取用户 Coco 作品生成器"""
 		params = {
 			"offset": 0,
 			"limit": 30,
 			"status": status,
-			"published": published,
 		}
+		# published 是可选参数
+		if published is not None:
+			params["published"] = published
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/coconut/web/work/list",
+			endpoint="/coconut/web/work/list",
 			params=params,
 			data_key="data.items",
 			total_key="data.total",
 			limit=limit,
+			base_url_key="creation",
 		)
+
+	def fetch_coco_all_works(self, limit: int = 20) -> dict:
+		params = {"limit": limit}
+		response = self._client.send_request(endpoint="/coconut/web/work/list/all", method="GET", params=params)
+		return response.json()
 
 	def fetch_followers_gen(self, user_id: int, limit: int | None = 15) -> Generator[dict]:
 		"""获取用户粉丝列表生成器"""
@@ -374,7 +385,7 @@ class UserDataFetcher:
 
 	def check_new_user_status(self) -> dict:
 		"""检查用户是否为新用户"""
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/works/isNewUser", method="GET")
+		response = self._client.send_request(endpoint="/neko/works/isNewUser", method="GET", base_url_key="creation")
 		return response.json()
 
 

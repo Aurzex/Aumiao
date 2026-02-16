@@ -145,6 +145,20 @@ class DataFetcher:
 		response = self._client.send_request(endpoint="/nemo/v2/home/banners", method="GET", params=params)
 		return response.json()
 
+	# 获取推荐头图
+	def fetch_coco_banners(self) -> dict:
+		response = self._client.send_request(
+			endpoint="/coconut/banner/list",
+			method="GET",
+			base_url_key="creation",
+		)
+		return response.json()
+
+	# 获取 Coco 话题
+	def fetch_coco_topic(self) -> dict:
+		response = self._client.send_request(endpoint="/coconut/topic/list", method="GET", base_url_key="creation")
+		return response.json()
+
 	# 获取举报类型
 	@lru_cache  # noqa: B019
 	def fetch_report_reasons(self) -> dict:
@@ -228,19 +242,20 @@ class DataFetcher:
 	def fetch_public_courses_gen(self, limit: int | None = 10) -> Generator[dict]:
 		params = {"limit": 10, "offset": 0}
 		return self._client.fetch_paginated_data(
-			endpoint="https://api-creation.codemao.cn/neko/course/publish/list",
+			endpoint="/neko/course/publish/list",
 			params=params,
 			limit=limit,
 			total_key="total_course",
 			# total_key 也可设置为 "course_page.total",
 			data_key="course_page.items",
+			base_url_key="creation",
 		)
 
 	# 获取 KN 模板作品
 	# subject_id 为 1 时返回基础指南, 为 2 时返回进阶指南
 	def fetch_sample_works(self, subject_id: Literal[1, 2]) -> dict:
 		params = {"subject_id": subject_id}
-		response = self._client.send_request(endpoint="https://api-creation.codemao.cn/neko/sample/list", params=params, method="GET")
+		response = self._client.send_request(endpoint="/neko/sample/list", params=params, method="GET", base_url_key="creation")
 		return response.json()
 
 	# 获取社区各个部分开启状态
@@ -251,10 +266,7 @@ class DataFetcher:
 
 	# 获取 kitten 编辑页面精选活动
 	def fetch_kitten_activities(self) -> dict:
-		response = self._client.send_request(
-			endpoint="https://api-creation.codemao.cn/kitten/activity/choiceness/list",
-			method="GET",
-		)
+		response = self._client.send_request(endpoint="/kitten/activity/choiceness/list", method="GET", base_url_key="creation")
 		return response.json()
 
 	# 获取 nemo 端教程合集
@@ -286,7 +298,7 @@ class DataFetcher:
 	# TODO @Aurzex: 未知
 	def fetch_teaching_plans_gen(self, limit: int = 100) -> Generator[dict]:
 		params = {"limit": limit, "offset": 0}
-		return self._client.fetch_paginated_data(endpoint="https://api-creation.codemao.cn/neko/teaching-plan/list/team", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="/neko/teaching-plan/list/team", params=params, limit=limit, base_url_key="creation")
 
 	# 获取未读板块消息数量
 	# TODO @Aurzex: 功能待确认
