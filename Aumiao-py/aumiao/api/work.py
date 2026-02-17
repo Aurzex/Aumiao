@@ -1110,23 +1110,29 @@ class WorkDataFetcher:
 		return response.json()
 
 	def fetch_kitten_source_code(self, work_id: int) -> dict:
-		"""获取 kitten 作品源代码"""
+		"""获取 Kitten 作品源代码"""
 		response = self._client.send_request(endpoint=f"/kitten/work/ide/load/{work_id}", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_kitten_player_code(self, work_id: int) -> dict:
-		"""获取 游玩端 kitten 作品代码"""
+		"""获取 游玩端 Kitten 作品代码"""
 		response = self._client.send_request(endpoint=f"/kitten/r2/work/player/load/{work_id}", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_coco_source_code(self, work_id: int) -> dict:
-		"""获取 coco 作品源代码"""
+		"""获取 Coco 作品源代码"""
 		response = self._client.send_request(endpoint=f"/coconut/web/work/{work_id}/content", method="GET", base_url_key="creation")
 		return response.json()
 
 	def fetch_coco_player_code(self, work_id: int) -> dict:
-		"""获取 游玩端 coco 作品代码"""
+		"""获取 游玩端 Coco 作品代码"""
 		response = self._client.send_request(endpoint=f"/coconut/web/work/{work_id}/load", method="GET", base_url_key="creation")
+		return response.json()
+
+	def fetch_wood_player_code(self, work_id: int) -> dict:
+		"""获取 游玩端 Wood 作品代码"""
+		params = {"channel_type": 0}
+		response = self._client.send_request(endpoint=f"/wood/work/{work_id}/publish", method="GET", params=params, base_url_key="creation")
 		return response.json()
 
 	def fetch_kn_work_versions(self, work_id: int) -> dict:
