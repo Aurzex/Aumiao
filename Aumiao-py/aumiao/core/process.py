@@ -735,7 +735,7 @@ class ViolationChecker:
 			coordinator.output_handler_tool.print_message("未检测到违规评论或刷屏帖子", "INFO")
 			return
 		# 执行自动举报
-		self._process_auto_report(violations=violations, source_type=source_type)
+		self._process_auto_report(violations=violations)
 
 	def _analyze_comment_violations(
 		self,
@@ -814,21 +814,19 @@ class ViolationChecker:
 			coordinator.output_handler_tool.print_message(f"检查刷屏帖子失败: {e!s}", "ERROR")
 		return []
 
-	def _process_auto_report(self, violations: list[str], source_type: Literal["forum", "work", "shop"]) -> None:
+	def _process_auto_report(self, violations: list[str]) -> None:
 		"""处理自动举报: 用学生账号批量举报违规评论"""
-		# 1. 检查是否有学生账号
+		# 1. 预处理:检查账号和用户确认
 		auth_manager = MultiAccount()
 		auth_manager.load_from_file(coordinator.path_config.PASSWORD_FILE_PATH)
-		# 如果没有账号, 先加载
-		# if not auth_manager.accounts:
-		# 	coordinator.output_handler_tool.print_message("未加载学生账号, 无法进行自动举报", "ERROR")
-		# 	coordinator.output_handler_tool.print_message("请在主菜单中选择 ' 加载学生账号 ' 功能", "INFO")
-		# 	return
-		# 2. 询问是否执行自动举报
+		if not auth_manager.accounts:
+			coordinator.output_handler_tool.print_message("未加载学生账号, 无法进行自动举报", "ERROR")
+			coordinator.output_handler_tool.print_message("请在主菜单中选择 '加载学生账号' 功能", "INFO")
+			return
 		if coordinator.output_handler_tool.get_valid_input(prompt="是否自动举报违规评论? (Y/N)", valid_options={"Y", "N"}).upper() != "Y":
 			coordinator.output_handler_tool.print_message("自动举报操作已取消", "INFO")
 			return
-		# 3. 获取举报原因
+		# 2. 获取举报原因
 		try:
 			report_reasons = coordinator.community_data_fetcher.fetch_report_reasons()
 			report_reasons_ndd = coordinator.nested_defaultdict_tool.__class__(report_reasons)
@@ -836,74 +834,41 @@ class ViolationChecker:
 		except (KeyError, IndexError) as e:
 			coordinator.output_handler_tool.print_message(f"获取举报原因失败: {e!s}", "ERROR")
 			return
-		# 4. 来源类型映射
-		source_key_map: dict[Literal["work", "forum", "shop"], Literal["work", "forum", "shop"]] = {
-			"work": "work",
-			"forum": "forum",
-			"shop": "shop",
-		}
-		_source_key = source_key_map[source_type]
+		# 3. 执行批量举报
+		success_count = self._execute_batch_reports(violations, reason_content, auth_manager.accounts.copy())
+		# 4. 恢复管理员账号
+		try:
+			coordinator.auth_manager.restore_admin_account()
+			coordinator.output_handler_tool.print_message("已恢复管理员账号", "INFO")
+		except Exception as e:
+			coordinator.output_handler_tool.print_message(f"恢复管理员账号失败: {e!s}", "WARNING")
+
+		coordinator.output_handler_tool.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
+
+	def _execute_batch_reports(self, violations: list[str], reason_content: str, available_accounts: list) -> int:
+		"""执行批量举报"""
 		coordinator.output_handler_tool.print_message(f"开始自动举报 (共 {len(violations)} 条违规内容)", "INFO")
-		success_count = 0
-		# 5. 账号管理初始化
-		# 重要: 创建账号副本, 避免修改原始列表
-		available_accounts = auth_manager.accounts.copy()
 		if not available_accounts:
 			coordinator.output_handler_tool.print_message("没有可用的学生账号", "ERROR")
-			return
+			return 0
 		account_index = 0
 		account_usage = {}
-		account_success_map = {}  # 记录每个账号的成功状态
-		# 6. 处理每条违规内容
+		success_count = 0
 		for idx, violation in enumerate(violations, 1):
 			try:
 				# 检查是否需要切换账号
-				usage_count = account_usage.get(account_index, 0)
-				if usage_count >= 25:
-					# 切换到下一个账号
-					old_index = account_index
+				if account_usage.get(account_index, 0) >= 25:
 					account_index = (account_index + 1) % len(available_accounts)
-					# 记录账号切换
-					if account_usage.get(old_index, 0) > 0:
-						coordinator.output_handler_tool.print_message(f"账号 {old_index + 1} 已使用 {account_usage.get(old_index, 0)} 次, 切换到账号 {account_index + 1}", "INFO")
-				# 获取当前要使用的账号
-				if account_index >= len(available_accounts):
-					coordinator.output_handler_tool.print_message("账号索引超出范围, 重新开始", "WARNING")
+				# 首次使用该账号时登录
+				if account_usage.get(account_index, 0) == 0 and not self._login_student_account(available_accounts[account_index]):
+					available_accounts.pop(account_index)
+					if not available_accounts:
+						break
 					account_index = 0
-				# 使用账号
-				current_usage = account_usage.get(account_index, 0)
-				if current_usage == 0:
-					# 首次使用该账号, 需要切换
-					coordinator.output_handler_tool.print_message(f"使用账号 {account_index + 1} 进行举报...", "INFO")
-					# 重要修改: 直接使用账号进行登录, 而不是调用 switch_to_student_account
-					# 因为 switch_to_student_account 会从列表中 pop 账号
-					username, password = available_accounts[account_index]
-					try:
-						coordinator.auth_manager.login(
-							identity=username,
-							password=password,
-							status="edu",
-							prefer_method="password_v1",
-						)
-						account_success_map[account_index] = True
-						coordinator.output_handler_tool.print_message(f"账号 {account_index + 1} 登录成功", "SUCCESS")
-					except Exception as e:
-						coordinator.output_handler_tool.print_message(f"账号 {account_index + 1} 登录失败: {e!s}", "ERROR")
-						account_success_map[account_index] = False
-						# 移除失败的账号
-						available_accounts.pop(account_index)
-						if not available_accounts:
-							coordinator.output_handler_tool.print_message("所有账号均已失效, 停止处理", "ERROR")
-							break
-						# 重置索引
-						if account_index >= len(available_accounts):
-							account_index = 0
-						continue
+					continue
 				# 执行举报
-				result = self._execute_single_report(violation=violation, reason_content=reason_content)
-				if result:
+				if self._execute_single_report(violation=violation, reason_content=reason_content):
 					success_count += 1
-					# 更新账号使用计数
 					account_usage[account_index] = account_usage.get(account_index, 0) + 1
 					coordinator.output_handler_tool.print_message(
 						f"[{idx}/{len(violations)}] 举报成功 (账号 {account_index + 1} 使用 {account_usage[account_index]} 次): {violation}",
@@ -913,13 +878,25 @@ class ViolationChecker:
 					coordinator.output_handler_tool.print_message(f"[{idx}/{len(violations)}] 举报失败: {violation}", "ERROR")
 			except Exception as e:
 				coordinator.output_handler_tool.print_message(f"[{idx}/{len(violations)}] 举报异常: {e!s}", "ERROR")
-		# 完成后恢复管理员账号
+
+		return success_count
+
+	@staticmethod
+	def _login_student_account(account: tuple) -> bool:
+		"""登录学生账号"""
+		username, password = account
 		try:
-			coordinator.auth_manager.restore_admin_account()
-			coordinator.output_handler_tool.print_message("已恢复管理员账号", "INFO")
+			coordinator.auth_manager.login(
+				identity=username,
+				password=password,
+				status="edu",
+				prefer_method="password_v1",
+			)
 		except Exception as e:
-			coordinator.output_handler_tool.print_message(f"恢复管理员账号失败: {e!s}", "WARNING")
-		coordinator.output_handler_tool.print_message(f"自动举报完成, 成功举报 {success_count}/{len(violations)} 条内容", "SUCCESS")
+			coordinator.output_handler_tool.print_message(f"账号登录失败: {e!s}", "ERROR")
+			return False
+		else:
+			return True
 
 	@staticmethod
 	def _parse_violation(violation: str) -> tuple[str, int, str, int, int] | None:
