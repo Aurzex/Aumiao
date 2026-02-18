@@ -428,12 +428,6 @@ class Index:
 		print(f"\n {self.COLOR_SLOGAN}{coordinator.setting_manager.data.PROGRAM.SLOGAN}{self.COLOR_RESET}")
 		print(f"{self.COLOR_VERSION} 版本号: {coordinator.setting_manager.data.PROGRAM.VERSION}{self.COLOR_RESET}")
 
-	def _print_lyric(self) -> None:
-		"""打印歌词"""
-		self._print_title("一言")
-		lyric: str = coordinator.client.send_request(endpoint="https://lty.vc/lyric", method="GET").text
-		print(f"{self.COLOR_SLOGAN}{lyric}{self.COLOR_RESET}")
-
 	def _print_announcements(self) -> None:
 		"""打印公告"""
 		self._print_title("公告")
@@ -450,7 +444,6 @@ class Index:
 	def index(self) -> None:
 		"""显示首页"""
 		self._print_slogan()
-		# self._print_lyric()  # 暂时注释掉歌词显示
 		self._print_announcements()
 		self._print_user_data()
 
