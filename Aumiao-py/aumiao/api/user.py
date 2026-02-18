@@ -64,6 +64,12 @@ class UserDataFetcher:
 		response = self._client.send_request(endpoint=f"/web/work-shops/{user_id}/participators", method="GET")
 		return response.json()
 
+	def fetch_user_annual_summary(self, user_id: int) -> dict:
+		"""获取用户年度总结"""
+		params = {"user_id": user_id}
+		response = self._client.send_request(endpoint="/web/activities/annual-summary", method="GET", params=params)
+		return response.json()
+
 	# 获取账户信息 (简略)
 	def get_account_info(self) -> dict:
 		response = self._client.send_request(
@@ -330,14 +336,25 @@ class UserDataFetcher:
 		)
 		return response.json()
 
-	def fetch_user_attention(self, user_id: int, limit: int = 10) -> dict:
+	def fetch_user_attention(self, user_id: int) -> dict:
 		"""获取用户关注列表"""
 		params = {
 			"user_id": user_id,
-			"limit": limit,
 		}
 		response = self._client.send_request(
 			endpoint="/web/api/user/me/attention",
+			method="GET",
+			params=params,
+		)
+		return response.json()
+
+	def fetch_user_followers(self, user_id: int) -> dict:
+		"""获取用户粉丝列表"""
+		params = {
+			"user_id": user_id,
+		}
+		response = self._client.send_request(
+			endpoint="/web/api/user/attention/me",
 			method="GET",
 			params=params,
 		)
