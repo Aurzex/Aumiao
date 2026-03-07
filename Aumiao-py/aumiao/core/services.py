@@ -315,7 +315,11 @@ class CommunityService:
 		for item in config.get_items():
 			self.comment_processor.process_item(item, config, action_type, params, target_lists, source)
 		label_map = {"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}
-		result = self._execute_comment_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
+		result = self._execute_comment_deletion(
+			target_list=target_lists[action_type],
+			delete_handler=config.delete,
+			label=label_map[action_type]
+		)
 		return {
 			"success": result["success"],
 			"action_type": action_type,
@@ -791,8 +795,8 @@ class CommunityService:
 
 	def generate_online_leaderboard(self, works: list | None) -> dict:
 		"""作品在线人数排行榜"""
-		# works 数据类型和 fetch_and_aggregate_works 返回的一样
 
+		# works 数据类型和 fetch_and_aggregate_works 返回的一样
 		def _get_online_users(work_id: int, token: str) -> int:
 			"""获取作品的在线用户数"""
 			client = CloudAPI(work_id=work_id, authorization_token=token)
@@ -813,7 +817,6 @@ class CommunityService:
 				continue
 			online_count = _get_online_users(work["work_id"], token)
 			results.append((work_name, online_count))
-		print("\n=== 作品在线人数排行榜 ===")
 		sorted_results = []
 		for name, count in sorted(results, key=lambda x: x[1], reverse=True):
 			print(f"{name}: {count} 人在线")

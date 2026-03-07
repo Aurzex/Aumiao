@@ -613,8 +613,7 @@ class CodeMaoAIClient:
 		while not response_complete.is_set() and (time() - start_time) < timeout:
 			current_content = "".join(full_response)
 			if len(current_content) > last_content_length:
-				new_content = current_content[last_content_length:]
-				yield new_content
+				yield current_content[last_content_length:]
 				last_content_length = len(current_content)
 			sleep(0.1)
 		# 返回剩余内容

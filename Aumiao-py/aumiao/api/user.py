@@ -276,6 +276,7 @@ class UserDataFetcher:
 			"offset": 0,
 			"limit": 30,
 			"status": status,
+			"published": published
 		}
 		# published 是可选参数
 		if published is not None:

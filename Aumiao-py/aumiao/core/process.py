@@ -677,7 +677,7 @@ class CommentProcessor:
 	def process_item(
 		self,
 		item: dict[str, Any],
-		config: ...,
+		config: Any,
 		action_type: Literal["duplicates", "ads", "blacklist"],
 		params: dict[Literal["ads", "blacklist", "duplicates"], Any],
 		target_lists: defaultdict[str, list[str]],
@@ -1465,14 +1465,14 @@ class ReportProcessor:
 		super().__init__()
 
 	@property
-	def violation_checker(self) -> ...:
+	def violation_checker(self) -> Any:
 		"""获取违规检查器 (懒加载)"""
 		if self._violation_checker is None:
 			self._violation_checker = ViolationChecker()
 		return self._violation_checker
 
 	@violation_checker.setter
-	def violation_checker(self, value: ...) -> None:
+	def violation_checker(self, value: Any) -> None:
 		self._violation_checker = value
 
 	@property
