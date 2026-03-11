@@ -21,7 +21,7 @@
     "dotenv": "^16.6.1",
     "inquirer": "^9.3.8",
     "inquirer-table-input": "^0.0.4",
-    "sequelize": "^6.37.7",
+    "sequelize": "^6.37.8",
     "lodash": "^4.17.23"
   },
   "devDependencies": {
