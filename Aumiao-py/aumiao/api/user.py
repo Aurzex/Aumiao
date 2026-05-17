@@ -272,12 +272,7 @@ class UserDataFetcher:
 
 	def fetch_coco_works_gen(self, status: int = 1, *, published: bool | None = True, limit: int | None = 30) -> Generator[dict]:
 		"""获取用户 Coco 作品生成器"""
-		params = {
-			"offset": 0,
-			"limit": 30,
-			"status": status,
-			"published": published
-		}
+		params = {"offset": 0, "limit": 30, "status": status, "published": published}
 		# published 是可选参数
 		if published is not None:
 			params["published"] = published

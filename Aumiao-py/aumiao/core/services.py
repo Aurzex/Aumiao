@@ -315,11 +315,7 @@ class CommunityService:
 		for item in config.get_items():
 			self.comment_processor.process_item(item, config, action_type, params, target_lists, source)
 		label_map = {"ads": "广告评论", "blacklist": "黑名单评论", "duplicates": "刷屏评论"}
-		result = self._execute_comment_deletion(
-			target_list=target_lists[action_type],
-			delete_handler=config.delete,
-			label=label_map[action_type]
-		)
+		result = self._execute_comment_deletion(target_list=target_lists[action_type], delete_handler=config.delete, label=label_map[action_type])
 		return {
 			"success": result["success"],
 			"action_type": action_type,
