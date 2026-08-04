@@ -1,5 +1,6 @@
 from collections.abc import Callable, Generator
 from functools import lru_cache, wraps
+from typing import Any
 
 
 def singleton(cls):  # noqa: ANN001, ANN201
@@ -44,14 +45,14 @@ def generator(chunk_size: int = 1000) -> Callable:
 
 
 def lru_cache_with_reset(maxsize: int = 128, max_calls: int = 3, *, typed: bool = False) -> Callable:
-	def decorator(func: Callable) -> ...:
+	def decorator(func: Callable) -> Any:
 		# 使用 lru_cache 缓存结果
 		cached_func = lru_cache(maxsize=maxsize, typed=typed)(func)
 		# 使用字典记录调用次数,键为参数元组
 		call_counts = {}
 
 		@wraps(func)
-		def wrapper(*args: ..., **kwargs: ...) -> ...:
+		def wrapper(*args: Any, **kwargs: Any) -> Any:
 			# 生成缓存键
 			# 注意:functools.lru_cache 内部使用的方式更复杂
 			# 我们简化处理,只基于 args 和排序后的 kwargs

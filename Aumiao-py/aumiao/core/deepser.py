@@ -9,7 +9,7 @@ from urllib.parse import quote
 from websocket import WebSocketApp
 
 
-# ==================== 配置管理 ====================
+# 配置管理
 class CodeMaoConfig:
 	"""配置管理类"""
 
@@ -50,7 +50,7 @@ class CodeMaoConfig:
 		return f"{cls.WS_BASE_URL}?{query_string}"
 
 
-# ==================== 事件处理器 ====================
+# 事件处理器
 class EventHandler:
 	"""事件处理器基类"""
 
@@ -86,7 +86,7 @@ class EventHandler:
 			print(message)
 
 
-# ==================== WebSocket 连接管理 ====================
+# WebSocket 连接管理
 class WebSocketManager:
 	"""WebSocket 连接管理器"""
 
@@ -180,7 +180,7 @@ class WebSocketManager:
 		self.connected = False
 
 
-# ==================== AI 聊天核心实现 ====================
+# AI 聊天核心实现
 class CodeMaoAICore(EventHandler):
 	"""CodeMao AI 聊天核心实现"""
 
@@ -349,7 +349,7 @@ class CodeMaoAICore(EventHandler):
 		self.ws_manager.close()
 
 
-# ==================== 高级接口类 ====================
+# 高级接口类
 class CodeMaoAIChat:
 	"""CodeMao AI 聊天客户端 - 高级接口"""
 
@@ -403,7 +403,7 @@ class CodeMaoAIChat:
 		self._core.close()
 
 
-# ==================== 工具类 ====================
+# 工具类
 class CodeMaoTool:
 	"""工具类 - 提供便捷的聊天方法"""
 
@@ -500,7 +500,7 @@ class CodeMaoTool:
 			client.close()
 
 
-# ==================== 多 token 管理 ====================
+# 多 token 管理
 class CodeMaoAIClient:
 	"""CodeMao AI 聊天客户端 - 多 token 管理版本"""
 
@@ -613,8 +613,7 @@ class CodeMaoAIClient:
 		while not response_complete.is_set() and (time() - start_time) < timeout:
 			current_content = "".join(full_response)
 			if len(current_content) > last_content_length:
-				new_content = current_content[last_content_length:]
-				yield new_content
+				yield current_content[last_content_length:]
 				last_content_length = len(current_content)
 			sleep(0.1)
 		# 返回剩余内容

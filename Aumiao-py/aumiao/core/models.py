@@ -10,9 +10,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 ModuleType = TypeVar("ModuleType")
 
-# ==============================
 # 基本类型定义
-# ==============================
 SourceType = Literal["shop", "forum", "work"]
 
 
@@ -27,15 +25,11 @@ class ReportRecord(TypedDict):
 	action: str | None
 
 
-# ==============================
 # 命名元组定义
-# ==============================
 BatchGroup = namedtuple("BatchGroup", ["group_type", "group_key", "record_ids"])  # noqa: PYI024
 
 
-# ==============================
 # 数据类定义 (dataclass)
-# ==============================
 @dataclass
 class WorkParsingRequest:
 	"""作品解析请求"""
@@ -246,16 +240,12 @@ class SourceConfig:
 			self.available_actions = []
 
 
-# ==============================
 # 异常类定义
-# ==============================
 class ProcessingError(Exception):
 	"""处理过程中的异常"""
 
 
-# ==============================
 # 枚举类型定义
-# ==============================
 class EditorType(Enum):
 	"""编辑器类型枚举"""
 
@@ -572,9 +562,7 @@ class BlockType(Enum):
 	SHADOW_TEXT = "shadow_text"
 
 
-# ==============================
 # 常量定义
-# ==============================
 # 数据大小限制
 MAX_SIZE_BYTES: int = 15 * 1024 * 1024  # 15MB
 REPORT_BATCH_THRESHOLD: int = 15
@@ -589,9 +577,7 @@ VALID_REPLY_TYPES: set[str] = {
 	"POST_REPLY_REPLY",
 }
 
-# ==============================
 # 配置字典常量
-# ==============================
 # 块配置映射 - 更详细的配置
 BLOCK_CONFIG: dict[BlockType, dict[str, Any]] = {
 	# 事件类配置
@@ -817,9 +803,7 @@ COLOR_CONFIG: dict[BlockCategory, str] = {
 }
 
 
-# ==============================
 # 暂时无用
-# ==============================
 class FieldType(Enum):
 	"""字段类型枚举"""
 

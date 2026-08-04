@@ -8,7 +8,8 @@ from time import sleep
 from types import TracebackType
 from typing import Any, Literal, Self, TypedDict
 
-from httpx import Client, ConnectError, HTTPStatusError, Response, TimeoutException
+from requests import ConnectionError as ConnectionErrors
+from requests import HTTPError, Response, Session, Timeout
 
 from aumiao.utils import tool
 from aumiao.utils.data import CodeMaoFile, SettingManager
@@ -17,7 +18,7 @@ from aumiao.utils.decorator import singleton
 setting_manager = SettingManager()
 
 
-# ==================== 配置类 ====================
+# 配置类
 @dataclass
 class ClientConfig:
 	"""客户端配置 - 重构版本"""
@@ -65,12 +66,12 @@ class PaginationConfig(TypedDict, total=False):
 	response_offset_key: str
 
 
-# ==================== 类型定义 ====================
+# 类型定义
 HttpMethod = Literal["GET", "POST", "DELETE", "PATCH", "PUT", "HEAD"]
 FetchMethod = Literal["GET", "POST"]
 
 
-# ==================== 接口定义 ====================
+# 接口定义
 class IHTTPClient(ABC):
 	"""HTTP 客户端接口"""
 
@@ -126,7 +127,7 @@ class IFileUploader(ABC):
 		"""上传文件"""
 
 
-# ==================== 身份管理器 ====================
+# 身份管理器
 @dataclass
 class Token:
 	"""Token 管理"""
@@ -209,7 +210,7 @@ class IdentityManager:
 		return self._current_identity
 
 
-# ==================== 基础实现 ====================
+# 基础实现
 class BaseHTTPClient:
 	"""基础 HTTP 客户端 - 优化版"""
 
@@ -219,7 +220,8 @@ class BaseHTTPClient:
 	def __init__(self, config: ClientConfig) -> None:
 		self.config = config
 		self.headers = setting_manager.data.PROGRAM.HEADERS.copy()
-		self._http_client = Client(headers=self.headers, timeout=config.timeout)
+		self._http_client = Session()
+		self._http_client.headers.update(self.headers)
 		self._data_processor = tool.DataProcessor()
 		self.log_file = Path.cwd() / "logs" / f"requests_{tool.TimeUtils().current_timestamp()}.txt"
 		self._pagination_config: PaginationConfig = {
@@ -255,19 +257,10 @@ class BaseHTTPClient:
 		retries = retries or self.config.max_retries
 		timeout = timeout or self.config.timeout
 		log_enabled = bool(self.config.log_requests and log)
+
 		for attempt in range(retries):
 			try:
 				request_headers = self._prepare_headers(headers, files)
-				# sleep(0.5)
-				# print("&" * 50)
-				# print("Headers:", request_headers)
-				# print("URL:", url)
-				# print("Method:", method)
-				# print("Params:", params)
-				# print("Data:", data)
-				# print("Payload:", payload)
-				# print("Files:", files)
-				# print("&" * 50)
 				response = self._execute_request(
 					method=method,
 					url=url,
@@ -281,11 +274,11 @@ class BaseHTTPClient:
 				if log_enabled:
 					self._log_request(response)
 				response.raise_for_status()
-			except HTTPStatusError as e:
+			except HTTPError as e:
 				if attempt == retries - 1:
 					return e.response
 				self._handle_retry(e, attempt)
-			except (ConnectError, TimeoutException) as e:
+			except (ConnectionErrors, Timeout) as e:
 				if attempt == retries - 1:
 					raise
 				self._handle_retry(e, attempt)
@@ -295,7 +288,12 @@ class BaseHTTPClient:
 			else:
 				return response
 			sleep(self.config.retry_delay * (2**attempt * backoff_factor))
-		return Response(500)
+
+		# 创建一个模拟的错误响应
+		error_response = Response()
+		error_response.status_code = 500
+		error_response._content = b'{"error": "Request failed"}'  # noqa: SLF001
+		return error_response
 
 	def _prepare_headers(self, headers: dict[str, str] | None, files: dict[str, Any] | None) -> dict[str, str]:
 		"""准备请求头 - 修复版本"""
@@ -325,10 +323,12 @@ class BaseHTTPClient:
 	) -> Response:
 		"""执行 HTTP 请求"""
 		request_args: dict[str, Any] = {"method": method.upper(), "url": url, "params": params, "headers": headers, "timeout": timeout}
+
 		if files:
 			request_args.update({"data": data, "files": files})
-		else:
+		elif payload is not None:
 			request_args["json"] = payload
+
 		return self._http_client.request(**request_args)
 
 	@staticmethod
@@ -608,14 +608,7 @@ class BaseHTTPClient:
 
 	def _log_request(self, response: Response) -> None:
 		"""记录请求日志"""
-		log_entry = (
-			f"[{tool.TimeUtils().format_timestamp()}]\n"
-			f"Method: {response.request.method}\n"
-			f"URL: {response.url}\n"
-			f"Status: {response.status_code}\n"
-			f"Response: {response.text}\n"
-			f"{'=' * 50}\n\n"
-		)
+		log_entry = f"[{tool.TimeUtils().format_timestamp()}]\nURL: {response.url}\nStatus: {response.status_code}\nResponse: {response.text}\n{'=' * 50}\n\n"
 		CodeMaoFile().file_write(path=self.log_file, content=log_entry, method="a")
 
 	def close(self) -> None:
@@ -629,7 +622,7 @@ class BaseHTTPClient:
 		self.close()
 
 
-# ==================== 具体实现 ====================
+# 具体实现
 @singleton
 class CodeMaoClient(BaseHTTPClient):
 	"""编程猫 HTTP 客户端 - 修复版本"""
@@ -668,7 +661,7 @@ class CodeMaoClient(BaseHTTPClient):
 			auth_header = identity_headers["Authorization"]
 			if not auth_header.startswith("Bearer "):
 				auth_header = f"Bearer {auth_header}"
-			# 强制更新到 httpx 客户端
+			# 强制更新到 requests 客户端
 			self._http_client.headers["Authorization"] = auth_header
 			# 同时更新实例的 headers 属性
 			if hasattr(self, "headers"):
@@ -690,7 +683,7 @@ class FileUploader(IFileUploader):
 			"codemao": self._upload_codemao,
 		}
 		# 为文件上传创建独立 session 避免影响主会话
-		self._upload_session = Client()
+		self._upload_session = Session()
 
 	@staticmethod
 	def generate_id(length: int = 20) -> str:
@@ -814,7 +807,7 @@ class FileUploader(IFileUploader):
 		self._upload_session.close()
 
 
-# ==================== 工厂类 ====================
+# 工厂类
 class ClientFactory:
 	"""客户端工厂"""
 

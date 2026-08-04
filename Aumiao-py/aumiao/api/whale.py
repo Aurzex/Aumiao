@@ -24,7 +24,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="/reports/works/search", params=params, limit=limit, base_url_key="whale")
 
 	def fetch_work_reports_total(
 		self,
@@ -36,7 +36,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works/search", params=params)
+		return self._client.get_pagination_total(endpoint="/reports/works/search", params=params, base_url_key="whale")
 
 	def fetch_work_reports_total_extra(
 		self,
@@ -48,7 +48,7 @@ class ReportFetcher:
 		params = {"type": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/works", params=params)
+		return self._client.get_pagination_total(endpoint="/reports/works", params=params, base_url_key="whale")
 
 	def fetch_comment_reports_gen(
 		self,
@@ -61,7 +61,7 @@ class ReportFetcher:
 		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="/reports/comments/search", params=params, limit=limit, base_url_key="whale")
 
 	def fetch_comment_reports_total(
 		self,
@@ -73,7 +73,7 @@ class ReportFetcher:
 		params = {"source": source_type, "status": status, "offset": 0, "limit": 15}
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/comments/search", params=params)
+		return self._client.get_pagination_total(endpoint="/reports/comments/search", params=params, base_url_key="whale")
 
 	def fetch_post_reports_gen(
 		self,
@@ -88,7 +88,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/posts", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="/reports/posts", params=params, limit=limit, base_url_key="whale")
 
 	def fetch_post_reports_total(
 		self,
@@ -102,7 +102,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/posts", params=params)
+		return self._client.get_pagination_total(endpoint="/reports/posts", params=params, base_url_key="whale")
 
 	def fetch_discussion_reports_gen(
 		self,
@@ -117,7 +117,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.fetch_paginated_data(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params, limit=limit)
+		return self._client.fetch_paginated_data(endpoint="/reports/posts/discussions", params=params, limit=limit, base_url_key="whale")
 
 	def fetch_discussion_reports_total(
 		self,
@@ -131,7 +131,7 @@ class ReportFetcher:
 			params["board_id"] = board_id
 		if filter_type is not None and target_id is not None:
 			params[filter_type] = target_id
-		return self._client.get_pagination_total(endpoint="https://api-whale.codemao.cn/reports/posts/discussions", params=params)
+		return self._client.get_pagination_total(endpoint="/reports/posts/discussions", params=params, base_url_key="whale")
 
 
 @singleton
@@ -141,33 +141,37 @@ class ReportHandler:
 
 	def execute_process_post_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/reports/posts/{report_id}",
+			endpoint=f"/reports/posts/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_discussion_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/reports/posts/discussions/{report_id}",
+			endpoint=f"/reports/posts/discussions/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_comment_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "MUTE_SEVEN_DAYS", "MUTE_THREE_MONTHS", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/reports/comments/{report_id}",
+			endpoint=f"/reports/comments/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def execute_process_work_report(self, report_id: int, admin_id: int, resolution: Literal["PASS", "DELETE", "UNLOAD", "TOBEDONE"]) -> bool:
 		response = self._client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/reports/works/{report_id}",
+			endpoint=f"/reports/works/{report_id}",
 			method="PATCH",
 			payload={"admin_id": admin_id, "status": resolution},
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 

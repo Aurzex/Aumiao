@@ -11,12 +11,11 @@ _is_compiling: bool = hasattr(sys, "_nuitka_compiled") or hasattr(sys, "frozen")
 
 # 类型检查支持
 if TYPE_CHECKING or _is_compiling:
-	from . import auth, coco, codegame, community, edu, forum, library, pickduck, shop, user, whale, work
+	from . import auth, codegame, community, edu, forum, library, pickduck, shop, user, whale, work
 
 # 模块路径映射
 _MODULE_PATHS: Final[dict[str, str]] = {
 	"auth": ".api.auth",
-	"coco": ".api.coco",
 	"codegame": ".api.codegame",
 	"community": ".api.community",
 	"edu": ".api.edu",
@@ -30,7 +29,7 @@ _MODULE_PATHS: Final[dict[str, str]] = {
 }
 
 # 固定的导出列表
-__all__: Final[tuple[str, ...]] = ("__version__", "auth", "coco", "codegame", "community", "edu", "forum", "library", "pickduck", "shop", "user", "whale", "work")
+__all__: Final[tuple[str, ...]] = ("__version__", "auth", "codegame", "community", "edu", "forum", "library", "pickduck", "shop", "user", "whale", "work")
 
 # 模块缓存
 _LOADED_MODULES: dict[str, ModuleType] = {}
@@ -63,4 +62,4 @@ def __dir__() -> list[str]:
 # 编译时确保所有模块都被引用
 if _is_compiling:
 	# 这些引用确保编译时包含所有模块
-	_ = auth, coco, codegame, community, edu, forum, library, pickduck, shop, user, whale, work
+	_ = auth, codegame, community, edu, forum, library, pickduck, shop, user, whale, work

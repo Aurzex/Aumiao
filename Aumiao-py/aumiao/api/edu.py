@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from typing import Literal
 
-from httpx import Response
+from requests.models import Response
 
 from aumiao.utils import acquire, tool
 from aumiao.utils.acquire import HTTPStatus
@@ -350,7 +350,7 @@ class DataFetcher:
 		)
 		return response.json()
 
-	def fetch_banners(self, type_id: Literal[101, 106] = 101) -> dict:
+	def fetch_edu_banners(self, type_id: Literal[101, 106] = 101) -> dict:
 		timestamp = self.tool.TimeUtils().current_timestamp(13)
 		params = {"TIME": timestamp, "type_id": type_id}
 		response = self._client.send_request(

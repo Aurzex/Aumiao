@@ -10,7 +10,7 @@ from aumiao.utils import acquire, data, tool
 from aumiao.utils.decorator import singleton
 
 
-# ==================== 基础数据结构和枚举 ====================
+# 基础数据结构和枚举
 class LoginMethod(Enum):
 	"""登录方法枚举"""
 
@@ -69,7 +69,7 @@ class LoginResult:
 	auth_details: dict[str, Any] | None = None
 
 
-# ==================== 辅助函数 ====================
+# 辅助函数
 def fetch_current_timestamp(client: acquire.CodeMaoClient) -> int:
 	"""获取当前服务器时间戳"""
 	response = client.send_request(endpoint="/coconut/clouddb/currentTime", method="GET")
@@ -96,7 +96,7 @@ def determine_admin_login_method(token: str | None, identity: str | None, passwo
 	raise ValueError(msg)
 
 
-# ==================== 认证处理器 ====================
+# 认证处理器
 class AuthProcessor:
 	"""认证处理器, 负责具体的认证逻辑"""
 
@@ -155,18 +155,20 @@ class AuthProcessor:
 		"""管理员用户认证"""
 		payload = {"username": username, "password": password, "key": key, "code": code}
 		response = self.client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/login",
+			endpoint="/admins/login",
 			method="POST",
 			payload=payload,
+			base_url_key="whale",
 		)
 		return response.json()
 
 	def fetch_admin_captcha(self, timestamp: int) -> Any:
 		"""获取管理员验证码"""
 		response = self.client.send_request(
-			endpoint=f"https://api-whale.codemao.cn/admins/captcha/{timestamp}",
+			endpoint=f"/admins/captcha/{timestamp}",
 			method="GET",
 			log=False,
+			base_url_key="whale",
 		)
 		if response.status_code == HTTPStatus.OK.value:
 			data.CodeMaoFile().file_write(
@@ -203,7 +205,7 @@ class AuthProcessor:
 		return self.get_login_security_info(identity, password, ticket, pid)
 
 
-# ==================== 登录处理器 ====================
+# 登录处理器
 class LoginHandler:
 	"""登录处理器, 负责执行具体的登录操作"""
 
@@ -275,7 +277,7 @@ class LoginHandler:
 				password_input = input("请输入密码:")
 
 
-# ==================== 主认证管理器 ====================
+# 主认证管理器
 @singleton
 class AuthManager:
 	"""
@@ -481,16 +483,18 @@ class AuthManager:
 	def admin_logout(self) -> bool:
 		"""管理员登出"""
 		response = self._client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/logout",
+			endpoint="/admins/logout",
 			method="DELETE",
+			base_url_key="whale",
 		)
 		return response.status_code == HTTPStatus.NO_CONTENT.value
 
 	def fetch_admin_dashboard_data(self) -> dict[str, Any]:
 		"""获取用户仪表板数据"""
 		response = self._client.send_request(
-			endpoint="https://api-whale.codemao.cn/admins/info",
+			endpoint="/admins/info",
 			method="GET",
+			base_url_key="whale",
 		)
 		return response.json()
 
@@ -514,7 +518,7 @@ class AuthManager:
 		return self._current_credentials
 
 
-# ==================== 云服务认证器 ====================
+# 云服务认证器
 class CloudAuthenticator:
 	"""云服务认证管理器"""
 

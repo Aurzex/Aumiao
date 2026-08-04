@@ -5,11 +5,10 @@
 [![Moe Counter](https://count.getloli.com/@aurzex?name=aurzex&theme=capoo-1&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)](https://count.getloli.com/)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Python 3.13+](https://img.shields.io/badge/Python-3.13+-green.svg)](https://www.python.org/downloads/)
+[![Python 3.14+](https://img.shields.io/badge/Python-3.14+-green.svg)](https://www.python.org/downloads/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
 [![PyPI Version](https://img.shields.io/pypi/v/aumiao.svg)](https://pypi.org/project/aumiao/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/aumiao.svg)](https://pypi.org/project/aumiao/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Aurzex/Aumiao)
 
 一个为编程猫社区开发的 API 收集项目和工具集合，旨在赋能脚本开发并提升社区管理效率。
 
@@ -243,7 +242,7 @@ A powerful API collection project and toolset for CodeMao community development,
 
 ### 环境要求 | Requirements
 
-- Python 3.13 或更高版本 | Python 3.13 or higher
+- Python 3.14 或更高版本 | Python 3.14 or higher
 
 ### 安装方式 | Installation Methods
 
